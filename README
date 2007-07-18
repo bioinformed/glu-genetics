@@ -1,0 +1,28 @@
+Welcome to GLU: The Genotype Library and Utilities.
+
+GLU provides tools for the management of large amounts of SNP genotype data
+and programs to check its quality and to test for association between SNP
+markers with continuous or discrete trait phenotypes.
+
+This will be an informative, witty, and insightful README file at some
+point.
+
+In the mean time, to install GLU, run:
+
+	python setup.py install
+
+To run GLU:
+
+	glu -h
+	glu <module>
+
+To get started:
+
+	glu intro
+
+Please contact me if you have any questions, suggestions, or want to
+contribute better documentation.
+
+-Kevin Jacobs
+BioInformed LLC
+jacobs@bioinformed.com

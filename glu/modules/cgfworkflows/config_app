@@ -1,0 +1,16 @@
+#----tab-delimited file
+# dirs for web-app only
+cgfdata_dir	/mnt/nfs/cgfimage/Projects/CGF
+TQVC_dir	/mnt/nfs/cgfimage/Projects/CGF/AnalysisHome
+
+#script_dir	/home/lujun/pre_atm/scripts
+#script_dir2	/home/lujun/pre_atm
+script_dir	/home/cgfatm/src/dev/scripts
+script_dir2	/home/cgfatm/src/dev
+
+
+comp_dir	/home/analysis/hapmap/r21a/fwd_strand
+comp_format	hapmap
+abmap_dir	/home/analysis/ab_map
+hapsamples	/home/analysis/hapmap/hapmap_samples.txt
+meta_dir	/home/analysis/meta_data

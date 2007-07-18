@@ -1,0 +1,1 @@
+from tagzilla import main

@@ -1,0 +1,37 @@
+#----tab-delimited file
+#parameters used for custom run
+data_dir	/mnt/nfs/cgfimage/Projects/CGF/GR-0570/Analysis/QC/QCData
+proj_name	GR-0570
+platform	taqman
+result_dir	/mnt/nfs/cgfimage/Public/lujun/samplerun
+
+preprocess	yes
+
+#for final report
+final_dir	/mnt/nfs/cgfimage/Public/lujun/samplerun/GP0009-UN1/final
+report_assayid	dbsnp
+
+#for dupcheck
+Ident_threshold	80
+Ident_mincount	5
+Ident_with_expdup	yes
+Ident_dupcheck_lite	no
+
+Geno_threshold	90
+Geno_mincount	2
+Geno_with_expdup	yes
+Geno_expdup_type	ident_dups
+Geno_dupcheck_lite	yes
+
+#script_dir	/home/cgfatm/src/test/scripts
+#script_dir2	/home/cgfatm/src/test
+script_dir	/home/cgfatm/src/dev/scripts
+script_dir2	/home/cgfatm/src/dev
+##script_dir	/home/lujun/pre_atm/scripts
+##script_dir2	/home/lujun/pre_atm
+
+comp_dir	/home/analysis/hapmap/r21a/fwd_strand
+comp_format	hapmap
+abmap_dir	/home/analysis/ab_map
+hapsamples	/home/analysis/hapmap/hapmap_samples.txt
+meta_dir	/home/analysis/meta_data
