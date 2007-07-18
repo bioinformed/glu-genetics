@@ -1,0 +1,186 @@
+all: snp_dim.csv snpmap.csv \
+     snp_assay.csv assaymap.csv \
+     snp_analysis_finding_fact.csv \
+     study_participant.csv \
+     specimen.csv \
+     stdpt_analysis_grp_asso.csv \
+     genotype_fact.csv.gz \
+     scan1a_snpstats_control.csv.gz \
+     scan1a_snpstats_agg.csv.gz \
+     scan1a_snpstats_nonagg.csv.gz \
+     scan1a_snpstats_ceph.csv.gz \
+     scan1a_snpstats_case.csv.gz \
+     snp_frequency_fact.csv
+
+snp_dim.csv snpmap.csv: /home/dengx/cgems/projects/CGEMS/cabig/snpdim.py \
+                        /home/wangzha/public/caBIG/HumanHap300_v1.1.csv \
+                        /home/wangzha/public/caBIG/HumanHap240S.csv \
+                        /home/wangzha/public/caBIG/BDCHP-1X10-HumanHap550_11218540_C.csv \
+                        /home/wangzha/public/caBIG/Mapping250K_Sty_annot.csv \
+                        /home/wangzha/public/caBIG/Mapping250K_Nsp_annot.csv
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpdim.py \
+	ilm /home/wangzha/public/caBIG/HumanHap300_v1.1.csv \
+	ilm /home/wangzha/public/caBIG/HumanHap240S.csv \
+	ilm /home/wangzha/public/caBIG/BDCHP-1X10-HumanHap550_11218540_C.csv \
+	aff /home/wangzha/public/caBIG/Mapping250K_Sty_annot.csv \
+	aff /home/wangzha/public/caBIG/Mapping250K_Nsp_annot.csv \
+	-c 1 \
+	-m snpmap.csv \
+	-o snp_dim.csv
+
+snp_assay.csv assaymap.csv: /home/dengx/cgems/projects/CGEMS/cabig/snpassay.py \
+                            /home/wangzha/public/caBIG/HumanHap300_v1.1.csv \
+                            /home/wangzha/public/caBIG/HumanHap240S.csv \
+                            /home/wangzha/public/caBIG/Mapping250K_Sty_annot.csv \
+                            /home/wangzha/public/caBIG/Mapping250K_Nsp_annot.csv \
+                            snpmap.csv
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpassay.py \
+	ilm /home/wangzha/public/caBIG/HumanHap300_v1.1.csv \
+	ilm /home/wangzha/public/caBIG/HumanHap240S.csv \
+	ilm /home/wangzha/public/caBIG/BDCHP-1X10-HumanHap550_11218540_C.csv \
+	aff /home/wangzha/public/caBIG/Mapping250K_Sty_annot.csv \
+	aff /home/wangzha/public/caBIG/Mapping250K_Nsp_annot.csv \
+	-c 1 \
+	-m snpmap.csv:key=2:value=1:dialect='csv' \
+	-M assaymap.csv \
+	-o snp_assay.csv
+
+snp_analysis_finding_fact.csv: /home/dengx/cgems/projects/CGEMS/cabig/snpanafindfact.py \
+                               /home/wangzha/public/caBIG/scan1_id_ev.out \
+                               /home/wangzha/public/caBIG/scan1_filtered.out \
+                               snp_map.csv
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpanafindfact.py \
+	-c 1206685 \
+	-i /home/wangzha/public/caBIG/scan1_id_ev.out \
+	-I /home/wangzha/public/caBIG/scan1_filtered.out \
+	-m snp_map.csv:dialect='csv' \
+	-o snp_analysis_finding_fact.csv
+
+study_participant.csv: /home/dengx/cgems/projects/CGEMS/cabig/studyparticipant.py \
+                       /home/wangzha/public/caBIG/sample.def \
+                       /home/wangzha/public/caBIG/hapmap_ceph_id.out
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/studyparticipant.py \
+	-c 1 \
+	-s /home/wangzha/public/caBIG/sample.def \
+	-i /home/wangzha/public/caBIG/hapmap_ceph_id.out \
+	-o study_participant.csv
+
+specimen.csv: /home/dengx/cgems/projects/CGEMS/cabig/specimen.py \
+              /home/wangzha/public/caBIG/sample.def \
+              study_participant.csv
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/specimen.py \
+	-s /home/wangzha/public/caBIG/sample.def \
+	-i study_participant.csv:skip=1:dialect='csv' \
+	-o specimen.csv
+
+stdpt_analysis_grp_asso.csv: /home/dengx/cgems/projects/CGEMS/cabig/stdptanagrpasso.py \
+                             /home/wangzha/public/caBIG/phenos_fasttrack.csv \
+                             /home/wangzha/public/caBIG/participantid.map
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/stdptanagrpasso.py \
+	-p /home/wangzha/public/caBIG/phenos_fasttrack.csv \
+	-m /home/wangzha/public/caBIG/participantid.map \
+	-o stdpt_analysis_grp_asso.csv
+
+genotype_fact.csv.gz: /home/dengx/cgems/projects/CGEMS/cabig/genotypefact.py \
+                      /home/jacobske/projects/CGEMS/Scans/Prostate/1/raw/scan1_sample.trips \
+                      /home/wangzha/public/caBIG/sample.def \
+                      /home/wangzha/public/sample.map \
+                      /home/wangzha/public/scan1_merged.loci \
+                      snp_map.csv \
+                      specimen.csv
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/genotypefact.py \
+	/home/jacobske/projects/CGEMS/Scans/Prostate/1/raw/scan1_sample.trips \
+	-s /home/wangzha/public/sample.def:key=1:value=12:skip=1 \
+	-q /home/wangzha/public/scan1_merged.loci \
+	-p specimen.csv:skip=1:index=1:dialect='csv' \
+	-r snp_map.csv:dialect='csv' \
+	-o genotype_fact.csv.gz
+
+scan1a_snpstats_control.csv.gz: /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+                       /home/jacobske/projects/CGEMS/Scans/Prostate/1/results/merge/scan1_STUDY_CONTROL.merged.ldat.gz\
+                       /home/wangzha/public/scan1_autosome_loci\
+                       /home/wangzha/public/illchip317and240\
+                       /home/wangzha/public/chip1_snps.csv \
+                       /home/wangzha/public/scan1a_cabig.individuals
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+	/home/jacobske/projects/CGEMS/Scans/Prostate/1/results/merge/scan1_STUDY_CONTROL.merged.ldat.gz\
+	-a /home/wangzha/public/illchip317and240\
+	-A /home/wangzha/public/scan1_autosome_loci\
+	-s /home/wangzha/public/chip1_snps.csv \
+	-S /home/wangzha/public/scan1a_cabig.individuals \
+	-o scan1a_snpstats_control.csv.gz
+
+scan1a_snpstats_agg.csv.gz: /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+                       /home/wangzha/public/merge/scan1_STUDY_CASE_CaseAdvanced.merged.ldat.gz\
+                       /home/wangzha/public/scan1_autosome_loci\
+                       /home/wangzha/public/illchip317and240\
+                       /home/wangzha/public/chip1_snps.csv \
+                       /home/wangzha/public/scan1a_cabig.individuals
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+	/home/wangzha/public/merge/scan1_STUDY_CASE_CaseAdvanced.merged.ldat.gz \
+	-a /home/wangzha/public/illchip317and240 \
+	-A /home/wangzha/public/scan1_autosome_loci \
+	-s /home/wangzha/public/chip1_snps.csv \
+	-S /home/wangzha/public/scan1a_cabig.individuals \
+	-o scan1a_snpstats_agg.csv.gz
+
+scan1a_snpstats_nonagg.csv.gz: /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+                       /home/wangzha/public/scan1_STUDY_CASE_CaseEarly.merged.ldat.gz\
+                       /home/wangzha/public/scan1_autosome_loci\
+                       /home/wangzha/public/illchip317and240\
+                       /home/wangzha/public/chip1_snps.csv \
+                       /home/wangzha/public/scan1a_cabig.individuals
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+	/home/wangzha/public/scan1_STUDY_CASE_CaseEarly.merged.ldat.gz\
+	-a /home/wangzha/public/illchip317and240\
+	-A /home/wangzha/public/scan1_autosome_loci\
+	-s /home/wangzha/public/chip1_snps.csv \
+	-S /home/wangzha/public/scan1a_cabig.individuals \
+	-o scan1a_snpstats_nonagg.csv.gz
+
+scan1a_snpstats_ceph.csv.gz: /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+                       /home/jacobske/projects/CGEMS/Scans/Prostate/1/results/merge/scan1_CEPH.merged.ldat.gz\
+                       /home/wangzha/public/scan1_autosome_loci\
+                       /home/wangzha/public/illchip317and240\
+                       /home/wangzha/public/chip1_snps.csv \
+                       /home/wangzha/public/scan1a_cabig.individuals
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+	/home/jacobske/projects/CGEMS/Scans/Prostate/1/results/merge/scan1_CEPH.merged.ldat.gz\
+	-a /home/wangzha/public/illchip317and240\
+	-A /home/wangzha/public/scan1_autosome_loci\
+	-s /home/wangzha/public/chip1_snps.csv \
+	-S /home/wangzha/public/scan1a_cabig.individuals \
+	-o scan1a_snpstats_ceph.csv.gz
+
+scan1a_snpstats_case.csv.gz: /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+                       /home/jacobske/projects/CGEMS/Scans/Prostate/1/results/merge/scan1_STUDY_CASE.merged.ldat.gz\
+                       /home/wangzha/public/scan1_autosome_loci\
+                       /home/wangzha/public/illchip317and240\
+                       /home/wangzha/public/chip1_snps.csv \
+                       /home/wangzha/public/scan1a_cabig.individuals
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpstats.py \
+	/home/jacobske/projects/CGEMS/Scans/Prostate/1/results/merge/scan1_STUDY_CASE.merged.ldat.gz\
+	-a /home/wangzha/public/illchip317and240\
+	-A /home/wangzha/public/scan1_autosome_loci\
+	-s /home/wangzha/public/chip1_snps.csv \
+	-S /home/wangzha/public/scan1a_cabig.individuals \
+	-o scan1a_snpstats_case.csv.gz
+
+snp_frequency_fact.csv: /home/dengx/cgems/projects/CGEMS/cabig/snpfreqfact.py \
+                        scan1a_snpstats.csv.gz \
+                        snpmap.csv\
+                        scan1a_snpstats_control.csv.gz \
+                        scan1a_snpstats_nonagg.csv.gz \
+                        scan1a_snpstats_agg.csv.gz \
+                        scan1a_snpstats_ceph.csv.gz \
+                        scan1a_snpstats_case.csv.gz
+	python -u /home/dengx/cgems/projects/CGEMS/cabig/snpfreqfact.py \
+	-c 10000 \
+	-s snpmap.csv:skip=1:dialect='csv' \
+	-o snp_frequency_fact.csv.gz \
+	-p 1 scan1a_snpstats_control.csv.gz \
+	-p 2 scan1a_snpstats_nonagg.csv.gz \
+	-p 3 scan1a_snpstats_agg.csv.gz \
+	-p 4 scan1a_snpstats_ceph.csv.gz \
+	-p 5 scan1a_snpstats_case.csv.gz
+

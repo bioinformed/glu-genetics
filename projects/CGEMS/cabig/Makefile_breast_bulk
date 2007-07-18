@@ -1,0 +1,37 @@
+all: study_participant_bulk.csv snp_analysis_finding_fact_bulk.csv snp_frequency_fact_bulk.csv
+
+study_participant_bulk.csv: studyparticipant_breast_bulk.py \
+                            study_population.csv \
+                            study_participant.csv
+	python -u studyparticipant_breast_bulk.py \
+	-p study_population.csv:key=1:value=2:skip=1:dialect='csv' \
+	-i study_participant.csv \
+	-o study_participant_bulk.csv
+
+
+snp_analysis_finding_fact_bulk.csv:  associationfinding_breast_bulk.py \
+                            snp_dim.csv.noaffy \
+                            /home/wangzha/projects/caBIG/raw/gene_snp_map \
+                            snp_association_analysis.csv \
+                            snp_analysis_finding_fact.csv
+	python -u  associationfinding_breast_bulk.py \
+	-s snp_dim.csv.noaffy \
+	-g /home/wangzha/projects/caBIG/raw/gene_snp_map\
+	-a snp_association_analysis.csv:skip=1:dialect='csv'\
+	-i snp_analysis_finding_fact.csv \
+	-o snp_analysis_finding_fact_bulk.csv
+
+
+snp_frequency_fact_bulk.csv: snpfreqfact_breast_bulk.py \
+                             snp_dim.csv.noaffy \
+                             /home/wangzha/projects/caBIG/raw/gene_snp_map \
+                             study_population.csv \
+                             snp_frequency_fact.csv
+	python -u snpfreqfact_breast_bulk.py \
+	-s snp_dim.csv.noaffy \
+	-g /home/wangzha/projects/caBIG/raw/gene_snp_map \
+	-p study_population.csv:skip=1:key=1:value=2:dialect='csv' \
+	-i snp_frequency_fact.csv \
+	-o snp_frequency_fact_bulk.csv
+
+
