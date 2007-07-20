@@ -235,8 +235,6 @@ def main():
     print >> sys.stderr, 'Error: Output data format must be specified'
     return
 
-  print >> sys.stderr, 'OUTPUT: format=%s' % options.outformat
-
   user_abmap = {}
   if options.manifest:
     print >> sys.stderr, 'Processing Illumina manifest file...',
