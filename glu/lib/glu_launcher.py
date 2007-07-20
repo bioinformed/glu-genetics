@@ -93,8 +93,8 @@ def run_profile(options,progmain):
     raise GLUError, 'ERROR: Unknown profiling option provided "%s"' % options.profile
 
 
-def module_info(module,out=sys.stderr):
-  program   = 'GLU module: %s' % (getattr(module,'__program__',None) or sys.argv[0] or '?')
+def module_info(name,module,out=sys.stderr):
+  program   = 'GLU module: %s' % name
   version   = getattr(module,'__version__',   None)
   authors   = getattr(module,'__authors__',   [])
   copyright = getattr(module,'__copyright__', None)
@@ -166,7 +166,7 @@ def main():
 
   sys.argv = ['glu %s' % modulename] + module_options
 
-  module_info(module)
+  module_info(modulename,module)
 
   if glu_options.stats:
     cstart = time.clock()
