@@ -8,6 +8,11 @@
 import os
 import sys
 
+
+from ez_setup import use_setuptools
+use_setuptools()
+
+
 # minimum versions required
 min_python_version = (2,5)
 min_numpy_version  = '1.0.2'
@@ -17,8 +22,7 @@ if sys.version_info < min_python_version:
   sys.exit(1)
 
 import distutils
-from   setuptools     import setup, find_packages
-from   distutils.core import Extension
+from   setuptools     import setup, find_packages, Extension
 
 import numpy
 
