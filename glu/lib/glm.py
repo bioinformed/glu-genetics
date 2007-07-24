@@ -20,9 +20,10 @@ from math         import pi
 from itertools    import izip
 
 # Import Python numerical libraries (from http://scipy.org/)
-from numpy        import array, matrix, asmatrix, asarray, asarray_chkfinite, zeros, zeros_like, ones, \
-                         where, exp, log, vsplit, unique, bmat, inf, sum, dot, transpose, diag, diagonal
-from scipy.linalg import lapack, calc_lwork, eig, eigh, svd, LinAlgError
+from numpy        import array,matrix,asmatrix,asarray,asarray_chkfinite,asanyarray,zeros,zeros_like,ones,\
+                         where,exp,log,vsplit,unique,bmat,inf,sum,dot,transpose,diag,sqrt,conjugate
+from scipy        import linalg
+from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 
 from utils        import tally
 
@@ -195,11 +196,82 @@ def linear_least_squares(a, b, cond=None):
   return beta,ss,cov,resids,rank,s,vt
 
 
+def sqrtm(x):
+  '''
+  Compute the square root y of x such that y*y = x, where x is a general
+  positive semi-definite matrix and * is matrix multiplication. 
+
+  Algorithm by Nicholas J. Higham, 'A New sqrtm for Matlab' (1999),
+  Manchester Centre for Computational Mathematics Numerical Analysis
+  Reports.  http://www.maths.man.ac.uk/~nareports/narep336.ps.gz
+
+  Near-singular example:
+
+  >>> x = ([[ 1.,      0.5,     0.3333,  0.25  ],
+  ...       [ 0.5,     0.3333,  0.25,    0.2   ],
+  ...       [ 0.3333,  0.25,    0.2,     0.1667],
+  ...       [ 0.25,    0.2,     0.1667,  0.1429]])
+  >>> y = sqrtm(x)
+  >>> y
+  array([[ 0.91145927,  0.33907405,  0.19263836,  0.13100093],
+         [ 0.33907405,  0.35263109,  0.24780888,  0.18047398],
+         [ 0.19263836,  0.24780888,  0.24041034,  0.20900738],
+         [ 0.13100093,  0.18047398,  0.20900738,  0.22244957]])
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
+  True
+
+  Defective example:
+
+  >>> x = array([[4.,1.,1.],
+  ...            [2.,4.,1.],
+  ...            [0.,1.,4.]])
+  >>> y = sqrtm(x)
+  >>> y
+  array([[ 1.97119712,  0.23914631,  0.23914631],
+         [ 0.51131184,  1.95468751,  0.2226367 ],
+         [-0.03301922,  0.25565592,  1.98770673]])
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
+  True
+  '''
+  A = x
+  A = asanyarray(A)
+  if len(A.shape)!=2:
+    raise ValueError, "Non-matrix input to matrix function."
+
+  # Refactor into complex Schur form
+  T,Z = linalg.schur(A)
+  T,Z = linalg.rsf2csf(T,Z)
+  n,n = T.shape
+
+  # Compute upper triangular square root R of T a column at a tim
+  R = diag(sqrt(diag(T)))
+  for j in range(n):
+    for i in range(j-1,-1,-1):
+      k = slice(i+1,j)
+      R[i,j] = (T[i,j] - dot(R[i,k],R[k,j]))/(R[i,i] + R[j,j])
+
+  X = dot(dot(Z,R),conjugate(transpose(Z))).astype(A.dtype.char)
+
+  # XXX: Should be a warning
+  if 0:
+    nzeig = (diag(T)==0).any()
+    if nzeig:
+      print 'Matrix is singular and may not have a square root.'
+
+  return X
+
+
 def sqrtm_svd(x):
   '''
   Compute the square root y of x such that y*y = x, where x is a general
   positive semi-definite matrix and * is standard matrix multiplication.
   Computation is performed by singular value decomposition.
+
+  Will not work for defective inputs (and no error is generated)!
+
+  Near-singular example:
 
   >>> x = ([[ 1.,      0.5,     0.3333,  0.25  ],
   ...       [ 0.5,     0.3333,  0.25,    0.2   ],
@@ -211,9 +283,23 @@ def sqrtm_svd(x):
          [ 0.33907405,  0.35263109,  0.24780888,  0.18047398],
          [ 0.19263836,  0.24780888,  0.24041034,  0.20900738],
          [ 0.13100093,  0.18047398,  0.20900738,  0.22244957]])
-  >>> error = ((dot(y,y)-x)**2).sum()
-  >>> error < 1e-24
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
   True
+
+  Defective example:
+
+  >>> x = array([[4.,1.,1.],
+  ...            [2.,4.,1.],
+  ...            [0.,1.,4.]])
+  >>> y = sqrtm_svd(x)
+  >>> y
+  array([[ 1.94181569,  0.11454081,  0.37488366],
+         [ 0.63982574,  1.94044655,  0.2169288 ],
+         [-0.16206229,  0.28998723,  1.97233742]])
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
+  False
   '''
   u,s,vt = svd(x)
   return dot(u,transpose((s**0.5)*transpose(vt)))
@@ -225,6 +311,10 @@ def sqrtm_eig(x):
   positive semi-definite matrix and * is standard matrix multiplication.
   Computation is performed by eigenvalue decomposition.
 
+  Will not work for defective inputs (and no error is generated)!
+
+  Near-singular example:
+
   >>> x = ([[ 1.,      0.5,     0.3333,  0.25  ],
   ...       [ 0.5,     0.3333,  0.25,    0.2   ],
   ...       [ 0.3333,  0.25,    0.2,     0.1667],
@@ -235,13 +325,27 @@ def sqrtm_eig(x):
          [ 0.33907405,  0.35263109,  0.24780888,  0.18047398],
          [ 0.19263836,  0.24780888,  0.24041034,  0.20900738],
          [ 0.13100093,  0.18047398,  0.20900738,  0.22244957]])
-  >>> error = ((dot(y,y)-x)**2).sum()
-  >>> error < 1e-24
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
+  True
+
+  Defective example:
+
+  >>> x = array([[4.,1.,1.],
+  ...            [2.,4.,1.],
+  ...            [0.,1.,4.]])
+  >>> y = sqrtm_eig(x)
+  >>> y
+  array([[ 0.76018647,  1.01358196,  0.50679098],
+         [ 1.01358196,  3.08349342, -1.0563295 ],
+         [ 0.50679098, -1.0563295 ,  2.06991146]])
+  >>> error = norm(x-dot(y,y))
+  >>> error > 1e-14
   True
   '''
   d,e = eig(x)
   d = (d**0.5).astype(float)
-  return dot(e,transpose(d*e))
+  return dot(e,transpose(d*e)).astype(float)
 
 
 def sqrtm_symmetric(x,cond=1e-7):
@@ -249,6 +353,8 @@ def sqrtm_symmetric(x,cond=1e-7):
   Compute the square root y of x such that y*y = x, where x is a symmetic
   positive semi-definite matrix and * is standard matrix multiplication.
   Computation is performed by symmetric eigenvalue decomposition.
+
+  Near-singular example:
 
   >>> x = ([[ 1.,      0.5,     0.3333,  0.25  ],
   ...       [ 0.5,     0.3333,  0.25,    0.2   ],
@@ -260,13 +366,173 @@ def sqrtm_symmetric(x,cond=1e-7):
          [ 0.33907405,  0.35263109,  0.24780888,  0.18047398],
          [ 0.19263836,  0.24780888,  0.24041034,  0.20900738],
          [ 0.13100093,  0.18047398,  0.20900738,  0.22244957]])
-  >>> error = ((dot(y,y)-x)**2).sum()
-  >>> error < 1e-24
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
   True
   '''
   d,e = eigh(x)
   d[d<cond] = 0
   return dot(e,transpose((d**0.5)*e)).astype(float)
+
+
+def sqrtm_symmetric2(x):
+  '''
+  Compute the square root y of x such that y*y = x, where x is a symmetic
+  positive semi-definite matrix and * is standard matrix multiplication.
+  Computation is performed by singular value decomposition of the lower
+  Cholesky factorization of x (algorithm by Golub and Van Loan).
+
+  Near-singular example:
+
+  >>> x = ([[ 1.,      0.5,     0.3333,  0.25  ],
+  ...       [ 0.5,     0.3333,  0.25,    0.2   ],
+  ...       [ 0.3333,  0.25,    0.2,     0.1667],
+  ...       [ 0.25,    0.2,     0.1667,  0.1429]])
+  >>> y = sqrtm_symmetric2(x)
+  >>> y
+  array([[ 0.91145927,  0.33907405,  0.19263836,  0.13100093],
+         [ 0.33907405,  0.35263109,  0.24780888,  0.18047398],
+         [ 0.19263836,  0.24780888,  0.24041034,  0.20900738],
+         [ 0.13100093,  0.18047398,  0.20900738,  0.22244957]])
+  >>> error = norm(x-dot(y,y))
+  >>> error < 1e-14
+  True
+  '''
+  l=cholesky(x,lower=1)
+  u,s,vt = svd(l)
+  return dot(u,transpose(s*u))
+
+
+def bdiag_to_mat(x):
+  n = len(x)
+  m = [ [None]*n for i in range(n) ]
+  for i in range(n):
+    for j in range(n):
+      m[i][j] = diag(x[i][j])
+  return bmat(m)
+
+
+def block_cholesky(w):
+  '''
+  Efficiently compute the lower Cholesky decomposition of a block matrix
+  composed entirely of diagonal matrices.  Input is given as a 2-dimensional
+  list of diagonal vectors.  As the results are also in the form of a block
+  matrix composed of diagonal vectors, output is also a 2-dimensional list
+  of diagonal vectors.
+
+  This is essentially the classical scalar Cholesky-Crout algorithm adapted
+  to exploit the block structure of the input and the diagonal nature of
+  each block element.
+
+  The traditional algorithm costs 2*n^3*m^3/3 FLOPS, where n is the number
+  of row/column blocks and m is the diagonal length of each block.  This
+  algorithm requires only 2n^3*m/3 FLOPS, a reduction over the usual
+  algorithm of a factor of m^2 for suitably structured inputs.
+
+  Example of a 2x2 block matrix of 2x2 diagonal matrices:
+
+  >>> w11 = array([16.,36.])
+  >>> w22 = array([64.,25.])
+  >>> w12 = array([-4.,-16.])
+  >>> w   = [[w11,w12],[w12,w22]]
+  >>> x   = bmat( [[diag(w11),diag(w12)],
+  ...              [diag(w12),diag(w22)]])
+  >>> x
+  matrix([[ 16.,   0.,  -4.,   0.],
+          [  0.,  36.,   0., -16.],
+          [ -4.,   0.,  64.,   0.],
+          [  0., -16.,   0.,  25.]])
+
+  Perform a lower Cholesky decomposition on the expanded form:
+
+  >>> l = matrix(cholesky(x.astype(float),lower=1))
+  >>> l
+  matrix([[ 4.        ,  0.        ,  0.        ,  0.        ],
+          [ 0.        ,  6.        ,  0.        ,  0.        ],
+          [-1.        ,  0.        ,  7.93725393,  0.        ],
+          [ 0.        , -2.66666667,  0.        ,  4.22952585]])
+
+  Verify x=l*l':
+
+  >>> norm(dot(l,transpose(l))-x) < 1e-14
+  True
+
+  Now do the same thing using our algorithm, still using the packed format:
+
+  >>> l2 = bdiag_to_mat(block_cholesky(w))
+  >>> l2
+  matrix([[ 4.        ,  0.        ,  0.        ,  0.        ],
+          [ 0.        ,  6.        ,  0.        ,  0.        ],
+          [-1.        ,  0.        ,  7.93725393,  0.        ],
+          [ 0.        , -2.66666667,  0.        ,  4.22952585]])
+
+  Verify the factorization matches the expanded version above and solves x=l*l':
+
+  >>> norm(l2-l) < 1e-14
+  True
+  >>> norm(dot(l2,transpose(l2))-x) < 1e-14
+  True
+
+  Derivation:
+
+  Let A be a symmetric block matrix with Aij as the i,j'th block of size
+  nxn.  Each Aij element is a vector of length m, representing the diagonal
+  of a mxm matrix.  For n=3,
+
+      |               |          |               |   |               |
+      | A11  A12  A13 |          | L11   0    0  |   | L11  L21  L31 |
+      |               |          |               |   |               |
+  A = | A21  A22  A23 | = L*L' = | L21  L22   0  | * |  0   L22  L32 |
+      |               |          |               |   |               |
+      | A31  A32  A33 |          | L31  L32  L33 |   |  0    0   L33 |
+      |               |          |               |   |               |
+
+      |                                                   |
+      | L11*L11      L11*L12              L11*L13         |
+      |                                                   |
+    = | L21*L11  L21*L21+L22*L22      L21*L31+L22*L32     |
+      |                                                   |
+      | L31*L11  L31*L12+L32*L22  L31+L31+L32*L32+L33*L33 |
+      |                                                   |
+
+  where + and * are defined as element-wise addition and multiplication over
+  vectors.
+
+  Elements of L can be defermined in a manner akin to the Cholesky-Crout
+  algorithm:
+
+  L11 = sqrt(A11)
+  L21 = A21/L11
+  L31 = A31/L11
+  L22 = sqrt(A22-L21*L21)
+  L32 = (A23-L31*L12)/L22
+  L33 = sqrt(A33-L31+L31+L32*L32)
+
+  This 3x3 case can be generalized to the nxn, where computation starts from
+  the upper left corner of the matrix A and proceeds to calculate the matrix
+  column by column by:
+
+                   i-1
+  Lii = sqrt(Aii - sum (Lik*Ljk))
+                   k=1
+
+             min(i,j)-1
+  Lij = (Aij - sum      (Lik*Ljk) ) )/Ljj
+               k=1
+  '''
+  n = len(w)
+  m = len(w[0][0])
+  c = [ [zeros(m)]*n for i in range(n) ]
+
+  for j in range(n):
+    for i in range(j,n):
+      s = w[i][j] - sum(c[i][k]*c[j][k] for k in range(min(i,j)))
+      if i==j:
+        c[i][j] = s**0.5
+      else:
+        c[i][j] = s/c[j][j]
+
+  return c
 
 
 def grand_mean(X):
@@ -816,16 +1082,16 @@ class LinearWaldTest(object):
 
 def test_glogit():
   '''
-  Example trichotomous outcome data taken from "Logistic Regression: A
-  Self-Learning Text", David G. Kleinbaum, Springer-Verlag Telos, ISBN
+  Example trichotomous outcome data taken from 'Logistic Regression: A
+  Self-Learning Text', David G. Kleinbaum, Springer-Verlag Telos, ISBN
   978-0387941424 based on dataset from <need to find the book>.
 
   Load and parse test data
 
-  >>> dfile = file('test/cancer.dat')
+  >>> from pkg_resources import resource_stream
   >>> D = []
   >>> indices = [4,5,3,6]
-  >>> for line in dfile:
+  >>> for line in resource_stream(__name__,'test/cancer.dat'):
   ...   fields = line.split()
   ...   row = [ fields[i] for i in indices ]
   ...   if '.' in row:
