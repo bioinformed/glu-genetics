@@ -32,7 +32,7 @@ CONV = 1e-8
 
 # Derived from SciPy's linalg.lstsq routine, though heavily modified and
 # extended.
-def linear_least_squares(a, b, cond=None):
+def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   '''linear_least_squares(a, b, cond=None) -> x,ss,cov,resids,rank,s,vt
 
   Return least-squares solution of a * x = b.
@@ -130,11 +130,87 @@ def linear_least_squares(a, b, cond=None):
          [-0.5, -0.5,  0.5, -0.5],
          [ 0.5, -0.5,  0.5,  0.5],
          [ 0.5, -0.5, -0.5, -0.5]])
+
+  Weighted Example (diagonal)
+  ---------------------------
+
+  >>> X = matrix([[-0.57, -1.28,  -0.39],
+  ...             [-1.93,  1.08,  -0.31],
+  ...             [ 2.30,  0.24,  -0.40],
+  ...             [-0.02,  1.03,  -1.43]])
+  >>> y = matrix([1.31,-4.01,5.56,3.22]).T
+  >>> w = matrix([0.5,1,2,5])
+
+  Least-squares Fit:
+
+  >>> beta,ss,cov,resids,rank,s,vt = linear_least_squares(X,y,weights=w)
+
+  Results:
+
+  >>> beta.T
+  array([[ 2., -1., -3.]])
+  >>> ss
+  array([  7.88860905e-31])
+  >>> cov
+  array([[ 0.07494261,  0.05450618,  0.04577265],
+         [ 0.05450618,  0.55082517,  0.39779859],
+         [ 0.04577265,  0.39779859,  0.38118818]])
+  >>> resids
+  array([  7.88860905e-31])
+
+  Rank, singluar Values, and right-hand singular vectors:
+
+  >>> rank
+  3
+  >>> s
+  array([ 4.11371205,  3.81196479,  1.0665822 ])
+  >>> vt
+  array([[ 0.13309546,  0.61438512, -0.77769951],
+         [-0.98717469,  0.15197524, -0.04888411],
+         [ 0.0881574 ,  0.77423153,  0.62673265]])
+
+  Weighted Example (general)
+  ---------------------------
+
+  >>> X = matrix([[-0.57, -1.28,  -0.39],
+  ...             [-1.93,  1.08,  -0.31],
+  ...             [ 2.30,  0.24,  -0.40],
+  ...             [-0.02,  1.03,  -1.43]])
+  >>> y = matrix([1.31,-4.01,5.56,3.22]).T
+  >>> w = diag([0.5,1,2,5])
+
+  Least-squares Fit:
+
+  >>> beta,ss,cov,resids,rank,s,vt = linear_least_squares(X,y,weights=w)
+
+  Results:
+
+  >>> beta.T
+  array([[ 2., -1., -3.]])
+  >>> ss
+  array([  7.88860905e-31])
+  >>> cov
+  array([[ 0.07494261,  0.05450618,  0.04577265],
+         [ 0.05450618,  0.55082517,  0.39779859],
+         [ 0.04577265,  0.39779859,  0.38118818]])
+  >>> resids
+  array([  7.88860905e-31])
+
+  Rank, singluar Values, and right-hand singular vectors:
+
+  >>> rank
+  3
+  >>> s
+  array([ 4.11371205,  3.81196479,  1.0665822 ])
+  >>> vt
+  array([[ 0.13309546,  0.61438512, -0.77769951],
+         [-0.98717469,  0.15197524, -0.04888411],
+         [ 0.0881574 ,  0.77423153,  0.62673265]])
   '''
   a1,b1 = map(asarray_chkfinite,(a,b))
 
   if len(a1.shape) != 2:
-    raise ValueError, 'expected matrix'
+    raise ValueError('incompatible design matrix dimensions')
 
   m,n = a1.shape
 
@@ -146,11 +222,42 @@ def linear_least_squares(a, b, cond=None):
   if m != b1.shape[0]:
     raise ValueError('incompatible dimensions')
 
+  # Apply weights via 'whitening' or 'preconditioning'.  This is not always
+  # stable for wildly variable weights, but works satisfactorily when
+  # weights are well-conditioned.
+  if weights is not None:
+    # Weight vector
+    k = len(weights.shape)
+    if k==1 or (k==2 and 1 in weights.shape):
+      weights = asarray(weights).reshape(-1)
+
+      if weights.size != m:
+        raise ValueError('incompatible weight vector dimensions')
+
+      if not sqrtweights:
+        weights = sqrt(weights)
+
+      a1 = transpose(weights*transpose(a1))
+      b1 = transpose(weights*transpose(b1))
+
+    # Generalized covariance
+    elif len(weights.shape) == 2:
+      if weights.shape[0] != weights.shape[1] != m:
+        raise ValueError('incompatible weight matrix dimensions')
+
+      if not sqrtweights:
+        weights = cholesky(weights,lower=False)
+
+      a1 = dot(weights,a1)
+      b1 = dot(weights,b1)
+
+    else:
+      raise ValueError('incompatible weight dimensions')
+
   gelss, = lapack.get_lapack_funcs(('gelss',),(a1,b1))
 
   if n>m:
-    # need to extend b matrix as it will be filled with
-    # a larger solution matrix
+    # extend b matrix as it will be filled with a larger solution
     b2 = zeros((n,nrhs), dtype=gelss.dtype)
     if len(b1.shape)==2:
       b2[:m,:] = b1
@@ -185,13 +292,17 @@ def linear_least_squares(a, b, cond=None):
   if m>rank:
     ss = resids/(m-rank)
 
-  # Truncated inverse squared singular values
-  svs2 = s**-2
-  svs2[rank:] = 0
+  # Truncated inverse squared singular values (vector)
+  s2 = s**-2
+  s2[rank:] = 0
 
-  # Form covariance matrix
+  # Form covariance matrix based on SVD using truncated singular values:
+  #   X     = U*S*V'                   U is unitary, so that U'*U=U*U'=I;
+  #  X'X    = V*S**2*V'                V is unitary, so that V'*V=V*V'=I;
+  #   I     = V*S**2*V'*(V*S**-2*V')   S is diagonal positive semi-definite
+  # (X'X).I = V*S**-2*V'
   v   = transpose(vt)
-  cov = dot(v,transpose(svs2*v))
+  cov = dot(v,transpose(s2*v))
 
   return beta,ss,cov,resids,rank,s,vt
 
@@ -199,7 +310,7 @@ def linear_least_squares(a, b, cond=None):
 def sqrtm(x):
   '''
   Compute the square root y of x such that y*y = x, where x is a general
-  positive semi-definite matrix and * is matrix multiplication. 
+  positive semi-definite matrix and * is matrix multiplication.
 
   Algorithm by Nicholas J. Higham, 'A New sqrtm for Matlab' (1999),
   Manchester Centre for Computational Mathematics Numerical Analysis
@@ -235,10 +346,9 @@ def sqrtm(x):
   >>> error < 1e-14
   True
   '''
-  A = x
-  A = asanyarray(A)
+  A = asanyarray(x)
   if len(A.shape)!=2:
-    raise ValueError, "Non-matrix input to matrix function."
+    raise ValueError('Non-matrix input to matrix function')
 
   # Refactor into complex Schur form
   T,Z = linalg.schur(A)
@@ -671,7 +781,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
     b = W*X.T*z
 
   else:
-    raise RuntimeError,'logit estimator failed to converge'
+    raise RuntimeError('logit estimator failed to converge')
 
   # Return log-likelihood, regression estimates, and covariance matrix
   return L,b,W
@@ -696,7 +806,7 @@ class GLogit(object):
       ref = categories[0]
     else:
       if ref not in categories:
-        raise ValueError, 'Reference class for dependent variable not observed in data'
+        raise ValueError('reference class for dependent variable not observed in data')
       categories = [ref] + [ r for r in categories if r!=ref ]
 
     # Recode y with ordinal categories from 0..k-1, where 0 is reference
@@ -771,7 +881,7 @@ class GLogit(object):
       b = vsplit(beta,k)
 
     else:
-      raise RuntimeError,'glogit estimator failed to converge'
+      raise RuntimeError('glogit estimator failed to converge')
 
     # Return log-likelihood, regression estimates, and covariance matrix
     self.L    = L
