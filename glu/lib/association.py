@@ -329,8 +329,8 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
   return header,_phenos()
 
 
-def build_models(phenofile, genofile, options):
-  header,phenos = load_phenos(phenofile)
+def build_models(phenofile, genofile, options,deptype=int):
+  header,phenos = load_phenos(phenofile,deptype=deptype)
   phenos        = list(phenos)
   phenocount1   = len(phenos)
   loci          = load_genostream(genofile,options.format).as_ldat()

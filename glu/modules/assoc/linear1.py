@@ -77,7 +77,7 @@ def main():
     if details is out:
       raise ValueError('Cannot send summary and detailed output to stdout')
 
-  loci,models = build_models(args[0], args[1], options)
+  loci,models = build_models(args[0], args[1], options, deptype=float)
 
   if options.nullmodel:
     null_model = models.build_model(NULL(),{})
