@@ -18,6 +18,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from   types       import NoneType
 from   operator    import itemgetter
+from   collections import defaultdict
 from   itertools   import izip,islice,ifilter,imap,chain,groupby,repeat
 
 from   utils       import pick,tally,peekfirst,unique
@@ -680,14 +681,46 @@ class GenomatrixStream(GenotypeStream):
     ['s1', 's2', 's3']
     ('l1', [('G', 'G'), 0, ('T', 'T')])
     ('l2', [('A', 'A'), ('T', 'T'), 0])
+    >>> streams = [GenomatrixStream(rows,'ldat'),
+    ...            GenomatrixStream(rows,'ldat')]
+    >>> combined = GenomatrixStream.from_streams(streams, 'sdat', genorepr=snp_marker, mergefunc=VoteMerger())
+    >>> for row in combined:
+    ...   print row
+    ('l1', 'l2')
+    ('s1', [('G', 'G'), ('A', 'A')])
+    ('s2', [('G', 'T'), ('T', 'T')])
+    ('s3', [('T', 'T'), ('G', 'G')])
     '''
     if format not in ('sdat','ldat'):
       raise ValueError, "Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format
 
+    formats  = set(g.format for g in genos)
+    informat = formats.pop() if len(formats) == 1 else None
+    headers  = [ g.columns for g in genos ] if informat in ('ldat','sdat') else None
+
+    # Single input is trivial -- just transform to the desired genorepr and
+    # mergefunc
     if len(genos) == 1:
-      genos = genos[0]
-      if genorepr is not None:
-        genos = genos.transformed(genorepr=genorepr)
+      genos = genos[0].transformed(genorepr=genorepr,mergefunc=mergefunc)
+
+    # Inputs are all matricies in same format with identical headers, so
+    # merge can be performed by concatenating and merging, without knowledge
+    # of uniqueness of rows.  Concatenation without merging would be
+    # sufficient if it was possible to prove rows were disjoint.
+    elif headers and all(headers[0]==h for h in headers):
+      genos = [ iter(g.transformed(genorepr=genorepr)) for g in genos ]
+
+      # Skip headers prior to concatentation
+      for g in genos:
+        g.next()
+
+      genos = chain(*[[headers[0]]]+genos)
+      genos = merge_genomatrix(genos, mergefunc)
+      genos = GenomatrixStream(genos,informat,unique=True,genorepr=genorepr)
+
+    # Very general strategy of converting all inputs to genotriples, sorting
+    # by the appopriate clustering, and transforming into ldat or sdat.
+    # Unfortunately, also very slow.
     else:
       order = 'locus' if format=='ldat' else 'sample'
       genos = GenotripleStream.from_streams(genos, order=order, genorepr=genorepr)
@@ -1757,15 +1790,13 @@ def merge_genomatrix_rows(genos, mergefunc):
   if non_unique:
     raise ValueError('merge_genomatrix_rows requires unique column labels')
 
-  merge_rows = {}
+  merge_rows = defaultdict(lambda: [])
   new_rows   = []
 
   for row_label,row in genos:
     if row_label not in merge_rows:
       new_rows.append(row_label)
-      merge_rows[row_label] = [row]
-    else:
-      merge_rows[row_label].append(row)
+    merge_rows[row_label].append(row)
 
   yield columns
 
@@ -1835,27 +1866,24 @@ def merge_genomatrix(genos, mergefunc):
   except StopIteration:
     raise ValueError('Invalid empty genotype stream')
 
-  merge_indices = {}
+  merge_indices = defaultdict(lambda: [])
   new_columns = []
 
   for i,column in enumerate(columns):
     if column not in merge_indices:
       new_columns.append(column)
-      merge_indices[column] = [i]
-    else:
-      merge_indices[column].append(i)
+    merge_indices[column].append(i)
 
-  merge_rows = {}
+  merge_rows = defaultdict(lambda: [])
   new_rows   = []
 
   for row_label,row in genos:
     if row_label not in merge_rows:
       new_rows.append(row_label)
-      merge_rows[row_label] = [row]
-    else:
-      merge_rows[row_label].append(row)
+    merge_rows[row_label].append(row)
 
-  yield tuple(new_columns)
+  new_columns = tuple(new_columns)
+  yield new_columns
 
   if new_columns == columns:
     # Optimize case where columns are unique as in merge_genomatrix_rows
@@ -2967,6 +2995,15 @@ def transpose_matrix(rows, columns, genorepr=snp_acgt.pack_reps, missing=0):
   return rowlabels,zip(columns,newrows)
 
 
+def _test_genodata():
+  import doctest
+  return doctest.testmod()
+
+
+if __name__ == '__main__':
+  _test_genodata()
+
+
 ###################################################
 #                                                 #
 # IMPORT GENOIO MODULE FOR BACKWARD COMPATIBILITY #
@@ -2975,10 +3012,3 @@ from genoio import *                              #
 ###################################################
 
 
-def _test():
-  import doctest
-  return doctest.testmod()
-
-
-if __name__ == '__main__':
-  _test()
