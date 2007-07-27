@@ -402,14 +402,20 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
   return [ v for v in values if v ]
 
 
-def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'):
+# Anonymous object
+_nothing = object()
+
+def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_nothing,dialect='tsv'):
   '''
   Creates a dictionary representing a list or mapping from a text file.
   Valid files should be composed of standard ASCII lines of text with tab
   delimited fields.  Only the first and second fields of each line are
   considered. Whitespace is stripped from the beginning and end of every
   field considered.  If the skip parameter is used to ignore a certain
-  number of lines (e.g., headers) at the beginning of the file.
+  number of lines (e.g., headers) at the beginning of the file.  A default
+  parameter may be specified to assign values to keys with empty or
+  non-existant value fields.  Otherwise, the value will be set equal to the
+  key.
 
   If the file or filename is a string that begins with ':', it is
   interpreted as a literal list of comma separated values, ignoring the skip
@@ -441,12 +447,14 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'
   of values is returned.
 
   Each line is mapped to key,value pairs that are returned in a dictionary
-  and treated as follows::
+  and treated as follows:
 
   1) Empty line             --> skipped
   2) Empty key field        --> skipped
   3) Only key field         --> identity mapping, key=key field, value=key field
+                                if not default, otherwise default
   4) Empty value field      --> identity mapping, key=key field, value=key field
+                                if not default, otherwise default
   5) Non-empty value field  --> key=key field, value=value field
   6) More than two fields   --> additional fields are ignored
 
@@ -461,6 +469,7 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'
        skip,  s: number of header lines to skip
    key_index, i: index of field to select or name of header for keys
  value_index, v: index of field to select or name of header for values
+  default,def,d: default value for keys with no or empty value
         dialect: csv module dialect name ('csv' or 'tsv')
       delimiter: single field delimiter character
     doublequote: A one-character string used to quote fields containing
@@ -484,6 +493,9 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'
   @type        unique: bool
   @param         skip: number of initial lines to be skipped (defaults to 0)
   @type          skip: int
+  @param      default: default value for keys with no or empty value, if not
+                       specified the value is taken to be the key
+  @type       default: object
   @param      dialect: csv module dialect name or dialect object
   @type       dialect: str or csv.Dialect
   @return            : mapping from key string to value string, if
@@ -503,6 +515,8 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'
   Traceback (most recent call last):
        ...
   ValueError: Found 1 non-unique mapping in <StringIO.StringIO instance at ...>. The first is "loc1" -> "loc1" and "foo"
+  >>> test(StringIO("loc1\\tloc1\\nloc2"),default='missing')
+  [('loc1', 'loc1'), ('loc2', 'missing')]
   >>> test(':loc1,loc2')
   [('loc1', 'loc1'), ('loc2', 'loc2')]
   >>> test(':loc1=locA ,loc2,,=, loc3 =locC,=foo,loc4=')
@@ -538,6 +552,7 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'
     args        = dict(args)
     dialect     = get_csv_dialect(args,dialect)
     skip        = int(get_arg(args, ['s','skip'], skip))
+    default     = get_arg(args, ['d','def','default'], default)
     key_index   = tryint(get_arg(args, ['k','key',  'key_index'  ], key_index))
     value_index = tryint(get_arg(args, ['v','value','value_index'], value_index))
 
@@ -572,12 +587,21 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,dialect='tsv'
   # Parse the data file
   def _load_map_generator():
     for row in lines:
-      if len(row)<=key_index or not row[key_index].strip():
+      n = len(row)
+
+      key = intern(row[key_index].strip()) if key_index<n else None
+
+      if not key:
         continue
-      elif len(row)<=value_index or not row[value_index].strip():
-        key = value = intern(row[key_index].strip())
-      else:
-        key,value = intern(row[key_index].strip()),intern(row[value_index].strip())
+
+      value = intern(row[value_index].strip()) if value_index<n else None
+
+      if not value:
+        if default is not _nothing:
+          value = default
+        else:
+          value = key
+
       yield key,value
 
   m = {}
