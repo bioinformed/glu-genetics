@@ -34,9 +34,6 @@ class Nothing(object): pass
 #   genotype string = string representation
 #   packed          = random access sequence of internal genotype reps
 
-# Storage for interned genotype tuples
-_geno_intern = {}
-
 
 class UnphasedMarkerRepresentation(object):
   '''
@@ -82,6 +79,7 @@ class UnphasedMarkerRepresentation(object):
     self.allelestr  = dict( (m,None) for m in missing_allele_strs )
     self.missingrep = (None,None)
     self.missing    = None
+    self.strcache   = {}
 
   def homozygote_geno(self,g):
     '''
@@ -92,7 +90,7 @@ class UnphasedMarkerRepresentation(object):
     @return : True if g is a homozygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedMarkerRepresentation('AG')
     >>> model.homozygote_geno( ('A','A') )
     True
     >>> model.homozygote_geno( ('A','G') )
@@ -113,7 +111,7 @@ class UnphasedMarkerRepresentation(object):
     @return : True if g is a heterozygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedMarkerRepresentation('AG')
     >>> model.heterozygote_geno( ('A','A') )
     False
     >>> model.heterozygote_geno( ('A','G') )
@@ -133,7 +131,7 @@ class UnphasedMarkerRepresentation(object):
     @return : True if g is a hemizygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedMarkerRepresentation('AG')
     >>> model.hemizygote_geno( ('A','A') )
     False
     >>> model.hemizygote_geno( ('A','G') )
@@ -308,7 +306,12 @@ class UnphasedMarkerRepresentation(object):
     >>> generic_marker.rep_from_str(' /')
     >>> generic_marker.rep_from_str('')
     '''
+    strcache = self.strcache
+    if geno in strcache:
+      return strcache[geno]
+
     if geno in self.missing_geno_strs:
+      self.strcache[geno] = None
       return None
 
     if self.delimiter:
@@ -321,9 +324,11 @@ class UnphasedMarkerRepresentation(object):
     rep = tuple(sorted(self.allelestr.get(a,a) for a in alleles))
 
     if not rep or rep == self.missingrep:
+      self.strcache[geno] = None
       return None
 
-    return _geno_intern.setdefault(rep,rep)
+    self.strcache[geno] = rep
+    return rep
 
   def reps_from_strs(self,genos):
     '''
@@ -596,7 +601,7 @@ class UnphasedPackedMarkerRepresentation(object):
     @return : True if g is a homozygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedPackedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedPackedMarkerRepresentation('AG')
     >>> model.homozygote_geno( ('A','A') )
     True
     >>> model.homozygote_geno( ('A','G') )
@@ -617,7 +622,7 @@ class UnphasedPackedMarkerRepresentation(object):
     @return : True if g is a heterozygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedPackedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedPackedMarkerRepresentation('AG')
     >>> model.heterozygote_geno( ('A','A') )
     False
     >>> model.heterozygote_geno( ('A','G') )
@@ -638,7 +643,7 @@ class UnphasedPackedMarkerRepresentation(object):
     @return : True if g is a hemizygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedPackedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedPackedMarkerRepresentation('AG')
     >>> model.hemizygote_geno( ('A','A') )
     False
     >>> model.hemizygote_geno( ('A','G') )
@@ -1036,7 +1041,7 @@ class UnphasedGenotypeArrayRepresentation(object):
     @return : True if g is a homozygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedPackedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedPackedMarkerRepresentation('AG')
     >>> model.homozygote_geno( ('A','A') )
     True
     >>> model.homozygote_geno( ('A','G') )
@@ -1057,7 +1062,7 @@ class UnphasedGenotypeArrayRepresentation(object):
     @return : True if g is a heterozygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedPackedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedPackedMarkerRepresentation('AG')
     >>> model.heterozygote_geno( ('A','A') )
     False
     >>> model.heterozygote_geno( ('A','G') )
@@ -1078,7 +1083,7 @@ class UnphasedGenotypeArrayRepresentation(object):
     @return : True if g is a hemizygote, False otherwise
     @rtype  : bool
 
-    >>> model = UnphasedPackedMarkerRepresentation('AG',missing_allele_str=' ')
+    >>> model = UnphasedPackedMarkerRepresentation('AG')
     >>> model.hemizygote_geno( ('A','A') )
     False
     >>> model.hemizygote_geno( ('A','G') )
