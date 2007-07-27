@@ -243,11 +243,12 @@ def _load_genomatrix(filename,format,limit,genorepr):
     ir = iter
     it = intern
     st = str.strip
+    gr = genorepr
 
     for i,row in enumerate(rows):
       row   = ir(row)
       label = it(st(row.next()))
-      genos = genorepr(row)
+      genos = gr(row)
 
       if len(genos) != n:
         raise ValueError('Invalid genotype matrix row on line %d of %s' % (i+1,namefile(filename)))
@@ -907,11 +908,11 @@ def transform_files(infiles,informat,ingenorepr,
     outformat = informat
 
   if outformat == 'ldat':
-    genos = GenomatrixStream.from_streams(genos,'ldat',genorepr=outgenorepr)
+    genos = GenomatrixStream.from_streams(genos,'ldat',genorepr=outgenorepr,mergefunc=mergefunc)
   elif outformat == 'sdat':
-    genos = GenomatrixStream.from_streams(genos,'sdat',genorepr=outgenorepr)
+    genos = GenomatrixStream.from_streams(genos,'sdat',genorepr=outgenorepr,mergefunc=mergefunc)
   elif outformat in ('trip','genotriple'):
-    genos = GenotripleStream.from_streams(genos,genorepr=outgenorepr)
+    genos = GenotripleStream.from_streams(genos,genorepr=outgenorepr,mergefunc=mergefunc)
   elif not outformat:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(outfile)
   else:
@@ -925,10 +926,10 @@ def transform_files(infiles,informat,ingenorepr,
   save_genostream(outfile,genos,outformat,mergefunc=mergefunc)
 
 
-def _test():
+def _test_genoio():
   import doctest
   return doctest.testmod()
 
 
 if __name__ == '__main__':
-  _test()
+  _test_genoio()

@@ -1067,11 +1067,14 @@ class GenomatrixStream(GenotypeStream):
                                    genorepr=self.genorepr, packed=packed)
 
   def merged(self, mergefunc):
+    '''
+    Merge genotypes for rows and columns with the same labels
+    '''
     if self.unique:
       return self
 
-    merge_rows = self.rows    is None or len(self.rows)    != set(self.rows)
-    merge_cols = self.columns is None or len(self.columns) != set(self.columns)
+    merge_rows = self.rows    is None or len(self.rows)    != len(set(self.rows))
+    merge_cols = self.columns is None or len(self.columns) != len(set(self.columns))
 
     if not merge_rows and not merge_cols:
       return self
@@ -1079,18 +1082,14 @@ class GenomatrixStream(GenotypeStream):
     if self.format == 'ldat':
       mergefunc = mergefunc_transpose_adapter(mergefunc)
 
-    packed = self.packed
-    if merge_rows and merge_cols:
-      genos = merge_genomatrix(self, mergefunc)
-      packed = False
-    elif merge_cols:
-      genos = merge_genomatrix_columns(self, mergefunc)
-      packed = False
+    if merge_rows:
+      # Pack, since merge will materialize
+      genos = merge_genomatrix(self.transformed(repack=True), mergefunc)
     else:
-      genos = merge_genomatrix_rows(self, mergefunc)
+      genos = merge_genomatrix_columns(self, mergefunc)
 
     return GenomatrixStream(genos, self.format, unique=True,
-                                   genorepr=self.genorepr, packed=packed)
+                                   genorepr=self.genorepr, packed=False)
 
   def transposed(self):
     '''
@@ -1690,6 +1689,7 @@ def merge_genomatrix_columns(genos, mergefunc):
   ('s3', [17, 17])
   ('s4', [52, 0])
   '''
+  assert mergefunc is not None
   genos = iter(genos)
 
   try:
@@ -1714,7 +1714,7 @@ def merge_genomatrix_columns(genos, mergefunc):
       yield row
     return
 
-  # Non-trivial path: one or more columns must be merged  yield
+  # Non-trivial path: one or more columns must be merged
   yield tuple(new_columns)
 
   rows_seen = set()
@@ -1778,6 +1778,7 @@ def merge_genomatrix_rows(genos, mergefunc):
   ('s1', [0, 17, 52])
   ('s2', [0, 11, 0])
   '''
+  assert mergefunc is not None
   genos = iter(genos)
 
   try:
@@ -1859,6 +1860,7 @@ def merge_genomatrix(genos, mergefunc):
   ('s1', [0, 17])
   ('s2', [7, 11])
   '''
+  assert mergefunc is not None
   genos = iter(genos)
 
   try:
