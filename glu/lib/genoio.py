@@ -232,7 +232,7 @@ def _load_genomatrix(filename,format,limit,genorepr):
     raise ValueError, 'Input file "%s" does not appear to be in %s format.  Found %s.' \
                         % (namefile(filename),format,format_found)
 
-  header = [ intern(h.strip()) for h in header ]
+  header = tuple(intern(h.strip()) for h in header)
 
   def _gen_load_genomatrix():
     yield header
@@ -750,7 +750,7 @@ def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_acgt, 
   >>> ldat = load_genomatrixstream(data,'ldat',genorepr=snp_marker)
   >>> for row in ldat:
   ...   print row
-  ['s1', 's2', 's3']
+  ('s1', 's2', 's3')
   ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
   ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
   '''
@@ -795,11 +795,11 @@ def load_genostream(filename, format=None, limit=None, genorepr=snp_acgt, unique
   >>> loaded = load_genostream(StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n"),'ldat')
   >>> for row in loaded:
   ...   print row
-  ['s1', 's2', 's3']
+  ('s1', 's2', 's3')
   ('l1', array('B', [17, 19, 51]))
   ('l2', array('B', [34, 36, 68]))
   >>> loaded.samples
-  ['s1', 's2', 's3']
+  ('s1', 's2', 's3')
   >>> loaded.unique
   True
   '''
@@ -923,7 +923,7 @@ def transform_files(infiles,informat,ingenorepr,
     genos = genos.transformed(order_loci=transform.loci.order,
                               order_samples=transform.samples.order)
 
-  save_genostream(outfile,genos,outformat,mergefunc=mergefunc)
+  save_genostream(outfile,genos,outformat)
 
 
 def _test_genoio():

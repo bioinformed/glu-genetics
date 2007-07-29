@@ -28,8 +28,7 @@ def _remap_comp(a1s,a2s):
 def remap_category(allelemap):
   # FIXME: Use genoarray model once support is available
   complement = {'A':'T','T':'A','G':'C','C':'G'}
-  allelemap.pop(' ',None)
-  a1s,a2s    = zip(*allelemap.iteritems())
+  a1s,a2s    = zip(*( (a1,a2) for a1,a2 in allelemap.iteritems() if a1 and a2 ))
   identity   = _remap_comp(a1s,a2s)
   complement = _remap_comp(a1s, (complement.get(a2) for a2 in a2s))
   swap       = _remap_comp(a1s, (allelemap.get(a2)  for a2 in a2s))

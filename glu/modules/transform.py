@@ -118,7 +118,7 @@ def main():
   infiles = sorted(set(hyphen(arg,sys.stdin) for arg in args))
   outfile = hyphen(options.output,sys.stdout)
 
-  merger = get_genomerger(options.merge)
+  merger = get_genomerger(options.merge,outgenorepr)
 
   transform = GenoTransform.from_options(options)
 

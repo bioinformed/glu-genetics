@@ -24,15 +24,21 @@ from utils import tally
 
 def count_genos(genos):
   '''
-  Estimate allele and genotype frequencies
-  Missing alleles are coded as ' '
+  Count non-hemizygous genotypes
   '''
-  f = tally(g for g in genos if g and ' ' not in g)
+  f = tally(genos)
 
   hom1 = hom2 = het = 0
 
   for g,n in f.iteritems():
-    if g[0] != g[1]:
+    if not g:
+      continue
+
+    a1,a2 = g
+
+    if not a1 or not a2:
+      continue
+    elif a1!=a2:
       het = n
     elif hom1:
       hom2 = n
@@ -89,7 +95,7 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
   for i,h in enumerate(xrange(hets,1,-2)):
     probs[h/2-1] = probs[h/2]*h*(h-1) / (4*(hom_r+i+1)*(hom_c+i+1))
 
-  # Fill in relative probabilities fore greater than the expected hets
+  # Fill in relative probabilities for greater than the expected hets
   for i,h in enumerate(xrange(hets,rare-1,2)):
     probs[h/2+1] = probs[h/2]*4*(hom_r-i)*(hom_c-i) / ((h+1)*(h+2))
 

@@ -499,7 +499,7 @@ class GenotripleStream(GenotypeStream):
     >>> rows = [        [  's1',       's2',       's3'   ],
     ...         ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')]),
     ...         ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])]
-    >>> merge = VoteMerger()
+    >>> merge = VoteMerger(missingrepr=snp_marker.missing)
     >>> ldat = GenotripleStream(trips).as_ldat(merge).transformed(genorepr=snp_marker)
     >>> assert list(ldat) == rows and ldat.samples == rows[0]
     >>> ldat = GenotripleStream(trips,loci=['l1','l2']).as_ldat(merge).transformed(genorepr=snp_marker)
@@ -508,7 +508,7 @@ class GenotripleStream(GenotypeStream):
     >>> assert list(ldat) == rows and ldat.samples == rows[0]
     '''
     if mergefunc is None:
-      mergefunc = UniqueMerger()
+      mergefunc = UniqueMerger(missingrepr=self.genorepr.missing)
 
     genos = build_genomatrix_from_triples(self, 'ldat', mergefunc=mergefunc,
                                           samples=self.samples, loci=self.loci, order=self.order,
@@ -544,7 +544,7 @@ class GenotripleStream(GenotypeStream):
     >>> assert list(sdat) == rows and sdat.loci == rows[0]
     '''
     if mergefunc is None:
-      mergefunc = UniqueMerger()
+      mergefunc = UniqueMerger(missingrepr=self.genorepr.missing)
 
     genos = build_genomatrix_from_triples(self, 'sdat', mergefunc=mergefunc,
                                           samples=self.samples, loci=self.loci, order=self.order,
@@ -675,7 +675,8 @@ class GenomatrixStream(GenotypeStream):
     >>> streams = [GenotripleStream(trip1),
     ...            GenomatrixStream(rows,'ldat'),
     ...            GenotripleStream(trip2)]
-    >>> combined = GenomatrixStream.from_streams(streams, 'ldat', genorepr=snp_marker, mergefunc=VoteMerger())
+    >>> merger=VoteMerger(snp_marker.missing)
+    >>> combined = GenomatrixStream.from_streams(streams, 'ldat', genorepr=snp_marker, mergefunc=merger)
     >>> for row in combined:
     ...   print row
     ['s1', 's2', 's3']
@@ -683,7 +684,7 @@ class GenomatrixStream(GenotypeStream):
     ('l2', [('A', 'A'), ('T', 'T'), 0])
     >>> streams = [GenomatrixStream(rows,'ldat'),
     ...            GenomatrixStream(rows,'ldat')]
-    >>> combined = GenomatrixStream.from_streams(streams, 'sdat', genorepr=snp_marker, mergefunc=VoteMerger())
+    >>> combined = GenomatrixStream.from_streams(streams, 'sdat', genorepr=snp_marker, mergefunc=merger)
     >>> for row in combined:
     ...   print row
     ('l1', 'l2')
@@ -695,7 +696,7 @@ class GenomatrixStream(GenotypeStream):
       raise ValueError, "Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format
 
     formats  = set(g.format for g in genos)
-    informat = formats.pop() if len(formats) == 1 else None
+    informat = formats.pop() if len(formats)==1 else None
     headers  = [ g.columns for g in genos ] if informat in ('ldat','sdat') else None
 
     # Single input is trivial -- just transform to the desired genorepr and
@@ -703,24 +704,15 @@ class GenomatrixStream(GenotypeStream):
     if len(genos) == 1:
       genos = genos[0].transformed(genorepr=genorepr,mergefunc=mergefunc)
 
-    # Inputs are all matricies in same format with identical headers, so
-    # merge can be performed by concatenating and merging, without knowledge
-    # of uniqueness of rows.  Concatenation without merging would be
-    # sufficient if it was possible to prove rows were disjoint.
-    elif headers and all(headers[0]==h for h in headers):
-      genos = [ iter(g.transformed(genorepr=genorepr)) for g in genos ]
-
-      # Skip headers prior to concatentation
-      for g in genos:
-        g.next()
-
-      genos = chain(*[[headers[0]]]+genos)
-      genos = merge_genomatrix(genos, mergefunc)
-      genos = GenomatrixStream(genos,informat,unique=True,genorepr=genorepr)
+    # Inputs are all matricies, without knowledge of uniqueness of rows.
+    elif formats <= set(['ldat','sdat']):
+      genos = [ (g.as_ldat() if format=='ldat' else g.as_sdat()).transformed(genorepr=genorepr) for g in genos ]
+      genos = merge_genomatrix_list(genos, mergefunc)
+      genos = GenomatrixStream(genos,format,unique=True,genorepr=genorepr)
 
     # Very general strategy of converting all inputs to genotriples, sorting
     # by the appopriate clustering, and transforming into ldat or sdat.
-    # Unfortunately, also very slow.
+    # Unfortunately, very slow.
     else:
       order = 'locus' if format=='ldat' else 'sample'
       genos = GenotripleStream.from_streams(genos, order=order, genorepr=genorepr)
@@ -1707,15 +1699,17 @@ def merge_genomatrix_columns(genos, mergefunc):
     else:
       merge_indices[column].append(i)
 
+  new_columns = tuple(new_columns)
+
   # Trivial path: no merge is needed
   if new_columns == columns:
     yield columns
-    for label,row in genos:
+    for row in genos:
       yield row
     return
 
   # Non-trivial path: one or more columns must be merged
-  yield tuple(new_columns)
+  yield new_columns
 
   rows_seen = set()
   for row_label,row in genos:
@@ -1791,7 +1785,7 @@ def merge_genomatrix_rows(genos, mergefunc):
   if non_unique:
     raise ValueError('merge_genomatrix_rows requires unique column labels')
 
-  merge_rows = defaultdict(lambda: [])
+  merge_rows = defaultdict(list)
   new_rows   = []
 
   for row_label,row in genos:
@@ -1868,7 +1862,7 @@ def merge_genomatrix(genos, mergefunc):
   except StopIteration:
     raise ValueError('Invalid empty genotype stream')
 
-  merge_indices = defaultdict(lambda: [])
+  merge_indices = defaultdict(list)
   new_columns = []
 
   for i,column in enumerate(columns):
@@ -1876,7 +1870,9 @@ def merge_genomatrix(genos, mergefunc):
       new_columns.append(column)
     merge_indices[column].append(i)
 
-  merge_rows = defaultdict(lambda: [])
+  new_columns = tuple(new_columns)
+
+  merge_rows = defaultdict(list)
   new_rows   = []
 
   for row_label,row in genos:
@@ -1884,7 +1880,6 @@ def merge_genomatrix(genos, mergefunc):
       new_rows.append(row_label)
     merge_rows[row_label].append(row)
 
-  new_columns = tuple(new_columns)
   yield new_columns
 
   if new_columns == columns:
@@ -1914,6 +1909,133 @@ def merge_genomatrix(genos, mergefunc):
 
       # Yield new row
       yield row_label,new_row
+
+
+def merge_genomatrix_list(genos, mergefunc):
+  '''
+  Take a sequence of genotype matrix streams and merge all genotypes
+  identical row or column labels into a single genotype matrix stream using
+  the specified merge function.
+
+  All input matricies must meet the following requirements:
+    1) share the same orientation (either sdat or ldat)
+    2) share the same genotype representation
+
+  The algorithm used requires a full materialization of the genomatrix
+  streams, since row labels must be known.  Results are in an unpacked list
+  representation that may need to be repacked.
+
+  The supplied merge function will be called assuming samples are on the
+  rows and loci on the columns, for the purpose of collecting merge
+  statistics.  If this is not the case, please use the
+  glu.lib.genomerge.mergefunc_transpose_adapter.
+
+  @param      genos: sequence of genomatrix streams
+  @type       genos: sequence
+  @param  mergefunc: merge function taking sample, locus, and list of genotypes
+  @type   mergefunc: callable
+  @return          : merged unpacked genomatix stream
+  @rtype           : generator
+
+  Test slow-path for heterogeneous schema:
+
+  >>> rows1 = [         ('s1',       's2',       's3'),
+  ...          ('l1',[('G', 'G'), ('G', 'T'), ('T', 'T')]),
+  ...          ('l2',[('A', 'A'), ('T', 'T'), ('G', 'G')])]
+  >>> rows2 = [         ('s1',       's3',       's4'),
+  ...          ('l1',[   None,    ('A', 'T'), ('C', 'C')]),
+  ...          ('l3',[('A', 'A'),  None,      ('A', 'T')])]
+  >>> for row in merge_genomatrix_list([rows1,rows2,rows1],VoteMerger(missingrepr=None)):
+  ...   print row
+  ('s1', 's2', 's3', 's4')
+  ('l1', [('G', 'G'), ('G', 'T'), None, ('C', 'C')])
+  ('l2', [('A', 'A'), ('T', 'T'), ('G', 'G'), None])
+  ('l3', [('A', 'A'), None, None, ('A', 'T')])
+
+  Test fast-path for homogeneous schema:
+
+  ('s1', 's2', 's3', 's4')
+  ('l1', [('G', 'G'), ('G', 'T'), None, ('C', 'C')])
+  ('l2', [('A', 'A'), ('T', 'T'), ('G', 'G'), None])
+  ('l3', [('A', 'A'), None, None, ('A', 'T')])
+  >>> rows1 = [         ('s1',       's2',       's3'),
+  ...          ('l1',[('G', 'G'), ('G', 'T'), ('T', 'T')]),
+  ...          ('l2',[('A', 'A'), ('T', 'T'), ('G', 'G')])]
+  >>> rows2 = [         ('s1',       's2',       's3'),
+  ...          ('l1',[   None,    ('A', 'T'), ('T', 'T')]),
+  ...          ('l3',[('A', 'A'),  None,      ('A', 'T')])]
+  >>> for row in merge_genomatrix_list([rows1,rows2,rows1],VoteMerger(missingrepr=None)):
+  ...   print row
+  ('s1', 's2', 's3')
+  ('l1', [('G', 'G'), None, ('T', 'T')])
+  ('l2', [('A', 'A'), ('T', 'T'), ('G', 'G')])
+  ('l3', [('A', 'A'), None, ('A', 'T')])
+  '''
+  assert mergefunc is not None
+
+  genos = [ iter(g) for g in genos ]
+
+  if not genos:
+    raise ValueError('Invalid empty genotype list')
+
+  # Collect headers, noting that a generator expression cannot be used due
+  # to StopIteration exceptions
+  columns = []
+  for g in genos:
+    try:
+      columns.append(tuple(g.next()))
+    except StopIteration:
+      raise ValueError('Invalid empty genotype stream')
+
+  # Fastpath for identical schema: Concatenate all genotype rows and merge
+  # using the single-matrix merge function.  Also optimizes the single input
+  # case.
+  if all(columns[0]==c for c in columns):
+    # Pass-through from merge_genomatrix
+    for row in merge_genomatrix(chain(*[[columns[0]]]+genos), mergefunc):
+      yield row
+    return
+
+  new_rows      = {}
+  new_columns   = {}
+  merge_columns = defaultdict(list)
+  merge_rows    = defaultdict(lambda: defaultdict(list))
+
+  for i,(g,c) in enumerate(izip(genos,columns)):
+    # Collect columns and form mappings from old schemas to new
+    for j,column in enumerate(c):
+      k=new_columns.setdefault(column,len(new_columns))
+      merge_columns[i].append( (j,k) )
+
+    # Collect row labels and materialize all rows for later merging
+    for row_label,row in g:
+      new_rows.setdefault(row_label,len(new_rows))
+      merge_rows[row_label][i].append(row)
+
+  # Invert row and column dictionaries to recover insertion orderings
+  new_columns = tuple(imap(itemgetter(0),sorted(new_columns.iteritems(),key=itemgetter(1))))
+  new_rows    = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(),   key=itemgetter(1))))
+  n = len(new_columns)
+
+  # Emit new schema
+  yield new_columns
+
+  # Fully general merge over duplicate rows and columns
+  for row_label in new_rows:
+    # Form lists of all genotypes at each new column for all rows with row_label
+    new_row = [ [] for i in xrange(n) ]
+
+    # Iterate over input rows and schema, find the cooresponding column
+    # mappings, and append the relevant genotypes
+    for i,rows in merge_rows.pop(row_label).iteritems():
+      for j,k in merge_columns.get(i,[]):
+         new_row[k] += (row[j] for row in rows)
+
+    # Merge genotypes
+    new_row = list(imap(mergefunc,repeat(row_label),new_columns,new_row))
+
+    # Yield new row
+    yield row_label,new_row
 
 
 #######################################################################################
@@ -2662,15 +2784,15 @@ def filter_genomatrix_by_column(rows,colset,exclude=False):
     raise ValueError('Invalid empty genotype stream')
 
   if exclude:
-    header = [(name,i) for i,name in enumerate(header) if name not in colset]
+    header = tuple((name,i) for i,name in enumerate(header) if name not in colset)
   else:
-    header = [(name,i) for i,name in enumerate(header) if name in colset]
+    header = tuple((name,i) for i,name in enumerate(header) if name     in colset)
 
-  if not header:
-    yield header
-    return
+  if header:
+    header,indices = izip(*header)
+  else:
+    indices = []
 
-  header,indices = izip(*header)
   yield header
   for locus,genos in rows:
     yield locus,pick(genos,indices)

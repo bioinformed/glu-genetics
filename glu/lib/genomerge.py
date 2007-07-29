@@ -87,7 +87,7 @@ class Unique(object):
       return MISSING,self.missingrepr
     elif len(genos) == 1:
       geno = genos[0]
-      if geno == self.missingrepr:
+      if not geno:
         return MISSING,geno
       else:
         return UNAMBIGUOUS,geno
@@ -160,14 +160,13 @@ class Vote(object):
       return MISSING,self.missingrepr
     elif len(genos)==1:
       geno = genos[0]
-      if geno == self.missingrepr:
+      if not geno:
         return MISSING,geno
       else:
         return UNAMBIGUOUS,geno
 
     # Slow path
-    genocounts = tally(genos)
-    genocounts.pop(self.missingrepr,None)
+    genocounts = tally(g for g in genos if g)
 
     if not genocounts:
       return MISSING,self.missingrepr
@@ -282,14 +281,13 @@ class Ordered(object):
       return MISSING,self.missingrepr
     elif len(genos)==1:
       geno = genos[0]
-      if geno == self.missingrepr:
+      if not geno:
         return MISSING,geno
       else:
         return UNAMBIGUOUS,geno
 
     # Slow path
-    genocounts = tally(genos)
-    genocounts.pop(self.missingrepr,None)
+    genocounts = tally(g for g in genos if g)
 
     if not genocounts:
       return MISSING,self.missingrepr
@@ -297,7 +295,7 @@ class Ordered(object):
       return CONCORDANT,iter(genocounts).next()
 
     total = sum(genocounts.itervalues())
-    geno  = dropwhile(lambda g: g==self.missingrepr, genos).next()
+    geno  = dropwhile(lambda g: not g, genos).next()
 
     votes  = float(genocounts[geno])/total
 
@@ -389,12 +387,14 @@ def OrderedMerger(threshold=0.4999999,missingrepr=0):
   return Merger(Ordered(threshold=threshold,missingrepr=missingrepr))
 
 
-def get_genomerger(reprname):
+def get_genomerger(reprname,genorepr):
   '''
-  Retrieve the supported genotype merge algorithm. Otherwise raises an ValueError exception
-
+  Retrieve the supported genotype merge algorithm. Otherwise raises an ValueError exception.
+  
   @param reprname: genotype merger name
   @type  reprname: str
+  @param genorepr: genotype representation object
+  @type  genorepr: object
   @return        : genotype merge object
   '''
   parts = reprname.split(':')
@@ -415,9 +415,9 @@ def get_genomerger(reprname):
 
   if len(parts) == 2:
     threshold=float(parts[1])
-    return merger(threshold=threshold)
+    return merger(threshold=threshold,missingrepr=genorepr.missing)
   else:
-    return merger()
+    return merger(genorepr=genorepr)
 
 
 def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
