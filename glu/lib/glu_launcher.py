@@ -54,7 +54,7 @@ def format_elapsed_time(t):
 
 
 def run_profile(options,progmain):
-  if options.profile == 'python':
+  if options.profiler == 'python':
     try:
       import cProfile as profile
     except ImportError:
@@ -70,7 +70,7 @@ def run_profile(options,progmain):
       stats.sort_stats('time', 'calls')
       stats.print_stats(25)
 
-  elif options.profile == 'hotshot':
+  elif options.profiler == 'hotshot':
     import hotshot, hotshot.stats
 
     if sys.argv:
@@ -90,7 +90,7 @@ def run_profile(options,progmain):
       stats.print_stats(25)
 
   else:
-    raise GLUError, 'ERROR: Unknown profiling option provided "%s"' % options.profile
+    raise GLUError('ERROR: Unknown profiling option provided "%s"' % options.profiler)
 
 
 def module_info(name,module,out=sys.stderr):
@@ -129,7 +129,8 @@ def main():
                     help='verbose error output')
   parser.add_option('--path', dest='path', action='store_true',
                     help='Display GLU path')
-  parser.add_option('-p', '--profile', dest='profile', metavar='P', help=optparse.SUPPRESS_HELP)
+  parser.add_option('-p', '--profile', dest='profile', action='store_true', help=optparse.SUPPRESS_HELP)
+  parser.add_option('--profiler', dest='profiler', metavar='P', default='python', help=optparse.SUPPRESS_HELP)
 
   # options:
   #   set module path
@@ -174,7 +175,7 @@ def main():
     sys.stderr.write('[%s] Execution start\n' % time.asctime())
 
   try:
-    if getattr(glu_options,'profile',None):
+    if glu_options.profile:
       run_profile(glu_options,progmain)
     else:
       progmain()
