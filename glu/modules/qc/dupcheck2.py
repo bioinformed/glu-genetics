@@ -389,7 +389,7 @@ def main():
   print >> sys.stderr, 'Loading genotype data...'
   genorepr  = get_genorepr(options.genorepr)
   limit     = options.limit or None
-  merger    = get_genomerger(options.merge)
+  merger    = get_genomerger(options.merge,genorepr)
   samples   = load_genostream(args[0], options.format, limit=limit, genorepr=genorepr, unique=False).as_sdat(merger)
 
   exp_dupsets = None

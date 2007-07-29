@@ -27,7 +27,6 @@ from   itertools             import chain
 
 from   glu.lib.utils         import autofile,hyphen,tally
 from   glu.lib.genoarray     import get_genorepr,snp_marker
-from   glu.lib.genomerge     import get_genomerger, output_merge_statistics
 from   glu.lib.genodata      import load_genostream, guess_informat_list, guess_outformat
 
 
@@ -56,8 +55,7 @@ def option_parser():
 
 
 def compute_maf(genos):
-  counts = tally( chain(*(g for g in genos if g) ))
-  counts.pop(' ',None)
+  counts = tally(a for g in genos if g for a in g if a)
 
   if not counts:
     return ['',''],[0,0]
