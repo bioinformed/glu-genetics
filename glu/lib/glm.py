@@ -534,9 +534,9 @@ def block_cholesky(w):
   to exploit the block structure of the input and the diagonal nature of
   each block element.
 
-  The traditional algorithm costs 2*n^3*m^3/3 FLOPS, where n is the number
+  The traditional algorithm costs n^3*m^3/3 FLOPS, where n is the number
   of row/column blocks and m is the diagonal length of each block.  This
-  algorithm requires only 2n^3*m/3 FLOPS, a reduction over the usual
+  algorithm requires only n^3*m/3 FLOPS, a reduction over the usual
   algorithm of a factor of m^2 for suitably structured inputs.
 
   Example of a 2x2 block matrix of 2x2 diagonal matrices:
@@ -545,8 +545,7 @@ def block_cholesky(w):
   >>> w22 = array([64.,25.])
   >>> w12 = array([-4.,-16.])
   >>> w   = [[w11,w12],[w12,w22]]
-  >>> x   = bmat( [[diag(w11),diag(w12)],
-  ...              [diag(w12),diag(w22)]])
+  >>> x   = bdiag_to_mat(w)
   >>> x
   matrix([[ 16.,   0.,  -4.,   0.],
           [  0.,  36.,   0., -16.],
@@ -622,13 +621,13 @@ def block_cholesky(w):
   the upper left corner of the matrix A and proceeds to calculate the matrix
   column by column by:
 
-                   i-1
-  Lii = sqrt(Aii - sum (Lik*Ljk))
-                   k=1
-
              min(i,j)-1
-  Lij = (Aij - sum      (Lik*Ljk) ) )/Ljj
+  Lij = (Aij - sum      Lik*Ljk)/Ljj     for i>j
                k=1
+
+                   i-1
+  Lii = sqrt(Aii - sum Lik^2)
+                   k=1
   '''
   n = len(w)
   m = len(w[0][0])
