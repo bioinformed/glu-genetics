@@ -21,7 +21,7 @@ from itertools    import izip
 
 # Import Python numerical libraries (from http://scipy.org/)
 from numpy        import array,matrix,asmatrix,asarray,asarray_chkfinite,asanyarray,zeros,zeros_like,ones,\
-                         where,exp,log,vsplit,unique,bmat,inf,sum,dot,transpose,diag,sqrt,conjugate
+                         where,exp,log,vsplit,unique,bmat,inf,sum,dot,transpose,diag,sqrt,conjugate,eye
 from scipy        import linalg
 from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 
@@ -522,7 +522,9 @@ def bdiag_to_mat(x):
   return bmat(m)
 
 
-def block_cholesky(w):
+
+
+def block_cholesky(w,lower=True):
   '''
   Efficiently compute the lower Cholesky decomposition of a block matrix
   composed entirely of diagonal matrices.  Input is given as a 2-dimensional
@@ -641,7 +643,143 @@ def block_cholesky(w):
       else:
         c[i][j] = s/c[j][j]
 
+  if not lower:
+    for i in range(n):
+      for j in range(i):
+        c[i][j],c[j][i] = c[j][i],c[i][j]
+
   return c
+
+
+def block_inverse_from_triangular(u,lower=True):
+  '''
+  Efficiently compute the inverse of a block matrix composed entirely of
+  diagonal matrices.  Input is the upper or lower Cholesky factor of the
+  desired matrix, given as a 2-dimensional list of diagonal vectors.  As the
+  results are also in the form of a block matrix composed of diagonal
+  vectors, output is also a 2-dimensional list of diagonal vectors.
+
+  This is essentially the classical inverse of a triangular system adapted
+  to exploit the block structure of the input and the diagonal nature of
+  each block element.
+
+  >>> w11 = array([16.,36.])
+  >>> w22 = array([64.,25.])
+  >>> w12 = array([-4.,-16.])
+  >>> w   = [[w11,w12],[w12,w22]]
+  >>> x   = bdiag_to_mat(w)
+  >>> x
+  matrix([[ 16.,   0.,  -4.,   0.],
+          [  0.,  36.,   0., -16.],
+          [ -4.,   0.,  64.,   0.],
+          [  0., -16.,   0.,  25.]])
+
+  Find the inverse using the expanded form:
+
+  >>> y = matrix(x).I
+  >>> y
+  matrix([[ 0.06349206, -0.        ,  0.00396825, -0.        ],
+          [ 0.        ,  0.03881988, -0.        ,  0.02484472],
+          [ 0.00396825,  0.        ,  0.01587302, -0.        ],
+          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+  >>> norm(dot(x,y)-eye(4)) < 1e-14
+  True
+
+  Now with our algorithm, starting with a packed lower block cholesky
+  decomposition:
+
+  >>> l = block_cholesky(w)
+  >>> z = bdiag_to_mat(block_inverse_from_triangular(l))
+  >>> z
+  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
+          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+
+  Verify the solution matches above and solves x*y=I:
+
+  >>> norm(z-y) < 1e-14
+  True
+  >>> norm(dot(x,z)-eye(4)) < 1e-14
+  True
+  '''
+  m = len(u[0][0])
+  n = len(u)
+
+  if lower:
+    for i in range(n):
+      for j in range(i):
+        u[i][j],u[j][i] = u[j][i],u[i][j]
+
+  # Invert upper triangular system, updating u in place
+  for j in range(n):
+    ujj     = 1/u[j][j]
+    u[j][j] = ujj
+    t       = [ u[k][j] for k in range(j) ]
+    for i in range(j):
+      u[i][j] = -ujj*u[i][i]*t[i]+sum(u[i][k]*t[k] for k in range(i+1,j-1))
+
+  # Form a*a' = w^-1
+  c = [ [zeros(m)]*n for i in range(n) ]
+  for i in range(n):
+    for j in range(i,n):
+      c[i][j] = c[j][i] = sum(u[i][k]*u[j][k] for k in range(j,n))
+
+  return c
+
+
+def block_inverse(w):
+  '''
+  Efficiently compute the inverse of a block matrix composed entirely of
+  diagonal matrices.  Input is given as a 2-dimensional list of diagonal
+  vectors.  As the results are also in the form of a block matrix composed
+  of diagonal vectors, output is also a 2-dimensional list of diagonal
+  vectors.
+
+  This is essentially the classical inverse of a triangular system adapted
+  to exploit the block structure of the input and the diagonal nature of
+  each block element.
+
+  >>> w11 = array([16.,36.])
+  >>> w22 = array([64.,25.])
+  >>> w12 = array([-4.,-16.])
+  >>> w   = [[w11,w12],[w12,w22]]
+  >>> x   = bdiag_to_mat(w)
+  >>> x
+  matrix([[ 16.,   0.,  -4.,   0.],
+          [  0.,  36.,   0., -16.],
+          [ -4.,   0.,  64.,   0.],
+          [  0., -16.,   0.,  25.]])
+
+  Find the inverse using the expanded form:
+
+  >>> y = matrix(x).I
+  >>> y
+  matrix([[ 0.06349206, -0.        ,  0.00396825, -0.        ],
+          [ 0.        ,  0.03881988, -0.        ,  0.02484472],
+          [ 0.00396825,  0.        ,  0.01587302, -0.        ],
+          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+  >>> norm(dot(x,y)-eye(4)) < 1e-14
+  True
+
+  Now with our algorithm, starting with the packed input:
+
+  >>> z = bdiag_to_mat(block_inverse(w))
+  >>> z
+  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
+          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+
+  Verify the solution matches above and solves x*y=I:
+
+  >>> norm(z-y) < 1e-14
+  True
+  >>> norm(dot(x,z)-eye(4)) < 1e-14
+  True
+  '''
+  a = block_cholesky(w,lower=False)
+  return block_inverse_from_triangular(a,lower=False)
 
 
 def grand_mean(X):
@@ -731,6 +869,67 @@ def linreg(y, X, add_mean=False):
 
 
 def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
+  '''
+  Logistic/binomial regression
+
+  Example outcome data taken from:
+
+     http://luna.cas.usf.edu/~mbrannic/files/regression/Logistic.html
+
+  Load and parse test data
+
+  >>> from pkg_resources import resource_stream
+  >>> D = []
+  >>> indices = [0,1,2]
+  >>> for line in resource_stream(__name__,'test/heart.dat'):
+  ...   fields = line.split()
+  ...   row = [ fields[i] for i in indices ]
+  ...   row = map(float,row)
+  ...   D.append(row)
+
+  >>> D=asmatrix(D,dtype=float)
+
+  Extract dependent variable (first column) and design matrix (following columns)
+
+  >>> y,X = D[:,0].astype(int),D[:,1:]
+
+  Compute the logistic model
+
+  >>> L,b,W = logit(y,X,add_mean=True)
+
+  Compute standard errors
+
+  >>> stde = W.diagonal().A**.5
+
+  Compute Z-statistics
+
+  >>> z = b.T.A/stde
+
+  Show results
+
+  >>> print 'obs =',len(D)
+  obs = 20
+  >>> print 'logL =',L
+  logL = -9.41018298385
+  >>> print '-2logL =',-2*L
+  -2logL = 18.8203659677
+  >>> print 'beta =',b.T
+  beta = [[-6.36346994 -1.02410605  0.11904492]]
+  >>> print 'stde =',stde
+  stde = [[ 3.21389766  1.17107845  0.05497905]]
+  >>> print 'Z =',z
+  Z = [[-1.97998524 -0.87449825  2.16527797]]
+  >>> print 'X2 =',z**2
+  X2 = [[ 3.92034156  0.76474719  4.68842868]]
+
+  Test model against empty model
+
+  >>> print 'score test =',GLogit(y,X,add_mean=True).score_test().test()
+  score test = (7.5849056603773608, 2)
+  '''
+  y = asmatrix(y)
+  X = asmatrix(X)
+
   # Add type specific means, if requested
   if add_mean:
     X = grand_mean(X)
@@ -772,21 +971,80 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
     # Form weights and quadrants of the expected information matrix
     w = mu1 * (1-mu1)
 
-    # Build information matrix and compute the inverse
-    W = (X.T*(w*X.A)).I
-
     # Update regression estimates
-    z = y - mu1 + w*eta1.A
-    b = W*X.T*z
+    z = (y - mu1)/w + eta1.A
+    b,ss,W,resids,rank,s,vt = linear_least_squares(X,z,weights=w)
 
   else:
     raise RuntimeError('logit estimator failed to converge')
+
+  b = asmatrix(b)
+  W = asmatrix(W)
 
   # Return log-likelihood, regression estimates, and covariance matrix
   return L,b,W
 
 
 class GLogit(object):
+  '''
+  Example trichotomous outcome data taken from 'Logistic Regression: A
+  Self-Learning Text', David G. Kleinbaum, Springer-Verlag Telos, ISBN
+  978-0387941424 based on dataset from <need to find the book>.
+
+  Load and parse test data
+
+  >>> from pkg_resources import resource_stream
+  >>> D = []
+  >>> indices = [4,5,3,6]
+  >>> for line in resource_stream(__name__,'test/cancer.dat'):
+  ...   fields = line.split()
+  ...   row = [ fields[i] for i in indices ]
+  ...   if '.' in row:
+  ...     continue
+  ...   row = map(float,row)
+  ...   D.append(row)
+
+  >>> D=asmatrix(D,dtype=float)
+
+  Extract dependent variable (first column) and design matrix (following columns)
+
+  >>> y,X = D[:,0].astype(int),D[:,1:]
+
+  Compute the polytomous logit model for 3 outcomes
+
+  >>> L,b,W = GLogit(y,X,ref=0).fit()
+
+  Compute standard errors
+
+  >>> stde = W.diagonal().A**.5
+
+  Compute Z-statistics
+
+  >>> z = b.T.A/stde
+
+  Show results
+
+  >>> print 'obs =',len(D)
+  obs = 286
+  >>> print 'logL =',L
+  logL = -264.821392873
+  >>> print '-2logL =',-2*L
+  -2logL = 529.642785746
+  >>> print 'beta =',b.T
+  beta = [[-0.50851018 -1.41766704 -0.23349802 -0.56820429 -0.75411164 -2.43513171]]
+  >>> print 'ss =',stde
+  ss = [[ 0.22752862  0.29154207  0.47386178  0.22469103  0.25034798  1.03396066]]
+  >>> print 'Z =',z
+  Z = [[-2.2349284  -4.86265001 -0.49275555 -2.52882501 -3.01225372 -2.35514928]]
+  >>> print 'X2 =',z**2
+  X2 = [[  4.99490495  23.64536512   0.24280803   6.39495594   9.07367248
+      5.54672813]]
+
+  Test model against empty model
+
+  >>> print 'score test =',GLogit(y,X).score_test().test()
+  score test = (44.858794628046766, 4)
+  '''
 
   def __init__(self, y, X, ref=None, vars=None, add_mean=False, max_iterations=50):
     y = asmatrix(y,dtype=int)
@@ -1187,68 +1445,6 @@ class LinearWaldTest(object):
     x2 = float((b.T*w.I*b)[0,0])
 
     return x2,df
-
-
-def test_glogit():
-  '''
-  Example trichotomous outcome data taken from 'Logistic Regression: A
-  Self-Learning Text', David G. Kleinbaum, Springer-Verlag Telos, ISBN
-  978-0387941424 based on dataset from <need to find the book>.
-
-  Load and parse test data
-
-  >>> from pkg_resources import resource_stream
-  >>> D = []
-  >>> indices = [4,5,3,6]
-  >>> for line in resource_stream(__name__,'test/cancer.dat'):
-  ...   fields = line.split()
-  ...   row = [ fields[i] for i in indices ]
-  ...   if '.' in row:
-  ...     continue
-  ...   row = map(float,row)
-  ...   D.append(row)
-
-  >>> D=asmatrix(D,dtype=float)
-
-  Extract dependent variable (first column) and design matrix (following columns)
-
-  >>> y,X = D[:,0],D[:,1:]
-
-  Compute the polytomous logit model for 3 outcomes
-
-  >>> L,b,W = GLogit(y,X,ref=0).fit()
-
-  Compute standard errors
-
-  >>> stde = W.diagonal().A**.5
-
-  Compute Z-statistics
-
-  >>> z = b.T.A/stde
-
-  Show results
-
-  >>> print 'obs =',len(D)
-  obs = 286
-  >>> print 'logL =',L
-  logL = -264.821392873
-  >>> print '-2logL =',-2*L
-  -2logL = 529.642785746
-  >>> print 'beta =',b.T
-  beta = [[-0.50851018 -1.41766704 -0.23349802 -0.56820429 -0.75411164 -2.43513171]]
-  >>> print 'ss =',stde
-  ss = [[ 0.22752862  0.29154207  0.47386178  0.22469103  0.25034798  1.03396066]]
-  >>> print 'Z =',z
-  Z = [[-2.2349284  -4.86265001 -0.49275555 -2.52882501 -3.01225372 -2.35514928]]
-  >>> print 'X2 =',z**2
-  X2 = [[  4.99490495  23.64536512   0.24280803   6.39495594   9.07367248
-      5.54672813]]
-
-  Test model against empty model
-
-  >>> print 'score test =',GLogit(y,X).score_test().test()
-  score test = (44.858794628046766, 4)
-  '''
 
 
 if __name__ == '__main__':
