@@ -65,10 +65,9 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
 import unittest
-import csv
 
-from   itertools            import islice
 from   textwrap             import fill
+from   collections          import defaultdict
 
 from   glu.lib.utils        import percent
 from   glu.lib.fileutils    import load_map,autofile,hyphen
@@ -136,14 +135,14 @@ def output_group(out,name,comp):
   '''
   out.write('\n\nMISSING GENOTYPES BY %s\n' % name.upper())
   out.write('                                                         Informative                   All\n')
-  out.write('  Rank     %-17s   Member  Empty   Dropped    N / Total      %%           N / Total      %%  \n' % name)
-  out.write('  -------  ------------------  ------- ------- ------- -----------------  ------  -----------------  ------\n')
+  out.write('  Rank     %-17s   Members Empty   Dropped    N / Total      %%           N / Total      %%  \n' % name)
+  out.write('  -----  ------------------  ------- ------- ------- -------------------  ------  -------------------  ------\n')
 
   data = sorted( (vals[0],k,vals[2],vals[3],vals[4],vals[5],vals[6]) for k,vals in comp.iteritems() )
 
   for rank,(nonmiss,gname,empty,dropped,inf,total,mtotal) in enumerate(data):
     d = (rank+1,gname,mtotal,empty,dropped,nonmiss,inf,percent(nonmiss,inf),nonmiss,total,percent(nonmiss,total))
-    out.write('  %7d  %-17s  %7d %7d %7d %7d / %7d  %6.2f  %7d / %7d  %6.2f\n' % d)
+    out.write('  %5d  %-17s  %7d %7d %7d %8d /%9d  %6.2f  %8d /%9d  %6.2f\n' % d)
 
 
 def save_elements(sw, elements, name, type):
@@ -198,16 +197,16 @@ def count_missing(genotriples):
   @type  genotriples: tuple
 
   >>> genotriples = ('1420_11', 'rs2070', 17),('1420_12', 'rs2070', 19),('1420_2', 'rs2070', 0)
-  >>> count_missing(genotriples)
-  ({'1420_2': [0, 1], '1420_11': [1, 0], '1420_12': [1, 0]}, {'rs2070': [2, 1]})
+  >>> map(dict,count_missing(genotriples))
+  [{'1420_2': [0, 1], '1420_11': [1, 0], '1420_12': [1, 0]}, {'rs2070': [2, 1]}]
   '''
-  samcomp = {}
-  loccomp = {}
+  samcomp = defaultdict(lambda: [0,0])
+  loccomp = defaultdict(lambda: [0,0])
 
   for sample,locus,geno in genotriples:
     g = not geno
-    samcomp.setdefault(sample,[0,0])[g] += 1
-    loccomp.setdefault(locus,[0,0])[g] += 1
+    samcomp[sample][g] += 1
+    loccomp[locus][g]  += 1
   return samcomp,loccomp
 
 
@@ -218,34 +217,31 @@ def process_expected(regions,loccomp,samcomp,samempty,locempty):
   for locus,counts in loccomp.iteritems():
     if regions:
       expected = expected_samples(locus,regions)
-      stats = calculate(samempty,expected,samcomp,counts)
+      stats    = calculate(samempty,expected,samcomp,counts)
     else:
-      inf = len(samcomp)-len(samempty)
-      if locus in locempty:
-        inf = 0
-      stats = [len(samempty),0,inf,len(samcomp),len(samcomp)-sum(counts)]
+      inf      = max(0,len(samcomp)-len(samempty))
+      stats    = [len(samempty),0,inf,len(samcomp),len(samcomp)-sum(counts)]
     loccomp[locus].extend(stats)
 
   for sample,counts in samcomp.iteritems():
     if regions:
       expected = expected_loci(sample,regions)
-      stats = calculate(locempty,expected,loccomp,counts)
+      stats    = calculate(locempty,expected,loccomp,counts)
     else:
-      inf = len(loccomp)-len(locempty)
-      if sample in samempty:
-        inf = 0
-      stats = [len(locempty),0,inf,len(loccomp),len(loccomp)-sum(counts)]
+      inf      = max(0,len(loccomp)-len(locempty))
+      stats    = [len(locempty),0,inf,len(loccomp),len(loccomp)-sum(counts)]
     samcomp[sample].extend(stats)
+
 
 def calculate(emptyset,expected,comp,counts):
   '''
   Compute the additional statistics
   '''
-  empty    = len(emptyset & expected)
-  dropped  = len(expected - set(comp))
-  inf      = sum(counts)  - empty
-  total    = len(expected)
-  return   [empty,dropped,inf,total]
+  empty   = len(emptyset & expected)
+  dropped = len(expected - set(comp))
+  inf     = sum(counts)  - empty
+  total   = len(expected)
+  return  [empty,dropped,inf,total]
 
 
 def expected_samples(locus, regions):
@@ -278,11 +274,9 @@ def expected_loci(sample, regions):
   @rtype        : set
   '''
   loci = set()
-
   for name,rsample,rlocus in regions:
     if sample in rsample:
       loci.update(rlocus)
-
   return loci
 
 
@@ -290,24 +284,18 @@ def dropped_all(samcomp,loccomp,regions):
   '''
   Compute dropped samples/loci
   '''
-  droppedsam,droppedloc = set(),set()
-
-  def expected_all(regions):
-    '''
-    Compute all samples/loci to be expected
-    '''
+  if regions:
     expectedsam_all = set()
     expectedloc_all = set()
     for name,rsample,rlocus in regions:
       expectedsam_all.update(rsample)
       expectedloc_all.update(rlocus)
-    return expectedsam_all,expectedloc_all
 
-  if regions:
-    expectedsam_all,expectedloc_all = expected_all(regions)
     droppedsam = expectedsam_all-set(samcomp)
     droppedloc = expectedloc_all-set(loccomp)
-  return droppedsam,droppedloc
+    return droppedsam,droppedloc
+  else:
+    return set(),set()
 
 
 def build_emptyset(counts):
@@ -351,14 +339,15 @@ def completion_group(comp,groupmap):
   @param  groupmap: map sample/locus ids to grouping variables
   @type   groupmap: dict
   '''
-  groupcomp = {}
+  groupcomp = defaultdict(lambda: [0,0,0,0,0,0,0])
 
   for i,g in comp.iteritems():
-    group = groupmap.get(i,'default')
+    group = groupmap.get(i) or 'default'
+    # FIXME: Not thrilled by all of the opaque positional references
+    comp  = groupcomp[group]
     for i in range(6):
-      # FIXME: Not thrilled by all of the opaque positional references
-      groupcomp.setdefault(group,[0,0,0,0,0,0,0])[i]   += g[i]
-    groupcomp.setdefault(group,[0,0,0,0,0,0,0])[6]   += 1
+      comp[i] += g[i]
+    comp[6] += 1
 
   return groupcomp
 
@@ -435,9 +424,8 @@ def main():
   if options.regions:
     regions = list(load_regions(options.regions))
 
-  infile  = hyphen(args[0],        sys.stdin)
-  outfile = autofile(hyphen(options.output, sys.stdout),'w')
-
+  infile      = hyphen(args[0], sys.stdin)
+  outfile     = autofile(hyphen(options.output, sys.stdout),'w')
   genorepr    = get_genorepr(options.genorepr)
   genostream  = load_genostream(infile,options.format,limit=options.limit,genorepr=genorepr)
   genotriples = genostream.as_genotriples()
