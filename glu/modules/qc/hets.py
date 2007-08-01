@@ -22,37 +22,35 @@ import csv
 from   textwrap              import fill
 from   operator              import itemgetter
 
-from   glu.lib.genoarray     import snp_marker
-from   glu.lib.genodata      import load_list, load_genomatrixstream
 from   glu.lib.utils         import percent, tally
-from   glu.lib.fileutils     import autofile, hyphen
+from   glu.lib.fileutils     import autofile, hyphen, load_list
+from   glu.lib.genoarray     import snp_marker
+from   glu.lib.genodata      import load_genomatrixstream
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
 
 def het_output(out,results):
 
-  results = [ (l,hom,het,hom+het,percent(het,hom+het)) for l,(hom,het) in results ]
+  results = [ (l,hom,het,miss,percent(het,hom+het),percent(miss,hom+het+miss))
+               for l,(hom,het,miss) in results ]
 
   results.sort(key=itemgetter(4,3,0))
 
-  out.write('DEVIATIONS FROM HARDY-WEINBERG PROPORTIONS')
+  out.write('HETEROZYGOSITY')
   out.write('\n')
-  out.write('  Rank  Sample                     hom    hets     n     %het \n')
-  out.write('  ----  -------------------------  -----  -----  -----  ------\n')
+  out.write('  Rank  Sample                      homs     hets    missing   %het    %missing\n')
+  out.write('  ----  -------------------------  -------  -------  -------  -------  --------\n')
 
-  for r,(l,hom,het,n,p) in enumerate(results):
-    out.write('  %4d  %-25s  %5d  %5d  %5d  %6.2f\n' % (r+1,l,hom,het,n,p))
+  for r,(l,hom,het,miss,p1,p2) in enumerate(results):
+    out.write('  %4d  %-25s  %7d  %7d  %7d  %7.3f  %7.3f\n' % (r+1,l,hom,het,miss,p1,p2))
 
   out.write('\n')
 
 
 def save_results(sw,results):
   results.sort()
-
-  rows=[['sample', 'hom', 'hets']]
-  for r,(l,(hom,het)) in enumerate(results):
-    rows.append([l,hom,het])
-
+  rows  =[['sample', 'hom', 'hets', 'miss']]
+  rows += ([l,hom,het,miss] for r,(l,(hom,het,miss)) in enumerate(results))
   save_section(sw, 'het', rows)
 
 
@@ -81,17 +79,19 @@ def option_parser():
 def count_genos(genos):
   '''
   '''
-  f = tally(g for g in genos if g and ' ' not in g)
+  f = tally(genos)
 
-  hom = het = 0
+  hom = het = miss = 0
 
   for g,n in f.iteritems():
-    if g[0] != g[1]:
-      het += n
+    if not g or None in g:
+      miss += n
+    elif g[0] != g[1]:
+      het  += n
     else:
-      hom += n
+      hom  += n
 
-  return hom,het
+  return hom,het,miss
 
 
 def geno_counts(loci):
@@ -109,14 +109,14 @@ def read_counts(filename):
     if len(sample) < 3 or not sample[0]:
       continue
 
-    hom,het = tuple(map(int,sample[1:3]))
-    yield sample[0],(hom,het)
+    hom,het,miss = tuple(map(int,sample[1:4]))
+    yield sample[0],(hom,het,miss)
 
 
 def filter_counts(counts,mincount):
-  for sample,(hom,het) in counts:
+  for sample,(hom,het,miss) in counts:
     if hom+het >= mincount:
-      yield sample,(hom,het)
+      yield sample,(hom,het,miss)
 
 
 def main():
@@ -132,7 +132,7 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genomatrixstream(args[0],options.format,limit=options.limit,genorepr=snp_marker).as_ldat()
+    loci = load_genomatrixstream(args[0],options.format,limit=options.limit,genorepr=snp_marker).as_sdat()
 
     if options.locussubset:
       loci = loci.transformed(exclude_loci=options.locussubset)
