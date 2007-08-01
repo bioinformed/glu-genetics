@@ -16,6 +16,8 @@ use_setuptools()
 # minimum versions required
 min_python_version = (2,5)
 min_numpy_version  = '1.0.2'
+min_scipy_version  = '0.5.3'
+min_tables_version = '2.0'
 
 if sys.version_info < min_python_version:
   sys.stderr.write('Python 2.5 or newer to required to install and run GLU!\n')
@@ -39,8 +41,10 @@ Operating System :: Microsoft :: Windows
 Operating System :: Unix
 '''
 
+#entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
+
 setup (name             = 'glu',
-       version          = '0.52',
+       version          = '0.54',
        author           = 'Kevin Jacobs',
        author_email     = 'jacobske@mail.nih.gov',
        maintainer       = 'Kevin Jacobs',
@@ -52,11 +56,12 @@ setup (name             = 'glu',
                            'test for association between SNP markers with continuous or discrete '
                            'trait phenotypes.'),
        classifiers      = filter(None, classifiers.split('\n')),
-       install_requires = ['numpy>=%s' % min_numpy_version],
-       setup_requires   = ['numpy>=%s' % min_numpy_version],
+       install_requires = ['numpy>=%s'  % min_numpy_version,
+                           'scipy>=%s'  % min_scipy_version,
+                           'tables>=%s' % min_tables_version],
+       setup_requires   = ['numpy>=%s'  % min_numpy_version],
        packages         = find_packages(),
        scripts          = ['bin/glu'],
-       #entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
        zip_safe         = True,
        ext_modules = [ Extension('glu.lib.bitarrayc',        ['glu/lib/bitarrayc.c']),
                        Extension('glu.lib._genoarray',       ['glu/lib/_genoarray.c','glu/lib/bitarrayc.c'],
