@@ -20,10 +20,10 @@ import csv
 import sys
 
 from   operator          import itemgetter
-from   itertools         import islice, chain
+from   itertools         import islice, chain, izip
 
 from   glu.lib.fileutils import autofile, hyphen
-from   glu.lib.xtab      import xtab_list
+from   glu.lib.xtab      import xtab
 
 
 def option_parser():
@@ -67,10 +67,12 @@ def main():
   else:
     raise ValueError, 'Unknown or unsupported LD measure specified: %s' % options.measure
 
-  rows = xtab_list(datain,itemgetter(1),itemgetter(0),itemgetter(col),merge)
-  out.writerow(['']+rows.next())
-  for label,row in rows:
+  columns,rows,data = xtab(datain,itemgetter(1),itemgetter(0),itemgetter(col),merge)
+  out.writerow(['']+columns)
+
+  for label,row in izip(rows,data):
     out.writerow([label]+row)
+
 
 if __name__=='__main__':
   main()

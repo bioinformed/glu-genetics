@@ -19,7 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools          import islice, izip
+from   itertools          import izip
 from   textwrap           import fill
 
 from   glu.lib.utils      import percent
@@ -93,14 +93,12 @@ def completion_output2(name, data, m):
 
 
 def completion(genos, droppedrows=0, droppedcols=0):
-  header = list(genos.next())
-
   print >> sys.stderr, 'Computing completion rates...',
 
   rowcomp = {}
   colcomp = {}
 
-  colcomps = [ colcomp.setdefault(colkey,[0,0]) for colkey in header ]
+  colcomps = [ colcomp.setdefault(colkey,[0,0]) for colkey in genos.columns ]
 
   for row in genos:
     rowkey,rgenos = row
@@ -187,10 +185,6 @@ def option_parser():
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output of duplicate check report')
-  parser.add_option('-l', '--rowlimit', dest='rowlimit', metavar='N', type='int',
-                    help='Limit the number of rows considered to N for testing purposes (default=0 for unlimited)')
-  parser.add_option('-L', '--collimit', dest='collimit', metavar='N', type='int',
-                    help='Limit the number of columns considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('-r', '--droppedrows', dest='droppedrows', metavar='N', type='int', default=0,
                     help='Number of rows that where dropped from the dataset previously.  Used to compute overall completion.')
   parser.add_option('-c', '--droppedcols', dest='droppedcols', metavar='N', type='int', default=0,
@@ -211,7 +205,7 @@ def main():
     parser.print_help()
     return
 
-  genos  = load_genomatrixstream(args[0],format=options.format,limit=options.collimit)
+  genos  = load_genomatrixstream(args[0],format=options.format)
   format = genos.format
 
   if format=='sdat':
@@ -223,11 +217,6 @@ def main():
   else:
     rowlabel='Rows'
     collabel='Columns'
-
-  genos = iter(genos)
-
-  if options.rowlimit:
-    genos = islice(genos, options.rowlimit+1)
 
   results,rowresults,colresults = completion(genos, options.droppedrows, options.droppedcols)
 

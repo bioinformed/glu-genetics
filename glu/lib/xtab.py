@@ -44,22 +44,22 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
   if len(colkeys) != len(columns):
     raise ValueError, 'Column values must be unique'
 
-  # Output column metadata
-  yield columns
+  def _rowsby():
+    # Build and yield result rows
+    for rowkey,rowdata in groupby(data, get0):
+      row = [ [] for i in range(len(colkeys)) ]
 
-  # Build and yield result rows
-  for rowkey,rowdata in groupby(data, get0):
-    row = [ [] for i in range(len(colkeys)) ]
+      for rowkey,colkey,value in rowdata:
+        j = colkeys[colkey]
+        row[j].append(value)
 
-    for rowkey,colkey,value in rowdata:
-      j = colkeys[colkey]
-      row[j].append(value)
+      if aggregatefunc:
+        for colkey,j in colkeys.iteritems():
+          row[j] = aggregatefunc(rowkey, colkey, row[j] or None)
 
-    if aggregatefunc:
-      for colkey,j in colkeys.iteritems():
-        row[j] = aggregatefunc(rowkey, colkey, row[j] or None)
+      yield rowkey,row
 
-    yield rowkey,row
+  return columns,_rowsby()
 
 
 def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
@@ -105,8 +105,3 @@ def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
       yield row
 
   return columns,rows,_xtab()
-
-
-def xtab_list(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
-  columns,rows,results = xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=aggregatefunc)
-  return chain([columns],izip(rows,results))

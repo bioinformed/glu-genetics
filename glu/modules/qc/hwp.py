@@ -99,9 +99,6 @@ def option_parser():
 
 
 def geno_counts(loci):
-  # Skip header
-  loci = iter(loci)
-  loci.next()
   for lname,genos in loci:
     yield lname,count_genos(genos)
 

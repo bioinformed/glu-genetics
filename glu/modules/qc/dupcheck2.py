@@ -126,10 +126,8 @@ def load_expected_dupsets(file):
   return expected_dupset
 
 
-def find_dups(samples,threshold=85,mincount=20,exp_dups=None,sample_phenos=None):
+def find_dups(genos,threshold=85,mincount=20,exp_dups=None,sample_phenos=None):
   threshold = float(threshold)/100
-  samples = iter(samples)
-  samples.next()
   samples = list(samples)
   sample_ids = set(map(itemgetter(0),samples))
 

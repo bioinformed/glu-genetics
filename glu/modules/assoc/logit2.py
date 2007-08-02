@@ -129,9 +129,6 @@ def main():
 
   print '\t'.join(headers)
 
-  loci    = iter(loci)
-  samples = loci.next()
-
   # For each locus
   for left,locus,right in window(loci,options.window):
     lname1 = locus[0]

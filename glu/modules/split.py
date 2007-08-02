@@ -381,8 +381,7 @@ def split_fullname(filename,destdir):
 def matrix_split(matrix, prefix, suffix, options):
   format       = matrix.format
   genorepr     = matrix.genorepr
-  matrix       = iter(matrix)
-  header       = matrix.next()
+  header       = matrix.columns
   maxrows      = options.maxrows
   locusgroups  = load_map(options.locusgroups, unique=False) if options.locusgroups  else None
   samplegroups = load_map(options.samplegroups,unique=False) if options.samplegroups else None

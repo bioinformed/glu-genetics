@@ -19,8 +19,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 import csv
 import sys
 
-from   itertools           import islice
-
 from   scipy               import stats
 
 from   glu.lib.glm         import GLogit
@@ -45,8 +43,6 @@ def option_parser():
                     help='List of loci to include')
   parser.add_option('-D', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='List of loci to exclude')
-  parser.add_option('-x', '--fixedloci', dest='fixedloci', metavar='FILE',
-                    help='List of loci to include in every model')
   parser.add_option('--nullmodel', dest='nullmodel', action='store_true', default=False, help='Show null model')
   parser.add_option('--minmaf', dest='minmaf', metavar='N', default=0.01, type='float',
                     help='Minimum minor allele frequency filter')
@@ -68,7 +64,7 @@ def main():
 
   loci,models = build_models(args[0], args[1], options)
 
-  loci        = dict(islice(loci,1,None))
+  loci        = dict(loci)
   trend_terms = sum( (TREND(l) for l in loci), NULL())
   null_terms  = sum( ( NULL(l) for l in loci), NULL())
 

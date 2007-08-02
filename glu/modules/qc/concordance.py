@@ -190,14 +190,12 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
 
 def load_reference_genotypes(filename, format, locusset, sampleset, limit):
   genos = load_genostream(filename,format)
-  genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
-  rows  = iter(genos.as_ldat())
+  genos = genos.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
 
-  samples = rows.next()
-  samples = dict( (s,i) for i,s in enumerate(samples) )
+  samples = dict( (s,i) for i,s in enumerate(genos.samples) )
   loci = []
   genos = []
-  for locus,row in rows:
+  for locus,row in genos:
     loci.append(locus)
     genos.append(row)
 

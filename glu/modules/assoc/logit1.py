@@ -126,9 +126,6 @@ def main():
       bi.extend( [b[:1],[[0]]*i,b[1:]] )
     initial_beta.append(vstack(bi))
 
-  loci    = iter(loci)
-  samples = loci.next()
-
   terms = [ get_term(m) for m in options.genomodel.split(',') ]
 
   if not terms:

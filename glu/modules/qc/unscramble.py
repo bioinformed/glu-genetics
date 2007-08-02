@@ -26,46 +26,26 @@ __license__   = 'See GLU license for terms by running: glu license'
 import csv
 import sys
 from   operator          import itemgetter
-from   itertools         import islice, chain
 from   glu.lib.utils     import autofile, peekfirst
 from   glu.lib.genoarray import snp_acgt
 from   glu.lib.remap     import remap_alleles, remap_category
-from   glu.lib.genodata  import load_genomatrixstream, reorder_genomatrix_columns
+from   glu.lib.genodata  import load_genomatrixstream
 
 
 def align_genotypes(genos1, genos2):
-  genos1 = list(genos1)
-  genos2 = list(genos2)
+  sampleset = set(genos1.columns) && set(genos2.columns)
+  samples   = [ c for c in cols1 if c in sampleset ]
 
-  cols1,genos1 = peekfirst(genos1)
-  cols2,genos2 = peekfirst(genos2)
-
-  genos1 = list(genos1)
-  genos2 = list(genos2)
-
-  colset = set(cols1) & set(cols2)
-  cols   = [ c for c in cols1 if c in colset ]
-
-  genos1 = reorder_genomatrix_columns(genos1, cols)
-  genos2 = reorder_genomatrix_columns(genos2, cols)
-
-  genos1 = list(genos1)
-  genos2 = list(genos2)
+  genos1 = genos1.sorted(sampleorder=samples)
+  genos2 = genos2.sorted(sampleorder=samples)
 
   return genos1,genos2
 
 
 def concordance(test,reference):
-   test        = iter(test)
-   testsamples = test.next()
-
-   reference   = iter(reference)
-   refsamples  = reference.next()
-
-   assert testsamples == refsamples
+   assert test.columns == test.samples == reference.columns == reference.samples
 
    reference = list(reference)
-
    for testlocus,testgenos in test:
      results = []
      ident = 0
@@ -109,11 +89,9 @@ def main():
     parser.print_help()
     return
 
-  test           = load_genomatrixstream(args[0], format=options.testformat)
-  reference      = load_genomatrixstream(args[1], format=options.refformat)
-  reference      = list(reference)
+  test           = load_genomatrixstream(args[0], format=options.testformat).as_ldat()
+  reference      = load_genomatrixstream(args[1], format=options.refformat).as_ldat()
   test,reference = align_genotypes(test,reference)
-
   concordance(test,reference)
 
 

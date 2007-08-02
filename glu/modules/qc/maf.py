@@ -23,7 +23,6 @@ import sys
 import csv
 
 from   operator              import itemgetter
-from   itertools             import chain
 
 from   glu.lib.utils         import autofile,hyphen,tally
 from   glu.lib.genoarray     import get_genorepr,snp_marker
@@ -83,8 +82,6 @@ def main():
   print >> sys.stderr, 'INPUT : format=%s,repr=%s' % (options.format, options.genorepr)
 
   data   = load_genostream(args[0],options.format,limit=options.limit,genorepr=genorepr).recoded(snp_marker).as_ldat()
-  data   = iter(data)
-  header = data.next()
 
   outfile = hyphen(options.output,sys.stdout)
   out = csv.writer(outfile,dialect='excel-tab')

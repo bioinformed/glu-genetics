@@ -23,8 +23,9 @@ __license__   = 'See GLU license for terms by running: glu license'
 import re
 import sys
 import csv
-from   itertools         import islice, chain, groupby
-from   operator          import attrgetter, itemgetter
+
+from   operator         import itemgetter
+
 from   glu.lib.utils    import autofile, hyphen
 from   glu.lib.xtab     import rowsby
 from   glu.lib.genodata import load_list,load_map,save_genomatrix
@@ -137,10 +138,10 @@ def main():
 
   data = datastream(genos,options.rowkey,options.colkey,options.datakey)
 
-  rows = rowsby(data, columns, itemgetter(0), itemgetter(1), itemgetter(2), merge_genos)
+  columns,rows = rowsby(data, columns, itemgetter(0), itemgetter(1), itemgetter(2), merge_genos)
 
   out = hyphen(options.output,sys.stdout)
-  save_genomatrix(out,rows,genorepr=list)
+  save_genomatrix(out,columns,rows,genorepr=list)
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools             import islice, izip, chain, imap
+from   itertools             import izip, chain
 from   textwrap              import fill
 
 from   glu.lib.utils         import percent
@@ -192,10 +192,6 @@ def main():
 
   if options.samplemap:
     samples = samples.transformed(rename_samples=options.samplemap)
-
-  # Skip locus names
-  samples = iter(samples)
-  samples.next()
 
   # Materialize samples
   samples = list(samples)

@@ -90,9 +90,6 @@ def main():
   out.write('\t'.join( ['Locus','Wald X2', 'df', 'p-value', 'Score X2', 'df', 'p-value'] ))
   out.write('\n')
 
-  loci    = iter(loci)
-  samples = loci.next()
-
   terms = [ get_term(m) for m in options.genomodel.split(',') ]
 
   if not terms:

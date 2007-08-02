@@ -370,8 +370,6 @@ def main():
   t4 = time.clock()
 
   if 1:
-    m = n//10
-    s=float(n)/m
     for i in range(m):
       e = genoarray.snp_marker.pack_strs(genos)
       f = genoarray.snp_marker.pack_reps(e)
@@ -383,13 +381,13 @@ def main():
     print '_genoarray:',t2-t1
     print 'snp_acgt2 :',t3-t2
     print 'snp_acgt  :',t4-t3
-    print 'snp_marker:',(t5-t4)*s
+    print 'snp_marker:',t5-t4
     print
     print '_genoarray/snp_acgt  :',(t2-t1)/(t4-t3),(t4-t3)/(t2-t1)
     print 'snp_acgt2 /snp_acgt  :',(t3-t2)/(t4-t3),(t4-t3)/(t3-t2)
     print
-    print 'snp_acgt2 /snp_marker:',(t3-t2)/(t5-t4)/s,(t5-t4)/(t3-t2)*s
-    print '_genoarray/snp_marker:',(t2-t1)/(t5-t4)/s,(t5-t4)/(t2-t1)*s
+    print 'snp_acgt2 /snp_marker:',(t3-t2)/(t5-t4),(t5-t4)/(t3-t2)
+    print '_genoarray/snp_marker:',(t2-t1)/(t5-t4),(t5-t4)/(t2-t1)
 
   if 0:
     snp_ab = model_from_alleles('AB',allow_hemizygote=True)

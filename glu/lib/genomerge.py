@@ -390,7 +390,7 @@ def OrderedMerger(threshold=0.4999999,missingrepr=0):
 def get_genomerger(reprname,genorepr):
   '''
   Retrieve the supported genotype merge algorithm. Otherwise raises an ValueError exception.
-  
+
   @param reprname: genotype merger name
   @type  reprname: str
   @param genorepr: genotype representation object

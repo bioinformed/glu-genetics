@@ -259,7 +259,7 @@ def main():
 
   abmap   = build_abmap(loci,user_abmap)
   samples = convert_ab_genos(loci, samples, abmap)
-  genos   = GenomatrixStream(chain([loci],samples), 'sdat', genorepr=snp_marker)
+  genos   = GenomatrixStream(samples, 'sdat', loci=loci, genorepr=snp_marker)
 
   save_genostream(hyphen(options.output,sys.stdout),genos,options.outformat)
 

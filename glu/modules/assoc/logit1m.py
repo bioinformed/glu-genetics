@@ -83,9 +83,7 @@ def main():
 
   print '\t'.join(headers)
 
-  loci    = iter(loci)
-  samples = loci.next()
-
+  # FIXME: Load fixed loci
   fixed_loci  = dict(fixed_loci)
   fixed_trend = sum( (TREND(l) for l in fixed_loci), NULL())
   fixed_null  = sum( ( NULL(l) for l in fixed_loci), NULL())

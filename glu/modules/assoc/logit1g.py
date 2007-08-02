@@ -162,9 +162,6 @@ def main():
   out.write('\t'.join(headers))
   out.write('\n')
 
-  loci    = iter(loci)
-  samples = loci.next()
-
   # For each locus
   for locus in loci:
     lname = locus[0]
