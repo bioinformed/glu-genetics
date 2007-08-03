@@ -30,6 +30,7 @@ import tables
 from   utils      import tally,ilen
 from   genoarray  import snp_acgt, snp_acgt2, snp_marker
 from   genoarray2 import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype
+from   genoio     import load_genotriples,load_genomatrix
 
 
 def xlen2(s):
@@ -788,7 +789,7 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
       chunks    = int(len(rows)+chunksize-1)//chunksize
 
       stop = 0
-      for i in range(chunks):
+      for i in xrange(chunks):
         start,stop = stop,stop+chunksize
         labels = rows[start:stop]
         chunk  = gfile.root.genotypes[start:stop,:]
@@ -809,7 +810,7 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
 
       stop = 0
       mods = iter(models)
-      for i in range(chunks):
+      for i in xrange(chunks):
         start,stop = stop,stop+chunksize
         labels = rows[start:stop]
         chunk  = gfile.root.genotypes[start:stop,:]
@@ -835,7 +836,7 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
       stopbit = 0
       stop    = 0
       mods = iter(models)
-      for i in range(chunks):
+      for i in xrange(chunks):
         start    = stop
         startbit = stopbit
 
@@ -878,7 +879,7 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
 
       stopbit = 0
       stop    = 0
-      for i in range(chunks):
+      for i in xrange(chunks):
         start    = stop
         startbit = stopbit
 
@@ -938,6 +939,46 @@ def recode_genomatrixstream_bitpacked(columns, genos, format, old_genorepr):
   ('l2', [(None, None), (None, None), (None, None)])
   ('l3', [('A', 'A'), (None, None), (None, None)])
   ('l4', [('G', 'T'), (None, None), ('T', 'T')])
+
+  >>> genos = [('l1', [('A', 'A'),    None,   ('G', 'G')]),
+  ...          ('l2', [   None,       None,      None   ]),
+  ...          ('l3', [('A', 'A'),    None,      None   ]),
+  ...          ('l4', [('G', 'T'),    None,   ('T', 'T')])]
+  >>> samples,new_rows = recode_genomatrixstream_bitpacked(samples,genos,'ldat',snp_marker)
+  >>> samples
+  ('s1', 's2', 's3')
+  >>> for row in new_rows:
+  ...   print row
+  ('l1', [('A', 'A'), (None, None), ('G', 'G')])
+  ('l2', [(None, None), (None, None), (None, None)])
+  ('l3', [('A', 'A'), (None, None), (None, None)])
+  ('l4', [('G', 'T'), (None, None), ('T', 'T')])
+
+  >>> samples = ('l1','l2','l3', 'l4')
+  >>> genos = [('s1',[17,0,17,52]),
+  ...          ('s2',[0,0,0,0]),
+  ...          ('s3',[51,0,0,68])]
+  >>> samples,new_rows = recode_genomatrixstream_bitpacked(samples,genos,'sdat',snp_acgt)
+  >>> samples
+  ('l1', 'l2', 'l3', 'l4')
+  >>> for row in new_rows:
+  ...   print row
+  ('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')])
+  ('s2', [(None, None), (None, None), (None, None), (None, None)])
+  ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
+
+  >>> samples = ('l1','l2','l3', 'l4')
+  >>> genos = [('s1',[17,0,17,52]),
+  ...          ('s2',[0,0,0,0]),
+  ...          ('s3',[51,0,0,68])]
+  >>> samples,new_rows = recode_genomatrixstream_bitpacked(samples,iter(genos),'sdat',snp_acgt)
+  >>> samples
+  ('l1', 'l2', 'l3', 'l4')
+  >>> for row in new_rows:
+  ...   print row
+  ('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')])
+  ('s2', [(None, None), (None, None), (None, None), (None, None)])
+  ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
   '''
   if format == 'ldat':
     def _recode():
@@ -960,18 +1001,15 @@ def recode_genomatrixstream_bitpacked(columns, genos, format, old_genorepr):
         row = GenotypeArray(descr, geno)
         yield label,row
 
-  elif format == 'sdat':
-    if not isinstance(genos, (list,tuple)):
-      genos = list(genos)
-
+  # Materialized sdat
+  elif format == 'sdat' and isinstance(genos, (list,tuple)):
     def _recode():
-
-      counts = [ defaultdict(int) for i in range(len(columns)) ]
+      counts = [ defaultdict(int) for i in xrange(len(columns)) ]
 
       for label,row in genos:
         geno = [ g or (None,None) for g in old_genorepr.genos_from_reps(row) ]
-        for i,g in enumerate(geno):
-          counts[i][g] += 1
+        for c,g in izip(counts,geno):
+          c[g] += 1
 
       modelmap = {}
       models   = []
@@ -994,10 +1032,114 @@ def recode_genomatrixstream_bitpacked(columns, genos, format, old_genorepr):
         geno = [ g or (None,None) for g in old_genorepr.genos_from_reps(row) ]
         yield label,GenotypeArray(descr, geno)
 
+  # Naive streaming sdat
+  elif format == 'sdat':
+    def _recode():
+      models = [ UnphasedMarkerModel() for c in columns ]
+      descr = GenotypeArrayDescriptor(models)
+      for label,row in genos:
+        gmodels = izip(models,old_genorepr.genos_from_reps(row))
+        geno    = [ model.add_genotype(g or (None,None)) for model,g in gmodels ]
+        yield label,GenotypeArray(descr, geno)
+
   else:
     raise ValueError('Unsupported format')
 
   return columns,_recode()
+
+
+def load_genomatrix_text(filename,format=None,limit=None,unique=True):
+  '''
+  Load the genotype matrix data from file.
+  Note that the first row is header and the rest rows are genotypes,
+  and the file is tab delimited.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param       format: text string expected in the first header field to
+                       indicate data format, if specified
+  @type        format: string
+  @param        limit: limit the number of columms loaded
+  @type         limit: int or None
+  @param       unique: verify that rows and columns are uniquely labeled
+                       (default is True)
+  @type        unique: bool
+  @return:             format and sequence of column names followed by
+                       tuples of row label and row data
+  @rtype:              tuple of string and generator
+
+  >>> from StringIO import StringIO
+  >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
+  >>> format,columns,rows = load_genomatrix_text(data,'ldat')
+  >>> format
+  'ldat'
+  >>> columns
+  ('s1', 's2', 's3')
+  >>> for row in rows:
+  ...   print row
+  ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
+  ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
+  '''
+  format,columns,rows = load_genomatrix(filename,format=format,limit=limit,genorepr=snp_marker.pack_strs,unique=unique)
+  columns,rows = recode_genomatrixstream_bitpacked(columns, rows, format, snp_marker)
+  return format,columns,rows
+
+
+def recode_genotriples_bitpacked(triples, old_genorepr):
+  '''
+  Returns a new genotriples with the genotypes recoded to the a new internal representation
+
+  @param      triples: genomatriple
+  @type       triples: genomatriple generator
+  @param old_genorepr: internal representation of genotypes to be transformed from
+  @type  old_genorepr: UnphasedMarkerRepresentation or similar object
+  @return            : genotriple in bitpacked format
+  @rtype             : genotriple generator
+
+  >>> triples = [('s3','l1', 51),('s3','l2', 17),
+  ...            ('s2','l3', 52),('s1','l1', 68),
+  ...            ('s1','l1', 51),('s2','l2', 17)]
+  >>> for row in recode_genotriples_bitpacked(triples,snp_acgt):
+  ...   print row
+  ('s3', 'l1', ('G', 'G'))
+  ('s3', 'l2', ('A', 'A'))
+  ('s2', 'l3', ('G', 'T'))
+  ('s1', 'l1', ('T', 'T'))
+  ('s1', 'l1', ('G', 'G'))
+  ('s2', 'l2', ('A', 'A'))
+  '''
+  models = {}
+  for sample,locus,geno in triples:
+    model = models.get(locus)
+    if not model:
+      models[locus] = model = UnphasedMarkerModel()
+    geno = old_genorepr.geno_from_rep(geno) or (None,None)
+    yield sample,locus,model.add_genotype(geno)
+
+
+def load_genotriples_text(filename,limit=None):
+  '''
+  Load genotype triples from file
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param        limit: limit the number of genotypes loaded
+  @type         limit: int or None
+  @return            : sequence of tuples of sample name, locus name, and genotype
+  @rtype             : generator
+
+  >>> from StringIO import StringIO
+  >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
+  >>> triples = load_genotriples_text(data)
+  >>> for triple in triples:
+  ...   print triple
+  ('s1', 'l1', ('A', 'A'))
+  ('s1', 'l2', ('G', 'G'))
+  ('s2', 'l1', ('A', 'G'))
+  ('s2', 'l2', ('C', 'C'))
+  '''
+  triples = load_genotriples(filename,limit=limit,genorepr=snp_marker.rep_from_str)
+  return recode_genotriples_bitpacked(triples, snp_marker)
 
 
 def test(descr,filename,command,genotypes):
@@ -1167,4 +1309,4 @@ def _test():
 
 if __name__ == '__main__':
   _test()
-  main()
+  #main()

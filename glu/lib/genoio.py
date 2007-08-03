@@ -137,6 +137,7 @@ def load_rename_alleles_file(filename):
 def load_hapmap_genotypes(filename,limit=None,genorepr=snp_acgt.pack_strs):
   '''
   Load the hampmap genotype data from file.
+
   @param     filename: file name or file object
   @type      filename: str or file object
   @param        limit: limit the number of samples loaded
@@ -144,8 +145,8 @@ def load_hapmap_genotypes(filename,limit=None,genorepr=snp_acgt.pack_strs):
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @return: rows of genotypes with the first row being the sample names
-  @rtype:  generator
+  @return            : rows of genotypes with the first row being the sample names
+  @rtype             : generator
   '''
   gfile = autofile(filename)
   gfile = dropwhile(lambda s: s.startswith('#'), gfile)
@@ -194,9 +195,21 @@ def load_genomatrix(filename,format=None,limit=None,genorepr=snp_acgt.pack_strs,
   @param       unique: verify that rows and columns are uniquely labeled
                        (default is True)
   @type        unique: bool
-  @return:             format and sequence of column names followed by
+  @return            : format and sequence of column names followed by
                        tuples of row label and row data
-  @rtype:              tuple of string and generator
+  @rtype             : tuple of string and generator
+
+  >>> from StringIO import StringIO
+  >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
+  >>> format,columns,rows = load_genomatrix(data,'ldat',genorepr=snp_marker.pack_strs)
+  >>> format
+  'ldat'
+  >>> columns
+  ('s1', 's2', 's3')
+  >>> for row in rows:
+  ...   print row
+  ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
+  ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
   '''
   format,columns,rows = _load_genomatrix(filename,format=format,limit=limit,genorepr=genorepr)
 
@@ -525,8 +538,18 @@ def load_genotriples(filename,limit=None,genorepr=snp_acgt.rep_from_str):
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @return: sequence of tuples of sample name, locus name, and genotype representation
-  @rtype:  generator
+  @return            : sequence of tuples of sample name, locus name, and genotype representation
+  @rtype             : generator
+
+  >>> from StringIO import StringIO
+  >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
+  >>> triples = load_genotriples(data,genorepr=snp_marker.rep_from_str)
+  >>> for triple in triples:
+  ...   print triple
+  ('s1', 'l1', ('A', 'A'))
+  ('s1', 'l2', ('G', 'G'))
+  ('s2', 'l1', ('A', 'G'))
+  ('s2', 'l2', ('C', 'C'))
   '''
   rows = csv.reader(autofile(filename),dialect='tsv')
 
