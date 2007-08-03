@@ -357,8 +357,8 @@ def sqrtm(x):
 
   # Compute upper triangular square root R of T a column at a tim
   R = diag(sqrt(diag(T)))
-  for j in range(n):
-    for i in range(j-1,-1,-1):
+  for j in xrange(n):
+    for i in xrange(j-1,-1,-1):
       k = slice(i+1,j)
       R[i,j] = (T[i,j] - dot(R[i,k],R[k,j]))/(R[i,i] + R[j,j])
 
@@ -515,9 +515,9 @@ def sqrtm_symmetric2(x):
 
 def bdiag_to_mat(x):
   n = len(x)
-  m = [ [None]*n for i in range(n) ]
-  for i in range(n):
-    for j in range(n):
+  m = [ [None]*n for i in xrange(n) ]
+  for i in xrange(n):
+    for j in xrange(n):
       m[i][j] = diag(x[i][j])
   return bmat(m)
 
@@ -633,19 +633,19 @@ def block_cholesky(w,lower=True):
   '''
   n = len(w)
   m = len(w[0][0])
-  c = [ [zeros(m)]*n for i in range(n) ]
+  c = [ [zeros(m)]*n for i in xrange(n) ]
 
-  for j in range(n):
-    for i in range(j,n):
-      s = w[i][j] - sum(c[i][k]*c[j][k] for k in range(min(i,j)))
+  for j in xrange(n):
+    for i in xrange(j,n):
+      s = w[i][j] - sum(c[i][k]*c[j][k] for k in xrange(min(i,j)))
       if i==j:
         c[i][j] = s**0.5
       else:
         c[i][j] = s/c[j][j]
 
   if not lower:
-    for i in range(n):
-      for j in range(i):
+    for i in xrange(n):
+      for j in xrange(i):
         c[i][j],c[j][i] = c[j][i],c[i][j]
 
   return c
@@ -707,23 +707,23 @@ def block_inverse_from_triangular(u,lower=True):
   n = len(u)
 
   if lower:
-    for i in range(n):
-      for j in range(i):
+    for i in xrange(n):
+      for j in xrange(i):
         u[i][j],u[j][i] = u[j][i],u[i][j]
 
   # Invert upper triangular system, updating u in place
-  for j in range(n):
+  for j in xrange(n):
     ujj     = 1/u[j][j]
     u[j][j] = ujj
-    t       = [ u[k][j] for k in range(j) ]
-    for i in range(j):
-      u[i][j] = -ujj*u[i][i]*t[i]+sum(u[i][k]*t[k] for k in range(i+1,j-1))
+    t       = [ u[k][j] for k in xrange(j) ]
+    for i in xrange(j):
+      u[i][j] = -ujj*u[i][i]*t[i]+sum(u[i][k]*t[k] for k in xrange(i+1,j-1))
 
   # Form a*a' = w^-1
-  c = [ [zeros(m)]*n for i in range(n) ]
-  for i in range(n):
-    for j in range(i,n):
-      c[i][j] = c[j][i] = sum(u[i][k]*u[j][k] for k in range(j,n))
+  c = [ [zeros(m)]*n for i in xrange(n) ]
+  for i in xrange(n):
+    for j in xrange(i,n):
+      c[i][j] = c[j][i] = sum(u[i][k]*u[j][k] for k in xrange(j,n))
 
   return c
 
@@ -951,7 +951,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   L = -1e308*1e308
 
   # Iterate until convergence
-  for i in range(max_iterations):
+  for i in xrange(max_iterations):
     eta1 = X*b
 
     # Compute expected values and linear predictors
@@ -1093,12 +1093,12 @@ class GLogit(object):
     n,m = X.shape
 
     # Initial estimate for mu1_0 and mu2_0
-    mu = array( [(y==i+1).sum() for i in range(k) ], dtype=float)/n
+    mu = array( [(y==i+1).sum() for i in xrange(k) ], dtype=float)/n
 
     # Initial estimates of beta (b1,b2)
     if initial_beta is None:
       b = []
-      for i in range(k):
+      for i in xrange(k):
         bi = asmatrix(zeros(m), dtype=float).T
         bi[0,0] = log(mu[i]/(1-mu.sum()))
         b.append(bi)
@@ -1109,13 +1109,13 @@ class GLogit(object):
     L = -inf
 
     # Iterate until convergence
-    for iteration in range(max_iterations):
+    for iteration in xrange(max_iterations):
       eta = [ X*bi for bi in b ]
 
       # Compute expected values and linear predictors
       mu0  = 1/(1+sum(exp(etai) for etai in eta)).A
       eta0 = log(mu0)
-      mu   = [ exp(eta[i]).A*mu0 for i in range(k) ]
+      mu   = [ exp(eta[i]).A*mu0 for i in xrange(k) ]
 
       # Compute likelihood
       newL = eta0.sum() + y.choose( [0]+eta ).sum()
@@ -1150,9 +1150,9 @@ class GLogit(object):
 
   def weights(self,mu):
     k = len(mu)
-    w = [ [None]*k for i in range(k) ]
-    for i in range(0,k):
-      for j in range(i,k):
+    w = [ [None]*k for i in xrange(k) ]
+    for i in xrange(0,k):
+      for j in xrange(i,k):
         if i == j:
           w[i][i] = mu[i]*(1-mu[i])
         else:
@@ -1163,9 +1163,9 @@ class GLogit(object):
   def information_matrix(self,w):
     X = self.X
     k = len(w)
-    W = [ [None]*k for i in range(k) ]
-    for i in range(0,k):
-      for j in range(i,k):
+    W = [ [None]*k for i in xrange(k) ]
+    for i in xrange(0,k):
+      for j in xrange(i,k):
         W[i][j] = W[j][i] = X.T*(w[i][j]*X.A)
     return bmat(W)
 
@@ -1176,9 +1176,9 @@ class GLogit(object):
     k = len(mu)
 
     xz = []
-    for i in range(k):
+    for i in xrange(k):
       # Form adjusted dependent variable: z_i = y_i-mu_i + eta
-      z   = (y==i+1) - mu[i] + sum( w[i][j]*eta[j].A for j in range(k) )
+      z   = (y==i+1) - mu[i] + sum( w[i][j]*eta[j].A for j in xrange(k) )
       # Evaluate X'z_i
       xz += [[X.T*z]]
 
@@ -1203,7 +1203,7 @@ class GLogitScoreTest(object):
 
     if indices is None:
       indices = []
-      for i in range(k):
+      for i in xrange(k):
         s = i*n
         indices += range(s+1,s+n)
 
@@ -1214,14 +1214,14 @@ class GLogitScoreTest(object):
       assert design_indices
       assert all(m == k for m in design_indices.itervalues())
 
-      null_indices = [ i for i in range(n) if i not in design_indices ]
+      null_indices = [ i for i in xrange(n) if i not in design_indices ]
       X_null = X[:,null_indices]
 
       # Fit null model
       self.null_L,beta_null,W = GLogit(y,X_null).fit(initial_beta=initial_beta)
 
       # Augment null beta with zeros for all parameters to be tested
-      null_indices = (i for i in range(n*k) if i not in indices)
+      null_indices = (i for i in xrange(n*k) if i not in indices)
       beta = asmatrix(zeros((X.shape[1]*k,1), dtype=float))
       for b,i in izip(beta_null.A.ravel(),null_indices):
         beta[i,0] = b
@@ -1256,7 +1256,7 @@ class GLogitScoreTest(object):
     # Compute expected values and linear predictors
     mu0  = 1/(1+sum(exp(etai) for etai in eta)).A
     eta0 = log(mu0)
-    mu   = [ exp(eta[i]).A*mu0 for i in range(k) ]
+    mu   = [ exp(eta[i]).A*mu0 for i in xrange(k) ]
 
     # Form weights and blocks of the expected information matrix
     w = self.model.weights(mu)
@@ -1266,7 +1266,7 @@ class GLogitScoreTest(object):
 
     # Compute scores
     # FIXME: Can scores and mu be further vectorized?
-    scores = bmat([ (y==i+1) - mu[i] for i in range(k) ])
+    scores = bmat([ (y==i+1) - mu[i] for i in xrange(k) ])
 
     return scores,w,W
 
@@ -1299,9 +1299,9 @@ class GLogitWaldTest(object):
       n = X.shape[1]
       k = len(model.categories)-1
       indices = []
-      for i in range(k):
+      for i in xrange(k):
         s = i*n
-        indices += range(s+1,s+n)
+        indices += xrange(s+1,s+n)
 
     self.model   = model
     self.indices = indices
@@ -1376,11 +1376,11 @@ class LinearScoreTest(object):
     n = X.shape[1]
 
     if indices is None:
-      indices = range(1,n)
+      indices = xrange(1,n)
 
     if beta is None:
       design_indices = set(indices)
-      null_indices = [ i for i in range(n) if i not in design_indices ]
+      null_indices = [ i for i in xrange(n) if i not in design_indices ]
       X_null = X[:,null_indices]
 
       # Fit null model
@@ -1428,7 +1428,7 @@ class LinearWaldTest(object):
   def __init__(self,model,indices=None):
     if indices is None:
       n = X.shape[1]
-      indices = range(1,n)
+      indices = xrange(1,n)
 
     self.model   = model
     self.indices = indices
