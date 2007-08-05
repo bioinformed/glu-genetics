@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 '''
-File:          logit.py
+File:          glm.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
 Created:
 
-Abstract:
+Abstract:      Generalized linear models
 
 Requires:      Python 2.5, glu
 
@@ -297,8 +297,8 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   s2[rank:] = 0
 
   # Form covariance matrix based on SVD using truncated singular values:
-  #   X     = U*S*V'                   U is unitary, so that U'*U=U*U'=I;
-  #  X'X    = V*S**2*V'                V is unitary, so that V'*V=V*V'=I;
+  #   X     = U*S*V'                   U is unitary, so U'*U=U*U'=I;
+  #  X'X    = V*S**2*V'                V is unitary, so V'*V=V*V'=I;
   #   I     = V*S**2*V'*(V*S**-2*V')   S is diagonal positive semi-definite
   # (X'X).I = V*S**-2*V'
   v   = transpose(vt)
@@ -514,14 +514,51 @@ def sqrtm_symmetric2(x):
 
 
 def bdiag_to_mat(x):
+  '''
+  Expand a block matrix of block diagonal matrices stored as vectors into a
+  dense matrix.  Each block must be of equal size.
+
+  >>> w11 = array([16.,36.])
+  >>> w22 = array([64.,25.])
+  >>> w12 = array([-4.,-16.])
+  >>> bdiag_to_mat([[w11,w12],[w12,w22]])
+  matrix([[ 16.,   0.,  -4.,   0.],
+          [  0.,  36.,   0., -16.],
+          [ -4.,   0.,  64.,   0.],
+          [  0., -16.,   0.,  25.]])
+  '''
   n = len(x)
   m = [ [None]*n for i in xrange(n) ]
   for i in xrange(n):
     for j in xrange(n):
-      m[i][j] = diag(x[i][j])
+      m[i][j] = diag(asarray(x[i][j]).reshape(-1))
   return bmat(m)
 
 
+def bdiag_copy(x):
+  '''
+  Return a copy of the specified block matrix of block diagonal matrices
+  stored as vectors.
+
+  >>> w11 = array([16.,36.])
+  >>> w22 = array([64.,25.])
+  >>> w12 = array([-4.,-16.])
+  >>> w=[[w11,w12],[w12,w22]]
+  >>> x=bdiag_copy(w)
+  >>> w[0][0] *= 2
+  >>> bdiag_to_mat(x)  # Not changed
+  matrix([[ 16.,   0.,  -4.,   0.],
+          [  0.,  36.,   0., -16.],
+          [ -4.,   0.,  64.,   0.],
+          [  0., -16.,   0.,  25.]])
+  >>> bdiag_to_mat(w)  # Changed
+  matrix([[ 32.,   0.,  -4.,   0.],
+          [  0.,  72.,   0., -16.],
+          [ -4.,   0.,  64.,   0.],
+          [  0., -16.,   0.,  25.]])
+  '''
+  k = len(x)
+  return [ [ x[i][j].copy() for j in xrange(k) ] for i in xrange(k) ]
 
 
 def block_cholesky(w,lower=True):
@@ -532,9 +569,9 @@ def block_cholesky(w,lower=True):
   matrix composed of diagonal vectors, output is also a 2-dimensional list
   of diagonal vectors.
 
-  This is essentially the classical scalar Cholesky-Crout algorithm adapted
-  to exploit the block structure of the input and the diagonal nature of
-  each block element.
+  This function employed a method that is essentially the classical scalar
+  Cholesky-Crout algorithm adapted to exploit the block structure of the
+  input and the diagonal nature of each block element.
 
   The traditional algorithm costs n^3*m^3/3 FLOPS, where n is the number
   of row/column blocks and m is the diagonal length of each block.  This
@@ -637,7 +674,8 @@ def block_cholesky(w,lower=True):
 
   for j in xrange(n):
     for i in xrange(j,n):
-      s = w[i][j] - sum(c[i][k]*c[j][k] for k in xrange(min(i,j)))
+      ww = asarray(w[i][j]).reshape(-1)
+      s = ww - sum(c[i][k]*c[j][k] for k in xrange(min(i,j)))
       if i==j:
         c[i][j] = s**0.5
       else:
@@ -659,9 +697,11 @@ def block_inverse_from_triangular(u,lower=True):
   results are also in the form of a block matrix composed of diagonal
   vectors, output is also a 2-dimensional list of diagonal vectors.
 
-  This is essentially the classical inverse of a triangular system adapted
-  to exploit the block structure of the input and the diagonal nature of
-  each block element.
+  NOTE: u is destroyed by this function and replaced by its inverse
+
+  The algorithm employed is essentially the classical inverse of a
+  triangular system adapted to exploit the block structure of the input and
+  the diagonal nature of each block element.
 
   >>> w11 = array([16.,36.])
   >>> w22 = array([64.,25.])
@@ -924,8 +964,8 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
 
   Test model against empty model
 
-  >>> print 'score test =',GLogit(y,X,add_mean=True).score_test().test()
-  score test = (7.5849056603773608, 2)
+  >>> print 'score test=%.6f df=%d' % GLogit(y,X,add_mean=True).score_test().test()
+  score test=7.584906 df=2
   '''
   y = asmatrix(y)
   X = asmatrix(X)
@@ -948,7 +988,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
     b[0,0] = log(m1/(1-m1))
 
   # Initialize likelihood to -infinity
-  L = -1e308*1e308
+  L = -inf
 
   # Iterate until convergence
   for i in xrange(max_iterations):
@@ -1012,7 +1052,8 @@ class GLogit(object):
 
   Compute the polytomous logit model for 3 outcomes
 
-  >>> L,b,W = GLogit(y,X,ref=0).fit()
+  >>> g = GLogit(y,X,ref=0)
+  >>> L,b,W = g.fit()
 
   Compute standard errors
 
@@ -1042,10 +1083,13 @@ class GLogit(object):
 
   Test model against empty model
 
-  >>> print 'score test =',GLogit(y,X).score_test().test()
-  score test = (44.858794628046766, 4)
+  >>> print 'score test=%.6f df=%d' % g.score_test().test()
+  score test=44.858795 df=4
+  >>> print 'wald test=%.6f df=%d' % g.wald_test().test()
+  wald test=36.099593 df=4
+  >>> print 'lr test=%.6f df=%d' % g.lr_test().test()
+  lr test=47.191791 df=4
   '''
-
   def __init__(self, y, X, ref=None, vars=None, add_mean=False, max_iterations=50):
     y = asmatrix(y,dtype=int)
     X = asmatrix(X,dtype=float)
@@ -1084,7 +1128,6 @@ class GLogit(object):
 
 
   def fit(self, initial_beta=None, max_iterations=50):
-    # Form the dependent variable vector for classes y==1 and y==2
     y = self.y_ord
     X = self.X
     k = len(self.categories)-1
@@ -1126,29 +1169,40 @@ class GLogit(object):
       if d < CONV:
         break
 
-      # Form weights and blocks of the expected information matrix
-      w = self.weights(mu)
+      # Form weights in block form
+      w  = self.update_weights(mu)
 
-      # Build information matrix and compute the inverse
-      W = self.information_matrix(w).I
+      # Compute upper Cholesky factor and inverse weights
+      ww = block_cholesky(w,lower=False)
+      uw = bdiag_copy(ww)
+      iw = block_inverse_from_triangular(ww,lower=False)
 
-      # Update regression estimates
-      beta = self.update_estimates(w,W,mu,eta)
+      # Form augmented dependent vector and design matrix
+      zz = self.dependent_vector(mu,eta,iw,uw)
+      XX = self.design_matrix(uw)
 
-      b = vsplit(beta,k)
+      # Update model fit
+      beta,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz,cond=1e-10)
+      beta = asmatrix(beta)
+      W    = asmatrix(W)
+      b    = vsplit(beta,k)
 
     else:
       raise RuntimeError('glogit estimator failed to converge')
 
     # Return log-likelihood, regression estimates, and covariance matrix
-    self.L    = L
-    self.beta = beta
-    self.W    = W
+    self.L       = L
+    self.beta    = beta
+    self.W       = W
+    self.weights = w
 
     return L,beta,W
 
 
-  def weights(self,mu):
+  def update_weights(self,mu):
+    '''
+    Form block matrix of block diagonal weights
+    '''
     k = len(mu)
     w = [ [None]*k for i in xrange(k) ]
     for i in xrange(0,k):
@@ -1161,41 +1215,110 @@ class GLogit(object):
 
 
   def information_matrix(self,w):
-    X = self.X
-    k = len(w)
-    W = [ [None]*k for i in xrange(k) ]
-    for i in xrange(0,k):
+    '''
+    Form information matrix based on SVD using truncated singular values:
+      X     = U*S*V'                   U is unitary, so that U'*U=U*U'=I;
+     X'X    = V*S**2*V'                V is unitary, so that V'*V=V*V'=I;
+    '''
+    uw = block_cholesky(w,lower=False)
+    XX = self.design_matrix(uw)
+
+    # Fit linear model with y=1 in order to obtain s and vt from the SVD of XX
+    # This is cheaper than computing the full SVD of X, since U is not required
+    _,_,_,_,_,s,vt = linear_least_squares(XX,ones( (XX.shape[0],1) ))
+
+    for i in xrange(len(s)):
+      if s[i] < 1e-10:
+        s[i] = 0.
+      else:
+        s[i] = s[i]**2
+
+    v   = transpose(vt)
+    inf = dot(v,transpose(s*v))
+
+    return inf
+
+
+  def covariance_matrix(self,w):
+    '''
+    Form covariance matrix based on SVD using truncated singular values:
+      X     = U*S*V'                   U is unitary, so U'*U=U*U'=I;
+     X'X    = V*S**2*V'                V is unitary, so V'*V=V*V'=I;
+      I     = V*S**2*V'*(V*S**-2*V')   S is diagonal positive semi-definite
+    (X'X).I = V*S**-2*V'
+    '''
+    uw = block_cholesky(w,lower=False)
+    XX = self.design_matrix(uw)
+
+    # Fit linear model with y=1 in order to obtain the covariance matrix
+    # This is cheaper than computing the full SVD of X, since U is not required
+    _,_,W,_,_,_,_ = linear_least_squares(XX,ones( (XX.shape[0],1) ))
+
+    return asmatrix(W)
+
+
+  def dependent_vector(self,mu,eta,iw,uw):
+    '''
+    Form new dependent vector by pre-conditioning the sum of the decorrelated
+    scores and linear predictors by the Cholesky factor of the
+    regression weights.
+    '''
+    k  = len(iw)
+    y  = self.y_ord
+    yy = [ ((y==i+1) - mu[i]).reshape(-1) for i in xrange(k) ]
+    zz = [ [eta[i]+sum((iw[i][j]*yy[j]) for j in xrange(k)).reshape(-1,1)] for i in xrange(k) ]
+    return bmat([ [sum(uw[i][j]*zz[j][0].T.A for j in xrange(i,k)).T] for i in xrange(k) ])
+
+
+  def design_matrix(self,uw):
+    '''
+    Form augmented design matrix by pre-conditioning the sum of the
+    decorrelated scores and linear predictors by the Cholesky factor of the
+    regression weights.
+    '''
+    X  = self.X
+    k  = len(uw)
+    z  = zeros_like(X)
+    XX = [ [z]*k for i in xrange(k) ]
+    for i in xrange(k):
       for j in xrange(i,k):
-        W[i][j] = W[j][i] = X.T*(w[i][j]*X.A)
-    return bmat(W)
+        XX[i][j] = (uw[i][j]*X.T.A).T
+    return bmat(XX)
 
 
   def update_estimates(self,w,W,mu,eta):
-    y = self.y_ord
+    '''
+    Update parameter estimates by least-squares by regressing the weighted
+    augmented design matrix on the weighted dependent vector.
+    '''
     X = self.X
     k = len(mu)
 
-    xz = []
-    for i in xrange(k):
-      # Form adjusted dependent variable: z_i = y_i-mu_i + eta
-      z   = (y==i+1) - mu[i] + sum( w[i][j]*eta[j].A for j in xrange(k) )
-      # Evaluate X'z_i
-      xz += [[X.T*z]]
+    ww = block_cholesky(w,lower=False)
+    uw = [ [ ww[i][j].copy() for j in xrange(k) ] for i in xrange(k) ]
+    iw = block_inverse_from_triangular(ww,lower=False)
 
-    # Obtain new betas: (X'*w*X*)^-1 * X'*w*z
-    return W * bmat(xz)
+    zz = self.dependent_vector(mu,eta,iw,uw)
+    XX = self.design_matrix(uw)
+
+    b,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz)
+    return asmatrix(b),asmatrix(W)
 
 
-  def score_test(self,beta=None,initial_beta=None,indices=None):
-    return GLogitScoreTest(self,beta=beta,initial_beta=initial_beta,indices=indices)
+  def score_test(self,indices=None):
+    return GLogitScoreTest(self,indices=indices)
 
 
   def wald_test(self,indices=None):
     return GLogitWaldTest(self,indices=indices)
 
 
+  def lr_test(self,indices=None):
+    return GLogitLRTest(self,indices=indices)
+
+
 class GLogitScoreTest(object):
-  def __init__(self,model,beta=None,initial_beta=None,indices=None):
+  def __init__(self,model,indices=None):
     y = model.y
     X = model.X
     k = len(model.categories)-1
@@ -1207,34 +1330,27 @@ class GLogitScoreTest(object):
         s = i*n
         indices += range(s+1,s+n)
 
-    if beta is None:
-      # Form null design matrix by finding the rows of the design matrix
-      # that are to be scored and excluding those from the null model
-      design_indices = tally(i%n for i in indices)
-      assert design_indices
-      assert all(m == k for m in design_indices.itervalues())
+    # Form null design matrix by finding the rows of the design matrix
+    # that are to be scored and excluding those from the null model
+    design_indices = tally(i%n for i in indices)
+    null_indices   = [ i for i in xrange(n) if i not in design_indices ]
+    X_null = X[:,null_indices]
 
-      null_indices = [ i for i in xrange(n) if i not in design_indices ]
-      X_null = X[:,null_indices]
+    # Fit null model
+    self.null = GLogit(y,X_null)
+    self.null.fit()
 
-      # Fit null model
-      self.null_L,beta_null,W = GLogit(y,X_null).fit(initial_beta=initial_beta)
+    # Augment null beta with zeros for all parameters to be tested
+    null_indices = (i for i in xrange(n*k) if i not in indices)
+    beta = asmatrix(zeros((X.shape[1]*k,1), dtype=float))
+    for b,i in izip(self.null.beta.A.ravel(),null_indices):
+      beta[i,0] = b
 
-      # Augment null beta with zeros for all parameters to be tested
-      null_indices = (i for i in xrange(n*k) if i not in indices)
-      beta = asmatrix(zeros((X.shape[1]*k,1), dtype=float))
-      for b,i in izip(beta_null.A.ravel(),null_indices):
-        beta[i,0] = b
-    else:
-      self.null_L = None
-
-    self.model   = model
     self.beta    = beta
-    scores,w,W   = self.build_scores()
+    self.model   = model
     self.indices = indices
-    self.scores  = scores
-    self.w = w
-    self.W = W
+
+    self.build_scores()
 
 
   def build_scores(self):
@@ -1259,16 +1375,13 @@ class GLogitScoreTest(object):
     mu   = [ exp(eta[i]).A*mu0 for i in xrange(k) ]
 
     # Form weights and blocks of the expected information matrix
-    w = self.model.weights(mu)
+    self.w = self.model.update_weights(mu)
 
     # Build information matrix and compute the inverse
-    W = self.model.information_matrix(w).I
+    self.W = self.model.covariance_matrix(self.w)
 
     # Compute scores
-    # FIXME: Can scores and mu be further vectorized?
-    scores = bmat([ (y==i+1) - mu[i] for i in xrange(k) ])
-
-    return scores,w,W
+    self.scores = bmat([ (y==i+1) - mu[i] for i in xrange(k) ])
 
 
   def test(self):
@@ -1294,9 +1407,27 @@ class GLogitScoreTest(object):
 
 
 class GLogitWaldTest(object):
+  '''
+  Perform a simplified Wald test on a GLogit object
+
+  Tests linear hypotheses of the form Cp = 0 in using the Wald test, where C
+  is a mxn matrix of linear contrasts, m is the number of contrasts, n is
+  the number of parameters in the GLogit model.
+
+  The test statistic is W = (Cp)' [C cov(p) C']^-1 (Cp).
+
+  W distributed is approximately chi2 with m degrees of freedom.
+
+  Contrasts are currently limited to one or more single parameters,
+  specified as a list of indices from 0..n-1.  This limitation will be
+  lifted soon.
+  '''
   def __init__(self,model,indices=None):
+    if model.beta is None:
+      model.fit()
+
     if indices is None:
-      n = X.shape[1]
+      n = model.X.shape[1]
       k = len(model.categories)-1
       indices = []
       for i in xrange(k):
@@ -1312,15 +1443,181 @@ class GLogitWaldTest(object):
     W       = self.model.W
     df      = len(indices)
 
+    # FIXME: Use robust inverse of covariance matrix
     b  = beta[indices,:]
-    w  = W[indices,:][:,indices]
-    x2 = float((b.T*w.I*b)[0,0])
+    w  = self.model.covariance_matrix(self.model.weights)[indices,:][:,indices].I
+    x2 = float((b.T*w*b)[0,0])
 
     return x2,df
 
 
-class Linear(object):
+class GLogitLRTest(object):
+  '''
+  Compute the likelihood ratio test statistic of a given logit model and a
+  list of parameter indices to test.  The null model removing those indices
+  is fit and -2(l_null-l_model) is distributed as a chi-squared distribution
+  with len(indices) degrees of freedom.
+  '''
+  def __init__(self,model,initial_beta=None,indices=None):
+    y = model.y
+    X = model.X
+    k = len(model.categories)-1
+    m,n = X.shape
 
+    if indices is None:
+      indices = []
+      for i in xrange(k):
+        s = i*n
+        indices += range(s+1,s+n)
+
+    # Form null design matrix by finding the rows of the design matrix
+    # that are to be scored and excluding those from the null model
+    design_indices = tally(i%n for i in indices)
+    null_indices   = [ i for i in xrange(n) if i not in design_indices ]
+    X_null = X[:,null_indices]
+
+    # Fit null model
+    self.null = GLogit(y,X_null)
+    self.null.fit()
+
+    self.model   = model
+    self.indices = indices
+
+  def test(self):
+    return -2*(self.null.L-self.model.L),len(self.indices)
+
+
+class Linear(object):
+  '''
+  Full-rank Example
+  -----------------
+
+  >>> X = matrix([[ 0.60, 1.20, 3.90],
+  ...             [ 5.00, 4.00, 2.50],
+  ...             [ 1.00,-4.00,-5.50],
+  ...             [-1.00,-2.00,-6.50],
+  ...             [-4.20,-8.40,-4.80]])
+  >>> y = matrix([3, 4, -1, -5, -1]).T
+
+  Least-squares Fit:
+
+  >>> l=Linear(y,X,add_mean=True)
+  >>> x=l.fit()
+
+  Results:
+
+  >>> l.beta.T
+  matrix([[ 0.1517341 ,  0.9022158 , -0.8039499 ,  0.90558767]])
+  >>> l.ss
+  0.28901734104
+  >>> l.W
+  matrix([[ 0.4515896 , -0.15213552,  0.11721259, -0.0032113 ],
+          [-0.15213552,  0.11347499, -0.08170984,  0.01441519],
+          [ 0.11721259, -0.08170984,  0.08486762, -0.0297224 ],
+          [-0.0032113 ,  0.01441519, -0.0297224 ,  0.0266895 ]])
+  >>> l.resids
+  0.28901734104
+
+  >>> l.L
+  0.032073587736
+
+  >>> print 'score test=%.6f df=%d' % l.score_test().test()
+  score test=3.977768 df=3
+  >>> print 'wald test=%.6f df=%d' % l.wald_test().test()
+  wald test=178.920000 df=3
+  >>> print 'lr test=%.6f df=%d' % l.lr_test().test()
+  lr test=25.962562 df=3
+
+  Check results using R:
+
+  >>> import rpy
+  >>> rpy.set_default_mode(rpy.NO_CONVERSION)
+  >>> X,y=X.A,y.A
+  >>> data = rpy.r.data_frame(x1=X[:,0],x2=X[:,1],x3=X[:,2],y=y[:,0])
+  >>> linear_model = rpy.r.lm(rpy.r("y ~ x1+x2+x3"), data=data)
+  >>> null_model   = rpy.r.lm(rpy.r("y ~ 1"), data=data)
+  >>> rpy.set_default_mode(rpy.BASIC_CONVERSION)
+  >>> print ', '.join('%s=%.8f' % i for i in sorted(linear_model.as_py()['coefficients'].iteritems()))
+  (Intercept)=0.15173410, x1=0.90221580, x2=-0.80394990, x3=0.90558767
+  >>> summary=rpy.r.summary(linear_model)
+  >>> print summary['cov.unscaled']
+  [[ 0.4515896  -0.15213552  0.11721259 -0.0032113 ]
+   [-0.15213552  0.11347499 -0.08170984  0.01441519]
+   [ 0.11721259 -0.08170984  0.08486762 -0.0297224 ]
+   [-0.0032113   0.01441519 -0.0297224   0.0266895 ]]
+  >>> print summary['sigma']**2
+  0.28901734104
+  >>> print rpy.r.logLik(linear_model)
+  0.032073587736
+  >>> print -2*(rpy.r.logLik(null_model)-rpy.r.logLik(linear_model))
+  25.9625615383
+
+  Rank Deficient Example
+  ----------------------
+
+  >>> X = matrix([[0.05,  0.05, 0.25, -0.25],
+  ...             [0.25,  0.25, 0.05, -0.05],
+  ...             [0.35,  0.35, 1.75, -1.75],
+  ...             [1.75,  1.75, 0.35, -0.35],
+  ...             [0.30, -0.30, 0.30,  0.30],
+  ...             [0.40, -0.40, 0.40,  0.40]])
+  >>> y = matrix([1, 2, 3, 4, 5, 6]).T
+
+  Least-squares Fit:
+
+  >>> l=Linear(y,X,add_mean=True)
+  >>> x=l.fit()
+
+  Results:
+
+  >>> l.beta.T
+  matrix([[ 1.18918919,  3.81711712, -2.31801802,  3.41711712,  2.71801802]])
+  >>> l.ss
+  0.193513513514
+  >>> l.W
+  matrix([[ 0.67567568, -0.65315315,  0.29279279, -0.65315315, -0.29279279],
+          [-0.65315315,  0.97165916, -0.44275526,  0.84665916,  0.56775526],
+          [ 0.29279279, -0.44275526,  0.46715465, -0.56775526, -0.34215465],
+          [-0.65315315,  0.84665916, -0.56775526,  0.97165916,  0.44275526],
+          [-0.29279279,  0.56775526, -0.34215465,  0.44275526,  0.46715465]])
+  >>> l.resids
+  0.387027027027
+  >>> l.L
+  -0.290570538209
+
+  >>> print 'score test=%.6f df=%d' % l.score_test().test()
+  score test=4.889421 df=4
+  >>> print 'wald test=%.6f df=%d' % l.wald_test().test()
+  wald test=200.807207 df=4
+  >>> print 'lr test=%.6f df=%d' % l.lr_test().test()
+  lr test=22.868770 df=4
+
+  Check results using R (we do considerably better, since in R x4 is aliased
+  and results are reported for a reduced parameter space without x4.  The
+  quality of model fit is identical, though the interpretation is less
+  obvious):
+
+  >>> rpy.set_default_mode(rpy.NO_CONVERSION)
+  >>> X,y=X.A,y.A
+  >>> data = rpy.r.data_frame(x1=X[:,0],x2=X[:,1],x3=X[:,2],x4=X[:,3],y=y[:,0])
+  >>> linear_model = rpy.r.lm(rpy.r("y ~ x1+x2+x3+x4"), data=data)
+  >>> null_model   = rpy.r.lm(rpy.r("y ~ 1"), data=data)
+  >>> rpy.set_default_mode(rpy.BASIC_CONVERSION)
+  >>> print ', '.join('%s=%.8f' % i for i in sorted(linear_model.as_py()['coefficients'].iteritems()))
+  (Intercept)=1.18918919, x1=6.53513514, x2=-5.03603604, x3=0.69909910, x4=nan
+  >>> summary=rpy.r.summary(linear_model)
+  >>> print summary['cov.unscaled']
+  [[ 0.67567568 -0.94594595  0.58558559 -0.36036036]
+   [-0.94594595  2.57432432 -1.81981982  0.2545045 ]
+   [ 0.58558559 -1.81981982  1.61861862 -0.2012012 ]
+   [-0.36036036  0.2545045  -0.2012012   0.5533033 ]]
+  >>> print summary['sigma']**2
+  0.193513513514
+  >>> print rpy.r.logLik(linear_model)
+  -0.290570538209
+  >>> print -2*(rpy.r.logLik(null_model)-rpy.r.logLik(linear_model))
+  22.8687697922
+  '''
   def __init__(self, y, X, vars=None, add_mean=False):
     y = asmatrix(y,dtype=float)
     X = asmatrix(X,dtype=float)
@@ -1328,18 +1625,21 @@ class Linear(object):
     assert y.shape[1] == 1
     assert y.shape[0] == X.shape[0]
 
-    # Add type specific means, if requested
+    # Add grand mean, if requested
     if add_mean:
       X = grand_mean(X)
 
-    self.y     = y
-    self.X     = X
-    self.vars  = vars
-
+    self.y    = y
+    self.X    = X
+    self.vars = vars
     self.L    = None
     self.beta = None
     self.W    = None
     self.ss   = None
+    self.rank = None
+
+    self.singular_values        = None
+    self.right_singlular_matrix = None
 
   def fit(self):
     y = self.y
@@ -1348,29 +1648,33 @@ class Linear(object):
     # n=observations and m=covariates
     n,m = X.shape
 
-    W      = (X.T*X).I
-    beta   = W*X.T*y
-    e      = y - X*beta
-    L      = -(n/2.0)*(1 + log(2*pi) - log(e.T*e/n))
-    ss     = (e.A**2).sum()/(n-m)
+    beta,ss,W,resids,rank,s,vt = linear_least_squares(X,y)
 
-    # Return log-likelihood, regression estimates, and covariance matrix
-    self.L    = L
-    self.beta = beta
-    self.W    = W
-    self.ss   = ss
+    L      = -(n/2.)*(1+log(2*pi)-log(n)+log(resids.sum()))
+
+    self.L      = L
+    self.beta   = asmatrix(beta)
+    self.W      = asmatrix(W)
+    self.ss     = ss.sum()
+    self.resids = resids.sum()
+    self.rank   = rank
+    self.singular_values = s
+    self.right_singlular_matrix = transpose(vt)
 
     return L,beta,W,ss
 
-  def score_test(self,beta=None,indices=None):
-    return LinearScoreTest(self,beta=beta,indices=indices)
+  def score_test(self,indices=None):
+    return LinearScoreTest(self,indices=indices)
 
   def wald_test(self,indices=None):
     return LinearWaldTest(self,indices=indices)
 
+  def lr_test(self,indices=None):
+    return LinearLRTest(self,indices=indices)
+
 
 class LinearScoreTest(object):
-  def __init__(self,model,beta=None,indices=None):
+  def __init__(self,model,indices=None):
     y = model.y
     X = model.X
     n = X.shape[1]
@@ -1378,24 +1682,18 @@ class LinearScoreTest(object):
     if indices is None:
       indices = xrange(1,n)
 
-    if beta is None:
-      design_indices = set(indices)
-      null_indices = [ i for i in xrange(n) if i not in design_indices ]
-      X_null = X[:,null_indices]
+    design_indices = set(indices)
+    null_indices = [ i for i in xrange(n) if i not in design_indices ]
+    X_null = X[:,null_indices]
 
-      # Fit null model
-      null = Linear(y,X_null)
-      null.fit()
+    # Fit null model
+    self.null = Linear(y,X_null)
+    self.null.fit()
 
-      # Augment null beta with zeros for all parameters to be tested
-      beta = asmatrix(zeros((n,1), dtype=float))
-      for b,i in izip(null.beta.A.ravel(),null_indices):
-        beta[i,0] = b
-
-      self.ss = null.ss
-    else:
-      # FIXME: residual variance should always be estimated from the null model
-      self.ss = model.ss
+    # Augment null beta with zeros for all parameters to be tested
+    beta = asmatrix(zeros((n,1), dtype=float))
+    for b,i in izip(self.null.beta.A.ravel(),null_indices):
+      beta[i,0] = b
 
     self.model   = model
     self.beta    = beta
@@ -1409,10 +1707,10 @@ class LinearScoreTest(object):
     W       = self.model.W
     df      = len(indices)
     X       = self.model.X
-    ss      = self.ss
+    ss      = self.null.ss
 
     # Compute score vectors with the full design matrix
-    indices = array(indices, dtype=int)
+    indices = asarray(indices, dtype=int)
     s = asmatrix(( X[:,indices].A*scores.A ).sum(axis=0))
 
     # Extract the covariance matrix of the score parameters
@@ -1425,13 +1723,29 @@ class LinearScoreTest(object):
 
 
 class LinearWaldTest(object):
+  '''
+  Perform a simplified Wald test on a Linear model
+
+  Tests linear hypotheses of the form Cp = 0 in using the Wald test, where C
+  is a mxn matrix of linear contrasts, m is the number of contrasts, n is
+  the number of parameters in the Linear model.
+
+  The test statistic is W = (Cp)' [C cov(p) C']^-1 (Cp).
+
+  W distributed is approximately chi2 with m degrees of freedom.
+
+  Contrasts are currently limited to one or more single parameters,
+  specified as a list of indices from 0..n-1.  This limitation will be
+  lifted soon.
+  '''
   def __init__(self,model,indices=None):
     if indices is None:
-      n = X.shape[1]
+      n = model.X.shape[1]
       indices = xrange(1,n)
 
     self.model   = model
     self.indices = indices
+
 
   def test(self):
     indices = self.indices
@@ -1440,11 +1754,43 @@ class LinearWaldTest(object):
     ss      = self.model.ss
     df      = len(indices)
 
+    # FIXME: Use robust inverse of covariance matrix
     b  = beta[indices,:]
-    w  = W[indices,:][:,indices]*ss
-    x2 = float((b.T*w.I*b)[0,0])
+    w  = self.model.W[indices,:][:,indices].I/ss
+    x2 = float((b.T*w*b)[0,0])
 
     return x2,df
+
+
+class LinearLRTest(object):
+  '''
+  Compute the likelihood ratio test statistic of a given linear model and a
+  list of parameter indices to test.  The null model removing those indices
+  is fit and -2(l_null-l_model) is distributed as a chi-squared distribution
+  with len(indices) degrees of freedom.
+  '''
+  def __init__(self,model,indices=None):
+    y = model.y
+    X = model.X
+    n = X.shape[1]
+
+    if indices is None:
+      indices = xrange(1,n)
+
+    design_indices = set(indices)
+    null_indices = [ i for i in xrange(n) if i not in design_indices ]
+    X_null = X[:,null_indices]
+
+    # Fit null model
+    self.null = Linear(y,X_null)
+    self.null.fit()
+
+    self.model   = model
+    self.indices = indices
+
+
+  def test(self):
+    return -2*(self.null.L-self.model.L),len(self.indices)
 
 
 if __name__ == '__main__':
