@@ -229,7 +229,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
     # Weight vector
     k = len(weights.shape)
     if k==1 or (k==2 and 1 in weights.shape):
-      weights = asarray(weights).reshape(-1)
+      weights = asarray(weights,dtype=float).reshape(-1)
 
       if weights.size != m:
         raise ValueError('incompatible weight vector dimensions')
@@ -531,7 +531,7 @@ def bdiag_to_mat(x):
   m = [ [None]*n for i in xrange(n) ]
   for i in xrange(n):
     for j in xrange(n):
-      m[i][j] = diag(asarray(x[i][j]).reshape(-1))
+      m[i][j] = diag(asarray(x[i][j],dtype=float).reshape(-1))
   return bmat(m)
 
 
@@ -674,7 +674,7 @@ def block_cholesky(w,lower=True):
 
   for j in xrange(n):
     for i in xrange(j,n):
-      ww = asarray(w[i][j]).reshape(-1)
+      ww = asarray(w[i][j],dtype=float).reshape(-1)
       s = ww - sum(c[i][k]*c[j][k] for k in xrange(min(i,j)))
       if i==j:
         c[i][j] = s**0.5
@@ -889,8 +889,8 @@ def linreg(y, X, add_mean=False):
           [  1.12589991e+15,  -1.12589991e+15,  -1.12589991e+15,
             -1.12589991e+15]])
   '''
-  y = asmatrix(y)
-  X = asmatrix(X)
+  y = asmatrix(y,dtype=float)
+  X = asmatrix(X,dtype=float)
 
   # Add type specific means, if requested
   if add_mean:
@@ -967,8 +967,8 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   >>> print 'score test=%.6f df=%d' % GLogit(y,X,add_mean=True).score_test().test()
   score test=7.584906 df=2
   '''
-  y = asmatrix(y)
-  X = asmatrix(X)
+  y = asmatrix(y,dtype=int)
+  X = asmatrix(X,dtype=float)
 
   # Add type specific means, if requested
   if add_mean:
@@ -1018,8 +1018,8 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   else:
     raise RuntimeError('logit estimator failed to converge')
 
-  b = asmatrix(b)
-  W = asmatrix(W)
+  b = asmatrix(b,dtype=float)
+  W = asmatrix(W,dtype=float)
 
   # Return log-likelihood, regression estimates, and covariance matrix
   return L,b,W
@@ -1183,8 +1183,8 @@ class GLogit(object):
 
       # Update model fit
       beta,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz,cond=1e-10)
-      beta = asmatrix(beta)
-      W    = asmatrix(W)
+      beta = asmatrix(beta,dtype=float)
+      W    = asmatrix(W,dtype=float)
       b    = vsplit(beta,k)
 
     else:
@@ -1302,7 +1302,7 @@ class GLogit(object):
     XX = self.design_matrix(uw)
 
     b,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz)
-    return asmatrix(b),asmatrix(W)
+    return asmatrix(b,dtype=float),asmatrix(W,dtype=float)
 
 
   def score_test(self,indices=None):
@@ -1653,8 +1653,8 @@ class Linear(object):
     L      = -(n/2.)*(1+log(2*pi)-log(n)+log(resids.sum()))
 
     self.L      = L
-    self.beta   = asmatrix(beta)
-    self.W      = asmatrix(W)
+    self.beta   = asmatrix(beta,dtype=float)
+    self.W      = asmatrix(W,dtype=float)
     self.ss     = ss.sum()
     self.resids = resids.sum()
     self.rank   = rank

@@ -51,8 +51,8 @@ def contingency_table_indicators(ys,gs):
          [0, 1, 2],
          [2, 0, 1]])
   '''
-  ys = asanyarray(ys)
-  gs = asanyarray(gs)
+  ys = asanyarray(ys,dtype=int)
+  gs = asanyarray(gs,dtype=int)
 
   assert ys.shape == gs.shape
 
@@ -77,8 +77,8 @@ def contingency_table_categorical(ys,gs):
          [0, 1, 2],
          [2, 0, 1]])
   '''
-  ys = asanyarray(ys)
-  gs = asanyarray(gs)
+  ys = asanyarray(ys,dtype=int)
+  gs = asanyarray(gs,dtype=int)
 
   assert ys.shape == gs.shape
 
@@ -96,7 +96,7 @@ contingency_table = contingency_table_categorical
 
 def contingency_analysis(c,mincell=5,minmargin=15):
   if not c.size:
-    return nan,0,array([])
+    return nan,0,array([],dtype=float)
 
   if minmargin>0:
     # Remove columns with less that the required margins
@@ -118,7 +118,7 @@ def contingency_analysis(c,mincell=5,minmargin=15):
   df = (m-1)*(n-1)
 
   if df <= 0:
-    return nan,0,array([])
+    return nan,0,array([],dtype=float)
 
   if c.min() <= mincell:
     import rpy
@@ -800,9 +800,9 @@ class LocusModelBuilder(object):
         continue
 
       y.append([stat])
-      X.append( [1] + geno_effects + covs )
+      X.append( [1.0] + geno_effects + covs )
 
-    y = matrix(y)
+    y = matrix(y, dtype=float)
     X = matrix(X, dtype=float)
 
     k = len(model_names)
