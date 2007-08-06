@@ -1029,7 +1029,8 @@ class GLogit(object):
   '''
   Example trichotomous outcome data taken from 'Logistic Regression: A
   Self-Learning Text', David G. Kleinbaum, Springer-Verlag Telos, ISBN
-  978-0387941424 based on dataset from <need to find the book>.
+  978-0387941424 based on dataset from Hill et al., 1995.  The study
+  involves 288 women who had been diagnosed with endometrial cancer.
 
   Load and parse test data
 
@@ -1041,8 +1042,7 @@ class GLogit(object):
   ...   row = [ fields[i] for i in indices ]
   ...   if '.' in row:
   ...     continue
-  ...   row = map(float,row)
-  ...   D.append(row)
+  ...   D.append([float(f) for f in row])
 
   >>> D=asmatrix(D,dtype=float)
 
@@ -1052,7 +1052,7 @@ class GLogit(object):
 
   Compute the polytomous logit model for 3 outcomes
 
-  >>> g = GLogit(y,X,ref=0)
+  >>> g = GLogit(y,X,add_mean=True,ref=0)
   >>> L,b,W = g.fit()
 
   Compute standard errors
@@ -1068,27 +1068,28 @@ class GLogit(object):
   >>> print 'obs =',len(D)
   obs = 286
   >>> print 'logL =',L
-  logL = -264.821392873
-  >>> print '-2logL =',-2*L
-  -2logL = 529.642785746
+  logL = -247.202541257
   >>> print 'beta =',b.T
-  beta = [[-0.50851018 -1.41766704 -0.23349802 -0.56820429 -0.75411164 -2.43513171]]
+  beta = [[-1.88217996  0.98705921 -0.64389914  0.88946435 -1.20321646  0.28228558
+    -0.10708623 -1.79131151]]
   >>> print 'ss =',stde
-  ss = [[ 0.22752862  0.29154207  0.47386178  0.22469103  0.25034798  1.03396066]]
+  ss = [[ 0.40248124  0.41178981  0.34356069  0.52534808  0.31897576  0.32796594
+     0.30673956  1.04647716]]
   >>> print 'Z =',z
-  Z = [[-2.2349284  -4.86265001 -0.49275555 -2.52882501 -3.01225372 -2.35514928]]
+  Z = [[-4.67644149  2.39699764 -1.87419331  1.69309528 -3.77212504  0.86071615
+    -0.34911126 -1.71175403]]
   >>> print 'X2 =',z**2
-  X2 = [[  4.99490495  23.64536512   0.24280803   6.39495594   9.07367248
-      5.54672813]]
+  X2 = [[ 21.86910498   5.74559769   3.51260056   2.86657163  14.22892731
+      0.7408323    0.12187867   2.93010187]]
 
   Test model against empty model
 
   >>> print 'score test=%.6f df=%d' % g.score_test().test()
-  score test=44.858795 df=4
+  score test=15.944228 df=6
   >>> print 'wald test=%.6f df=%d' % g.wald_test().test()
-  wald test=36.099593 df=4
+  wald test=13.942303 df=6
   >>> print 'lr test=%.6f df=%d' % g.lr_test().test()
-  lr test=47.191791 df=4
+  lr test=18.218406 df=6
   '''
   def __init__(self, y, X, ref=None, vars=None, add_mean=False, max_iterations=50):
     y = asmatrix(y,dtype=int)
