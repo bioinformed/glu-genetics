@@ -168,12 +168,17 @@ def main():
 
     ### SCORE TEST ###
     g = GLogit(model.y,model.X)
-    g.fit(initial_beta=initial_beta[k])
-    scoretest = g.score_test(indices=indices,initial_beta=null.beta)
+
+    # FIXME: Can use initial_betas to possibly speed things up
+    #g.fit(initial_beta=initial_beta[k])
+    #scoretest = g.score_test(indices=indices,initial_beta=null.beta)
+
+    g.fit()
+    scoretest = g.score_test(indices=indices)
 
     st,df_s = scoretest.test()
     wt,df_w = g.wald_test(indices=range(1,k+1)).test()
-    lt,df_l = -2*(scoretest.null_L-g.L),k
+    lt,df_l = g.lr_test(indices=range(1,k+1)).test()
 
     sp = stats.distributions.chi2.sf(st,df_s)
     wp = stats.distributions.chi2.sf(wt,df_w)
