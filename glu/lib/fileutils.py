@@ -307,9 +307,6 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
     doublequote: A one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
-    doublequote: A one-character string used to quote fields containing
-                 special characters, such as the delimiter or quotechar, or
-                 which contain new-line characters.
      escapechar: A one-character string that removes any special meaning
                  from the following character.
       quotechar: A one-character string used to quote fields containing
@@ -472,9 +469,6 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_noth
   default,def,d: default value for keys with no or empty value
         dialect: csv module dialect name ('csv' or 'tsv')
       delimiter: single field delimiter character
-    doublequote: A one-character string used to quote fields containing
-                 special characters, such as the delimiter or quotechar, or
-                 which contain new-line characters.
     doublequote: A one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
