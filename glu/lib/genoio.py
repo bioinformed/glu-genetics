@@ -26,7 +26,7 @@ from   itertools   import izip,islice,dropwhile,chain
 from   utils       import tally,deprecated_by
 from   fileutils   import autofile,namefile,load_table,guess_format
 from   genodata    import GenotripleStream, GenomatrixStream
-from   genoarray   import snp_acgt,snp_marker
+from   genoarray   import snp_marker
 
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
@@ -134,7 +134,7 @@ def load_rename_alleles_file(filename):
   return rename
 
 
-def load_hapmap_genotypes(filename,limit=None,genorepr=snp_acgt.pack_strs):
+def load_hapmap_genotypes(filename,limit=None,genorepr=snp_marker.pack_strs):
   '''
   Load the hampmap genotype data from file.
 
@@ -176,7 +176,7 @@ def load_hapmap_genotypes(filename,limit=None,genorepr=snp_acgt.pack_strs):
   return header,_load_hapmap_genotypes()
 
 
-def load_genomatrix(filename,format=None,limit=None,genorepr=snp_acgt.pack_strs,unique=True):
+def load_genomatrix(filename,format=None,limit=None,genorepr=snp_marker.pack_strs,unique=True):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -490,7 +490,7 @@ class TextGenotripleWriter(object):
     self.close()
 
 
-def save_genomatrix(filename,header,matrix,format=None,genorepr=snp_acgt.strs_from_reps):
+def save_genomatrix(filename,header,matrix,format=None,genorepr=snp_marker.strs_from_reps):
   '''
   Write the genotype matrix data to file.
 
@@ -527,7 +527,7 @@ def save_genomatrix(filename,header,matrix,format=None,genorepr=snp_acgt.strs_fr
     writer.writerows(matrix)
 
 
-def load_genotriples(filename,limit=None,genorepr=snp_acgt.rep_from_str):
+def load_genotriples(filename,limit=None,genorepr=snp_marker.rep_from_str):
   '''
   Load genotype triples from file
 
@@ -573,7 +573,7 @@ def load_genotriples(filename,limit=None,genorepr=snp_acgt.rep_from_str):
     yield sample,locus,geno
 
 
-def save_genotriples(filename,triples,genorepr=snp_acgt.str_from_rep):
+def save_genotriples(filename,triples,genorepr=snp_marker.str_from_rep):
   '''
   Write the genotype triple data to file.
 
@@ -605,7 +605,7 @@ def save_genotriples(filename,triples,genorepr=snp_acgt.str_from_rep):
     w.writerows(triples)
 
 
-def load_genotriplestream(filename, limit=None, genorepr=snp_acgt, unique=False):
+def load_genotriplestream(filename, limit=None, genorepr=snp_marker, unique=False):
   '''
   Load genotriple file and return a GenotripleStream object
 
@@ -635,7 +635,7 @@ def load_genotriplestream(filename, limit=None, genorepr=snp_acgt, unique=False)
   return GenotripleStream(triples, unique=unique, genorepr=genorepr)
 
 
-def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_acgt, unique=True):
+def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_marker, unique=True):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -683,7 +683,7 @@ def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_acgt, 
   return GenomatrixStream(genos,format,samples=samples,loci=loci,unique=unique,genorepr=genorepr,packed=True)
 
 
-def load_genostream(filename, format=None, limit=None, genorepr=snp_acgt, unique=None):
+def load_genostream(filename, format=None, limit=None, genorepr=snp_marker, unique=None):
   '''
   Load genotype data in the format of (ldat, sdat, hapmap, trip, genotriple) and return a
   GenomatrixStream or GenotripleStream object
@@ -708,8 +708,8 @@ def load_genostream(filename, format=None, limit=None, genorepr=snp_acgt, unique
   ('s1', 's2', 's3')
   >>> for row in loaded:
   ...   print row
-  ('l1', array('B', [17, 19, 51]))
-  ('l2', array('B', [34, 36, 68]))
+  ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
+  ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
   >>> loaded.samples
   ('s1', 's2', 's3')
   >>> loaded.loci
@@ -800,7 +800,7 @@ def transform_files(infiles,informat,ingenorepr,
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
   >>> out  = StringIO()
-  >>> transform_files([data],'ldat',snp_acgt,out,'trip',snp_marker)
+  >>> transform_files([data],'ldat',snp_marker,out,'trip',snp_marker)
   >>> print out.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1	l1	AA
   s2	l1	AG

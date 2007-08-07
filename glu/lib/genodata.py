@@ -26,7 +26,7 @@ from   utils       import pick,tally,unique
 from   fileutils   import load_list,load_map
 from   imerge      import imerge
 from   xtab        import xtab,rowsby
-from   genoarray   import snp_acgt,snp_marker,get_genorepr
+from   genoarray   import snp_marker,get_genorepr
 from   genomerge   import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
 
 
@@ -62,7 +62,7 @@ class GenotripleStream(GenotypeStream):
   '''
   format = 'genotriple'
 
-  def __init__(self, triples, samples=None, loci=None, order=None, unique=False, genorepr=snp_acgt, materialized=False):
+  def __init__(self, triples, samples=None, loci=None, order=None, unique=False, genorepr=snp_marker, materialized=False):
     '''
     Create a new GenotripleStream object
 
@@ -120,7 +120,7 @@ class GenotripleStream(GenotypeStream):
     self.__private_triples_do_not_touch = triples
 
   @staticmethod
-  def from_streams(genos, mergefunc=None, order=None, genorepr=snp_acgt):
+  def from_streams(genos, mergefunc=None, order=None, genorepr=snp_marker):
     '''
     Combine multiple genostreams into one genotriple stream
 
@@ -136,12 +136,12 @@ class GenotripleStream(GenotypeStream):
     @return         : combined genotriple stream
     @rtype          : sequence of sample, locus, and genotype
 
-    >>> trip1 = [('s1','l1', 51),('s1','l2', 17),
-    ...          ('s2','l2', 68),('s3','l1', 68)]
+    >>> trip1 = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l2', ('T', 'T')),('s3','l1', ('T', 'T'))]
     >>> samples = ['s1', 's2', 's3']
-    >>> rows = [('l1', [ 51,   52,   68 ]),
-    ...         ('l2', [ 17,   68,   51 ])]
-    >>> trip2 = [('s2','l1', 51),('s3','l2', 17)]
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('G', 'G') ])]
+    >>> trip2 = [('s2','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
     >>> streams = [GenotripleStream(trip1),
     ...            GenomatrixStream(rows,'ldat',samples=samples),
     ...            GenotripleStream(trip2)]
@@ -150,10 +150,10 @@ class GenotripleStream(GenotypeStream):
     ...   print row
     ('s1', 'l1', ('G', 'G'))
     ('s1', 'l2', ('A', 'A'))
-    ('s2', 'l1', 0)
+    ('s2', 'l1', None)
     ('s2', 'l2', ('T', 'T'))
     ('s3', 'l1', ('T', 'T'))
-    ('s3', 'l2', 0)
+    ('s3', 'l2', None)
     '''
     if not genos:
       raise ValueError
@@ -254,12 +254,12 @@ class GenotripleStream(GenotypeStream):
     @return        : recoded genotriple stream
     @rtype         : GenotripleStream
 
-    >>> triples = GenotripleStream([('s1','l1',51),('s1','l2',17),('s2','l2',68),('s3','l1',68)])
+    >>> triples = GenotripleStream([('s1','l1',('G', 'G')),('s1','l2',('A', 'A')),('s2','l2',('T', 'T')),('s3','l1',('T', 'T'))])
     >>> recoded = list(triples.recoded(snp_marker))
     >>> recoded
     [('s1', 'l1', ('G', 'G')), ('s1', 'l2', ('A', 'A')), ('s2', 'l2', ('T', 'T')), ('s3', 'l1', ('T', 'T'))]
-    >>> list(GenotripleStream(recoded,genorepr=snp_marker).recoded(snp_acgt))
-    [('s1', 'l1', 51), ('s1', 'l2', 17), ('s2', 'l2', 68), ('s3', 'l1', 68)]
+    >>> list(GenotripleStream(recoded,genorepr=snp_marker).recoded(snp_marker))
+    [('s1', 'l1', ('G', 'G')), ('s1', 'l2', ('A', 'A')), ('s2', 'l2', ('T', 'T')), ('s3', 'l1', ('T', 'T'))]
     '''
     return self.transformed(genorepr=genorepr)
 
@@ -305,13 +305,13 @@ class GenotripleStream(GenotypeStream):
     @return               : transformed genotriple stream
     @rtype                : GenotripleStream
 
-    >>> trips = [('s1','l1', 51),('s1','l2', 17),
-    ...          ('s2','l1', 52),('s2','l2', 68),
-    ...          ('s3','l1', 51),('s3','l2', 17)]
+    >>> trips = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+    ...          ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
     >>> for row in GenotripleStream(trips).transformed(include_loci=['l1'],exclude_samples=['s3']):
     ...   print row
-    ('s1', 'l1', 51)
-    ('s2', 'l1', 52)
+    ('s1', 'l1', ('G', 'G'))
+    ('s2', 'l1', ('G', 'T'))
     '''
 
     if transform is not None and kwargs:
@@ -415,17 +415,17 @@ class GenotripleStream(GenotypeStream):
     @return           : sorted genotriple stream
     @rtype            : GenotripleStream
 
-    >>> trips = [('s3','l1', 51),('s1','l2', 17),
-    ...          ('s2','l1', 52),('s3','l2', 68),
-    ...          ('s1','l1', 51),('s2','l2', 17)]
+    >>> trips = [('s3','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l1', ('G', 'T')),('s3','l2', ('T', 'T')),
+    ...          ('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
     >>> for row in GenotripleStream(trips).sorted():
     ...   print row
-    ('s1', 'l1', 51)
-    ('s1', 'l2', 17)
-    ('s2', 'l1', 52)
-    ('s2', 'l2', 17)
-    ('s3', 'l1', 51)
-    ('s3', 'l2', 68)
+    ('s1', 'l1', ('G', 'G'))
+    ('s1', 'l2', ('A', 'A'))
+    ('s2', 'l1', ('G', 'T'))
+    ('s2', 'l2', ('A', 'A'))
+    ('s3', 'l1', ('G', 'G'))
+    ('s3', 'l2', ('T', 'T'))
     '''
     if self.order is not None and self.order == order:
       return self
@@ -452,15 +452,15 @@ class GenotripleStream(GenotypeStream):
     @return          : sorted and merged genotriple stream
     @rtype           : GenotripleStream
 
-    >>> trips = [('s1','l1', 68),('s1','l2', 17),
-    ...          ('s2','l1', 52),('s2','l2', 17),
-    ...          ('s1','l1', 51),('s2','l2', 17)]
+    >>> trips = [('s1','l1', ('T', 'T')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l1', ('G', 'T')),('s2','l2', ('A', 'A')),
+    ...          ('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
     >>> for row in GenotripleStream(trips).merged(VoteMerger(),order='locus'):
     ...   print row
-    ('s1', 'l1', 0)
-    ('s2', 'l1', 52)
-    ('s1', 'l2', 17)
-    ('s2', 'l2', 17)
+    ('s1', 'l1', None)
+    ('s2', 'l1', ('G', 'T'))
+    ('s1', 'l2', ('A', 'A'))
+    ('s2', 'l2', ('A', 'A'))
     '''
     if self.unique:
       return self
@@ -494,9 +494,9 @@ class GenotripleStream(GenotypeStream):
     @return         : genotriples converted into a genomatrix stream
     @rtype          : GenomatrixStream
 
-    >>> trips = [('s1','l1',51),('s1','l2',17),
-    ...          ('s2','l1',52),('s2','l2',68),
-    ...          ('s3','l1',51),('s3','l2',17)]
+    >>> trips = [('s1','l1',('G', 'G')),('s1','l2',('A', 'A')),
+    ...          ('s2','l1',('G', 'T')),('s2','l2',('T', 'T')),
+    ...          ('s3','l1',('G', 'G')),('s3','l2',('A', 'A'))]
     >>> samples =         ('s1',       's2',       's3')
     >>> rows = [('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')]),
     ...         ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])]
@@ -546,13 +546,13 @@ class GenotripleStream(GenotypeStream):
     @return         : genotriples converted into a genomatrix stream
     @rtype          : GenomatrixStream
 
-    >>> trips = [('s1','l1', 51),('s1','l2', 17),
-    ...          ('s2','l1', 52),('s2','l2', 68),
-    ...          ('s3','l1', 51),('s3','l2', 17)]
+    >>> trips = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+    ...          ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
     >>> loci = ('l1','l2')
-    >>> rows = [('s1', [ 51,   17 ]),
-    ...         ('s2', [ 52,   68 ]),
-    ...         ('s3', [ 51,   17 ])]
+    >>> rows = [('s1', [ ('G', 'G'),   ('A', 'A') ]),
+    ...         ('s2', [ ('G', 'T'),   ('T', 'T') ]),
+    ...         ('s3', [ ('G', 'G'),   ('A', 'A') ])]
     >>> merge = VoteMerger()
     >>> sdat = GenotripleStream(trips,genorepr=snp_marker).as_sdat(merge)
     >>> assert list(sdat) == rows and sdat.loci == loci
@@ -576,7 +576,7 @@ class GenomatrixStream(GenotypeStream):
   A stream of genomatrix by sample or locus with optional metadata
   '''
   def __init__(self, genos, format, samples=None, loci=None, unique=False,
-                     genorepr=snp_acgt, materialized=False, packed=False):
+                     genorepr=snp_marker, materialized=False, packed=False):
     '''
     Create a new GenomatrixStream object
 
@@ -665,7 +665,7 @@ class GenomatrixStream(GenotypeStream):
     self.__private_genos_do_not_touch = genos
 
   @staticmethod
-  def from_streams(genos, format, mergefunc=None, genorepr=snp_acgt):
+  def from_streams(genos, format, mergefunc=None, genorepr=snp_marker):
     '''
     Combine multiple genostreams into one genomatrix stream
 
@@ -681,12 +681,12 @@ class GenomatrixStream(GenotypeStream):
     @return         : combined genotriple stream
     @rtype          : sequence of sample, locus, and genotype
 
-    >>> trip1 = [('s1','l1', 51),('s1','l2', 17),
-    ...          ('s2','l2', 68),('s3','l1', 68)]
+    >>> trip1 = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l2', ('T', 'T')),('s3','l1', ('T', 'T'))]
     >>> samples = ['s1', 's2', 's3']
-    >>> rows = [('l1', [ 51,   52,   68 ]),
-    ...         ('l2', [ 17,   68,   51 ])]
-    >>> trip2 = [('s2','l1', 51),('s3','l2', 17)]
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('G', 'G') ])]
+    >>> trip2 = [('s2','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
     >>> streams = [GenotripleStream(trip1),
     ...            GenomatrixStream(rows,'ldat',samples=samples),
     ...            GenotripleStream(trip2)]
@@ -696,8 +696,8 @@ class GenomatrixStream(GenotypeStream):
     ('s1', 's2', 's3')
     >>> for row in combined:
     ...   print row
-    ('l1', [('G', 'G'), 0, ('T', 'T')])
-    ('l2', [('A', 'A'), ('T', 'T'), 0])
+    ('l1', [('G', 'G'), None, ('T', 'T')])
+    ('l2', [('A', 'A'), ('T', 'T'), None])
 
     >>> streams = [GenomatrixStream(rows,'ldat',samples=samples),
     ...            GenomatrixStream(rows,'ldat',samples=samples)]
@@ -839,8 +839,8 @@ class GenomatrixStream(GenotypeStream):
     @rtype         : GenotripleStream
 
     >>> samples = ['s1', 's2', 's3']
-    >>> rows = [('l1', [ 51,   52,   68 ]),
-    ...         ('l2', [ 17,   68,   51 ])]
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('G', 'G') ])]
     >>> ldat = GenomatrixStream(rows,'ldat',samples=samples)
     >>> recoded = ldat.recoded(snp_marker)
     >>> recoded.columns
@@ -851,14 +851,14 @@ class GenomatrixStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T'), ('T', 'T')])
     ('l2', [('A', 'A'), ('T', 'T'), ('G', 'G')])
     >>> backagain = GenomatrixStream(recoded,'ldat',samples=samples,genorepr=snp_marker)
-    >>> for triple in backagain.recoded(snp_acgt).as_genotriples():
+    >>> for triple in backagain.recoded(snp_marker).as_genotriples():
     ...   print triple
-    ('s1', 'l1', 51)
-    ('s2', 'l1', 52)
-    ('s3', 'l1', 68)
-    ('s1', 'l2', 17)
-    ('s2', 'l2', 68)
-    ('s3', 'l2', 51)
+    ('s1', 'l1', ('G', 'G'))
+    ('s2', 'l1', ('G', 'T'))
+    ('s3', 'l1', ('T', 'T'))
+    ('s1', 'l2', ('A', 'A'))
+    ('s2', 'l2', ('T', 'T'))
+    ('s3', 'l2', ('G', 'G'))
     '''
     return self.transformed(genorepr=genorepr)
 
@@ -902,14 +902,14 @@ class GenomatrixStream(GenotypeStream):
     @rtype                : generator or list
 
     >>> samples = ['s1', 's2', 's3']
-    >>> rows = [('l1', [ 51,   52,   68 ]),
-    ...         ('l2', [ 17,   68,   51 ])]
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('G', 'G') ])]
     >>> genos = GenomatrixStream(rows,'ldat',samples=samples).transformed(include_loci=['l1'],exclude_samples=['s3'])
     >>> genos.samples
     ('s1', 's2')
     >>> for row in genos:
     ...   print row
-    ('l1', [51, 52])
+    ('l1', [('G', 'G'), ('G', 'T')])
     '''
     packed = self.packed
 
@@ -1038,26 +1038,26 @@ class GenomatrixStream(GenotypeStream):
     @rtype            : GenomatrixStream
 
     >>> loci = ['l1', 'l2']
-    >>> rows = [('s1', [ 51,   17 ]),
-    ...         ('s2', [ 52,   68 ]),
-    ...         ('s3', [ 51,   17 ])]
+    >>> rows = [('s1', [ ('G', 'G'),   ('A', 'A') ]),
+    ...         ('s2', [ ('G', 'T'),   ('T', 'T') ]),
+    ...         ('s3', [ ('G', 'G'),   ('A', 'A') ])]
     >>> genos = GenomatrixStream(rows,'sdat',loci=loci,genorepr=snp_marker)
     >>> genos = genos.sorted(locusorder=['l2'],sampleorder=['s2','s1','s3'])
     >>> genos.loci
     ('l2', 'l1')
     >>> for row in genos:
     ...   print row
-    ('s2', [68, 52])
-    ('s1', [17, 51])
-    ('s3', [17, 51])
+    ('s2', [('T', 'T'), ('G', 'T')])
+    ('s1', [('A', 'A'), ('G', 'G')])
+    ('s3', [('A', 'A'), ('G', 'G')])
     >>> genos = GenomatrixStream(rows,'sdat',loci=loci,genorepr=snp_marker).transposed()
     >>> genos = genos.sorted(locusorder=['l2'],sampleorder=['s2','s1','s3'])
     >>> genos.samples
     ('s2', 's1', 's3')
     >>> for row in genos:
     ...   print row
-    ('l2', [68, 17, 17])
-    ('l1', [52, 51, 51])
+    ('l2', [('T', 'T'), ('A', 'A'), ('A', 'A')])
+    ('l1', [('G', 'T'), ('G', 'G'), ('G', 'G')])
     '''
     if self.format == 'sdat':
       columnorder = locusorder
@@ -1133,9 +1133,9 @@ class GenomatrixStream(GenotypeStream):
     @rtype : genomatrix stream
 
     >>> loci = ['l1', 'l2']
-    >>> rows = [('s1', [ 51,   17 ]),
-    ...         ('s2', [ 52,   68 ]),
-    ...         ('s3', [ 51,   17 ])]
+    >>> rows = [('s1', [ ('G', 'G'),   ('A', 'A') ]),
+    ...         ('s2', [ ('G', 'T'),   ('T', 'T') ]),
+    ...         ('s3', [ ('G', 'G'),   ('A', 'A') ])]
     >>> genos = GenomatrixStream(rows,'sdat',loci=loci,genorepr=snp_marker).transposed()
     >>> print genos.format
     ldat
@@ -1145,8 +1145,8 @@ class GenomatrixStream(GenotypeStream):
     ('s1', 's2', 's3')
     >>> for row in genos:
     ...   print row
-    ('l1', [51, 52, 51])
-    ('l2', [17, 68, 17])
+    ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
+    ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
     '''
     rows,genos = transpose_generator(self.columns, list(self), missing=self.genorepr.missing)
 
@@ -1172,22 +1172,22 @@ class GenomatrixStream(GenotypeStream):
     @return         : genotriples converted into a genomatrix stream
     @rtype          : GenomatrixStream
 
-    >>> trips = [('s1','l1', 51),('s1','l2', 17),
-    ...          ('s2','l1', 52),('s2','l2', 68),
-    ...          ('s3','l1', 51),('s3','l2', 17)]
+    >>> trips = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...          ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+    ...          ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
     >>> loci = ['l1', 'l2']
-    >>> rows = [('s1', [ 51,   17 ]),
-    ...         ('s2', [ 52,   68 ]),
-    ...         ('s3', [ 51,   17 ])]
+    >>> rows = [('s1', [ ('G', 'G'),   ('A', 'A') ]),
+    ...         ('s2', [ ('G', 'T'),   ('T', 'T') ]),
+    ...         ('s3', [ ('G', 'G'),   ('A', 'A') ])]
     >>> triples = GenomatrixStream(rows,'sdat',loci=loci,genorepr=snp_marker).as_genotriples()
     >>> for row in triples:
     ...   print row
-    ('s1', 'l1', 51)
-    ('s1', 'l2', 17)
-    ('s2', 'l1', 52)
-    ('s2', 'l2', 68)
-    ('s3', 'l1', 51)
-    ('s3', 'l2', 17)
+    ('s1', 'l1', ('G', 'G'))
+    ('s1', 'l2', ('A', 'A'))
+    ('s2', 'l1', ('G', 'T'))
+    ('s2', 'l2', ('T', 'T'))
+    ('s3', 'l1', ('G', 'G'))
+    ('s3', 'l2', ('A', 'A'))
     '''
 
     if self.format == 'ldat':
@@ -1216,16 +1216,16 @@ class GenomatrixStream(GenotypeStream):
     @rtype          : GenomatrixStream
 
     >>> loci = ['l1', 'l2']
-    >>> rows = [('s1', [ 51,   17 ]),
-    ...         ('s2', [ 52,   68 ]),
-    ...         ('s3', [ 51,   17 ])]
+    >>> rows = [('s1', [ ('G', 'G'),   ('A', 'A') ]),
+    ...         ('s2', [ ('G', 'T'),   ('T', 'T') ]),
+    ...         ('s3', [ ('G', 'G'),   ('A', 'A') ])]
     >>> genos = GenomatrixStream(rows,'sdat',loci=loci,genorepr=snp_marker).as_ldat()
     >>> genos.samples
     ('s1', 's2', 's3')
     >>> for row in genos:
     ...   print row
-    ('l1', [51, 52, 51])
-    ('l2', [17, 68, 17])
+    ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
+    ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
     '''
     genos = self
     if mergefunc is not None:
@@ -1246,16 +1246,16 @@ class GenomatrixStream(GenotypeStream):
     @rtype          : GenomatrixStream
 
     >>> samples = ['s1', 's2', 's3']
-    >>> rows = [('l1', [51, 52, 51]),
-    ...         ('l2', [17, 68, 17])]
+    >>> rows = [('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')]),
+    ...         ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])]
     >>> genos = GenomatrixStream(rows,'ldat',samples=samples,genorepr=snp_marker).as_sdat()
     >>> genos.loci
     ('l1', 'l2')
     >>> for row in genos:
     ...   print row
-    ('s1', [51, 17])
-    ('s2', [52, 68])
-    ('s3', [51, 17])
+    ('s1', [('G', 'G'), ('A', 'A')])
+    ('s2', [('G', 'T'), ('T', 'T')])
+    ('s3', [('G', 'G'), ('A', 'A')])
     '''
     genos = self
     if mergefunc is not None:
@@ -1429,9 +1429,9 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   @return         : samples, loci, sorted genotriples
   @rtype          : tuple of list, list, genotriple sequence
 
-  >>> triples = [('s3','l1', 51),('s3','l2', 17),
-  ...            ('s2','l2', 52),('s1','l1', 68),
-  ...            ('s1','l1', 51),('s2','l2', 17)]
+  >>> triples = [('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A')),
+  ...            ('s2','l2', ('G', 'T')),('s1','l1', ('T', 'T')),
+  ...            ('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
   >>> samples,loci,striples = sort_genotriples(triples,order='sample',sampleorder=['s1','s2','s3'],
   ...                                                                  locusorder=['l1','l2','l3'])
   >>> samples
@@ -1439,21 +1439,21 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   >>> loci
   ['l1', 'l2']
   >>> striples
-  [('s1', 'l1', 51), ('s1', 'l1', 68), ('s2', 'l2', 17), ('s2', 'l2', 52), ('s3', 'l1', 51), ('s3', 'l2', 17)]
+  [('s1', 'l1', ('G', 'G')), ('s1', 'l1', ('T', 'T')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('G', 'T')), ('s3', 'l1', ('G', 'G')), ('s3', 'l2', ('A', 'A'))]
   >>> samples,loci,striples = sort_genotriples(triples,order='sample',locusorder=['l3','l2','l1'])
   >>> samples
   ['s1', 's2', 's3']
   >>> loci
   ['l1', 'l2']
   >>> striples
-  [('s1', 'l1', 51), ('s1', 'l1', 68), ('s2', 'l2', 17), ('s2', 'l2', 52), ('s3', 'l2', 17), ('s3', 'l1', 51)]
+  [('s1', 'l1', ('G', 'G')), ('s1', 'l1', ('T', 'T')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('G', 'T')), ('s3', 'l2', ('A', 'A')), ('s3', 'l1', ('G', 'G'))]
   >>> samples,loci,striples = sort_genotriples(triples,order='sample',sampleorder=['s3','s2','s1'])
   >>> samples
   ['s3', 's2', 's1']
   >>> loci
   ['l1', 'l2']
   >>> striples
-  [('s3', 'l1', 51), ('s3', 'l2', 17), ('s2', 'l2', 17), ('s2', 'l2', 52), ('s1', 'l1', 51), ('s1', 'l1', 68)]
+  [('s3', 'l1', ('G', 'G')), ('s3', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('G', 'T')), ('s1', 'l1', ('G', 'G')), ('s1', 'l1', ('T', 'T'))]
   '''
   def makeorderdict(o):
     od = {}
@@ -1501,19 +1501,19 @@ def combine_unsorted_genotriple_list(triplelist):
   @return          : combined genotriple stream
   @rtype           : sequence of sample, locus, and genotype
 
-  >>> trip1 = [('s3','l1', 51),('s3','l2', 17),
-  ...          ('s2','l2', 52),('s1','l1', 68)]
-  >>> trip2 = [('s1','l1', 51),('s2','l2', 17)]
+  >>> trip1 = [('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A')),
+  ...          ('s2','l2', ('G', 'T')),('s1','l1', ('T', 'T'))]
+  >>> trip2 = [('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
   >>> triplelist = [GenotripleStream(trip1),GenotripleStream(trip2)]
   >>> combined = combine_unsorted_genotriple_list(triplelist)
   >>> for row in combined:
   ...   print row
-  ('s3', 'l1', 51)
-  ('s3', 'l2', 17)
-  ('s2', 'l2', 52)
-  ('s1', 'l1', 68)
-  ('s1', 'l1', 51)
-  ('s2', 'l2', 17)
+  ('s3', 'l1', ('G', 'G'))
+  ('s3', 'l2', ('A', 'A'))
+  ('s2', 'l2', ('G', 'T'))
+  ('s1', 'l1', ('T', 'T'))
+  ('s1', 'l1', ('G', 'G'))
+  ('s2', 'l2', ('A', 'A'))
   '''
   # Make sure that input list is materialized and can be iterated
   if not isinstance(triplelist, list):
@@ -1571,19 +1571,19 @@ def combine_sorted_genotriple_list(triplelist):
   @return          : combined genotriple stream
   @rtype           : sequence of sample, locus, and genotype
 
-  >>> trip1 = [('s1','l1', 51),('s1','l2', 17),
-  ...          ('s2','l2', 52),('s3','l1', 68)]
-  >>> trip2 = [('s2','l1', 51),('s3','l2', 17)]
+  >>> trip1 = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+  ...          ('s2','l2', ('G', 'T')),('s3','l1', ('T', 'T'))]
+  >>> trip2 = [('s2','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
   >>> triplelist = [GenotripleStream(trip1,order='sample'),GenotripleStream(trip2,order='sample')]
   >>> combined = combine_sorted_genotriple_list(triplelist)
   >>> for row in combined:
   ...   print row
-  ('s1', 'l1', 51)
-  ('s1', 'l2', 17)
-  ('s2', 'l1', 51)
-  ('s2', 'l2', 52)
-  ('s3', 'l1', 68)
-  ('s3', 'l2', 17)
+  ('s1', 'l1', ('G', 'G'))
+  ('s1', 'l2', ('A', 'A'))
+  ('s2', 'l1', ('G', 'G'))
+  ('s2', 'l2', ('G', 'T'))
+  ('s3', 'l1', ('T', 'T'))
+  ('s3', 'l2', ('A', 'A'))
   >>> combined.order
   'sample'
   '''
@@ -1665,10 +1665,10 @@ def merge_sorted_genotriples(triples,mergefunc):
   @return         : sorted, merged genotriple stream
   @rtype          : sequence
 
-  >>> t = [('l1','s1','AA'),('l1','s1',   0),('l1','s2','AB'),('l2','s1','AA'),
+  >>> t = [('l1','s1','AA'),('l1','s1',   None),('l1','s2','AB'),('l2','s1','AA'),
   ...      ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
   >>> list(merge_sorted_genotriples(t,VoteMerger()))
-  [('l1', 's1', 'AA'), ('l1', 's2', 'AB'), ('l2', 's1', 'AA'), ('l3', 's1', 0)]
+  [('l1', 's1', 'AA'), ('l1', 's2', 'AB'), ('l2', 's1', 'AA'), ('l3', 's1', None)]
   '''
   for (sample,locus),trips in groupby(triples, itemgetter(0,1)):
     yield sample,locus,mergefunc(sample,locus,map(itemgetter(2),trips))
@@ -1700,34 +1700,34 @@ def merge_genomatrixstream_columns(columns, genos, mergefunc):
   @rtype           : generator
 
   >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[17,   0,  51]),
-  ...         ('s2',[ 0,   0,   0]),
-  ...         ('s3',[17,   0,   0]),
-  ...         ('s4',[52,   0,  68])]
+  >>> rows = [('s1',[('A', 'A'),   None,  ('G', 'G')]),
+  ...         ('s2',[ None,   None,   None]),
+  ...         ('s3',[('A', 'A'),   None,   None]),
+  ...         ('s4',[('G', 'T'),   None,  ('T', 'T')])]
   >>> loci,rows = merge_genomatrixstream_columns(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
   ...   print row
-  ('s1', [17, 0, 51])
-  ('s2', [0, 0, 0])
-  ('s3', [17, 0, 0])
-  ('s4', [52, 0, 68])
+  ('s1', [('A', 'A'), None, ('G', 'G')])
+  ('s2', [None, None, None])
+  ('s3', [('A', 'A'), None, None])
+  ('s4', [('G', 'T'), None, ('T', 'T')])
 
   >>> loci = ('l1','l2','l1')
-  >>> rows = [('s1',[17,   0,  51]),
-  ...         ('s2',[ 0,  11,   0]),
-  ...         ('s3',[17,  17,   0]),
-  ...         ('s4',[52,   0,  52])]
+  >>> rows = [('s1',[('A', 'A'),   None,  ('G', 'G')]),
+  ...         ('s2',[ None,  ('A', 'C'),   None]),
+  ...         ('s3',[('A', 'A'),  ('A', 'A'),   None]),
+  ...         ('s4',[('G', 'T'),   None,  ('G', 'T')])]
   >>> loci,rows = merge_genomatrixstream_columns(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2')
   >>> for row in rows:
   ...   print row
-  ('s1', [0, 0])
-  ('s2', [0, 11])
-  ('s3', [17, 17])
-  ('s4', [52, 0])
+  ('s1', [None, None])
+  ('s2', [None, ('A', 'C')])
+  ('s3', [('A', 'A'), ('A', 'A')])
+  ('s4', [('G', 'T'), None])
   '''
   assert mergefunc is not None
 
@@ -1792,31 +1792,31 @@ def merge_genomatrixstream_rows(columns, genos, mergefunc):
   @rtype           : generator
 
   >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[17,   0,  51]),
-  ...         ('s2',[ 0,   0,   0]),
-  ...         ('s3',[17,   0,   0]),
-  ...         ('s4',[52,   0,  68])]
+  >>> rows = [('s1',[('A', 'A'),   None,  ('G', 'G')]),
+  ...         ('s2',[ None,   None,   None]),
+  ...         ('s3',[('A', 'A'),   None,   None]),
+  ...         ('s4',[('G', 'T'),   None,  ('T', 'T')])]
   >>> loci,rows = merge_genomatrixstream_rows(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
   ...   print row
-  ('s1', [17, 0, 51])
-  ('s2', [0, 0, 0])
-  ('s3', [17, 0, 0])
-  ('s4', [52, 0, 68])
+  ('s1', [('A', 'A'), None, ('G', 'G')])
+  ('s2', [None, None, None])
+  ('s3', [('A', 'A'), None, None])
+  ('s4', [('G', 'T'), None, ('T', 'T')])
 
-  >>> rows = [('s1',[17,   0,  52]),
-  ...         ('s2',[ 0,  11,   0]),
-  ...         ('s1',[17,  17,   0]),
-  ...         ('s1',[52,   0,  52])]
+  >>> rows = [('s1',[('A', 'A'),   None,  ('G', 'T')]),
+  ...         ('s2',[ None,  ('A', 'C'),   None]),
+  ...         ('s1',[('A', 'A'),  ('A', 'A'),   None]),
+  ...         ('s1',[('G', 'T'),   None,  ('G', 'T')])]
   >>> loci,rows = merge_genomatrixstream_rows(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
   ...   print row
-  ('s1', [0, 17, 52])
-  ('s2', [0, 11, 0])
+  ('s1', [None, ('A', 'A'), ('G', 'T')])
+  ('s2', [None, ('A', 'C'), None])
   '''
   assert mergefunc is not None
 
@@ -1865,44 +1865,44 @@ def merge_genomatrixstream(columns, genos, mergefunc):
   @rtype           : generator
 
   >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[17,   0,  51]),
-  ...         ('s2',[ 0,   0,   0]),
-  ...         ('s3',[17,   0,   0]),
-  ...         ('s4',[52,   0,  68])]
+  >>> rows = [('s1',[('A', 'A'),   None,  ('G', 'G')]),
+  ...         ('s2',[ None,   None,   None]),
+  ...         ('s3',[('A', 'A'),   None,   None]),
+  ...         ('s4',[('G', 'T'),   None,  ('T', 'T')])]
   >>> loci,genos = merge_genomatrixstream(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
   ...   print row
-  ('s1', [17, 0, 51])
-  ('s2', [0, 0, 0])
-  ('s3', [17, 0, 0])
-  ('s4', [52, 0, 68])
+  ('s1', [('A', 'A'), None, ('G', 'G')])
+  ('s2', [None, None, None])
+  ('s3', [('A', 'A'), None, None])
+  ('s4', [('G', 'T'), None, ('T', 'T')])
 
-  >>> rows = [('s1',[17,   0,  52]),
-  ...         ('s2',[ 0,  11,   0]),
-  ...         ('s1',[17,  17,   0]),
-  ...         ('s1',[52,   0,  52])]
+  >>> rows = [('s1',[('A', 'A'),   None,  ('G', 'T')]),
+  ...         ('s2',[ None,  ('A', 'C'),   None]),
+  ...         ('s1',[('A', 'A'),  ('A', 'A'),   None]),
+  ...         ('s1',[('G', 'T'),   None,  ('G', 'T')])]
   >>> loci,rows = merge_genomatrixstream(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
   ...   print row
-  ('s1', [0, 17, 52])
-  ('s2', [0, 11, 0])
+  ('s1', [None, ('A', 'A'), ('G', 'T')])
+  ('s2', [None, ('A', 'C'), None])
 
   >>> loci = ('l1','l2','l1')
-  >>> rows = [('s1',[ 0,   0,  52]),
-  ...         ('s2',[ 0,  11,   7]),
-  ...         ('s1',[17,  17,   0]),
-  ...         ('s1',[52,   0,  52])]
+  >>> rows = [('s1',[ None,   None,  ('C', 'T')]),
+  ...         ('s2',[ None,  ('A', 'G'),   ('T', 'T')]),
+  ...         ('s1',[('A', 'A'),  ('A', 'A'),   None]),
+  ...         ('s1',[('G', 'T'),   None,  ('G', 'T')])]
   >>> loci,rows = merge_genomatrixstream(loci,rows,VoteMerger())
   >>> loci
   ('l1', 'l2')
   >>> for row in rows:
   ...   print row
-  ('s1', [0, 17])
-  ('s2', [7, 11])
+  ('s1', [None, ('A', 'A')])
+  ('s2', [('T', 'T'), ('A', 'G')])
   '''
   assert mergefunc is not None
 
@@ -2185,22 +2185,22 @@ def build_genomatrixstream_from_triples(genos, format, mergefunc, samples=None, 
   @return         : genomatrix formed from the input triples
   @rtype          : genomatrix generator
 
-  >>> rows = [('s1','l1', 51),('s1','l2', 17),
-  ...         ('s2','l1', 52),('s2','l2', 68),
-  ...         ('s3','l1', 51),('s3','l2', 17)]
+  >>> rows = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+  ...         ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+  ...         ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
   >>> merge = UniqueMerger()
   >>> loci,new_rows = build_genomatrixstream_from_triples(rows,'sdat',merge,loci=['l1','l2'],order='sample')
   >>> loci
   ('l1', 'l2')
   >>> for row in new_rows:
   ...   print row
-  ('s1', [51, 17])
-  ('s2', [52, 68])
-  ('s3', [51, 17])
+  ('s1', [('G', 'G'), ('A', 'A')])
+  ('s2', [('G', 'T'), ('T', 'T')])
+  ('s3', [('G', 'G'), ('A', 'A')])
 
-  >>> rows = [('s1','l1', 51),('s1','l1', 17),
-  ...         ('s2','l1', 52),('s2','l1', 68),
-  ...         ('s3','l1', 51),('s3','l1', 17)]
+  >>> rows = [('s1','l1', ('G', 'G')),('s1','l1', ('A', 'A')),
+  ...         ('s2','l1', ('G', 'T')),('s2','l1', ('T', 'T')),
+  ...         ('s3','l1', ('G', 'G')),('s3','l1', ('A', 'A'))]
   >>> loci,new_rows = build_genomatrixstream_from_triples(rows,'sdat',merge,loci=['l1','l2'],order='sample')
   >>> for row in new_rows:
   ...   print row
@@ -2208,18 +2208,18 @@ def build_genomatrixstream_from_triples(genos, format, mergefunc, samples=None, 
        ...
   NonUniqueGenotypeError: Non-unique genotype found
 
-  >>> rows = [('s1','l1', 51),('s1','l2', 17),
-  ...         ('s2','l1', 52),('s2','l2', 68),
-  ...         ('s3','l1', 51),('s3','l2', 17)]
+  >>> rows = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+  ...         ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+  ...         ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
   >>> merge = VoteMerger()
   >>> loci,new_rows = build_genomatrixstream_from_triples(rows,'sdat',merge,loci=['l1','l2'],order='sample')
   >>> loci
   ('l1', 'l2')
   >>> for row in new_rows:
   ...   print row
-  ('s1', [51, 17])
-  ('s2', [52, 68])
-  ('s3', [51, 17])
+  ('s1', [('G', 'G'), ('A', 'A')])
+  ('s2', [('G', 'T'), ('T', 'T')])
+  ('s3', [('G', 'G'), ('A', 'A')])
   >>> sorted(merge.samplestats.iteritems())
   [('s1', [2, 0, 0, 0, 0]), ('s2', [2, 0, 0, 0, 0]), ('s3', [2, 0, 0, 0, 0])]
   >>> sorted(merge.locusstats.iteritems())
@@ -2231,9 +2231,9 @@ def build_genomatrixstream_from_triples(genos, format, mergefunc, samples=None, 
   ('l1', 'l2')
   >>> for row in new_rows:
   ...   print row
-  ('s1', [51, 17])
-  ('s2', [52, 68])
-  ('s3', [51, 17])
+  ('s1', [('G', 'G'), ('A', 'A')])
+  ('s2', [('G', 'T'), ('T', 'T')])
+  ('s3', [('G', 'G'), ('A', 'A')])
   >>> sorted(merge.samplestats.iteritems())
   [('s1', [2, 0, 0, 0, 0]), ('s2', [2, 0, 0, 0, 0]), ('s3', [2, 0, 0, 0, 0])]
   >>> sorted(merge.locusstats.iteritems())
@@ -2245,8 +2245,8 @@ def build_genomatrixstream_from_triples(genos, format, mergefunc, samples=None, 
   ('s1', 's2', 's3')
   >>> for row in new_rows:
   ...   print row
-  ('l1', [51, 52, 51])
-  ('l2', [17, 68, 17])
+  ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
+  ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
   >>> sorted(merge.samplestats.iteritems())
   [('s1', [2, 0, 0, 0, 0]), ('s2', [2, 0, 0, 0, 0]), ('s3', [2, 0, 0, 0, 0])]
   >>> sorted(merge.locusstats.iteritems())
@@ -2302,19 +2302,19 @@ def pack_genomatrixstream(columns, genos, genorepr):
   @rtype           : genomatrix generator
 
   >>> samples = ('s1','s2','s3')
-  >>> genos = [('l1',[17,0,51]),
-  ...          ('l2',[0,0,0]),
-  ...          ('l3',[17,0,0]),
-  ...          ('l4',[52,0,68])]
-  >>> samples,rows = pack_genomatrixstream(samples,genos,genorepr=snp_acgt)
+  >>> genos = [('l1',[('A', 'A'),None,('G', 'G')]),
+  ...          ('l2',[None,None,None]),
+  ...          ('l3',[('A', 'A'),None,None]),
+  ...          ('l4',[('G', 'T'),None,('T', 'T')])]
+  >>> samples,rows = pack_genomatrixstream(samples,genos,genorepr=snp_marker)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in rows:
   ...   print row
-  ('l1', array('B', [17, 0, 51]))
-  ('l2', array('B', [0, 0, 0]))
-  ('l3', array('B', [17, 0, 0]))
-  ('l4', array('B', [52, 0, 68]))
+  ('l1', [('A', 'A'), None, ('G', 'G')])
+  ('l2', [None, None, None])
+  ('l3', [('A', 'A'), None, None])
+  ('l4', [('G', 'T'), None, ('T', 'T')])
   '''
   def _pack():
     for label,geno in genos:
@@ -2338,11 +2338,11 @@ def recode_genomatrixstream(columns, genos, old_genorepr, new_repr, format=None,
   @rtype             : genomatrix generator
 
   >>> samples = ('s1','s2','s3')
-  >>> genos = [('l1',[17,0,51]),
-  ...          ('l2',[0,0,0]),
-  ...          ('l3',[17,0,0]),
-  ...          ('l4',[52,0,68])]
-  >>> samples,rows = recode_genomatrixstream(samples,genos,snp_acgt,snp_marker)
+  >>> genos = [('l1',[('A', 'A'),None,('G', 'G')]),
+  ...          ('l2',[None,None,None]),
+  ...          ('l3',[('A', 'A'),None,None]),
+  ...          ('l4',[('G', 'T'),None,('T', 'T')])]
+  >>> samples,rows = recode_genomatrixstream(samples,genos,snp_marker,snp_marker)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in rows:
@@ -2354,7 +2354,7 @@ def recode_genomatrixstream(columns, genos, old_genorepr, new_repr, format=None,
 
   >>> complement = {'A':'T','T':'A','C':'G','G':'C',None:None}
   >>> rename = {'l1':complement, 'l4':complement}
-  >>> samples,rows = recode_genomatrixstream(samples,genos,snp_acgt,snp_marker,'ldat',rename)
+  >>> samples,rows = recode_genomatrixstream(samples,genos,snp_marker,snp_marker,'ldat',rename)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in rows:
@@ -2365,10 +2365,10 @@ def recode_genomatrixstream(columns, genos, old_genorepr, new_repr, format=None,
   ('l4', [('C', 'A'), None, ('A', 'A')])
 
   >>> loci = ('l1','l2','l3','l4')
-  >>> genos = [('s1',[17,0,17,52]),
-  ...          ('s2',[0,0,0,0]),
-  ...          ('s3',[51,0,0,68])]
-  >>> loci,rows = recode_genomatrixstream(loci,genos,snp_acgt,snp_marker,'sdat',rename)
+  >>> genos = [('s1',[('A', 'A'),None,('A', 'A'),('G', 'T')]),
+  ...          ('s2',[None,None,None,None]),
+  ...          ('s3',[('G', 'G'),None,None,('T', 'T')])]
+  >>> loci,rows = recode_genomatrixstream(loci,genos,snp_marker,snp_marker,'sdat',rename)
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for row in rows:
@@ -2415,10 +2415,10 @@ def recode_genotriples(triples, old_genorepr, new_genorepr, rename_alleles=None)
   @return            : genotriple with the new internal format
   @rtype             : genotriple generator
 
-  >>> triples = [('s3','l1', 51),('s3','l2', 17),
-  ...            ('s2','l2', 52),('s1','l1', 68),
-  ...            ('s1','l1', 51),('s2','l2', 17)]
-  >>> for row in recode_genotriples(triples,snp_acgt,snp_marker):
+  >>> triples = [('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A')),
+  ...            ('s2','l2', ('G', 'T')),('s1','l1', ('T', 'T')),
+  ...            ('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
+  >>> for row in recode_genotriples(triples,snp_marker,snp_marker):
   ...   print row
   ('s3', 'l1', ('G', 'G'))
   ('s3', 'l2', ('A', 'A'))
@@ -2427,7 +2427,7 @@ def recode_genotriples(triples, old_genorepr, new_genorepr, rename_alleles=None)
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   >>> rename = {'l1':{'A':'T','T':'A','C':'G','G':'C',None:None}}
-  >>> for row in recode_genotriples(triples,snp_acgt,snp_marker,rename):
+  >>> for row in recode_genotriples(triples,snp_marker,snp_marker,rename):
   ...   print row
   ('s3', 'l1', ('C', 'C'))
   ('s3', 'l2', ('A', 'A'))
@@ -2465,31 +2465,31 @@ def filter_genomatrixstream_missing(columns,genos):
   @rtype        : generator or list
 
   >>> samples = ('s1','s2','s3')
-  >>> rows = [('l1',[17,0,51]),
-  ...         ('l2',[0,0,0]),
-  ...         ('l3',[17,0,0]),
-  ...         ('l4',[52,0,68])]
+  >>> rows = [('l1',[('A', 'A'),None,('G', 'G')]),
+  ...         ('l2',[None,None,None]),
+  ...         ('l3',[('A', 'A'),None,None]),
+  ...         ('l4',[('G', 'T'),None,('T', 'T')])]
   >>> samples,rows = filter_genomatrixstream_missing(samples,rows)
   >>> samples
   ('s1', 's3')
   >>> for row in rows:
   ...   print row
-  ('l1', [17, 51])
-  ('l3', [17, 0])
-  ('l4', [52, 68])
+  ('l1', [('A', 'A'), ('G', 'G')])
+  ('l3', [('A', 'A'), None])
+  ('l4', [('G', 'T'), ('T', 'T')])
 
   >>> samples = ('s1','s2','s3')
-  >>> rows = [('l1',[0,0,0]),
-  ...         ('l2',[17,68,51]),
-  ...         ('l3',[0,0,0]),
-  ...         ('l4',[52,0,68])]
+  >>> rows = [('l1',[None,None,None]),
+  ...         ('l2',[('A', 'A'),('T', 'T'),('G', 'G')]),
+  ...         ('l3',[None,None,None]),
+  ...         ('l4',[('G', 'T'),None,('T', 'T')])]
   >>> samples,rows = filter_genomatrixstream_missing(samples,rows)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in rows:
   ...   print row
-  ('l2', [17, 68, 51])
-  ('l4', [52, 0, 68])
+  ('l2', [('A', 'A'), ('T', 'T'), ('G', 'G')])
+  ('l4', [('G', 'T'), None, ('T', 'T')])
   '''
 
   # Helper generator function used to filter for completely empty rows.
@@ -2536,7 +2536,7 @@ def filter_genotriples_missing(triples):
   @return       : iterator with missing genotype in the triples being filtered out.
   @rtype        : iterator
 
-  >>> ts=[('l1','s1',0),('l2','s2',1)]
+  >>> ts=[('l1','s1',None),('l2','s2',1)]
   >>> print list(filter_genotriples_missing(ts))
   [('l2', 's2', 1)]
   '''
@@ -3045,7 +3045,7 @@ def remap_genomatrixstream_row(columns,rows,rowmap):
 
 # Does not need to support a genorepr, since only one row is
 # materialized at a time.
-def transpose_generator(columns, rows, missing=0):
+def transpose_generator(columns, rows, missing=None):
   '''
   Transpose a matrix of row labels and row data generating one column of
   data at a time.  Return a generator of the columns of data stored in rows,
@@ -3093,7 +3093,7 @@ def transpose_generator(columns, rows, missing=0):
   return rowlabels,_transpose_generator()
 
 
-def transpose_matrix(columns, rows, genorepr=snp_acgt.pack_reps, missing=0):
+def transpose_matrix(columns, rows, genorepr=snp_marker.pack_reps, missing=None):
   '''
   Transpose a matrix of row labels and row data in memory.
 

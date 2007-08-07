@@ -47,12 +47,12 @@ class Unique(object):
 
   >>> unique = Unique()
   >>> unique(None)
-  (4, 0)
+  (4, None)
   >>> unique(['AA'])
   (0, 'AA')
-  >>> unique([0])
-  (4, 0)
-  >>> unique([0,0])
+  >>> unique([None])
+  (4, None)
+  >>> unique([None,None])
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
@@ -64,12 +64,12 @@ class Unique(object):
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
-  >>> unique(['AA',0])
+  >>> unique(['AA',None])
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
   '''
-  def __init__(self, missingrepr=0):
+  def __init__(self, missingrepr=None):
     '''
     @param missingrepr: internal representation for missing genotypes
     @type  missingrepr: str
@@ -112,33 +112,33 @@ class Vote(object):
 
   >>> vote = Vote(1.0)
   >>> vote(None)
-  (4, 0)
+  (4, None)
   >>> vote(['AA'])
   (0, 'AA')
   >>> vote([1])
   (0, 1)
   >>> vote([1,1])
   (1, 1)
-  >>> vote([0,0,0])
-  (4, 0)
-  >>> vote(['AA',0,0,0])
+  >>> vote([None,None,None])
+  (4, None)
+  >>> vote(['AA',None,None,None])
   (1, 'AA')
-  >>> vote(['AA','AA',0,'AA','AA','AA'])
+  >>> vote(['AA','AA',None,'AA','AA','AA'])
   (1, 'AA')
-  >>> vote(['AA','AA',0,'AA','AB','AA'])
-  (3, 0)
+  >>> vote(['AA','AA',None,'AA','AB','AA'])
+  (3, None)
   >>> vote = Vote(0.8)
-  >>> vote(['AA','AA',0,'AA','AB','AA'])
+  >>> vote(['AA','AA',None,'AA','AB','AA'])
   (2, 'AA')
   >>> vote = Vote(0.4)
-  >>> vote(['AT','AT','AA','TT','AC',0,0])
+  >>> vote(['AT','AT','AA','TT','AC',None,None])
   (2, 'AT')
   >>> vote(['AA','AA','AA','BB','BB','BB'])
-  (3, 0)
+  (3, None)
   >>> vote(['AA','AA','BB','BB','AB'])
-  (3, 0)
+  (3, None)
   '''
-  def __init__(self, threshold=1.0, missingrepr=0):
+  def __init__(self, threshold=1.0, missingrepr=None):
     '''
     @param   threshold: cut-off value to be voted as a consensus
     @type    threshold: float
@@ -198,7 +198,7 @@ class Ordered(object):
   A voting process is introduced to pick a consensus genotype if two or more
   non-missing genotypes exist.  Only the first non-missing genotype with
   better frequency higher the specified threshold will be returned,
-  otherwise 0.
+  otherwise None.
 
   Classes:
   0) unambiguous:  exactly one genotype and non-missing
@@ -209,24 +209,24 @@ class Ordered(object):
 
   >>> ordered = Ordered(0)
   >>> ordered(None)
-  (4, 0)
+  (4, None)
   >>> ordered(['AA'])
   (0, 'AA')
   >>> ordered([1])
   (0, 1)
   >>> ordered([1,1])
   (1, 1)
-  >>> ordered([0,0,0])
-  (4, 0)
-  >>> ordered(['AA',0,0,0])
+  >>> ordered([None,None,None])
+  (4, None)
+  >>> ordered(['AA',None,None,None])
   (1, 'AA')
-  >>> ordered(['AA','AA',0,'AA','AA','AA'])
+  >>> ordered(['AA','AA',None,'AA','AA','AA'])
   (1, 'AA')
-  >>> ordered(['AA','AA',0,'AA','AB','AA'])
+  >>> ordered(['AA','AA',None,'AA','AB','AA'])
   (2, 'AA')
-  >>> ordered(['AA','AA',0,'AA','AB','AA'])
+  >>> ordered(['AA','AA',None,'AA','AB','AA'])
   (2, 'AA')
-  >>> ordered(['AT','AT','AA','TT','AC',0,0])
+  >>> ordered(['AT','AT','AA','TT','AC',None,None])
   (2, 'AT')
   >>> ordered(['AA','AA','BB','BB','BB'])
   (2, 'AA')
@@ -234,32 +234,32 @@ class Ordered(object):
   (2, 'AA')
   >>> ordered = Ordered()
   >>> ordered(None)
-  (4, 0)
+  (4, None)
   >>> ordered(['AA'])
   (0, 'AA')
   >>> ordered([1])
   (0, 1)
   >>> ordered([1,1])
   (1, 1)
-  >>> ordered([0,0,0])
-  (4, 0)
-  >>> ordered(['AA',0,0,0])
+  >>> ordered([None,None,None])
+  (4, None)
+  >>> ordered(['AA',None,None,None])
   (1, 'AA')
-  >>> ordered(['AA','AA',0,'AA','AA','AA'])
+  >>> ordered(['AA','AA',None,'AA','AA','AA'])
   (1, 'AA')
-  >>> ordered(['AA','AA',0,'AA','AB','AA'])
+  >>> ordered(['AA','AA',None,'AA','AB','AA'])
   (2, 'AA')
-  >>> ordered(['AA','AA',0,'AA','AB','AA'])
+  >>> ordered(['AA','AA',None,'AA','AB','AA'])
   (2, 'AA')
-  >>> ordered(['AT','AT','AA','TT','AC',0,0])
-  (3, 0)
+  >>> ordered(['AT','AT','AA','TT','AC',None,None])
+  (3, None)
   >>> ordered(['AA','AA','AA','BB','BB','BB'])
   (2, 'AA')
   >>> ordered(['AA','AA','BB','BB','AB'])
-  (3, 0)
+  (3, None)
   '''
 
-  def __init__(self, threshold=0.4999999, missingrepr=0):
+  def __init__(self, threshold=0.4999999, missingrepr=None):
     '''
     @param   threshold: cut-off value to be voted as a consensus
     @type    threshold: float
@@ -351,17 +351,17 @@ class Merger(object):
 
     >>> samples  = ['s1','s1','s2','s2','s3','s3']
     >>> loci     = ['l1','l2','l3','l1','l2','l3']
-    >>> genosets = [['AA','AA',0,'AA','AB','AA'],None,['AA','AB','AB'],[0,0],[0],['AA']]
+    >>> genosets = [['AA','AA',None,'AA','AB','AA'],None,['AA','AB','AB'],[None,None],[None],['AA']]
     >>> merger = Merger(Vote(threshold = 0.8))
     >>> list(starmap(merger,izip(samples,loci,genosets)))
-    ['AA', 0, 0, 0, 0, 'AA']
+    ['AA', None, None, None, None, 'AA']
     >>> sorted(merger.samplestats.iteritems())
     [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
     >>> sorted(merger.locusstats.iteritems())
     [('l1', [0, 0, 1, 0, 1]), ('l2', [0, 0, 0, 0, 2]), ('l3', [1, 0, 0, 1, 0])]
     >>> merger = Merger(Vote(threshold = 0.8))
     >>> list(starmap(mergefunc_transpose_adapter(merger),izip(loci,samples,genosets)))
-    ['AA', 0, 0, 0, 0, 'AA']
+    ['AA', None, None, None, None, 'AA']
     >>> sorted(merger.samplestats.iteritems())
     [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
     >>> sorted(merger.locusstats.iteritems())
@@ -375,15 +375,15 @@ class Merger(object):
     return geno
 
 
-def UniqueMerger(threshold=None,missingrepr=0):
+def UniqueMerger(threshold=None,missingrepr=None):
   return Merger(Unique(missingrepr=missingrepr))
 
 
-def VoteMerger(threshold=1.0,missingrepr=0):
+def VoteMerger(threshold=1.0,missingrepr=None):
   return Merger(Vote(threshold=threshold,missingrepr=missingrepr))
 
 
-def OrderedMerger(threshold=0.4999999,missingrepr=0):
+def OrderedMerger(threshold=0.4999999,missingrepr=None):
   return Merger(Ordered(threshold=threshold,missingrepr=missingrepr))
 
 
@@ -427,13 +427,13 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   >>> import StringIO
   >>> samples  = ['s1','s1','s1','s1','s2','s2','s2','s2','s3','s3','s3','s3','s4','s4','s4','s4']
   >>> loci     = ['l1','l2','l3','l4','l1','l2','l3','l4','l1','l2','l3','l4','l1','l2','l3','l4']
-  >>> genosets = [['AA','AA',0,'AA','AB','AA'],['AA','AB','AB'],['AA','AA','AA'],[0,0],
-  ...            [0],['AA'],['AA',0,0,0],['AT','AT','AA','TT','AC',0,0],
+  >>> genosets = [['AA','AA',None,'AA','AB','AA'],['AA','AB','AB'],['AA','AA','AA'],[None,None],
+  ...            [None],['AA'],['AA',None,None,None],['AT','AT','AA','TT','AC',None,None],
   ...            ['AB'],['AA'],['AA','AA','AA','AA','AB'],['AB','AB'],
-  ...            ['AA','AB','AB'],['AA','AA'],['AA',0,0,0],['AA','AA','AA']]
+  ...            ['AA','AB','AB'],['AA','AA'],['AA',None,None,None],['AA','AA','AA']]
   >>> merger = Merger(Vote(threshold = 0.8))
   >>> list(starmap(merger, izip(samples,loci,genosets)))
-  ['AA', 0, 'AA', 0, 0, 'AA', 'AA', 0, 'AB', 'AA', 'AA', 'AB', 0, 'AA', 'AA', 'AA']
+  ['AA', None, 'AA', None, None, 'AA', 'AA', None, 'AB', 'AA', 'AA', 'AB', None, 'AA', 'AA', 'AA']
   >>> sampleout = StringIO.StringIO()
   >>> locusout  = StringIO.StringIO()
   >>> output_merge_statistics(merger,sampleout,locusout)
