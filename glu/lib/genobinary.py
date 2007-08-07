@@ -21,16 +21,16 @@ __license__   = 'See GLU license for terms by running: glu license'
 import os
 import time
 
-from   operator            import itemgetter
-from   itertools           import islice,izip,groupby,imap
-from   collections         import defaultdict
+from   operator    import itemgetter
+from   itertools   import islice,izip,groupby,imap
+from   collections import defaultdict
 
 import tables
 
-from   utils      import tally,ilen
-from   genoarray  import snp_acgt, snp_acgt2, snp_marker
-from   genoarray2 import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype
-from   genoio     import load_genotriples,load_genomatrix
+from   utils       import tally,ilen
+from   genoarray   import snp_acgt, snp_acgt2, snp_marker
+from   genoarray2  import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype
+from   genoio      import load_genotriples,load_genomatrix
 
 
 def xlen2(s):
@@ -1083,6 +1083,22 @@ def load_genomatrix_text(filename,format=None,limit=None,unique=True):
   format,columns,rows = load_genomatrix(filename,format=format,limit=limit,genorepr=snp_marker.pack_strs,unique=unique)
   columns,rows = recode_genomatrixstream_bitpacked(columns, rows, format, snp_marker)
   return format,columns,rows
+
+
+def load_hapmap_genotypes_text(filename,limit=None):
+  '''
+  Load the hampmap genotype data from file.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param        limit: limit the number of samples loaded
+  @type         limit: int or None
+  @return            : rows of genotypes with the first row being the sample names
+  @rtype             : generator
+  '''
+  columns,rows = load_hapmap_genotypes_text(filename,limit=limit,genorepr=snp_marker.pack_strs)
+  columns,rows = recode_genomatrixstream_bitpacked(columns, rows, 'ldat', snp_marker)
+  return columns,rows
 
 
 def recode_genotriples_bitpacked(triples, old_genorepr):
