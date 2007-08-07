@@ -35,7 +35,6 @@ Key innovations include:
     released)
 
 GLU's data management features include:
-
   * the ability to import, export, merge, and split genotype data among
     several common formats and standards
   * filter based on powerful criteria for inclusion, exclusion
