@@ -16,7 +16,7 @@ use_setuptools()
 # minimum versions required
 min_python_version = (2,5)
 min_numpy_version  = '1.0.2'
-min_scipy_version  = '0.5.3'
+min_scipy_version  = '0.5.3dev'
 min_tables_version = '2.0'
 
 if sys.version_info < min_python_version:
