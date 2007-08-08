@@ -201,7 +201,7 @@ def load_genomatrix(filename,format=None,limit=None,genorepr=snp_marker.pack_str
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> format,columns,rows = load_genomatrix(data,'ldat',genorepr=snp_marker.pack_strs)
+  >>> format,columns,rows = load_genomatrix(data,'ldat')
   >>> format
   'ldat'
   >>> columns
@@ -605,7 +605,7 @@ def save_genotriples(filename,triples,genorepr=snp_marker.str_from_rep):
     w.writerows(triples)
 
 
-def load_genotriplestream(filename, limit=None, genorepr=snp_marker, unique=False):
+def load_genotriplestream(filename, limit=None, unique=False):
   '''
   Load genotriple file and return a GenotripleStream object
 
@@ -623,7 +623,7 @@ def load_genotriplestream(filename, limit=None, genorepr=snp_marker, unique=Fals
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriplestream(data,genorepr=snp_marker)
+  >>> triples = load_genotriplestream(data)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -631,11 +631,11 @@ def load_genotriplestream(filename, limit=None, genorepr=snp_marker, unique=Fals
   ('s2', 'l1', ('A', 'G'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  triples = load_genotriples(filename,limit=None, genorepr=genorepr.rep_from_str)
-  return GenotripleStream(triples, unique=unique, genorepr=genorepr)
+  triples = load_genotriples(filename,limit=None)
+  return GenotripleStream(triples, unique=unique)
 
 
-def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_marker, unique=True):
+def load_genomatrixstream(filename, format=None, limit=None, unique=True):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -655,7 +655,7 @@ def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_marker
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> ldat = load_genomatrixstream(data,'ldat',genorepr=snp_marker)
+  >>> ldat = load_genomatrixstream(data,'ldat')
   >>> ldat.columns
   ('s1', 's2', 's3')
   >>> for row in ldat:
@@ -669,21 +669,21 @@ def load_genomatrixstream(filename, format=None, limit=None, genorepr=snp_marker
   samples = loci = None
 
   if format == 'hapmap':
-    samples,genos = load_hapmap_genotypes(filename,limit=limit,genorepr=genorepr.pack_strs)
+    samples,genos = load_hapmap_genotypes(filename,limit=limit)
     format = 'ldat'
   elif format == 'ldat':
-    format,samples,genos = load_genomatrix(filename,format=format,limit=limit,genorepr=genorepr.pack_strs,unique=unique)
+    format,samples,genos = load_genomatrix(filename,format=format,limit=limit,unique=unique)
   elif format == 'sdat':
-    format,loci,genos = load_genomatrix(filename,format=format,limit=limit,genorepr=genorepr.pack_strs,unique=unique)
+    format,loci,genos = load_genomatrix(filename,format=format,limit=limit,unique=unique)
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
   else:
     raise NotImplementedError,"File format '%s' is not supported" % format
 
-  return GenomatrixStream(genos,format,samples=samples,loci=loci,unique=unique,genorepr=genorepr,packed=True)
+  return GenomatrixStream(genos,format,samples=samples,loci=loci,unique=unique,packed=True)
 
 
-def load_genostream(filename, format=None, limit=None, genorepr=snp_marker, unique=None):
+def load_genostream(filename, format=None, limit=None, unique=None):
   '''
   Load genotype data in the format of (ldat, sdat, hapmap, trip, genotriple) and return a
   GenomatrixStream or GenotripleStream object
@@ -722,12 +722,12 @@ def load_genostream(filename, format=None, limit=None, genorepr=snp_marker, uniq
   if format in ('ldat','sdat','hapmap'):
     if unique is None:
       unique = True
-    return load_genomatrixstream(filename,format=format,limit=limit,genorepr=genorepr,unique=unique)
+    return load_genomatrixstream(filename,format=format,limit=limit,unique=unique)
 
   elif format in ('trip','genotriple'):
     if unique is None:
       unique = False
-    return load_genotriplestream(filename, limit=limit, genorepr=genorepr, unique=unique)
+    return load_genotriplestream(filename, limit=limit, unique=unique)
 
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
@@ -757,12 +757,12 @@ def save_genostream(filename, genos, format=None, mergefunc=None):
 
   if format == 'ldat':
     genos = genos.as_ldat(mergefunc)
-    save_genomatrix(filename, genos.columns, genos, format, genorepr=genos.genorepr.strs_from_reps)
+    save_genomatrix(filename, genos.columns, genos, format)
   elif format == 'sdat':
     genos = genos.as_sdat(mergefunc)
-    save_genomatrix(filename, genos.columns, genos, format, genorepr=genos.genorepr.strs_from_reps)
+    save_genomatrix(filename, genos.columns, genos, format)
   elif format in ('trip','genotriple'):
-    save_genotriples(filename, genos.as_genotriples(), genorepr=genos.genorepr.str_from_rep)
+    save_genotriples(filename, genos.as_genotriples())
   elif not format:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(filename)
   else:
@@ -774,9 +774,11 @@ def transform_files(infiles,informat,ingenorepr,
                     transform=None,
                     mergefunc=None,limit=None):
   '''
-  The driver for transforming multiple genodata files into different formats (ldat, sdat, trip, or genotriples),
-  representations (snp_acgt, snp_ab, snp_marker, generic_marker) and, depending on the presence and attributes
-  of the transform object, performing operations on samples and loci such as exclude, include, and rename.
+  The driver for transforming multiple genodata files into different formats
+  (ldat, sdat, trip, or genotriples), representations (snp_acgt, snp_ab,
+  snp_marker, generic_marker) and, depending on the presence and attributes
+  of the transform object, performing operations on samples and loci such as
+  exclude, include, and rename.
 
   @param     infiles: list of input file names or file objects
   @type      infiles: str or file objects
@@ -812,7 +814,7 @@ def transform_files(infiles,informat,ingenorepr,
   if informat is None:
     informat = guess_informat_list(infiles)
 
-  genos = [ load_genostream(f,informat,limit=limit,genorepr=ingenorepr).transformed(transform) for f in infiles ]
+  genos = [ load_genostream(f,informat,limit=limit).transformed(transform) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
@@ -823,11 +825,11 @@ def transform_files(infiles,informat,ingenorepr,
     outformat = informat
 
   if outformat == 'ldat':
-    genos = GenomatrixStream.from_streams(genos,'ldat',genorepr=outgenorepr,mergefunc=mergefunc)
+    genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
   elif outformat == 'sdat':
-    genos = GenomatrixStream.from_streams(genos,'sdat',genorepr=outgenorepr,mergefunc=mergefunc)
+    genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
   elif outformat in ('trip','genotriple'):
-    genos = GenotripleStream.from_streams(genos,genorepr=outgenorepr,mergefunc=mergefunc)
+    genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
   elif not outformat:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(outfile)
   else:

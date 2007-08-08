@@ -18,7 +18,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import unittest
 from   itertools   import izip,chain,islice
-from   genoarray   import snp_acgt
 
 
 def _remap_comp(a1s,a2s):
@@ -52,8 +51,8 @@ def remap_category(allelemap):
 def eval_remap(gmap, genocounts):
   concord = 0
   for (g1,g2),n in genocounts.iteritems():
-    a     = snp_acgt.geno(g1)
-    b1,b2 = snp_acgt.geno(g2)
+    a     = g1
+    b1,b2 = g2
     b1,b2 = gmap.get(b1),gmap.get(b2)
     if a == (b1,b2) or a == (b2,b1):
       concord += n
@@ -62,15 +61,16 @@ def eval_remap(gmap, genocounts):
 
 def remap_alleles(genocounts):
   '''
-    Find the best(i.e. the highest concordance) allele mapping between two sets of genotypes
-    @param:  genocounts: key is a tuple of left geno and right geno, value is the count of the pair
-    @type:   genocounts: dictionary
-    @return: the mapping from the right alleles to the left alleles
-    @rtype:  dictionary
+  Find the best(i.e. the highest concordance) allele mapping between two sets of genotypes
+
+  @param:  genocounts: key is a tuple of left geno and right geno, value is the count of the pair
+  @type:   genocounts: dictionary
+  @return: the mapping from the right alleles to the left alleles
+  @rtype:  dictionary
   '''
   genos = izip(*genocounts)
-  left  = set(a for g in genos.next() for a in snp_acgt.geno(g))
-  right = set(a for g in genos.next() for a in snp_acgt.geno(g))
+  left  = set(a for g in genos.next() for a in g)
+  right = set(a for g in genos.next() for a in g)
 
   if len(left) > len(right):
     right.update( left - right )
@@ -99,9 +99,9 @@ def permutations(l):
         yield tuple(chain(islice(p,0,i),a,islice(p,i,None)))
 
 
-def _byte_encode(s):
+def encode(s):
   for left,right,count in s:
-    yield (snp_acgt.byte_str(left),snp_acgt.byte_str(right)),count
+    yield (tuple(left),tuple(right)),count
 
 
 class TestRemap(unittest.TestCase):
@@ -119,7 +119,7 @@ class TestRemap(unittest.TestCase):
              ([('AT','GC',30),('AA','AG',30),('TT','TG',20),('GT','AG',20)], (50,{'A':'G','C':'A','T':'C','G':'T'})),
              ([('AA','CC', 6),('AC','CC', 1)],                               ( 6,{'A':'C','C':'A'}))]
     for data,result in cases:
-      self.assertEquals(remap_alleles(dict(_byte_encode(data))),result)
+      self.assertEquals(remap_alleles(dict(encode(data))),result)
 
   def test_remap_category(self):
     cases = [({'A':'A','C':'C'},         'identity'),
