@@ -36,7 +36,7 @@ def tally(seq):
   d = collections.defaultdict(int)
   for item in seq:
     d[item] += 1
-  return dict(d)
+  return d
 
 
 def ilen(seq):
