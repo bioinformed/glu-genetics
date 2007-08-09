@@ -561,7 +561,15 @@ genomodel_traverse(UnphasedMarkerModelObject *self, visitproc visit, void *arg)
 static PyObject *
 genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 {
-	PyObject *index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
+	PyObject *index;
+	
+        if(allele != Py_None && !PyString_Check(allele))
+        {
+		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
+		return NULL;
+	}        	
+	
+	index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
 
 	if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
 	{
@@ -575,6 +583,15 @@ static Py_ssize_t
 genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 {
 	Py_ssize_t result;
+
+        assert(!PyErr_Occurred());
+
+        if(allele != Py_None && !PyString_Check(allele))
+        {
+		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
+		return -1;
+	}        	
+
 	PyObject *index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
 
 	if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
@@ -786,6 +803,12 @@ error:
 	return -1;
 }
 
+static PyMappingMethods genomodel_as_mapping = {
+	(lenfunc)0,
+	(binaryfunc)genomodel_get_genotype,
+	(objobjargproc)0,
+};
+
 static PyMethodDef genomodel_methods[] = {
 	{"get_genotype", (PyCFunction)genomodel_get_genotype, METH_O, "get an existing genotype"},
 	{"add_genotype", (PyCFunction)genomodel_add_genotype, METH_O, "get or add a genotype"},
@@ -805,6 +828,7 @@ static PyMemberDef genomodel_members[] = {
 	{NULL}  /* Sentinel */
 };
 
+
 PyDoc_STRVAR(genomodel_doc,
 "UnphasedMarkerModelObject(allow_hemizygote=False, max_alleles=2)\n");
 
@@ -822,7 +846,7 @@ PyTypeObject UnphasedMarkerModelType = {
 	0,					/* tp_repr           */
 	0,					/* tp_as_number      */
 	0,					/* tp_as_sequence    */
-	0,					/* tp_as_mapping     */
+	&genomodel_as_mapping,			/* tp_as_mapping     */
 	0,					/* tp_hash           */
 	0,					/* tp_call           */
 	0,					/* tp_str            */
