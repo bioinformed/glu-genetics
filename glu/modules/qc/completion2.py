@@ -72,7 +72,7 @@ from   collections          import defaultdict
 from   glu.lib.utils        import percent
 from   glu.lib.fileutils    import load_map,autofile,hyphen
 from   glu.lib.genodata     import load_genostream
-from   glu.lib.genoarray    import get_genorepr
+from   glu.lib.genoreprs    import get_genorepr
 from   glu.lib.regionparser import load_regions,Regions
 from   glu.lib.sections     import save_section, SectionWriter, save_metadata_section
 
@@ -373,7 +373,7 @@ def option_parser():
   parser.add_option(      '--tabularoutput',   dest='tabularoutput',   metavar='FILE',
                     help='Generate machine readable tabular output of results')
   parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp_acgt',
-                    help='Input genotype representations. Values=snp_acgt (default), snp_marker, or generic')
+                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
 
   return parser
 
@@ -427,7 +427,7 @@ def main():
   infile      = hyphen(args[0], sys.stdin)
   outfile     = autofile(hyphen(options.output, sys.stdout),'w')
   genorepr    = get_genorepr(options.genorepr)
-  genostream  = load_genostream(infile,options.format,limit=options.limit,genorepr=genorepr)
+  genostream  = load_genostream(infile,options.format,genorepr,limit=options.limit)
   genotriples = genostream.as_genotriples()
 
   samcomp,samempty,loccomp,locempty,nonmissing,genos_inf,genos_all = completion(genotriples,regions)

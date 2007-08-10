@@ -23,7 +23,7 @@ import sys
 import csv
 
 from   glu.lib.utils         import autofile,hyphen
-from   glu.lib.genoarray     import get_genorepr
+from   glu.lib.genoreprs     import get_genorepr
 from   glu.lib.genomerge     import get_genomerger, output_merge_statistics
 from   glu.lib.genodata      import transform_files, GenoTransform, save_genostream
 
@@ -43,9 +43,9 @@ def option_parser():
   ioopts.add_option('-F','--outformat',  dest='outformat',
                     help='Output format for genotype data. Default is informat, cannot be hapmap.')
 
-  ioopts.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP', type='string', default='snp_acgt',
-                    help='Input genotype representation.  Values=snp_acgt (default), snp_ab, snp_marker, or generic')
-  ioopts.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP', type='string', default=None,
+  ioopts.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP', default='snp',
+                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  ioopts.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP', default=None,
                     help='Output genotype representation (see -g/--ingenorepr).  Default is ingenorepr')
   ioopts.add_option('-l', '--limit', dest='limit', metavar='N', type='int', default=None,
                     help='Limit the number of rows of data to N for testing purposes')
@@ -118,7 +118,7 @@ def main():
   infiles = sorted(set(hyphen(arg,sys.stdin) for arg in args))
   outfile = hyphen(options.output,sys.stdout)
 
-  merger = get_genomerger(options.merge,outgenorepr)
+  merger = get_genomerger(options.merge)
 
   transform = GenoTransform.from_options(options)
 

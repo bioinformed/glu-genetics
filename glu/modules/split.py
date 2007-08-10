@@ -29,7 +29,7 @@ import sys
 
 from   glu.lib.utils     import pick
 from   glu.lib.fileutils import hyphen, load_map
-from   glu.lib.genoarray import get_genorepr
+from   glu.lib.genoreprs import get_genorepr
 from   glu.lib.genoio    import guess_informat, load_genostream, \
                                 TextGenomatrixWriter, TextGenotripleWriter
 
@@ -74,12 +74,12 @@ def genomatrix_multiplexer(format, header, matrix, samplegroups, locusgroups,
     for rowkey,genos in matrix:
       for rowgroup in rowgroups.get(rowkey, rdefault):
         for columngroup,indices,header in groupcols:
-          yield (rowgroup,columngroup),header,rowkey,pick(genos,indices)
+          yield (rowgroup,columngroup),header,rowkey,pick(genos[:],indices)
 
   elif columngroups:
     for rowkey,genos in matrix:
       for columngroup,indices,header in groupcols:
-        yield (None,columngroup),header,rowkey,pick(genos,indices)
+        yield (None,columngroup),header,rowkey,pick(genos[:],indices)
 
   elif rowgroups:
     for rowkey,genos in matrix:
@@ -155,7 +155,7 @@ class RollingTextGenomatrixWriter(object):
       prefix,suffix = split_fullname(self.filename,'')
       filename = build_filename(prefix + '_part', suffix, (self.cycles,) )
 
-    self.writer = TextGenomatrixWriter(filename,self.format,self.header,genorepr=self.genorepr)
+    self.writer = TextGenomatrixWriter(filename,self.format,self.header,self.genorepr)
 
   def writerow(self,rowkey,genos):
     if self.rows >= self.maxrows:
@@ -265,7 +265,7 @@ class TextGenomatrixFileMap(object):
       if self.maxrows:
         writer = RollingTextGenomatrixWriter(filename,self.format,header,self.genorepr,self.maxrows)
       else:
-        writer = TextGenomatrixWriter(filename,self.format,header,genorepr=self.genorepr)
+        writer = TextGenomatrixWriter(filename,self.format,header,self.genorepr)
 
       self.writers[keys] = writer
 
@@ -378,9 +378,8 @@ def split_fullname(filename,destdir):
   return prefix,suffix
 
 
-def matrix_split(matrix, prefix, suffix, options):
+def matrix_split(matrix, genorepr, prefix, suffix, options):
   format       = matrix.format
-  genorepr     = matrix.genorepr
   header       = matrix.columns
   maxrows      = options.maxrows
   locusgroups  = load_map(options.locusgroups, unique=False) if options.locusgroups  else None
@@ -402,9 +401,8 @@ def matrix_split(matrix, prefix, suffix, options):
     sys.stderr.write('Terminating: No grouping or splitting specified\n')
 
 
-def triple_split(triples, prefix, suffix, options):
+def triple_split(triples, genorepr, prefix, suffix, options):
   maxrows      = options.maxrows
-  genorepr     = triples.genorepr
   locusgroups  = load_map(options.locusgroups, unique=False) if options.locusgroups  else None
   samplegroups = load_map(options.samplegroups,unique=False) if options.samplegroups else None
 
@@ -432,8 +430,8 @@ def option_parser():
 
   parser.add_option('-f','--format', dest='format',
                     help='Input format for genotype data. Values=hapmap, ldat, sdat, trip, or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp_acgt',
-                    help='genotype representation.  Values=snp_acgt (default), snp_ab, snp_marker, or generic')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
+                    help='genotype representation.  Values=snp (default), hapmap, marker')
 
   parser.add_option('-d', '--destdir', dest='destdir', default='',
                     help='Destination directory for output files.  Write to input file directory by default.')
@@ -476,9 +474,9 @@ def main():
   genos        = load_genostream(infile,format,genorepr=genorepr)
 
   if genos.format in ('sdat','ldat'):
-    matrix_split(genos, prefix, suffix, options)
+    matrix_split(genos, genorepr, prefix, suffix, options)
   elif genos.format == 'genotriple':
-    triple_split(genos, prefix, suffix, options)
+    triple_split(genos, genorepr, prefix, suffix, options)
   else:
     raise ValueError('Unsupported input file format %s' % genos.format)
 

@@ -21,13 +21,16 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import csv
 
-from   itertools   import izip,islice,dropwhile,chain
+from   operator    import getitem, itemgetter
+from   collections import defaultdict
+from   itertools   import izip,islice,dropwhile,imap,repeat
 
-from   utils       import tally,deprecated_by
+from   utils       import tally
 from   fileutils   import autofile,namefile,load_table,guess_format
-from   genodata    import GenotripleStream, GenomatrixStream
-from   genoarray   import snp_marker
-
+from   genodata    import GenotripleStream, GenomatrixStream, \
+                          encode_genomatrixstream, encode_genomatrixstream_from_strings, encode_genotriples
+from   genoarray2  import UnphasedMarkerModel, GenotypeArrayDescriptor, GenotypeArray, model_from_alleles
+from   genoreprs   import snp,hapmap,marker
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
@@ -134,7 +137,7 @@ def load_rename_alleles_file(filename):
   return rename
 
 
-def load_hapmap_genotypes(filename,limit=None,genorepr=snp_marker.pack_strs):
+def load_hapmap_genotypes(filename,limit=None):
   '''
   Load the hampmap genotype data from file.
 
@@ -162,21 +165,31 @@ def load_hapmap_genotypes(filename,limit=None,genorepr=snp_marker.pack_strs):
   if limit is not None:
     limit += 11
 
-  header = list(islice(header.split(),11,limit))
-  header = [ intern(h.strip()) for h in header ]
+  columns = [ intern(h.strip()) for h in islice(header,11,limit) ]
+  modelcache = {}
+  modelmap   = {}
 
-  def _load_hapmap_genotypes():
-    n = len(header)
+  def _load():
+    n = len(columns)
     for line in gfile:
-      fields = line.split()
-      genos = genorepr(g.replace('N','') for g in islice(fields,11,limit))
+      fields  = line.split()
+      locus   = intern(fields[0].strip())
+      alleles = tuple(sorted(fields[1].split('/')))
+      genos   = fields[11:limit]
+
       assert len(genos) == n
-      yield intern(fields[0].strip()),genos
 
-  return header,_load_hapmap_genotypes()
+      model = modelcache.get(alleles)
+      if model is None:
+        model = modelcache[alleles] = model_from_alleles(alleles)
+      modelmap[locus] = model
+
+      yield label,genos
+
+  return encode_genomatrixstream_from_strings(columns,_load(rows),'ldat',hapmap,modelmap)
 
 
-def load_genomatrix(filename,format=None,limit=None,genorepr=snp_marker.pack_strs,unique=True):
+def load_genomatrix(filename,format,genorepr,limit=None,unique=True,modelmap=None):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -201,7 +214,7 @@ def load_genomatrix(filename,format=None,limit=None,genorepr=snp_marker.pack_str
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> format,columns,rows = load_genomatrix(data,'ldat')
+  >>> format,columns,rows = load_genomatrix(data,'ldat',snp)
   >>> format
   'ldat'
   >>> columns
@@ -211,17 +224,6 @@ def load_genomatrix(filename,format=None,limit=None,genorepr=snp_marker.pack_str
   ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
   ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
   '''
-  format,columns,rows = _load_genomatrix(filename,format=format,limit=limit,genorepr=genorepr)
-
-  if unique:
-    columns,rows = unique_check_genomatrixstream(columns,rows)
-
-  return format,columns,rows
-
-
-def _load_genomatrix(filename,format,limit,genorepr):
-  '''See load_genomatrix'''
-
   gfile = autofile(filename)
   rows = csv.reader(gfile,dialect='tsv')
 
@@ -229,11 +231,11 @@ def _load_genomatrix(filename,format,limit,genorepr):
     limit += 1
 
   try:
-    header = iter(rows.next())
+    columns = iter(rows.next())
   except StopIteration:
     raise ValueError, 'Input file "%s" is empty' % namefile(filename)
 
-  format_found = header.next()
+  format_found = columns.next()
 
   # 'key' and blank are always allowed for backward compatibility
   if format_found == 'key':
@@ -243,28 +245,33 @@ def _load_genomatrix(filename,format,limit,genorepr):
     raise ValueError, 'Input file "%s" does not appear to be in %s format.  Found %s.' \
                         % (namefile(filename),format,format_found)
 
-  header = tuple(intern(h.strip()) for h in header)
+  columns = tuple(intern(h.strip()) for h in columns)
+  format = format_found or format
 
-  def _gen_load_genomatrix():
-    n = len(header)
+  def _load(rows):
+    n = len(columns)
 
     # Micro-optimization
-    ir = iter
-    it = intern
-    st = str.strip
-    gr = genorepr
+    local_intern = intern
+    local_strip  = str.strip
 
     for i,row in enumerate(rows):
-      row   = ir(row)
-      label = it(st(row.next()))
-      genos = gr(row)
+      label = local_intern(local_strip(row[0]))
+      genos = row[1:]
 
       if len(genos) != n:
         raise ValueError('Invalid genotype matrix row on line %d of %s' % (i+1,namefile(filename)))
 
       yield label,genos
 
-  return format_found or format,header,_gen_load_genomatrix()
+  #defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
+  #modelmap = defaultdict(lambda: defmodel)
+  columns,rows = encode_genomatrixstream_from_strings(columns,_load(rows),format,genorepr,modelmap)
+
+  if unique:
+    columns,rows = unique_check_genomatrixstream(columns,rows)
+
+  return format,columns,rows
 
 
 class TextGenomatrixWriter(object):
@@ -288,19 +295,22 @@ class TextGenomatrixWriter(object):
   typically 'sdat'.  However, these formatting issues are handled at a
   higher level by callers of TextGenomatrixWriter.
 
+  >>> loci =              ('l1',     'l2',    'l3')
+  >>> matrix = [('s1', [('A','A'),(None,None),('C','T')]),
+  ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
+  ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
+  >>> loci,matrix = encode_genomatrixstream(loci,matrix,'sdat')
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenomatrixWriter(o,'ldat',('l1','l2','l3'),snp_marker) as w:
-  ...   w.writerow('s1', [('A','A'),  None,   ('C','T')])
-  ...   w.writerow('s2', [('A','G'),('C','G'),('C','C')])
-  ...   w.writerows( [('s3', [('G','G'),  None,   ('C','T')]),
-  ...                 ('s4', [('A','A'),  None,     None   ])])
+  >>> with TextGenomatrixWriter(o,'ldat',loci,snp) as w:
+  ...   w.writerow(*matrix.next())
+  ...   w.writerow(*matrix.next())
+  ...   w.writerows(matrix)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  ldat	l1	l2	l3
-  s1	AA	  	CT
-  s2	AG	CG	CC
-  s3	GG	  	CT
-  s4	AA
+  ldat  l1      l2      l3
+  s1    AA              CT
+  s2    AG      CG      CC
+  s3    GG              CT
   '''
   def __init__(self,filename,format,header,genorepr,dialect='tsv'):
     '''
@@ -321,7 +331,7 @@ class TextGenomatrixWriter(object):
     self.headerlen = len(header)
     self.genorepr  = genorepr
 
-    self.out.writerow( [format]+list(self.header) )
+    self.out.writerow( [format]+[h.strip() for h in self.header] )
 
   def writerow(self, rowkey, genos):
     '''
@@ -341,7 +351,7 @@ class TextGenomatrixWriter(object):
     if len(genos) != self.headerlen:
       raise ValueError('[ERROR] Internal error: Genotypes do not match header')
 
-    out.writerow( [rowkey]+self.genorepr.strs_from_reps(genos) )
+    out.writerow( [rowkey]+self.genorepr.to_strings(genos) )
 
   def writerows(self, rows):
     '''
@@ -359,7 +369,7 @@ class TextGenomatrixWriter(object):
 
     headerlen = self.headerlen
     writerow  = out.writerow
-    repr      = self.genorepr.strs_from_reps
+    repr      = self.genorepr.to_strings
 
     for rowkey,genos in rows:
       if len(genos) != headerlen:
@@ -404,13 +414,15 @@ class TextGenotripleWriter(object):
   All rows output have exactly these three columns and no file header is
   output. Sample and locus names are arbitrary and user-specified strings.
 
+  >>> triples = [('s1','l1',('C','T')), ('s1','l2',(None,None)),
+  ...            ('s1','l3',('A','A')), ('s2','l2', ('C','C'))]
+  >>> triples = encode_genotriples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenotripleWriter(o,snp_marker) as w:
-  ...   w.writerow('s1', 'l1', ('C','T'))
-  ...   w.writerow('s1', 'l2',   None   )
-  ...   w.writerows( [('s1', 'l3', ('A','A')),
-  ...                 ('s2', 'l2', ('C','C'))])
+  >>> with TextGenotripleWriter(o,snp) as w:
+  ...   w.writerow(*triples.next())
+  ...   w.writerow(*triples.next())
+  ...   w.writerows(triples)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1	l1      CT
   s1	l2
@@ -447,7 +459,7 @@ class TextGenotripleWriter(object):
     if out is None:
       raise IOError('Cannot write to closed writer object')
 
-    out.writerow( (sample,locus,self.genorepr.str_from_rep(geno)) )
+    out.writerow( (sample,locus,self.genorepr.to_string(geno)) )
 
   def writerows(self, triples):
     '''
@@ -461,7 +473,7 @@ class TextGenotripleWriter(object):
       raise IOError('Cannot write to closed writer object')
 
     writerow = out.writerow
-    repr     = self.genorepr.str_from_rep
+    repr     = self.genorepr.to_string
 
     for sample,locus,geno in triples:
       writerow( (sample,locus,repr(geno)) )
@@ -490,7 +502,7 @@ class TextGenotripleWriter(object):
     self.close()
 
 
-def save_genomatrix(filename,header,matrix,format=None,genorepr=snp_marker.strs_from_reps):
+def save_genomatrix(filename,header,matrix,format,genorepr):
   '''
   Write the genotype matrix data to file.
 
@@ -508,26 +520,22 @@ def save_genomatrix(filename,header,matrix,format=None,genorepr=snp_marker.strs_
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> loci =              ('l1',     'l2',    'l3')
-  >>> matrix = [('s1', [('A','A'),  None,   ('C','T')]),
-  ...           ('s2', [('A','G'),('C','G'),('C','C')]),
-  ...           ('s3', [('G','G'),  None,   ('C','T')]) ]
-  >>> save_genomatrix(o,loci,matrix,'ldat',snp_marker.strs_from_reps)
+  >>> matrix = [('s1', [('A','A'),(None,None),('C','T')]),
+  ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
+  ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
+  >>> loci,matrix = encode_genomatrixstream(loci,matrix,'sdat')
+  >>> save_genomatrix(o,loci,matrix,'ldat',snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   ldat	l1	l2	l3
   s1	AA	  	CT
   s2	AG	CG	CC
   s3	GG	  	CT
   '''
-  # Create temporary representation class -- ugly, but necessary for
-  # backward compatibility
-  class TmpRepr(object):
-    strs_from_reps = genorepr
-
-  with TextGenomatrixWriter(filename, format or '', header, TmpRepr()) as writer:
+  with TextGenomatrixWriter(filename, format or '', header, genorepr) as writer:
     writer.writerows(matrix)
 
 
-def load_genotriples(filename,limit=None,genorepr=snp_marker.rep_from_str):
+def load_genotriples(filename,genorepr,limit=None):
   '''
   Load genotype triples from file
 
@@ -543,7 +551,7 @@ def load_genotriples(filename,limit=None,genorepr=snp_marker.rep_from_str):
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriples(data,genorepr=snp_marker.rep_from_str)
+  >>> triples = load_genotriples(data,snp)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -556,24 +564,28 @@ def load_genotriples(filename,limit=None,genorepr=snp_marker.rep_from_str):
   if limit:
     rows = islice(rows,limit)
 
-  # Micro-optimization
-  it = intern
-  st = str.strip
+  def _load():
+    # Micro-optimization
+    local_intern = intern
+    local_strip  = str.strip
+    repr         = genorepr.from_string
 
-  for i,row in enumerate(rows):
-    if not row:
-      continue
-    elif len(row) != 3:
-      raise ValueError('Invalid genotriple on line %d of %s' % (i+1,namefile(filename)))
+    for i,row in enumerate(rows):
+      if not row:
+        continue
+      elif len(row) != 3:
+        raise ValueError('Invalid genotriple on line %d of %s' % (i+1,namefile(filename)))
 
-    sample = it(st(row[0]))
-    locus  = it(st(row[1]))
-    geno   = genorepr(row[2])
+      sample = local_intern(local_strip(row[0]))
+      locus  = local_intern(local_strip(row[1]))
+      geno   = repr(row[2])
 
-    yield sample,locus,geno
+      yield sample,locus,geno
+
+  return encode_genotriples(_load())
 
 
-def save_genotriples(filename,triples,genorepr=snp_marker.str_from_rep):
+def save_genotriples(filename,triples,genorepr):
   '''
   Write the genotype triple data to file.
 
@@ -585,27 +597,23 @@ def save_genotriples(filename,triples,genorepr=snp_marker.str_from_rep):
                        to the desired string representation
   @type      genorepr: unary function
 
-  >>> triples = [ ('s1', 'l1', ('C','T')),
-  ...             ('s1', 'l2',   None   ),
-  ...             ('s1', 'l3', ('A','A')) ]
+  >>> triples = [ ('s1', 'l1',  ('C','T')),
+  ...             ('s1', 'l2', (None,None)),
+  ...             ('s1', 'l3',  ('A','A')) ]
+  >>> triples = encode_genotriples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> save_genotriples(o,triples,snp_marker.str_from_rep)
+  >>> save_genotriples(o,triples,snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1	l1      CT
   s1	l2
   s1	l3	AA
   '''
-  # Create temporary representation class -- ugly, but necessary for
-  # backward compatibility
-  class TmpRepr(object):
-    str_from_rep = genorepr
-
-  with TextGenotripleWriter(filename,TmpRepr()) as w:
+  with TextGenotripleWriter(filename,genorepr) as w:
     w.writerows(triples)
 
 
-def load_genotriplestream(filename, limit=None, unique=False):
+def load_genotriplestream(filename, genorepr, limit=None, unique=False):
   '''
   Load genotriple file and return a GenotripleStream object
 
@@ -623,7 +631,7 @@ def load_genotriplestream(filename, limit=None, unique=False):
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriplestream(data)
+  >>> triples = load_genotriplestream(data,snp)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -631,11 +639,11 @@ def load_genotriplestream(filename, limit=None, unique=False):
   ('s2', 'l1', ('A', 'G'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  triples = load_genotriples(filename,limit=None)
+  triples = load_genotriples(filename,genorepr,limit=None)
   return GenotripleStream(triples, unique=unique)
 
 
-def load_genomatrixstream(filename, format=None, limit=None, unique=True):
+def load_genomatrixstream(filename, format, genorepr, limit=None, unique=True):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -655,7 +663,7 @@ def load_genomatrixstream(filename, format=None, limit=None, unique=True):
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> ldat = load_genomatrixstream(data,'ldat')
+  >>> ldat = load_genomatrixstream(data,'ldat',snp)
   >>> ldat.columns
   ('s1', 's2', 's3')
   >>> for row in ldat:
@@ -672,9 +680,9 @@ def load_genomatrixstream(filename, format=None, limit=None, unique=True):
     samples,genos = load_hapmap_genotypes(filename,limit=limit)
     format = 'ldat'
   elif format == 'ldat':
-    format,samples,genos = load_genomatrix(filename,format=format,limit=limit,unique=unique)
+    format,samples,genos = load_genomatrix(filename,format,genorepr,limit=limit,unique=unique)
   elif format == 'sdat':
-    format,loci,genos = load_genomatrix(filename,format=format,limit=limit,unique=unique)
+    format,loci,genos = load_genomatrix(filename,format,genorepr,limit=limit,unique=unique)
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
   else:
@@ -683,7 +691,7 @@ def load_genomatrixstream(filename, format=None, limit=None, unique=True):
   return GenomatrixStream(genos,format,samples=samples,loci=loci,unique=unique,packed=True)
 
 
-def load_genostream(filename, format=None, limit=None, unique=None):
+def load_genostream(filename, format, genorepr, limit=None, unique=None):
   '''
   Load genotype data in the format of (ldat, sdat, hapmap, trip, genotriple) and return a
   GenomatrixStream or GenotripleStream object
@@ -703,7 +711,8 @@ def load_genostream(filename, format=None, limit=None, unique=None):
   @rtype         : GenomatrixStream or GenotripleStream
 
   >>> from StringIO import StringIO
-  >>> loaded = load_genostream(StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n"),'ldat')
+  >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
+  >>> loaded = load_genostream(data,'ldat',snp)
   >>> loaded.columns
   ('s1', 's2', 's3')
   >>> for row in loaded:
@@ -722,12 +731,12 @@ def load_genostream(filename, format=None, limit=None, unique=None):
   if format in ('ldat','sdat','hapmap'):
     if unique is None:
       unique = True
-    return load_genomatrixstream(filename,format=format,limit=limit,unique=unique)
+    return load_genomatrixstream(filename,format,genorepr,limit=limit,unique=unique)
 
   elif format in ('trip','genotriple'):
     if unique is None:
       unique = False
-    return load_genotriplestream(filename, limit=limit, unique=unique)
+    return load_genotriplestream(filename,genorepr,limit=limit, unique=unique)
 
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
@@ -736,7 +745,7 @@ def load_genostream(filename, format=None, limit=None, unique=None):
     raise NotImplementedError,"File format '%s' is not supported" % format
 
 
-def save_genostream(filename, genos, format=None, mergefunc=None):
+def save_genostream(filename, genos, format, genorepr, mergefunc=None):
   '''
   Write genotype data to file in one of the specified formats (ldat, sdat, trip, genotriple).
 
@@ -757,12 +766,12 @@ def save_genostream(filename, genos, format=None, mergefunc=None):
 
   if format == 'ldat':
     genos = genos.as_ldat(mergefunc)
-    save_genomatrix(filename, genos.columns, genos, format)
+    save_genomatrix(filename, genos.columns, genos, format, genorepr)
   elif format == 'sdat':
     genos = genos.as_sdat(mergefunc)
-    save_genomatrix(filename, genos.columns, genos, format)
+    save_genomatrix(filename, genos.columns, genos, format, genorepr)
   elif format in ('trip','genotriple'):
-    save_genotriples(filename, genos.as_genotriples())
+    save_genotriples(filename, genos.as_genotriples(), genorepr)
   elif not format:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(filename)
   else:
@@ -775,10 +784,9 @@ def transform_files(infiles,informat,ingenorepr,
                     mergefunc=None,limit=None):
   '''
   The driver for transforming multiple genodata files into different formats
-  (ldat, sdat, trip, or genotriples), representations (snp_acgt, snp_ab,
-  snp_marker, generic_marker) and, depending on the presence and attributes
-  of the transform object, performing operations on samples and loci such as
-  exclude, include, and rename.
+  (ldat, sdat, trip, or genotriples), representations (...) and, depending
+  on the presence and attributes of the transform object, performing
+  operations on samples and loci such as exclude, include, and rename.
 
   @param     infiles: list of input file names or file objects
   @type      infiles: str or file objects
@@ -800,21 +808,21 @@ def transform_files(infiles,informat,ingenorepr,
   @rtype            : GenomatrixStream or GenotripleStream
 
   >>> from StringIO import StringIO
-  >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
+  >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\t\\tCT\\tTT\\n")
   >>> out  = StringIO()
-  >>> transform_files([data],'ldat',snp_marker,out,'trip',snp_marker)
+  >>> transform_files([data],'ldat',snp,out,'trip',marker)
   >>> print out.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  s1	l1	AA
-  s2	l1	AG
-  s3	l1	GG
-  s1	l2	CC
-  s2	l2	CT
-  s3	l2	TT
+  s1  l1      A/A
+  s2  l1      A/G
+  s3  l1      G/G
+  s1  l2
+  s2  l2      C/T
+  s3  l2      T/T
   '''
   if informat is None:
     informat = guess_informat_list(infiles)
 
-  genos = [ load_genostream(f,informat,limit=limit).transformed(transform) for f in infiles ]
+  genos = [ load_genostream(f,informat,ingenorepr,limit=limit).transformed(transform) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
@@ -840,7 +848,7 @@ def transform_files(infiles,informat,ingenorepr,
     genos = genos.transformed(order_loci=transform.loci.order,
                               order_samples=transform.samples.order)
 
-  save_genostream(outfile,genos,outformat)
+  save_genostream(outfile,genos,outformat,outgenorepr)
 
 
 def _test_genoio():

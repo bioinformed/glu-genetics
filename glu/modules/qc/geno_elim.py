@@ -25,7 +25,7 @@ from   itertools         import izip,chain
 from   operator          import itemgetter
 
 from   glu.lib.utils     import autofile,hyphen
-from   glu.lib.genoarray import snp_marker
+from   glu.lib.genoreprs import snp
 from   glu.lib.genodata  import load_genomatrixstream
 
 
@@ -647,7 +647,7 @@ def main():
     parser.print_help()
     return
 
-  genos = iter(load_genomatrixstream(options.genofile,genorepr=snp_marker).as_ldat())
+  genos = iter(load_genomatrixstream(options.genofile,snp).as_ldat())
   individuals = genos.next()
 
   if options.errdetails:

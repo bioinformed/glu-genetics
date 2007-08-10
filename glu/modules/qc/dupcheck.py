@@ -25,7 +25,6 @@ from   textwrap              import fill
 from   glu.lib.utils         import percent
 from   glu.lib.fileutils     import autofile, hyphen
 from   glu.lib.union_find    import union_find
-from   glu.lib.genoarray     import snp_marker
 from   glu.lib.genodata      import load_map, load_genomatrixstream
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 

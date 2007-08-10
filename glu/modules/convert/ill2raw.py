@@ -141,7 +141,7 @@ def main():
   columns,rows = rowsby(data, columns, itemgetter(0), itemgetter(1), itemgetter(2), merge_genos)
 
   out = hyphen(options.output,sys.stdout)
-  save_genomatrix(out,columns,rows,genorepr=list)
+  save_genomatrix(out,columns,rows,snp)
 
 
 if __name__ == '__main__':

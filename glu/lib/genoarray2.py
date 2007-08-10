@@ -433,21 +433,29 @@ def main():
     print buffer(e.data)
 
 
-if __name__ == '__main__':
-  if 0:
-    try:
-      import cProfile as profile
-    except ImportError:
-      import profile
-    import pstats
+def test():
+  import doctest
+  return doctest.testmod()
 
-    prof = profile.Profile()
-    try:
-      prof.runcall(main)
-    finally:
-      stats = pstats.Stats(prof)
-      stats.strip_dirs()
-      stats.sort_stats('time', 'calls')
-      stats.print_stats(25)
-  else:
-    main()
+
+if __name__ == '__main__':
+  test()
+
+  if 0:
+    if 0:
+      try:
+        import cProfile as profile
+      except ImportError:
+        import profile
+      import pstats
+
+      prof = profile.Profile()
+      try:
+        prof.runcall(main)
+      finally:
+        stats = pstats.Stats(prof)
+        stats.strip_dirs()
+        stats.sort_stats('time', 'calls')
+        stats.print_stats(25)
+    else:
+      main()

@@ -24,7 +24,7 @@ from   operator              import itemgetter
 
 from   glu.lib.utils         import percent, tally
 from   glu.lib.fileutils     import autofile, hyphen, load_list
-from   glu.lib.genoarray     import snp_marker
+from   glu.lib.genoreprs     import snp
 from   glu.lib.genodata      import load_genomatrixstream
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
@@ -129,7 +129,7 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genomatrixstream(args[0],options.format,limit=options.limit,genorepr=snp_marker).as_sdat()
+    loci = load_genomatrixstream(args[0],options.format,snp,limit=options.limit).as_sdat()
 
     if options.locussubset:
       loci = loci.transformed(exclude_loci=options.locussubset)

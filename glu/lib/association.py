@@ -712,7 +712,7 @@ class BiallelicLocusModel(object):
   def __init__(self, lname, genos, geno_indices, reference_allele=None):
     self.lname        = lname
     self.genos        = genos
-    genos             = pick(genos, geno_indices.itervalues())
+    genos             = pick(genos[:], geno_indices.itervalues())
     self.allelecounts = tally(a for g in genos if g for a in g if a)
     self.genocounts   = tally(genos)
     self.genocount    = len([ 1 for g,n in self.genocounts.iteritems() if g and n ])

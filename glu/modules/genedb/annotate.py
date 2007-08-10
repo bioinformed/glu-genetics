@@ -118,7 +118,7 @@ def main():
   out = hyphen(options.outfile,sys.stdout)
   out = csv.writer(autofile(out,'w'),dialect='excel-tab')
 
-  rows = csv.reader(autofile(args[1]),dialect='excel-tab')
+  rows = csv.reader(autofile(hyphen(args[1],sys.stdin)),dialect='excel-tab')
   out.writerow(rows.next() + HEADER)
   out.writerows( process(con,rows,options) )
 

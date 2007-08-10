@@ -27,7 +27,7 @@ from   operator              import itemgetter
 
 from   glu.lib.utils         import autofile, hyphen, percent, pair_generator, pick
 from   glu.lib.union_find    import union_find
-from   glu.lib.genoarray     import get_genorepr
+from   glu.lib.genoreprs     import get_genorepr
 from   glu.lib.genomerge     import get_genomerger
 from   glu.lib.genodata      import load_map, load_genostream
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
@@ -351,7 +351,7 @@ def option_parser():
   parser.add_option('-f','--format',  dest='format', metavar='string', default='sdat',
                     help='The file input format for genotype data. Values=hapmap, ldat, sdat (default), trip or genotriple')
   parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp_acgt',
-                    help='Input genotype representation.  Values=snp_acgt (default), snp_ab, snp_marker, or generic')
+                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')
   parser.add_option('-T', '--threshold', dest='threshold', metavar='N%', type='int', default=85,
@@ -387,8 +387,8 @@ def main():
   print >> sys.stderr, 'Loading genotype data...'
   genorepr  = get_genorepr(options.genorepr)
   limit     = options.limit or None
-  merger    = get_genomerger(options.merge,genorepr)
-  samples   = load_genostream(args[0], options.format, limit=limit, genorepr=genorepr, unique=False).as_sdat(merger)
+  merger    = get_genomerger(options.merge)
+  samples   = load_genostream(args[0], options.format, genorepr, limit=limit, unique=False).as_sdat(merger)
 
   exp_dupsets = None
   if options.duplicates:

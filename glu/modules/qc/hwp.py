@@ -23,7 +23,7 @@ from   textwrap              import fill
 
 from   glu.lib.utils         import percent
 from   glu.lib.fileutils     import autofile, hyphen
-from   glu.lib.genoarray     import snp_marker
+from   glu.lib.genoreprs     import snp
 from   glu.lib.genodata      import load_list, load_genomatrixstream
 from   glu.lib.hwp           import hwp_exact_biallelic, hwp_chisq_biallelic, count_genos
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
@@ -127,7 +127,7 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genomatrixstream(args[0],options.format,limit=options.limit,genorepr=snp_marker).as_ldat()
+    loci = load_genomatrixstream(args[0],options.format,snp,limit=options.limit).as_ldat()
 
     if options.samplesubset:
       loci = loci.transformed(exclude_samples=options.samplesubset)

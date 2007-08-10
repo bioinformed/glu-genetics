@@ -21,14 +21,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools             import islice,chain,izip,imap,groupby
-from   operator              import itemgetter
+from   itertools            import islice,chain,izip,imap,groupby
+from   operator             import itemgetter
 
 from   glu.lib.utils        import autofile,hyphen
 from   glu.lib.sections     import read_sections
 from   glu.lib.genodata     import save_genostream, GenomatrixStream, \
-                                    guess_informat_list, guess_outformat
-from   glu.lib.genoarray    import snp_marker
+                                   guess_informat_list, guess_outformat
+from   glu.lib.genoreprs    import snp
 from   glu.lib.sequence     import norm_snp_seq, complement_base
 
 
@@ -193,8 +193,8 @@ def build_abmap(loci,usermap):
 
 def convert_ab_genos(loci, samples, abmap):
   for sampleid,genos in samples:
-    genos = (abmap[locus,geno] for locus,geno in izip(loci,genos))
-    yield sampleid,snp_marker.pack_genos(genos)
+    genos = [abmap[locus,geno] for locus,geno in izip(loci,genos)]
+    yield sampleid,genos
 
 
 def option_parser():
@@ -259,7 +259,7 @@ def main():
 
   abmap   = build_abmap(loci,user_abmap)
   samples = convert_ab_genos(loci, samples, abmap)
-  genos   = GenomatrixStream(samples, 'sdat', loci=loci, genorepr=snp_marker)
+  genos   = GenomatrixStream(samples, 'sdat', loci=loci, snp)
 
   save_genostream(hyphen(options.output,sys.stdout),genos,options.outformat)
 

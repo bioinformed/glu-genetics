@@ -25,7 +25,7 @@ import csv
 from   operator              import itemgetter
 
 from   glu.lib.utils         import autofile,hyphen,tally
-from   glu.lib.genoarray     import get_genorepr,snp_marker
+from   glu.lib.genoreprs     import get_genorepr,snp
 from   glu.lib.genodata      import load_genostream, guess_informat_list, guess_outformat
 
 
@@ -43,7 +43,7 @@ def option_parser():
                     help='Output of transformed data (default is "-" for standard out)')
 
   ioopts.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp_acgt',
-                    help='Input genotype representation.  Values=snp_acgt (default), snp_ab, snp_marker, or generic')
+                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
 
   ioopts.add_option('-l', '--limit', dest='limit', metavar='N', type='int', default=None,
                     help='Limit the number of rows of data to N for testing purposes')
@@ -81,7 +81,7 @@ def main():
 
   print >> sys.stderr, 'INPUT : format=%s,repr=%s' % (options.format, options.genorepr)
 
-  data   = load_genostream(args[0],options.format,limit=options.limit,genorepr=genorepr).recoded(snp_marker).as_ldat()
+  data   = load_genostream(args[0],options.format,genorepr,limit=options.limit).as_ldat()
 
   outfile = hyphen(options.output,sys.stdout)
   out = csv.writer(outfile,dialect='excel-tab')
