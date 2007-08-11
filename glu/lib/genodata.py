@@ -27,7 +27,7 @@ from   fileutils   import load_list,load_map
 from   imerge      import imerge
 from   xtab        import xtab,rowsby
 from   genomerge   import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
-from   genoarray2  import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
+from   genoarray   import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray, \
                           model_from_alleles
 from   genoreprs   import snp
 

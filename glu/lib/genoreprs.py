@@ -19,7 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from   operator   import getitem
 from   itertools  import imap, repeat
-from   genoarray2 import model_from_alleles
+from   genoarray  import model_from_alleles
 
 
 class Nothing(object): pass

@@ -31,7 +31,7 @@ import tables
 
 from   utils       import ilen
 from   genodata    import encode_genomatrixstream,encode_genotriples
-from   genoarray2  import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype
+from   genoarray   import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 from   genoio      import load_genotriples,load_genomatrix
 
 

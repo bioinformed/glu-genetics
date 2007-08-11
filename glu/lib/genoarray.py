@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          genoarray2.py
+File:          genoarray.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 

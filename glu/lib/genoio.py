@@ -29,7 +29,7 @@ from   utils       import tally
 from   fileutils   import autofile,namefile,load_table,guess_format
 from   genodata    import GenotripleStream, GenomatrixStream, \
                           encode_genomatrixstream, encode_genomatrixstream_from_strings, encode_genotriples
-from   genoarray2  import UnphasedMarkerModel, GenotypeArrayDescriptor, GenotypeArray, model_from_alleles
+from   genoarray   import model_from_alleles
 from   genoreprs   import snp,hapmap,marker
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
