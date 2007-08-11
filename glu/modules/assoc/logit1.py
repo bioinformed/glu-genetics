@@ -174,11 +174,10 @@ def main():
     #scoretest = g.score_test(indices=indices,initial_beta=null.beta)
 
     g.fit()
-    scoretest = g.score_test(indices=indices)
 
-    st,df_s = scoretest.test()
-    wt,df_w = g.wald_test(indices=range(1,k+1)).test()
-    lt,df_l = g.lr_test(indices=range(1,k+1)).test()
+    st,df_s = g.score_test(indices=indices).test()
+    wt,df_w = g.wald_test(indices=indices).test()
+    lt,df_l = g.lr_test(indices=indices).test()
 
     sp = stats.distributions.chi2.sf(st,df_s)
     wp = stats.distributions.chi2.sf(wt,df_w)
