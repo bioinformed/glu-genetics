@@ -929,7 +929,7 @@ class GenomatrixStream(GenotypeStream):
       columns,genos = rename_genomatrixstream_row(columns,genos,rowtransform.rename)
       if rows is not None:
         rows = [ rowtransform.rename.get(r,r) for r in rows ]
-    if coltransform.rename is not None:
+    if coltransform.rename:
       columns,genos = rename_genomatrixstream_column(columns,genos,coltransform.rename)
 
     # Filter rows and columns with all missing data
@@ -1748,7 +1748,7 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   >>> loci
   ['l1', 'l2']
   >>> striples
-  [('s1', 'l1', ('T', 'T')), ('s1', 'l1', ('G', 'G')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'T')), ('s3', 'l1', ('G', 'G')), ('s3', 'l2', ('A', 'A'))]
+  [('s1', 'l1', ('G', 'G')), ('s1', 'l1', ('T', 'T')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'T')), ('s3', 'l1', ('G', 'G')), ('s3', 'l2', ('A', 'A'))]
 
   >>> samples,loci,striples = sort_genotriples(triples,order='sample',locusorder=['l3','l2','l1'])
   >>> samples
@@ -1756,7 +1756,7 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   >>> loci
   ['l1', 'l2']
   >>> striples
-  [('s1', 'l1', ('T', 'T')), ('s1', 'l1', ('G', 'G')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'T')), ('s3', 'l2', ('A', 'A')), ('s3', 'l1', ('G', 'G'))]
+  [('s1', 'l1', ('G', 'G')), ('s1', 'l1', ('T', 'T')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'T')), ('s3', 'l2', ('A', 'A')), ('s3', 'l1', ('G', 'G'))]
 
   >>> samples,loci,striples = sort_genotriples(triples,order='sample',sampleorder=['s3','s2','s1'])
   >>> samples
@@ -1764,7 +1764,7 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   >>> loci
   ['l1', 'l2']
   >>> striples
-  [('s3', 'l1', ('G', 'G')), ('s3', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'T')), ('s1', 'l1', ('T', 'T')), ('s1', 'l1', ('G', 'G'))]
+  [('s3', 'l1', ('G', 'G')), ('s3', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'A')), ('s2', 'l2', ('A', 'T')), ('s1', 'l1', ('G', 'G')), ('s1', 'l1', ('T', 'T'))]
   '''
   def makeorderdict(o):
     od = {}
@@ -2032,15 +2032,13 @@ def merge_genomatrixstream_columns(columns, genos, mergefunc):
   '''
   assert mergefunc is not None
 
-  merge_indices = {}
+  merge_indices = defaultdict(list)
   new_columns   = []
 
   for i,column in enumerate(columns):
     if column not in merge_indices:
       new_columns.append(column)
-      merge_indices[column] = [i]
-    else:
-      merge_indices[column].append(i)
+    merge_indices[column].append(i)
 
   new_columns = tuple(new_columns)
 
@@ -2173,7 +2171,9 @@ def merge_genomatrixstream(columns, genos, mergefunc):
   ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
   ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T')])]
   >>> loci,rows = encode_genomatrixstream(loci,rows,'sdat')
-  >>> loci,rows = merge_genomatrixstream(loci,rows,VoteMerger())
+
+  >>> merger=VoteMerger()
+  >>> loci,rows = merge_genomatrixstream(loci,rows,merger)
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
@@ -2182,19 +2182,27 @@ def merge_genomatrixstream(columns, genos, mergefunc):
   ('s2', [(None, None), (None, None), (None, None)])
   ('s3', [('A', 'A'), (None, None), (None, None)])
   ('s4', [('A', 'T'), (None, None), ('T', 'T')])
+  >>> sorted(merger.samplestats.iteritems())
+
+  >>> sorted(merger.locusstats.iteritems())
 
   >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'T') ]),
   ...         ('s2',[(None, None), ('A', 'C'),   (None, None)]),
   ...         ('s1',[ ('A', 'A'),  ('A', 'A'),   (None, None)]),
   ...         ('s1',[ ('A', 'T'), (None, None),  ('G', 'T') ])]
   >>> loci,rows = encode_genomatrixstream(loci,rows,'sdat')
-  >>> loci,rows = merge_genomatrixstream(loci,rows,VoteMerger())
+
+  >>> merger=VoteMerger()
+  >>> loci,rows = merge_genomatrixstream(loci,rows,merger)
   >>> loci
   ('l1', 'l2', 'l3')
   >>> for row in rows:
   ...   print row
   ('s1', [(None, None), ('A', 'A'), ('G', 'T')])
   ('s2', [(None, None), ('A', 'C'), (None, None)])
+  >>> sorted(merger.samplestats.iteritems())
+
+  >>> sorted(merger.locusstats.iteritems())
 
   >>> loci = ('l1','l2','l1')
   >>> rows = [('s1',[(None, None), (None, None),  ('C', 'T')]),
@@ -2202,13 +2210,19 @@ def merge_genomatrixstream(columns, genos, mergefunc):
   ...         ('s1',[ ('C', 'C'),   ('A', 'A'),  (None, None)]),
   ...         ('s1',[ ('C', 'T'),  (None, None),  ('C', 'T')])]
   >>> loci,rows = encode_genomatrixstream(loci,rows,'sdat')
-  >>> loci,rows = merge_genomatrixstream(loci,rows,VoteMerger())
+
+  >>> merger=VoteMerger()
+  >>> loci,rows = merge_genomatrixstream(loci,rows,merger)
   >>> loci
   ('l1', 'l2')
   >>> for row in rows:
   ...   print row
   ('s1', [(None, None), ('A', 'A')])
   ('s2', [('T', 'T'), ('A', 'G')])
+  >>> sorted(merger.samplestats.iteritems())
+
+  >>> sorted(merger.locusstats.iteritems())
+
   '''
   assert mergefunc is not None
 

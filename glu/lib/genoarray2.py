@@ -86,6 +86,64 @@ except ImportError:
     def __repr__(self):
       return '<Genotype: %s/%s at 0x%X>' % (self.allele1,self.allele2,id(self))
 
+    def __eq__(self,other):
+      geno_self  = isinstance(self,Genotype)
+      geno_other = isinstance(self,Genotype)
+      if geno_self and geno_other:
+        return self is other
+
+      if geno_self:
+        self = geno.alleles()
+      if geno_other:
+        other = geno.alleles()
+
+      if not isinstance(self, tuple) or len(self) !=2 or \
+         not isinstance(other,tuple) or len(other)!=2:
+        return NotImplemented
+
+      return self==other
+
+    def __ne__(self,other):
+      geno_self  = isinstance(self,Genotype)
+      geno_other = isinstance(self,Genotype)
+      if geno_self and geno_other:
+        return self is not other
+
+      if geno_self:
+        self = geno.alleles()
+      if geno_other:
+        other = geno.alleles()
+
+      if not isinstance(self, tuple) or len(self) !=2 or \
+         not isinstance(other,tuple) or len(other)!=2:
+        return NotImplemented
+
+      return self!=other
+
+    def __lt__(self,other):
+      if isinstance(self,Genotype):
+        self = geno.alleles()
+      if isinstance(self,Genotype):
+        other = geno.alleles()
+
+      if not isinstance(self, tuple) or len(self) !=2 or \
+         not isinstance(other,tuple) or len(other)!=2:
+        return NotImplemented
+
+      return self<other
+
+    def __le__(self,other):
+      if isinstance(self,Genotype):
+        self = geno.alleles()
+      if isinstance(self,Genotype):
+        other = geno.alleles()
+
+      if not isinstance(self, tuple) or len(self) !=2 or \
+         not isinstance(other,tuple) or len(other)!=2:
+        return NotImplemented
+
+      return self<=other
+
 
   def genotype_bit_width(n,allow_hemizygote):
     if allow_hemizygote:

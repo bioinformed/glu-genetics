@@ -70,8 +70,9 @@ typedef struct {
 } GenotypeObject;
 
 /* Forward declaration */
-PyTypeObject UnphasedMarkerModelType;
-PyTypeObject GenotypeArrayType;
+static PyTypeObject UnphasedMarkerModelType;
+static PyTypeObject GenotypeArrayType;
+static PyTypeObject GenotypeType;
 
 #define GenotypeArray_Check(op)                PyObject_TypeCheck(op, &GenotypeArrayType)
 #define GenotypeArray_CheckExact(op)           ((op)->ob_type == &GenotypeArrayType)
@@ -79,6 +80,7 @@ PyTypeObject GenotypeArrayType;
 #define UnphasedMarkerModel_CheckExact(op)     ((op)->ob_type == &UnphasedMarkerModelType)
 #define Genotype_CheckExact(op)                ((op)->ob_type == &GenotypeType)
 #define GenotypeArrayDescriptor_CheckExact(op) ((op)->ob_type == &GenotypeArrayDescriptorType)
+
 
 static int
 genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
@@ -190,7 +192,8 @@ static PyObject *
 genotype_alleles(GenotypeObject *self)
 {
 	PyObject *result = PyList_GetItem(self->model->genotuples, self->index);
-	Py_INCREF(result);
+	if(result)
+		Py_INCREF(result);
 	return result;
 }
 
@@ -286,6 +289,56 @@ genotype_contains(GenotypeObject *self, PyObject *allele)
 	return cmp;
 }
 
+static long
+genotype_hash(GenotypeObject *self)
+{
+	return _Py_HashPointer(self);
+}
+
+static PyObject *
+genotype_richcompare(PyObject *self, PyObject *other, int op)
+{
+	int geno_self, geno_other;
+
+	geno_self  = Genotype_CheckExact(self);
+	geno_other = Genotype_CheckExact(other);
+
+	/* Genotype to genotype equality/inequality comparisons
+	   are based on object identity */
+	if(geno_self && geno_other && (op==Py_EQ || op==Py_NE))
+	{
+		if(op==Py_EQ)
+			return PyBool_FromLong(self==other);
+		else
+			return PyBool_FromLong(self!=other);
+	}
+
+	/* Otherwise compare based on the corresponding tuple ordering */
+	if(geno_self)
+	{
+		self=genotype_alleles( (GenotypeObject *)self );
+		if(!self)
+			return NULL;
+		Py_DECREF(self);  /* SAFE: borrowed reference that belongs to self */
+	}
+
+	if(geno_other)
+	{
+		other=genotype_alleles( (GenotypeObject *)other );
+		if(!other)
+			return NULL;
+		Py_DECREF(other); /* SAFE: borrowed reference that belongs to other*/
+	}
+
+	if(!PyTuple_Check(self)  || PyTuple_GET_SIZE(self)  != 2 ||
+	   !PyTuple_Check(other) || PyTuple_GET_SIZE(other) != 2)
+	{
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+	return PyObject_RichCompare(self, other, op);
+}
+
 static PyMethodDef genotype_methods[] = {
 	{"alleles",      (PyCFunction)genotype_alleles,      METH_NOARGS,
 		"Returns a tuple of alleles"},
@@ -328,7 +381,7 @@ static PyTypeObject GenotypeType = {
 	0,					/* tp_as_number      */
 	&genotype_as_sequence,			/* tp_as_sequence    */
 	0,					/* tp_as_mapping     */
-	0,					/* tp_hash           */
+	(hashfunc)genotype_hash,		/* tp_hash           */
 	0,					/* tp_call           */
 	0,					/* tp_str            */
 	0,					/* tp_getattro       */
@@ -338,7 +391,7 @@ static PyTypeObject GenotypeType = {
 	"Genotype objects",			/* tp_doc            */
 	(traverseproc)genotype_traverse,	/* tp_traverse       */
 	(inquiry)genotype_clear,		/* tp_clear          */
-	0,					/* tp_richcompare    */
+	genotype_richcompare,			/* tp_richcompare    */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter           */
 	0,					/* tp_iternext       */
@@ -562,13 +615,13 @@ static PyObject *
 genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 {
 	PyObject *index;
-	
+
         if(allele != Py_None && !PyString_Check(allele))
         {
 		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
 		return NULL;
-	}        	
-	
+	}
+
 	index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
 
 	if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
@@ -590,7 +643,7 @@ genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
         {
 		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
 		return -1;
-	}        	
+	}
 
 	PyObject *index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
 
@@ -832,7 +885,7 @@ static PyMemberDef genomodel_members[] = {
 PyDoc_STRVAR(genomodel_doc,
 "UnphasedMarkerModelObject(allow_hemizygote=False, max_alleles=2)\n");
 
-PyTypeObject UnphasedMarkerModelType = {
+static PyTypeObject UnphasedMarkerModelType = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size           */
 	"UnphasedMarkerModel",                  /* tp_name           */
@@ -1562,7 +1615,7 @@ static PyGetSetDef genoarray_getsetlist[] = {
 	{NULL, NULL, NULL, NULL},  /* Sentinel */
 };
 
-PyTypeObject GenotypeArrayType = {
+static PyTypeObject GenotypeArrayType = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size           */
 	"GenotypeArray",                        /* tp_name           */
