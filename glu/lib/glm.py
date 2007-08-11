@@ -28,7 +28,7 @@ from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgErro
 from utils        import tally
 
 CONV = 1e-8
-
+COND = 1e-6
 
 # Derived from SciPy's linalg.lstsq routine, though heavily modified and
 # extended.
@@ -286,7 +286,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   if n<m and rank==n:
     resids = (x[n:]**2).sum(axis=0)
   else:
-    resids = ((b-dot(a1,beta)).A**2).sum(axis=0)
+    resids = ((asarray(b)-dot(a1,beta))**2).sum(axis=0)
 
   # Estimated residual variance
   if m>rank:
@@ -1183,7 +1183,7 @@ class GLogit(object):
       XX = self.design_matrix(uw)
 
       # Update model fit
-      beta,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz,cond=1e-10)
+      beta,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz,cond=COND)
       beta = asmatrix(beta,dtype=float)
       W    = asmatrix(W,dtype=float)
       b    = vsplit(beta,k)
@@ -1229,7 +1229,7 @@ class GLogit(object):
     _,_,_,_,_,s,vt = linear_least_squares(XX,ones( (XX.shape[0],1) ))
 
     for i in xrange(len(s)):
-      if s[i] < 1e-10:
+      if s[i] < COND:
         s[i] = 0.
       else:
         s[i] = s[i]**2
