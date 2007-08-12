@@ -220,23 +220,27 @@ def get_genotypes(populations,chromosome):
 
   populations = populations.split(',')
   if len(populations) > 1:
-    command.append(' -M %s --multimethod global' % ','.join(populations))
+    command.append(' -M %s --multimethod global' % escape(','.join(populations)))
 
   for population in populations:
     data = POPS[population]
 
     if data == 'hapmap':
       command.append('-f hapmap')
-      command.append('-p %s' % HAP_PEDIGREES)
-      command.append(HAP_GENOTYPES % (chromosome,population))
+      command.append('-p %s' % escape(HAP_PEDIGREES))
+      command.append(escape(HAP_GENOTYPES % (chromosome,population)))
     elif data == 'NHS':
       command.append('-f ldat')
-      command.append('-l %s' % NHS_MAP)
+      command.append('-l %s' % escape(NHS_MAP))
       command.append(NHS_GENOTYPES % chromosome)
     else:
       raise ValueError('Unknown population')
 
   return ' '.join(command)
+
+
+def escape(s):
+  return s.replace(' ','\\ ')
 
 
 def get_tags(outdir, project, gene, dprime, r2, populations, chromosome, snps, maf, include, exclude,
@@ -274,7 +278,7 @@ def get_tags(outdir, project, gene, dprime, r2, populations, chromosome, snps, m
       incs = (set(load_list(includefile)) | set(include)) & set(snps)
       file('include','w').write('\n'.join(sorted(incs)))
     elif includefile:
-      command += ' -i %s' % includefile
+      command += ' -i %s' % escape(includefile)
     elif include:
       command += ' -i include'
       file('include','w').write('\n'.join(include))
@@ -284,7 +288,7 @@ def get_tags(outdir, project, gene, dprime, r2, populations, chromosome, snps, m
       file('exclude','w').write('\n'.join(exclude))
 
     for d in designfiles or []:
-      command += ' -D %s' % d
+      command += ' -D %s' % escape(d)
 
     command += ' ' + get_genotypes(populations,chromosome)
 
@@ -295,6 +299,7 @@ def get_tags(outdir, project, gene, dprime, r2, populations, chromosome, snps, m
 
     out = os.popen(command)
     err = out.read()
+    #print err
     bins = list(locus_result_sequence('loci.out',{},exclude))
   finally:
     os.chdir(cwd)
