@@ -22,9 +22,9 @@ import csv
 from   textwrap              import fill
 
 from   glu.lib.utils         import percent
-from   glu.lib.fileutils     import autofile, hyphen
+from   glu.lib.fileutils     import autofile, hyphen, load_list
 from   glu.lib.genoreprs     import snp
-from   glu.lib.genodata      import load_list, load_genomatrixstream
+from   glu.lib.genodata      import load_genomatrixstream
 from   glu.lib.hwp           import hwp_exact_biallelic, hwp_chisq_biallelic, count_genos
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
@@ -130,7 +130,7 @@ def main():
     loci = load_genomatrixstream(args[0],options.format,snp,limit=options.limit).as_ldat()
 
     if options.samplesubset:
-      loci = loci.transformed(exclude_samples=options.samplesubset)
+      loci = loci.transformed(include_samples=options.samplesubset)
 
     counts = geno_counts(loci)
 

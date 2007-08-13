@@ -25,6 +25,7 @@ from   textwrap              import fill
 from   glu.lib.utils         import percent
 from   glu.lib.fileutils     import autofile, hyphen
 from   glu.lib.union_find    import union_find
+from   glu.lib.genoreprs     import snp
 from   glu.lib.genodata      import load_map, load_genomatrixstream
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
@@ -184,7 +185,7 @@ def main():
     print >> sys.stderr, 'Done.'
 
   print >> sys.stderr, 'Loading data...',
-  samples = load_genomatrixstream(args[0], format=options.format).as_sdat()
+  samples = load_genomatrixstream(args[0], options.format, snp).as_sdat()
 
   if not samples.packed:
     samples = samples.transformed(repack=True)

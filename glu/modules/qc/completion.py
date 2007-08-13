@@ -23,6 +23,7 @@ from   itertools          import izip
 from   textwrap           import fill
 
 from   glu.lib.utils      import percent
+from   glu.lib.genoreprs  import snp
 from   glu.lib.genodata   import load_genomatrixstream
 from   glu.lib.sections   import save_section, SectionWriter, save_metadata_section
 
@@ -184,7 +185,7 @@ def option_parser():
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
-                    help='Output of duplicate check report')
+                    help='Output of completion report')
   parser.add_option('-r', '--droppedrows', dest='droppedrows', metavar='N', type='int', default=0,
                     help='Number of rows that where dropped from the dataset previously.  Used to compute overall completion.')
   parser.add_option('-c', '--droppedcols', dest='droppedcols', metavar='N', type='int', default=0,
@@ -205,7 +206,7 @@ def main():
     parser.print_help()
     return
 
-  genos  = load_genomatrixstream(args[0],format=options.format)
+  genos  = load_genomatrixstream(args[0],options.format,snp)
   format = genos.format
 
   if format=='sdat':

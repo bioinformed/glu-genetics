@@ -27,7 +27,7 @@ import csv
 import sys
 from   operator          import itemgetter
 from   glu.lib.utils     import autofile, peekfirst
-from   glu.lib.genoarray import snp_acgt
+from   glu.lib.genoreprs import snp
 from   glu.lib.remap     import remap_alleles, remap_category
 from   glu.lib.genodata  import load_genomatrixstream
 
@@ -56,8 +56,8 @@ def concordance(test,reference):
        results.append(result)
        if testlocus == reflocus:
          print
-         print list(snp_acgt.genos_str(testgenos[:20]))
-         print list(snp_acgt.genos_str(refgenos[:20]))
+         print testgenos[:20]
+         print refgenos[:20]
          ident = concord
 
      results.sort(key=lambda x: -x[2])
@@ -89,8 +89,8 @@ def main():
     parser.print_help()
     return
 
-  test           = load_genomatrixstream(args[0], format=options.testformat).as_ldat()
-  reference      = load_genomatrixstream(args[1], format=options.refformat).as_ldat()
+  test           = load_genomatrixstream(args[0], options.testformat).as_ldat()
+  reference      = load_genomatrixstream(args[1], options.refformat).as_ldat()
   test,reference = align_genotypes(test,reference)
   concordance(test,reference)
 

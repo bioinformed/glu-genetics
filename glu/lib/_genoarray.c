@@ -40,8 +40,8 @@ typedef struct {
 	PyObject_HEAD
 	PyObject      *models;
 	PyArrayObject *offsets;
-	unsigned long  bit_size;
-	unsigned long  byte_size;
+	unsigned int  bit_size;
+	unsigned int  byte_size;
 } GenotypeArrayDescriptorObject;
 
 typedef struct {
@@ -64,7 +64,7 @@ typedef struct {
 typedef struct {
 	PyObject_HEAD
 	UnphasedMarkerModelObject *model;
-	unsigned long  index;
+	unsigned int   index;
 	unsigned int   allele1;
 	unsigned int   allele2;
 } GenotypeObject;
@@ -424,8 +424,8 @@ descr_init(GenotypeArrayDescriptorObject *self, PyObject *args, PyObject *kwds)
 	PyArrayObject *offsets;
 	UnphasedMarkerModelObject *model;
 	Py_ssize_t n,i;
-	unsigned long initial_offset = 0;
-	unsigned long *offset_data;
+	unsigned int initial_offset = 0;
+	unsigned int *offset_data;
 	int dims;
 	static char *kwlist[] = {"models", "initial_offset", NULL};
 
@@ -446,10 +446,10 @@ descr_init(GenotypeArrayDescriptorObject *self, PyObject *args, PyObject *kwds)
 	if(n == -1) return -1;
 
 	dims = n+1;
-	offsets = (PyArrayObject*)PyArray_FromDims(1, &dims, PyArray_ULONG);
+	offsets = (PyArrayObject*)PyArray_FromDims(1, &dims, PyArray_UINT);
 	if(!offsets) return -1;
 
-	offset_data = (unsigned long *)PyArray_DATA(offsets);
+	offset_data = (unsigned int *)PyArray_DATA(offsets);
 	offset_data[0] = initial_offset;
 
 	for(i=0; i<n; ++i)
@@ -1018,7 +1018,7 @@ genoarray_alloc(PyTypeObject *type, Py_ssize_t nitems)
 static PyObject *
 genoarray_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 {
-	unsigned long n;
+	unsigned int n;
 	GenotypeArrayObject *self;
 	PyObject *descr;
 	GenotypeArrayDescriptorObject *descriptor = NULL;;
@@ -1079,16 +1079,19 @@ PyDoc_STRVAR(genoarray_doc,
 
 static PyObject *
 genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t datasize,
-                    unsigned long *offsets, Py_ssize_t i)
+                    unsigned int *offsets, Py_ssize_t i)
 {
 	Py_ssize_t k, offset1, offset2;
 	PyObject *geno;
 	UnphasedMarkerModelObject *model;
 	char *status;
 
-	model = (UnphasedMarkerModelObject*)PyList_GET_ITEM(models, i);
+	model = (UnphasedMarkerModelObject*)PyList_GetItem(models, i);
 
-	if(!model || !UnphasedMarkerModel_Check(model) || !model->genotypes)
+	if(!model)
+		return NULL;
+		
+	if(!UnphasedMarkerModel_Check(model) || !model->genotypes)
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 			return NULL;
@@ -1105,8 +1108,9 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 		return NULL;
 	}
 
-	geno = PyList_GET_ITEM(model->genotypes, k);
-	Py_INCREF(geno);
+	geno = PyList_GetItem(model->genotypes, k);
+	if(geno)
+		Py_INCREF(geno);
 	return geno;
 }
 
@@ -1127,7 +1131,7 @@ genoarray_item(GenotypeArrayObject *self, Py_ssize_t item)
 {
 	Py_ssize_t n, datasize;
 	PyObject *geno, *models;
-	unsigned long *offsets;
+	unsigned int *offsets;
 
 	if( genoarray_checkstate(self) == -1 )
 		return NULL;
@@ -1135,7 +1139,7 @@ genoarray_item(GenotypeArrayObject *self, Py_ssize_t item)
 	geno     = NULL;
 	datasize = self->descriptor->byte_size;
 
-	offsets  = (unsigned long *)PyArray_DATA(self->descriptor->offsets);
+	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
 	models   = self->descriptor->models;
 	if(!models || !offsets) goto done;
 
@@ -1171,7 +1175,7 @@ genoarray_slice(GenotypeArrayObject *self, PySliceObject *slice)
 	Py_ssize_t i, j, n, datasize;
 	Py_ssize_t start, stop, step, slicelength;
 	PyObject *result, *models, *geno;
-	unsigned long *offsets;
+	unsigned int *offsets;
 
 	if( genoarray_checkstate(self) == -1 )
 		return NULL;
@@ -1179,7 +1183,7 @@ genoarray_slice(GenotypeArrayObject *self, PySliceObject *slice)
 	result   = NULL;
 	datasize = self->descriptor->byte_size;
 
-	offsets  = (unsigned long *)PyArray_DATA(self->descriptor->offsets);
+	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
 	models   = self->descriptor->models;
 	if(!models || !offsets) goto done;
 
@@ -1243,7 +1247,7 @@ genoarray_subscript(GenotypeArrayObject *self, PyObject *item)
 }
 
 static int
-genoarray_inner_set(PyObject *models, PyObject *geno, unsigned char *data, Py_ssize_t datasize, unsigned long *offsets, Py_ssize_t i)
+genoarray_inner_set(PyObject *models, PyObject *geno, unsigned char *data, Py_ssize_t datasize, unsigned int *offsets, Py_ssize_t i)
 {
 	UnphasedMarkerModelObject *model;
 	GenotypeObject *g;
@@ -1308,7 +1312,7 @@ genoarray_ass_item(GenotypeArrayObject *self, Py_ssize_t item, PyObject *value)
 {
 	Py_ssize_t n, datasize;
 	PyObject *models;
-	unsigned long *offsets;
+	unsigned int *offsets;
 
 	if (!value)
 	{
@@ -1322,7 +1326,7 @@ genoarray_ass_item(GenotypeArrayObject *self, Py_ssize_t item, PyObject *value)
 
 	datasize = self->descriptor->byte_size;
 
-	offsets  = (unsigned long *)PyArray_DATA(self->descriptor->offsets);
+	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
 	models   = self->descriptor->models;
 	if(!models || !offsets) return -1;
 
@@ -1359,7 +1363,7 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 	Py_ssize_t start, stop, step, slicelength;
 	PyObject *models, *seq;
 	PyObject **seqitems;
-	unsigned long *offsets;
+	unsigned int *offsets;
 	int ret = -1;
 
 	if (!value) {
@@ -1374,7 +1378,7 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 	seq = NULL;
 	datasize = self->descriptor->byte_size;
 
-	offsets  = (unsigned long *)PyArray_DATA(self->descriptor->offsets);
+	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
 	models   = self->descriptor->models;
 	if(!models || !offsets) goto error;
 

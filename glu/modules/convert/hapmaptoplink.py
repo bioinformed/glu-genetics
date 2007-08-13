@@ -18,7 +18,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from itertools import dropwhile,islice,imap,chain
 
-from glu.lib.genoarray import snp_acgt
 from glu.lib.fileutils import autofile,namefile,load_map
 
 

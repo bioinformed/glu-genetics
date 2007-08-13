@@ -27,22 +27,25 @@ from   itertools   import izip,islice,dropwhile,imap,repeat
 
 from   utils       import tally
 from   fileutils   import autofile,namefile,load_table,guess_format
-from   genodata    import GenotripleStream, GenomatrixStream, \
-                          encode_genomatrixstream, encode_genomatrixstream_from_strings, encode_genotriples
+from   genodata    import GenotripleStream, GenomatrixStream
 from   genoarray   import model_from_alleles
 from   genoreprs   import snp,hapmap,marker
+from   genobinary  import BinaryGenomatrixWriter,BinaryGenotripleWriter,   \
+                          save_genotriples_binary,load_genotriples_binary, \
+                          save_genomatrix_binary, load_genomatrix_binary
+
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple')
-OUTPUT_FORMATS = ('ldat','sdat','trip','genotriple')
+INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple','lbat','sbat','tbat')
+OUTPUT_FORMATS = ('ldat','sdat','trip','genotriple','lbat','sbat','tbat')
 
 
 class NonUniqueError(ValueError): pass
 
 
-def unique_check_genomatrixstream(columns,rows):
+def unique_check_genomatrixstream(genos):
   '''
   Check that all row and column labels of a genomatrix are unique.  Raises
   a NonUniqueError if they are not.
@@ -51,25 +54,30 @@ def unique_check_genomatrixstream(columns,rows):
                being the column meta-data
   @type rows: sequence
 
-  >>> columns,rows = unique_check_genomatrixstream(['L1','L2','L3','L1'],[])
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'])
+  >>> unique_check_genomatrixstream(genos)
   Traceback (most recent call last):
        ...
   NonUniqueError: Non-unique column identifiers: L1:2
 
-  >>> columns,rows = unique_check_genomatrixstream(['L1','L2'],[('R1',['AA','AB']),('R1',['AA','AB'])])
-  >>> list(rows)
+  >>> loci=('L1','L2')
+  >>> rows=[('R1',['AA','AC']),
+  ...       ('R1',['AA','AC'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = unique_check_genomatrixstream(genos)
+  >>> list(genos)
   Traceback (most recent call last):
        ...
   NonUniqueError: Non-unique row identifier: R1
   '''
-  dcols  = [ (k,n) for k,n in tally(columns).iteritems() if n>1 ]
+  dcols  = [ (k,n) for k,n in tally(genos.columns).iteritems() if n>1 ]
   if dcols:
     dcols = ','.join( '%s:%d' % kv for kv in dcols )
     raise NonUniqueError,'Non-unique column identifiers: %s' % dcols
 
   def _check():
     drows = set()
-    for label,row in rows:
+    for label,row in genos:
       if label in drows:
         raise NonUniqueError,'Non-unique row identifier: %s' % label
       else:
@@ -77,7 +85,7 @@ def unique_check_genomatrixstream(columns,rows):
 
       yield label,row
 
-  return columns,_check()
+  return genos.clone(_check(),unique=True)
 
 
 def guess_informat(filename):
@@ -165,7 +173,7 @@ def load_hapmap_genotypes(filename,limit=None):
   if limit is not None:
     limit += 11
 
-  columns = [ intern(h.strip()) for h in islice(header,11,limit) ]
+  columns = [ intern(h.strip()) for h in islice(header.split(),11,limit) ]
   modelcache = {}
   modelmap   = {}
 
@@ -176,17 +184,20 @@ def load_hapmap_genotypes(filename,limit=None):
       locus   = intern(fields[0].strip())
       alleles = tuple(sorted(fields[1].split('/')))
       genos   = fields[11:limit]
+      if len(alleles) != 2 or any(a not in 'ACGT' for a in alleles):
+        alleles = tuple(set(a for g in genos for a in g if a!='N'))
 
+      assert len(alleles)<=2
       assert len(genos) == n
 
       model = modelcache.get(alleles)
       if model is None:
-        model = modelcache[alleles] = model_from_alleles(alleles)
+        model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
       modelmap[locus] = model
 
-      yield label,genos
+      yield locus,genos
 
-  return encode_genomatrixstream_from_strings(columns,_load(rows),'ldat',hapmap,modelmap)
+  return GenomatrixStream.from_strings(_load(),'ldat',hapmap,samples=columns,modelmap=modelmap)
 
 
 def load_genomatrix(filename,format,genorepr,limit=None,unique=True,modelmap=None):
@@ -214,16 +225,19 @@ def load_genomatrix(filename,format,genorepr,limit=None,unique=True,modelmap=Non
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> format,columns,rows = load_genomatrix(data,'ldat',snp)
-  >>> format
+  >>> genos = load_genomatrix(data,'ldat',snp)
+  >>> genos.format
   'ldat'
-  >>> columns
+  >>> genos.columns
   ('s1', 's2', 's3')
-  >>> for row in rows:
+  >>> for row in genos:
   ...   print row
   ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
   ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
   '''
+  if genorepr is None:
+    raise ValueError('genotype representation must be specified when reading a text format')
+
   gfile = autofile(filename)
   rows = csv.reader(gfile,dialect='tsv')
 
@@ -266,12 +280,15 @@ def load_genomatrix(filename,format,genorepr,limit=None,unique=True,modelmap=Non
 
   #defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
   #modelmap = defaultdict(lambda: defmodel)
-  columns,rows = encode_genomatrixstream_from_strings(columns,_load(rows),format,genorepr,modelmap)
+  if format=='ldat':
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,modelmap=modelmap)
+  else:
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,modelmap=modelmap)
 
   if unique:
-    columns,rows = unique_check_genomatrixstream(columns,rows)
+    genos = unique_check_genomatrixstream(genos)
 
-  return format,columns,rows
+  return genos
 
 
 class TextGenomatrixWriter(object):
@@ -295,19 +312,20 @@ class TextGenomatrixWriter(object):
   typically 'sdat'.  However, these formatting issues are handled at a
   higher level by callers of TextGenomatrixWriter.
 
-  >>> loci =              ('l1',     'l2',    'l3')
-  >>> matrix = [('s1', [('A','A'),(None,None),('C','T')]),
-  ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
-  ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
-  >>> loci,matrix = encode_genomatrixstream(loci,matrix,'sdat')
+  >>> loci =           ('l1',      'l2',      'l3')
+  >>> rows = [('s1', [('A','A'),(None,None),('C','T')]),
+  ...         ('s2', [('A','G'), ('C','G'), ('C','C')]),
+  ...         ('s3', [('G','G'),(None,None),('C','T')]) ]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenomatrixWriter(o,'ldat',loci,snp) as w:
-  ...   w.writerow(*matrix.next())
-  ...   w.writerow(*matrix.next())
-  ...   w.writerows(matrix)
+  >>> with TextGenomatrixWriter(o,genos.format,genos.columns,snp) as w:
+  ...   genos=iter(genos)
+  ...   w.writerow(*genos.next())
+  ...   w.writerow(*genos.next())
+  ...   w.writerows(genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  ldat  l1      l2      l3
+  sdat  l1      l2      l3
   s1    AA              CT
   s2    AG      CG      CC
   s3    GG              CT
@@ -326,6 +344,9 @@ class TextGenomatrixWriter(object):
     @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @type       dialect: str or csv dialect object
     '''
+    if genorepr is None:
+      raise ValueError('genotype representation must be specified when reading a text genotype format')
+
     self.out       = csv.writer(autofile(filename,'w'),dialect=dialect)
     self.header    = header
     self.headerlen = len(header)
@@ -416,7 +437,7 @@ class TextGenotripleWriter(object):
 
   >>> triples = [('s1','l1',('C','T')), ('s1','l2',(None,None)),
   ...            ('s1','l3',('A','A')), ('s2','l2', ('C','C'))]
-  >>> triples = encode_genotriples(triples)
+  >>> triples = iter(GenotripleStream.from_tuples(triples))
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> with TextGenotripleWriter(o,snp) as w:
@@ -439,6 +460,9 @@ class TextGenotripleWriter(object):
     @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @type       dialect: str or csv dialect object
     '''
+    if genorepr is None:
+      raise ValueError('genotype representation must be specified when reading a text genotype format')
+
     self.out       = csv.writer(autofile(filename,'w'),dialect=dialect)
     self.genorepr  = genorepr
 
@@ -502,7 +526,7 @@ class TextGenotripleWriter(object):
     self.close()
 
 
-def save_genomatrix(filename,header,matrix,format,genorepr):
+def save_genomatrix(filename,genos,genorepr):
   '''
   Write the genotype matrix data to file.
 
@@ -520,22 +544,22 @@ def save_genomatrix(filename,header,matrix,format,genorepr):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> loci =              ('l1',     'l2',    'l3')
-  >>> matrix = [('s1', [('A','A'),(None,None),('C','T')]),
+  >>> rows = [('s1', [('A','A'),(None,None),('C','T')]),
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
-  >>> loci,matrix = encode_genomatrixstream(loci,matrix,'sdat')
-  >>> save_genomatrix(o,loci,matrix,'ldat',snp)
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> save_genomatrix(o,genos,snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  ldat	l1	l2	l3
+  sdat	l1	l2	l3
   s1	AA	  	CT
   s2	AG	CG	CC
   s3	GG	  	CT
   '''
-  with TextGenomatrixWriter(filename, format or '', header, genorepr) as writer:
-    writer.writerows(matrix)
+  with TextGenomatrixWriter(filename, genos.format, genos.columns, genorepr) as writer:
+    writer.writerows(genos)
 
 
-def load_genotriples(filename,genorepr,limit=None):
+def load_genotriples(filename,genorepr,unique=True,limit=None,modelmap=None):
   '''
   Load genotype triples from file
 
@@ -559,6 +583,9 @@ def load_genotriples(filename,genorepr,limit=None):
   ('s2', 'l1', ('A', 'G'))
   ('s2', 'l2', ('C', 'C'))
   '''
+  if genorepr is None:
+    raise ValueError('genotype representation must be specified when reading a text genotype format')
+
   rows = csv.reader(autofile(filename),dialect='tsv')
 
   if limit:
@@ -582,7 +609,7 @@ def load_genotriples(filename,genorepr,limit=None):
 
       yield sample,locus,geno
 
-  return encode_genotriples(_load())
+  return GenotripleStream.from_tuples(_load(),unique=unique,modelmap=modelmap)
 
 
 def save_genotriples(filename,triples,genorepr):
@@ -600,7 +627,7 @@ def save_genotriples(filename,triples,genorepr):
   >>> triples = [ ('s1', 'l1',  ('C','T')),
   ...             ('s1', 'l2', (None,None)),
   ...             ('s1', 'l3',  ('A','A')) ]
-  >>> triples = encode_genotriples(triples)
+  >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> save_genotriples(o,triples,snp)
@@ -613,7 +640,7 @@ def save_genotriples(filename,triples,genorepr):
     w.writerows(triples)
 
 
-def load_genotriplestream(filename, genorepr, limit=None, unique=False):
+def load_genotriplestream(filename, format=None, genorepr=None, limit=None, unique=True, modelmap=None):
   '''
   Load genotriple file and return a GenotripleStream object
 
@@ -631,7 +658,7 @@ def load_genotriplestream(filename, genorepr, limit=None, unique=False):
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriplestream(data,snp)
+  >>> triples = load_genotriplestream(data,format='trip',genorepr=snp)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -639,11 +666,22 @@ def load_genotriplestream(filename, genorepr, limit=None, unique=False):
   ('s2', 'l1', ('A', 'G'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  triples = load_genotriples(filename,genorepr,limit=None)
-  return GenotripleStream(triples, unique=unique)
+  if format is None:
+    format = guess_informat(filename)
+
+  if format in ('trip','genotriple'):
+    triples = load_genotriples(filename,genorepr,limit=limit,unique=unique,modelmap=modelmap)
+  elif format=='tbat':
+    triples = load_genotriples_binary(filename,limit=limit,unique=unique,modelmap=modelmap)
+  elif not format:
+    raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
+  else:
+    raise NotImplementedError,"File format '%s' is not supported" % format
+
+  return triples
 
 
-def load_genomatrixstream(filename, format, genorepr, limit=None, unique=True):
+def load_genomatrixstream(filename, format=None, genorepr=None, limit=None, unique=True, modelmap=None):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -677,21 +715,24 @@ def load_genomatrixstream(filename, format, genorepr, limit=None, unique=True):
   samples = loci = None
 
   if format == 'hapmap':
-    samples,genos = load_hapmap_genotypes(filename,limit=limit)
-    format = 'ldat'
+    genos = load_hapmap_genotypes(filename,limit=limit)
   elif format == 'ldat':
-    format,samples,genos = load_genomatrix(filename,format,genorepr,limit=limit,unique=unique)
+    genos = load_genomatrix(filename,format,genorepr,limit=limit,unique=unique,modelmap=modelmap)
   elif format == 'sdat':
-    format,loci,genos = load_genomatrix(filename,format,genorepr,limit=limit,unique=unique)
+    genos = load_genomatrix(filename,format,genorepr,limit=limit,unique=unique,modelmap=modelmap)
+  elif format == 'lbat':
+    genos = load_genomatrix_binary(filename,'ldat',limit=limit,unique=unique,modelmap=modelmap)
+  elif format == 'sbat':
+    genos = load_genomatrix_binary(filename,'sdat',limit=limit,unique=unique,modelmap=modelmap)
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
   else:
     raise NotImplementedError,"File format '%s' is not supported" % format
 
-  return GenomatrixStream(genos,format,samples=samples,loci=loci,unique=unique,packed=True)
+  return genos
 
 
-def load_genostream(filename, format, genorepr, limit=None, unique=None):
+def load_genostream(filename, format=None, genorepr=None, limit=None, unique=True, modelmap=None):
   '''
   Load genotype data in the format of (ldat, sdat, hapmap, trip, genotriple) and return a
   GenomatrixStream or GenotripleStream object
@@ -728,15 +769,11 @@ def load_genostream(filename, format, genorepr, limit=None, unique=None):
   if format is None:
     format = guess_informat(filename)
 
-  if format in ('ldat','sdat','hapmap'):
-    if unique is None:
-      unique = True
-    return load_genomatrixstream(filename,format,genorepr,limit=limit,unique=unique)
+  if format in ('ldat','sdat','hapmap','lbat','sbat'):
+    return load_genomatrixstream(filename,format,genorepr=genorepr,limit=limit,unique=unique,modelmap=modelmap)
 
-  elif format in ('trip','genotriple'):
-    if unique is None:
-      unique = False
-    return load_genotriplestream(filename,genorepr,limit=limit, unique=unique)
+  elif format in ('trip','genotriple','tbat'):
+    return load_genotriplestream(filename,format,genorepr=genorepr,limit=limit,unique=unique,modelmap=modelmap)
 
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
@@ -745,7 +782,7 @@ def load_genostream(filename, format, genorepr, limit=None, unique=None):
     raise NotImplementedError,"File format '%s' is not supported" % format
 
 
-def save_genostream(filename, genos, format, genorepr, mergefunc=None):
+def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None, compress=True):
   '''
   Write genotype data to file in one of the specified formats (ldat, sdat, trip, genotriple).
 
@@ -765,13 +802,17 @@ def save_genostream(filename, genos, format, genorepr, mergefunc=None):
     genos = genos.merged(mergefunc)
 
   if format == 'ldat':
-    genos = genos.as_ldat(mergefunc)
-    save_genomatrix(filename, genos.columns, genos, format, genorepr)
+    save_genomatrix(filename, genos.as_ldat(mergefunc), genorepr)
   elif format == 'sdat':
-    genos = genos.as_sdat(mergefunc)
-    save_genomatrix(filename, genos.columns, genos, format, genorepr)
+    save_genomatrix(filename, genos.as_sdat(mergefunc), genorepr)
+  elif format == 'lbat':
+    save_genomatrix_binary(filename, genos.as_ldat(mergefunc), compress=compress)
+  elif format == 'sbat':
+    save_genomatrix_binary(filename, genos.as_sdat(mergefunc), compress=compress)
   elif format in ('trip','genotriple'):
     save_genotriples(filename, genos.as_genotriples(), genorepr)
+  elif format == 'tbat':
+    save_genotriples_binary(filename, genos.as_genotriples(), compress=compress)
   elif not format:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(filename)
   else:
@@ -832,11 +873,11 @@ def transform_files(infiles,informat,ingenorepr,
   if outformat is None:
     outformat = informat
 
-  if outformat == 'ldat':
+  if outformat in ('ldat','lbat'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
-  elif outformat == 'sdat':
+  elif outformat in ('sdat','sbat'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
-  elif outformat in ('trip','genotriple'):
+  elif outformat in ('trip','genotriple','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
   elif not outformat:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(outfile)

@@ -372,7 +372,7 @@ def option_parser():
                     help='Map the locus ids to the grouping variable')
   parser.add_option(      '--tabularoutput',   dest='tabularoutput',   metavar='FILE',
                     help='Generate machine readable tabular output of results')
-  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp_acgt',
+  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
                     help='Input genotype representations. Values=snp (default), hapmap, or marker')
 
   return parser

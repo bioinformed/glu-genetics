@@ -28,7 +28,7 @@ from   operator          import itemgetter
 from   itertools         import islice, chain
 
 from   glu.lib.utils     import autofile
-from   glu.lib.genoarray import snp_acgt
+from   glu.lib.genoreprs import snp
 from   glu.lib.remap     import remap_alleles, remap_category
 from   glu.lib.genodata  import load_genostream, load_map
 from   glu.lib.hwp       import hwp_exact_biallelic
@@ -42,7 +42,7 @@ LOCUS_HEADER  = SAMPLE_HEADER + ['REF_HWP','COMP_HWP','CONCORD_GENO_PAIR','DISCO
                                  'ALLELE_MAP_CATEGORY','ALLELE_MAPS']
 
 def geno_pair_mode(g1,g2):
-  return snp_acgt.homozygote(g1)*2 + snp_acgt.homozygote(g2)
+  return g1.homozygote()*2 + g2.homozygote()
 
 
 class SampleConcordStat(object):
@@ -107,7 +107,7 @@ def output_sample_concordstat(filename, sampleconcord):
 def count_genos(genos):
   hom1 = hom2 = het = 0
   for g,n in genos.iteritems():
-    if snp_acgt.heterozygote(g):
+    if g.heterozygote(g):
       het  = n
     elif hom1:
       hom2 = n
@@ -148,9 +148,9 @@ def generate_locus_output(locusconcord,allelemaps):
     discordgenos = []
     for (g1,g2),n in stats.iteritems():
       if g1==g2:
-        concordgenos.append((snp_acgt.geno_str(g1),snp_acgt.geno_str(g2),n))
+        concordgenos.append((snp.to_string(g1),snp.to_string(g2),n))
       else:
-        discordgenos.append((snp_acgt.geno_str(g1),snp_acgt.geno_str(g2),n))
+        discordgenos.append((snp.to_string(g1),snp.to_string(g2),n))
 
     locusstat.append( ', '.join( '%s->%s:%4d' % (g1,g2,n) for g1,g2,n in concordgenos ))
     locusstat.append( ', '.join( '%s->%s:%4d' % (g1,g2,n) for g1,g2,n in discordgenos ))
@@ -159,7 +159,7 @@ def generate_locus_output(locusconcord,allelemaps):
       amap = allelemaps.get(locus[1])
       if amap is not None:
         locusstat.append(remap_category(dict(amap)))
-        locusstat.append(', '.join( '%s->%s' % (a,b) for a,b in amap if a.strip() and b.strip()))
+        locusstat.append(', '.join( '%s->%s' % (a,b) for a,b in amap if a and b))
       else:
         locusstat.extend(['',''])
 
@@ -189,13 +189,13 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
 
 
 def load_reference_genotypes(filename, format, locusset, sampleset, limit):
-  genos = load_genostream(filename,format)
-  genos = genos.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
+  data = load_genostream(filename,format,genorepr=snp)
+  data = data.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
 
-  samples = dict( (s,i) for i,s in enumerate(genos.samples) )
+  samples = dict( (s,i) for i,s in enumerate(data.samples) )
   loci = []
   genos = []
-  for locus,row in genos:
+  for locus,row in data:
     loci.append(locus)
     genos.append(row)
 
@@ -205,7 +205,7 @@ def load_reference_genotypes(filename, format, locusset, sampleset, limit):
 
 
 def load_comparison_genotypes(filename, format, locusset, sampleset, lmapfile, smapfile):
-  genos = load_genostream(filename,format)
+  genos = load_genostream(filename,format,genorepr=snp)
   genos = genos.transformed(rename_samples=smapfile, include_samples=smapfile,
                             rename_loci=lmapfile,    include_loci=lmapfile)
   genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
@@ -253,11 +253,10 @@ def concordance(refgenos,samples,loci,compgenos,sampleeq,locuseq,sampleconcord,l
 
 # FIXME: Move to global sequence representation module
 def make_remap(amap):
-  return dict( (snp_acgt.byte( (b1,b2) ),snp_acgt.byte( (c1,c2) ))
-                        for b1,c1 in amap
-                        for b2,c2 in amap )
+  return dict( ((b1,b2),(c1,c2)) ) for b1,c1 in amap
+                                   for b2,c2 in amap )
 
-complement_map = 'AT','TA','CG','GC','  '
+complement_map = 'AT','TA','CG','GC',(None,None)
 
 
 def load_remap_file(allelemapfile):
@@ -277,7 +276,7 @@ def load_remap_file(allelemapfile):
     # Otherwise, parse the list of comma separated items into a geno remap
     # dictionary.
     else:
-      amap = [ tuple(reversed(m.split(','))) for m in islice(line,1,None) ] + ['  ']
+      amap = [ tuple(reversed(m.split(','))) for m in islice(line,1,None) ] + [(None,None)]
 
     allelemap[line[0]] = amap
 

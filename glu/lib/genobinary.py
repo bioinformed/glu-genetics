@@ -30,16 +30,8 @@ from   itertools   import izip,groupby,imap
 import tables
 
 from   utils       import ilen
-from   genodata    import encode_genomatrixstream,encode_genotriples
+from   genodata    import GenomatrixStream, GenotripleStream
 from   genoarray   import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
-from   genoio      import load_genotriples,load_genomatrix
-
-
-def xlen2(s):
-  return s[0],ilen(s[1])
-
-def xlen3(s):
-  return s[0],ilen(s[2])
 
 
 class TripleDesc(tables.IsDescription):
@@ -66,21 +58,21 @@ class BinaryGenomatrixWriter(object):
 
     Example of writing an sdat file:
 
-    >>> loci =           (    'l1',       'l2',        'l3'  )
-    >>> matrix = [('s1', ( ('A', 'A'), (None,None),  ('T','T'))),
-    ...           ('s2', ((None,None),  ('C','T'),   ('G','T'))),
-    ...           ('s3', ( ('A', 'T'),  ('T','C'),   ('G','G')))]
-    >>> loci,matrix = list(encode_genomatrixstream(loci, matrix, 'sdat'))
+    >>> loci =         (    'l1',       'l2',        'l3'  )
+    >>> rows = [('s1', ( ('A', 'A'), (None,None),  ('T','T'))),
+    ...         ('s2', ((None,None),  ('C','T'),   ('G','T'))),
+    ...         ('s3', ( ('A', 'T'),  ('T','C'),   ('G','G')))]
+    >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
     >>> import tempfile
     >>> f = tempfile.NamedTemporaryFile()
-    >>> with BinaryGenomatrixWriter(f.name,'sdat',loci) as writer:
-    ...   writer.writerows(matrix)
-    >>> format,loci,rows = load_genomatrix_binary(f.name,'sdat')
-    >>> format
+    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.loci) as writer:
+    ...   writer.writerows(genos)
+    >>> genos = load_genomatrix_binary(f.name,'sdat')
+    >>> genos.format
     'sdat'
-    >>> loci
+    >>> genos.loci
     ('l1', 'l2', 'l3')
-    >>> for row in rows:
+    >>> for row in genos:
     ...   print row
     ('s1', [('A', 'A'), (None, None), ('T', 'T')])
     ('s2', [(None, None), ('C', 'T'), ('G', 'T')])
@@ -88,19 +80,19 @@ class BinaryGenomatrixWriter(object):
 
     Example of writing an ldat file:
 
-    >>> samples =        (    's1',       's2',       's3'   )
-    >>> matrix = [('l1', ( ('A', 'A'), (None,None),  ('T','T'))),
-    ...           ('l2', ((None,None),  ('T','T'),   ('G','T'))),
-    ...           ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
-    >>> samples,matrix = list(encode_genomatrixstream(samples, matrix, 'ldat'))
-    >>> with BinaryGenomatrixWriter(f.name,'ldat',samples) as writer:
-    ...   writer.writerows(matrix)
-    >>> format,samples,rows = load_genomatrix_binary(f.name,'ldat')
-    >>> format
+    >>> samples =         (    's1',       's2',       's3'   )
+    >>> rows    = [('l1', ( ('A', 'A'), (None,None),  ('T','T'))),
+    ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
+    ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
+    >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
+    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.samples) as writer:
+    ...   writer.writerows(genos)
+    >>> genos = load_genomatrix_binary(f.name,'ldat')
+    >>> genos.format
     'ldat'
-    >>> samples
+    >>> genos.samples
     ('s1', 's2', 's3')
-    >>> for row in rows:
+    >>> for row in genos:
     ...   print row
     ('l1', [('A', 'A'), (None, None), ('T', 'T')])
     ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
@@ -166,7 +158,6 @@ class BinaryGenomatrixWriter(object):
       self.models.append(genos.descriptor.models[0])
 
     self.rowkeys.append(rowkey)
-
     chunk = self.chunk
     chunk.append(genos.data)
 
@@ -295,7 +286,7 @@ class BinaryGenotripleWriter(object):
   ...            ('s1', 'l2',    (None,None)  ),
   ...            ('s1', 'l3', ('A','A')),
   ...            ('s2', 'l2', ('C','C'))]
-  >>> triples = encode_genotriples(triples)
+  >>> triples = iter(GenotripleStream.from_tuples(triples))
   >>> with BinaryGenotripleWriter(f.name) as w:
   ...   w.writerow(*triples.next())
   ...   w.writerow(*triples.next())
@@ -452,7 +443,7 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
   ...            ('s1', 'l2',    (None,None)  ),
   ...            ('s1', 'l3', ('A','A')),
   ...            ('s2', 'l2', ('C','C'))]
-  >>> triples = encode_genotriples(triples)
+  >>> triples = GenotripleStream.from_tuples(triples)
   >>> save_genotriples_binary(f.name, triples)
   >>> for row in load_genotriples_binary(f.name):
   ...   print row
@@ -465,7 +456,7 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
     writer.writerows(triples)
 
 
-def load_genotriples_binary(filename,limit=None):
+def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
   '''
   Load genotype triples from file
 
@@ -482,7 +473,7 @@ def load_genotriples_binary(filename,limit=None):
   ...            ('s1', 'l2',    (None,None)  ),
   ...            ('s1', 'l3', ('A','A')),
   ...            ('s2', 'l2', ('C','C'))]
-  >>> triples = encode_genotriples(triples)
+  >>> triples = GenotripleStream.from_tuples(triples)
   >>> save_genotriples_binary(f.name, triples)
   >>> for row in load_genotriples_binary(f.name):
   ...   print row
@@ -501,11 +492,15 @@ def load_genotriples_binary(filename,limit=None):
   loci    = map(str,gfile.root.loci[:])
   models  = list(load_models(gfile))
 
-  for row in gfile.root.genotypes:
-    locusid = row[1]
-    yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
+  def _load():
+    for row in gfile.root.genotypes:
+      locusid = row[1]
+      yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
+    gfile.close()
 
-  gfile.close()
+  # FIXME: fill in modelmap
+  # FIXME: Order must be restored
+  return GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique)
 
 
 def save_strings(gfile,name,data,filters=None,maxlen=None):
@@ -574,10 +569,10 @@ def save_models(gfile, models, filters=None):
 
   locus_row = locus_models.row
   for model in models:
-    genotypes = (model.max_alleles,model.allow_hemizygote)+tuple(model.genotypes[1:])
-    index = modelmap.get(genotypes)
+    key = (model.max_alleles,model.allow_hemizygote)+tuple(g.alleles() for g in model.genotypes[1:])
+    index = modelmap.get(key)
     if index is None:
-      index = modelmap[genotypes] = len(modelmap)
+      index = modelmap[key] = len(modelmap)
       for allele in model.alleles:
         ad(allele,al())
 
@@ -641,26 +636,34 @@ def save_models(gfile, models, filters=None):
 
 
 def load_models(gfile):
+  '''
+  Load models from an HDF5 binary genotype file
+
+  Implements model compression upon input.
+  '''
   alleles         = map(str,gfile.root.model_alleles[:])
   alleles[0]      = None
   mods            = list(gfile.root.models[:])
   model_genotypes = list(gfile.root.model_genotypes[:])
   model_genotypes = groupby(model_genotypes, itemgetter(0))
 
+  modelcache = {}
   models = []
   for mod,(i,mgenos) in izip(mods,model_genotypes):
-    model = UnphasedMarkerModel(mod[1],mod[0])
-    for j,allele1,allele2 in mgenos:
-      allele1 = alleles[allele1] or None
-      allele2 = alleles[allele2] or None
-      model.add_genotype( (allele1,allele2) )
+    genotypes = tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos)
+    key = (mod[1],mod[0])+genotypes
+    model = modelcache.get(key)
+    if model is None:
+      model = modelcache[key] = UnphasedMarkerModel(mod[1],mod[0])
+      for g in genotypes:
+        model.add_genotype(g)
     models.append(model)
 
   locus_models = [ m[0] for m in gfile.root.locus_models[:] ]
   return [ models[i] for i in locus_models ]
 
 
-def save_genomatrix_binary(filename,columns,matrix,format,compress=True,scratch=16*1024*1024):
+def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
   '''
   Write the genotype matrix data to file.
 
@@ -676,20 +679,20 @@ def save_genomatrix_binary(filename,columns,matrix,format,compress=True,scratch=
 
   Example of writing an sdat file:
 
-  >>> loci   =           (  'l1',       'l2',        'l3'  )
-  >>> matrix = [('s1', ( ('A', 'A'), (None,None), ('T','T'))),
-  ...           ('s2', ((None,None),  ('C','T'),  ('G','T'))),
-  ...           ('s3', ( ('A', 'T'), ('T','C'),   ('G','G')))]
-  >>> loci,matrix = list(encode_genomatrixstream(loci, matrix, 'sdat'))
+  >>> loci =           (  'l1',       'l2',        'l3'  )
+  >>> rows = [('s1', ( ('A', 'A'), (None,None), ('T','T'))),
+  ...         ('s2', ((None,None),  ('C','T'),  ('G','T'))),
+  ...         ('s3', ( ('A', 'T'), ('T','C'),   ('G','G')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
-  >>> save_genomatrix_binary(f.name,loci,matrix,'sdat')
-  >>> format,loci,rows = load_genomatrix_binary(f.name,'sdat')
-  >>> format
+  >>> save_genomatrix_binary(f.name,genos)
+  >>> genos = load_genomatrix_binary(f.name,'sdat')
+  >>> genos.format
   'sdat'
-  >>> loci
+  >>> genos.loci
   ('l1', 'l2', 'l3')
-  >>> for row in rows:
+  >>> for row in genos:
   ...   print row
   ('s1', [('A', 'A'), (None, None), ('T', 'T')])
   ('s2', [(None, None), ('C', 'T'), ('G', 'T')])
@@ -697,29 +700,30 @@ def save_genomatrix_binary(filename,columns,matrix,format,compress=True,scratch=
 
   Example of writing an ldat file:
 
-  >>> samples =          (  's1',      's2',        's3'  )
-  >>> matrix = [('l1', ( ('A', 'A'), (None,None), ('T','T'))),
-  ...           ('l2', ((None, None),('T','T'),   ('G','T'))),
-  ...           ('l3', ( ('A', 'T'), ('T','A'),   ('T','T')))]
-  >>> samples,matrix = list(encode_genomatrixstream(samples,matrix,'ldat'))
+  >>> samples =           (  's1',      's2',        's3'  )
+  >>> rows    = [('l1', ( ('A', 'A'), (None,None), ('T','T'))),
+  ...            ('l2', ((None, None),('T','T'),   ('G','T'))),
+  ...            ('l3', ( ('A', 'T'), ('T','A'),   ('T','T')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
   >>> f = tempfile.NamedTemporaryFile()
-  >>> save_genomatrix_binary(f.name,samples,matrix,'ldat')
-  >>> format,samples,rows = load_genomatrix_binary(f.name,'ldat')
-  >>> samples
+  >>> save_genomatrix_binary(f.name,genos)
+  >>> genos = load_genomatrix_binary(f.name,'ldat')
+  >>> genos.samples
   ('s1', 's2', 's3')
-  >>> format
+  >>> genos.format
   'ldat'
-  >>> for row in rows:
+  >>> for row in genos:
   ...   print row
   ('l1', [('A', 'A'), (None, None), ('T', 'T')])
   ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
   ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
   '''
-  with BinaryGenomatrixWriter(filename,format,columns,compress=compress,scratch=scratch) as writer:
-    writer.writerows(matrix)
+  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,compress=compress,scratch=scratch) as writer:
+    writer.writerows(genos.transformed(repack=True))
 
 
-def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*1024*1024):
+#FIXME: Fill in modelmap
+def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,chunksize=4096,scratch=32*1024*1024):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -739,31 +743,31 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
                        tuples of row label and row data
   @rtype:              tuple of string and generator
 
-  >>> loci =           (   'l1',       'l2',        'l3'  )
-  >>> matrix = [('s1', (('A', 'A'), (None,None), ('T','T'))),
-  ...           ('s2', (   (None,None),    ('C','T'),   ('G','T'))),
-  ...           ('s3', (('A', 'T'), ('T','C'),   ('G','G')))]
-  >>> loci,matrix = list(encode_genomatrixstream(loci, matrix, 'sdat'))
+  >>> loci =         (   'l1',       'l2',        'l3'  )
+  >>> rows = [('s1', ( ('A','A'), (None,None), ('T','T'))),
+  ...         ('s2', ((None,None), ('C','T'),  ('G','T'))),
+  ...         ('s3', ( ('A','T'),  ('T','C'),  ('G','G')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
-  >>> save_genomatrix_binary(f.name,loci,matrix,'sdat')
-  >>> format,columns,rows = load_genomatrix_binary(f.name,'sdat')
-  >>> format
+  >>> save_genomatrix_binary(f.name,genos)
+  >>> genos = load_genomatrix_binary(f.name,'sdat')
+  >>> genos.format
   'sdat'
-  >>> columns
+  >>> genos.columns
   ('l1', 'l2', 'l3')
-  >>> for row in rows:
+  >>> for row in genos:
   ...   print row
   ('s1', [('A', 'A'), (None, None), ('T', 'T')])
   ('s2', [(None, None), ('C', 'T'), ('G', 'T')])
   ('s3', [('A', 'T'), ('C', 'T'), ('G', 'G')])
 
-  >>> format,columns,rows = load_genomatrix_binary(f.name,'ldat')
-  >>> format
+  >>> genos = load_genomatrix_binary(f.name,'ldat')
+  >>> genos.format
   'ldat'
-  >>> columns
+  >>> genos.columns
   ('s1', 's2', 's3')
-  >>> for row in rows:
+  >>> for row in genos:
   ...   print row
   ('l1', [('A', 'A'), (None, None), ('A', 'T')])
   ('l2', [(None, None), ('C', 'T'), ('C', 'T')])
@@ -781,12 +785,19 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
 
   cols   = map(intern,map(str,gfile.root.cols[:]))
   rows   = map(intern,map(str,gfile.root.rows[:]))
+
+  if unique:
+    if len(set(cols)) != len(cols):
+      raise ValueError('Non-unique column identifiers')
+    if len(set(rows)) != len(rows):
+      raise ValueError('Non-unique column identifiers')
+
   models = list(load_models(gfile))
 
   if format == format_found == 'sdat':
     columns = tuple(cols)
 
-    def _gen_load_genomatrix():
+    def _load():
       assert len(models) == len(cols)
       descr = GenotypeArrayDescriptor(models)
 
@@ -808,8 +819,10 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
   elif format == format_found == 'ldat':
     columns = tuple(cols)
 
-    def _gen_load_genomatrix():
+    def _load():
       assert len(models) == len(rows)
+      descrcache = {}
+
       chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
       chunks    = int(len(rows)+chunksize-1)//chunksize
 
@@ -820,7 +833,10 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
         labels = rows[start:stop]
         chunk  = gfile.root.genotypes[start:stop,:]
         for j,label in enumerate(labels):
-          descr = GenotypeArrayDescriptor( [mods.next()]*len(cols) )
+          model = mods.next()
+          descr = descrcache.get(model)
+          if descr is None:
+            descr = descrcache[model] = GenotypeArrayDescriptor( [model]*len(cols) )
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
           yield label,g
@@ -830,7 +846,7 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
   if format == 'ldat' and format_found == 'sdat':
     columns = tuple(rows)
 
-    def _gen_load_genomatrix():
+    def _load():
       descr = GenotypeArrayDescriptor(models)
 
       chunkrows,chunkcols = gfile.root.genotypes.chunkshape
@@ -873,7 +889,7 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
   elif format == 'sdat' and format_found == 'ldat':
     columns = tuple(rows)
 
-    def _gen_load_genomatrix():
+    def _load():
       assert len(models) == len(rows)
       descr = GenotypeArrayDescriptor(models)
 
@@ -912,7 +928,13 @@ def load_genomatrix_binary(filename,format,limit=None,chunksize=4096,scratch=32*
 
       gfile.close()
 
-  return format,columns,_gen_load_genomatrix()
+  # FIXME: We also know rows
+  if format=='ldat':
+    genos=GenomatrixStream(_load(),format,samples=columns,unique=unique,packed=True)
+  else:
+    genos=GenomatrixStream(_load(),format,loci=columns,unique=unique,packed=True)
+
+  return genos
 
 
 def test(descr,filename,command,genotypes):
@@ -928,141 +950,133 @@ def test(descr,filename,command,genotypes):
 
 
 def main():
-  from   random   import shuffle
-  from   genodata import (load_genomatrixstream, save_genomatrix,
-                          build_genotriples_by_locus, build_genotriples_by_sample,
-                          save_genotriples, load_genotriples)
+  from   random    import shuffle
+  from   genoreprs import snp
+  from   genoio    import load_genostream, save_genostream
 
   if 0:
-    f      = '/usr/local/share/hapmap/build21/fwd_strand/non-redundant/genotypes_chr2_CEU_r21a_nr_fwd.txt.gz'
+    f      = '/usr/local/share/hapmap/build21/fwd_strand/non-redundant/genotypes_chr22_CEU_r21a_nr_fwd.txt.gz'
     #f     = '/usr/local/share/hapmap/build21/fwd_strand/non-redundant/genotypes_chr2_YRI_r21a_nr_fwd.txt.gz'
-    matrix = load_genomatrixstream(f,'hapmap').materialize()
+    matrix = load_genostream(f,'hapmap').materialize()
     format = 'hapmap'
   else:
     f = '/home/jacobske/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_CASE_22.ldat.gz'
-    matrix = load_genomatrixstream(f).materialize()
-    format = None
+    matrix = load_genostream(f,genorepr=snp).materialize()
+    format = matrix.format
 
-  subjects = matrix.columns
-  matrix   = list(matrix)
+  matrix   = matrix.materialize()
 
-  g = len(matrix)*len(subjects)
-  print 'DATA: %d loci, %d subjects, %d genotypes' % (len(matrix),len(subjects),g)
+  g = len(matrix.loci)*len(matrix.samples)
+  print 'DATA: %d loci, %d subjects, %d genotypes' % (len(matrix.loci),len(matrix.samples),g)
   print
 
   test('Load   compressed %s file' % (format or 'source'), f,
-         lambda f: ilen(load_genomatrixstream(f,format)), g)
+         lambda f: ilen(load_genostream(f,format,snp)), g)
 
   if 1:
     test('Save uncompressed   triple file ldat', 'data/g2.trip',
-           lambda f: save_genotriples(f,build_genotriples_by_locus(subjects,matrix)), g)
+           lambda f: save_genostream(f,matrix.as_genotriples(),genorepr=snp), g)
     test('Save   compressed   triple file ldat', 'data/g2.trip.gz',
-           lambda f: save_genotriples(f,build_genotriples_by_locus(subjects,matrix)), g)
-    test('Save       binary   triple file ldat', 'data/g2.tdat',
-           lambda f: save_genotriples_binary(f,build_genotriples_by_locus(subjects,matrix)), g)
+           lambda f: save_genostream(f,matrix.as_genotriples(),genorepr=snp), g)
+    test('Save       binary   triple file ldat', 'data/g2.tbat',
+           lambda f: save_genostream(f,matrix.as_genotriples()), g)
     test('Load uncompressed   triple file ldat', 'data/g2.trip',
-           lambda f: ilen(load_genotriples(f)), g)
+           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
     test('Load   compressed   triple file ldat', 'data/g2.trip.gz',
-           lambda f: ilen(load_genotriples(f)), g)
-    test('Load       binary   triple file ldat', 'data/g2.tdat',
-           lambda f: ilen(load_genotriples_binary(f)), g)
+           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+    test('Load       binary   triple file ldat', 'data/g2.tbat',
+           lambda f: ilen(load_genostream(f)), g)
 
   if 1:
     test('Save   compressed   ldat file',        'data/g2.ldat.gz',
-           lambda f: save_genomatrix(f,subjects,matrix,format='ldat'), g)
+           lambda f: save_genostream(f,matrix,genorepr=snp), g)
 
   if 1:
     test('Save uncompressed   ldat file',        'data/g2.ldat',
-           lambda f: save_genomatrix(f,subjects,matrix,format='ldat'), g)
+           lambda f: save_genostream(f,matrix,genorepr=snp), g)
     test('Load   compressed   ldat file',        'data/g2.ldat.gz',
-           lambda f: ilen(load_genomatrixstream(f,'ldat')), g)
+           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
     test('Load uncompressed   ldat file',        'data/g2.ldat',
-           lambda f: ilen(load_genomatrixstream(f,'ldat')), g)
+           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
 
   if 1:
-    test('Save       binary   ldat file',        'data/g2.gdat',
-           lambda f: save_genomatrix_binary(f,subjects,matrix,format='ldat'), g)
+    test('Save       binary   ldat file',        'data/g2.lbat',
+           lambda f: save_genostream(f,matrix), g)
 
   if 1:
-    test('Load       binary   ldat file',        'data/g2.gdat',
-           lambda f: xlen3(load_genomatrix_binary(f,'ldat')), g)
+    test('Load       binary   ldat file',        'data/g2.lbat',
+           lambda f: ilen(load_genostream(f)), g)
 
-  test('Save      ubinary   ldat file',        'data/u2.gdat',
-         lambda f: save_genomatrix_binary(f,subjects,matrix,format='ldat',compress=False), g)
-  test('Load      ubinary   ldat file',        'data/u2.gdat',
-         lambda f: xlen3(load_genomatrix_binary(f,'ldat')), g)
+  test('Save      ubinary   ldat file',        'data/u2.lbat',
+         lambda f: save_genostream(f,matrix,compress=False), g)
+  test('Load      ubinary   ldat file',        'data/u2.lbat',
+         lambda f: ilen(load_genostream(f)), g)
 
-  test('Load       binary   ldat file as sdat', 'data/g2.gdat',
-         lambda f: xlen3(load_genomatrix_binary(f,'sdat')), g)
+  test('Load       binary   ldat file as sdat', 'data/g2.lbat',
+         lambda f: ilen(load_genomatrix_binary(f,'sdat')), g)
 
   test('Load   compressed   ldat file as sdat',        'data/g2.ldat.gz',
-         lambda f: ilen(load_genomatrixstream(f,'ldat').as_sdat()), g)
+         lambda f: ilen(load_genostream(f,genorepr=snp).as_sdat()), g)
 
   matrix  = None
 
   # Materialize for use later (but don't time)
   if 1:
-    format,loci,matrix2 = load_genomatrix_binary('data/g2.gdat','sdat')
-    matrix2 = list(matrix2)
+    matrix2 = load_genomatrix_binary('data/g2.lbat','sdat').materialize()
 
-  test('Save       binary   sdat file',        'data/g22.gdat',
-         lambda f: save_genomatrix_binary(f,loci,matrix2,format='sdat'), g)
-  test('Load       binary   sdat file',        'data/g22.gdat',
-         lambda f: xlen3(load_genomatrix_binary(f,'sdat')), g)
-  test('Save      ubinary   sdat file',        'data/u22.gdat',
-         lambda f: save_genomatrix_binary(f,loci,matrix2,format='sdat',compress=False), g)
-  test('Load      ubinary   sdat file',        'data/u22.gdat',
-         lambda f: xlen3(load_genomatrix_binary(f,'sdat')), g)
+  test('Save       binary   sdat file',        'data/g22.sbat',
+         lambda f: save_genostream(f,matrix2), g)
+  test('Load       binary   sdat file',        'data/g22.sbat',
+         lambda f: ilen(load_genostream(f)), g)
+  test('Save      ubinary   sdat file',        'data/u22.sbat',
+         lambda f: save_genostream(f,matrix2,compress=False), g)
+  test('Load      ubinary   sdat file',        'data/u22.sbat',
+         lambda f: ilen(load_genostream(f)), g)
 
-  test('Load       binary   sdat file as ldat', 'data/g22.gdat',
-         lambda f: xlen3(load_genomatrix_binary(f,'ldat')), g)
+  test('Load       binary   sdat file as ldat', 'data/g22.sbat',
+         lambda f: ilen(load_genomatrix_binary(f,'ldat')), g)
 
   test('Save   compressed   sdat file',        'data/g2.sdat.gz',
-         lambda f: save_genomatrix(f,loci,matrix2,format='sdat'), g)
+         lambda f: save_genostream(f,matrix2,genorepr=snp), g)
   test('Save uncompressed   sdat file',        'data/g2.sdat',
-         lambda f: save_genomatrix(f,loci,matrix2,format='sdat'), g)
+         lambda f: save_genostream(f,matrix2,genorepr=snp), g)
   test('Load   compressed   sdat file',        'data/g2.sdat.gz',
-         lambda f: ilen(load_genomatrixstream(f,'sdat')), g)
+         lambda f: ilen(load_genostream(f,genorepr=snp)), g)
   test('Load uncompressed   sdat file',        'data/g2.sdat',
-         lambda f: ilen(load_genomatrixstream(f,'sdat')), g)
+         lambda f: ilen(load_genostream(f,genorepr=snp)), g)
 
   test('Load   compressed   sdat file as ldat','data/g2.sdat.gz',
-         lambda f: ilen(load_genomatrixstream(f,'sdat').as_ldat()), g)
+         lambda f: ilen(load_genostream(f,genorepr=snp).as_ldat()), g)
 
   if 1:
     test('Save uncompressed   triple file sdat', 'data/g22.trip',
-           lambda f: save_genotriples(f,build_genotriples_by_sample(loci,matrix2)), g)
+           lambda f: save_genostream(f,matrix2.as_genotriples(),genorepr=snp), g)
     test('Save   compressed   triple file sdat', 'data/g22.trip.gz',
-           lambda f: save_genotriples(f,build_genotriples_by_sample(loci,matrix2)), g)
-    test('Save       binary   triple file sdat', 'data/g23.tdat',
-           lambda f: save_genotriples_binary(f,build_genotriples_by_sample(loci,matrix2)), g)
+           lambda f: save_genostream(f,matrix2.as_genotriples(),genorepr=snp), g)
+    test('Save       binary   triple file sdat', 'data/g23.tbat',
+           lambda f: save_genostream(f,matrix2.as_genotriples(),genorepr=snp), g)
     test('Load uncompressed   triple file sdat', 'data/g22.trip',
-           lambda f: ilen(load_genotriples(f)), g)
+           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
     test('Load   compressed   triple file sdat', 'data/g22.trip.gz',
-           lambda f: ilen(load_genotriples(f)), g)
-    test('Load       binary   triple file sdat', 'data/g23.tdat',
-           lambda f: ilen(load_genotriples_binary(f)), g)
+           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+    test('Load       binary   triple file sdat', 'data/g23.tbat',
+           lambda f: ilen(load_genostream(f)), g)
 
   if 0: # VERY VERY VERY VERY (VERY!) EXPENSIVE
-    triples = list(build_genotriples_by_sample(loci,matrix2))
-    shuffle(triples)
+    triples.clone(shuffle(list(matrix2.as_genotriples())))
 
     test('Save uncompressed   triple file random', 'data/g32.trip',
-           lambda f: save_genotriples(f,triples), g)
+           lambda f: save_genostream(f,triples), g)
     test('Save   compressed   triple file random', 'data/g32.trip.gz',
-           lambda f: save_genotriples(f,triples), g)
-
-    triples = list(build_genotriples_by_sample(loci,matrix2))
-    shuffle(triples)
-
-    test('Save       binary   triple file random', 'data/g33.tdat',
-           lambda f: save_genotriples_binary(f,triples), g)
+           lambda f: save_genostream(f,triples), g)
+    test('Save       binary   triple file random', 'data/g33.tbat',
+           lambda f: save_genostream_binary(f,triples), g)
     test('Load uncompressed   triple file random', 'data/g32.trip',
-           lambda f: ilen(load_genotriples(f)), g)
+           lambda f: ilen(load_genostream(f)), g)
     test('Load   compressed   triple file random', 'data/g32.trip.gz',
-           lambda f: ilen(load_genotriples(f)), g)
-    test('Load       binary   triple file random', 'data/g33.tdat',
-           lambda f: ilen(load_genotriples_binary(f)), g)
+           lambda f: ilen(load_genostream(f)), g)
+    test('Load       binary   triple file random', 'data/g33.tbat',
+           lambda f: ilen(load_genostream(f)), g)
 
 
 def _test():

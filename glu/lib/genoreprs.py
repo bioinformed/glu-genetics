@@ -268,7 +268,8 @@ class UnphasedMarkerRepresentation(object):
 
 snp    = UnphasedMarkerRepresentation(delimiter='', missing_geno_str='  ',missing_geno_strs=['','  '],
                                       missing_allele_str=' ',missing_allele_strs=['',' '])
-hapmap = UnphasedMarkerRepresentation(delimiter='',missing_allele_str='N',missing_allele_strs=['N'])
+hapmap = UnphasedMarkerRepresentation(delimiter='',missing_geno_str='NN',missing_geno_strs=['','NN'],
+                                      missing_allele_str='N',missing_allele_strs=['N'],)
 marker = UnphasedMarkerRepresentation(delimiter='/',missing_geno_str='',missing_geno_strs=['','/'],
                                       missing_allele_str='',missing_allele_strs=['',' '])
 

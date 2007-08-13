@@ -350,7 +350,7 @@ def option_parser():
                     help='Output of duplicate sets')
   parser.add_option('-f','--format',  dest='format', metavar='string', default='sdat',
                     help='The file input format for genotype data. Values=hapmap, ldat, sdat (default), trip or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp_acgt',
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')

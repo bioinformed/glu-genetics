@@ -25,7 +25,7 @@ import csv
 from   operator              import itemgetter
 
 from   glu.lib.utils         import autofile,hyphen,tally
-from   glu.lib.genoreprs     import get_genorepr,snp
+from   glu.lib.genoreprs     import get_genorepr
 from   glu.lib.genodata      import load_genostream, guess_informat_list, guess_outformat
 
 
@@ -42,7 +42,7 @@ def option_parser():
   ioopts.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of transformed data (default is "-" for standard out)')
 
-  ioopts.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp_acgt',
+  ioopts.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
 
   ioopts.add_option('-l', '--limit', dest='limit', metavar='N', type='int', default=None,
