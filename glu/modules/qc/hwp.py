@@ -54,7 +54,7 @@ def hwp_output(out,results):
 
   out.write('DEVIATIONS FROM HARDY-WEINBERG PROPORTIONS')
   out.write('\n')
-  out.write('                                                     Exact       Aymptotic \n')
+  out.write('                                                     Exact       Asymptotic\n')
   out.write('  Rank  Locus            hom1s  hets   hom2s    n    p-value     p-value   \n')
   out.write('  ----  ---------------  -----  -----  -----  -----  ----------  ----------\n')
 
