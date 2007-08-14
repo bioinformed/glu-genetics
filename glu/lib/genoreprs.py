@@ -150,7 +150,8 @@ class UnphasedMarkerRepresentation(object):
     ['A/A', '/A', '']
     '''
     try:
-      return [ self.strcache[r.alleles()] for r in reps ]
+      strcache = self.strcache
+      return [ strcache[r.alleles()] for r in reps ]
     except KeyError:
       return map(self.to_string, reps)
 
@@ -259,7 +260,6 @@ class UnphasedMarkerRepresentation(object):
     >>> marker.from_strings(['A/A','A/B','B/A',' /A','A/ ',' / ',''])
     [('A', 'A'), ('A', 'B'), ('A', 'B'), (None, 'A'), (None, 'A'), (None, None), (None, None)]
     '''
-    genos = list(genos)
     try:
       return list(imap(getitem, repeat(self.strcache), genos))
     except KeyError:
