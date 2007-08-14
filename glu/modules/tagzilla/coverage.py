@@ -53,6 +53,8 @@ def option_parser():
                                'to be open.  The end coordinate is exclusive and not included in the range.')
   inputgroup.add_option('-D', '--designscores', dest='designscores', metavar='FILE', type='str', action='append',
                           help='Read in design scores or other weights to use as criteria to choose the optimal tag for each bin')
+  inputgroup.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
+                          help='Default design score for any locus not found in a design file')
   inputgroup.add_option('-L', '--limit', dest='limit', metavar='N', type='int', default=0,
                           help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
 
@@ -109,6 +111,12 @@ def coverage(options,args):
 
   designscores = build_design_score(options.designscores)
 
+  # Trim undesignable tags
+  tags -= exclude
+  tags -= set(t for t,score in designscores.iteritems() if score < epsilon)
+  if options.designscores and options.designdefault <= epsilon:
+    tags -= set(t for t in tags if t not in designscores)
+
   locusmap = {}
   options.multipopulation = None
   ldpairs = generate_ldpairs(args, locusmap, set(), subset, tags, options)
@@ -117,22 +125,18 @@ def coverage(options,args):
   missing = '',-1
   for pairs in ldpairs:
     for lname1,lname2,r2,dprime in pairs:
-      if designscores:
-        if designscores.get(lname1,0) < epsilon:
-          exclude.add(lname1)
-        if designscores.get(lname2,0) < epsilon:
-          exclude.add(lname2)
-
-      for l1,l2 in [(lname1,lname2),(lname2,lname1)]:
+      for l1,l2 in (lname1,lname2),(lname2,lname1):
         if l2 in tags:
           best_locus,best_r2 = besttag.get(l1,missing)
           if l2 not in exclude and r2 > best_r2:
             besttag[l1] = l2,r2
+          break
 
   outfile = autofile(options.outfile, 'w', hyphen=sys.stdout)
   outfile.write('LNAME\tTAG\tBEST RSQUARED\n')
+  missing = '',sfloat(0)
   for lname in locusmap:
-    tag,r2 = '',''
+    tag,r2 = missing
     if lname in besttag:
       tag,r2 = besttag[lname]
       r2 = sfloat(r2)
