@@ -98,10 +98,7 @@ class GenotripleStream(GenotypeStream):
     @type  materialized: bool
     '''
     if order not in (None,'locus','sample'):
-      raise ValueError
-
-    if isinstance(triples, (list,tuple)):
-      materialized = True
+      raise ValueError('invalid GenotripleStream order specified')
 
     if not isinstance(samples,(NoneType,set)):
       samples = set(samples)
@@ -113,7 +110,7 @@ class GenotripleStream(GenotypeStream):
     self.loci         = loci
     self.order        = order
     self.unique       = bool(unique)
-    self.materialized = materialized
+    self.materialized = materialized or isinstance(triples, (list,tuple))
 
     self.__private_triples_do_not_touch = triples
 
@@ -153,7 +150,7 @@ class GenotripleStream(GenotypeStream):
     ('s3', 'l2', (None, None))
     '''
     if not genos:
-      raise ValueError
+      raise ValueError('empty stream list')
 
     # FIXME: Consider merging before converting to triples if inputs are all
     #        sdat/ldat
@@ -188,7 +185,7 @@ class GenotripleStream(GenotypeStream):
     sequence of triples with genotypes in tuple
     '''
     triples = encode_genotriples_from_tuples(triples, modelmap)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique, materialized=False)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique)
 
   @staticmethod
   def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False, modelmap=None):
@@ -197,7 +194,7 @@ class GenotripleStream(GenotypeStream):
     sequence of triples with genotypes in a string format
     '''
     triples = encode_genotriples_from_strings(triples, genorepr, modelmap)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique, materialized=False)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique)
 
   def clone(self, triples, **kwargs):
     '''
@@ -279,7 +276,7 @@ class GenotripleStream(GenotypeStream):
     if self.materialized:
       return self
 
-    return self.clone(list(self), materialized=True)
+    return self.clone(list(self.use_stream()), materialized=True)
 
   def transformed(self, transform=None, mergefunc=None, **kwargs):
     '''
@@ -329,7 +326,6 @@ class GenotripleStream(GenotypeStream):
     ('s1', 'l1', ('G', 'G'))
     ('s2', 'l1', ('G', 'T'))
     '''
-
     if transform is not None and kwargs:
       raise ValueError, 'specification of both a transform object and keyword arguments is not supported'
     elif kwargs:
@@ -337,10 +333,6 @@ class GenotripleStream(GenotypeStream):
 
     if transform is None:
       return self
-
-    # Build a transform object from kwargs if one was not specified
-    if transform is None:
-      transform = GenoTransform.from_kwargs(**kwargs)
 
     triples = self
 
@@ -563,8 +555,8 @@ class GenomatrixStream(GenotypeStream):
   '''
   A stream of genomatrix by sample or locus with optional metadata
   '''
-  def __init__(self, genos, format, samples=None, loci=None, unique=False,
-                     materialized=False, packed=False):
+  def __init__(self, genos, format, samples=None, loci=None, unique=True,
+                                    materialized=False, packed=False):
     '''
     Create a new GenomatrixStream object
 
@@ -607,36 +599,35 @@ class GenomatrixStream(GenotypeStream):
     if format not in ('sdat','ldat'):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
 
-    if loci:
+    if loci and not isinstance(loci,tuple):
       loci = tuple(loci)
 
-    if samples:
+    if samples and not isinstance(samples,tuple):
       samples = tuple(samples)
 
-    if format=='ldat' and samples is None:
-      raise ValueError('sample metadata are required for ldat streams')
+    if format=='ldat':
+      if samples is None:
+        raise ValueError('GenomatrixStream in ldat format requires sample metadata')
+    elif format=='sdat':
+      if loci is None:
+        raise ValueError('GenomatrixStream in sdat format requires locus metadata')
 
-    if format=='sdat' and loci is None:
-      raise ValueError('locus metadata are required for ldat streams')
+    materialized = materialized or isinstance(genos, (list,tuple))
 
-    materialized = isinstance(genos, (list,tuple))
-
-    # If materialized, we can supplement our metadata
+    # If materialized, we can supplement our metadata and perform additional
+    # sanity checking
     if materialized:
-      #FIXME: This restriction can be relaxed at some point
-      assert isinstance(genos, (list,tuple)), 'Materialized streams currently support only lists and tuples'
-
       rowlabels = tuple(imap(itemgetter(0),genos))
 
       if format == 'sdat':
         if samples is not None and samples!=rowlabels:
-          raise ValueError('invalid genomatrixstream metadata')
+          raise ValueError('GenomatrixStream row labels do not match samples')
         samples = rowlabels
 
       elif format == 'ldat':
         if loci is not None and loci!=rowlabels:
-          raise ValueError('invalid genomatrixstream metadata')
-        loci    = rowlabels
+          raise ValueError('GenomatrixStream row labels do not match loci')
+        loci = rowlabels
 
     self.format       = format
     self.samples      = samples
@@ -739,7 +730,7 @@ class GenomatrixStream(GenotypeStream):
       self.samples = columns
 
   @staticmethod
-  def from_tuples(genos, format, samples=None, loci=None, unique=False, modelmap=None):
+  def from_tuples(genos, format, samples=None, loci=None, unique=True, modelmap=None):
     '''
     Alternate constructor that builds a new GenomatrixStream object from a
     genotype matrix stream with genotypes in a string format.
@@ -751,11 +742,12 @@ class GenomatrixStream(GenotypeStream):
     else:
       raise ValueError('Invalid genotype matrix format')
 
-    columns,genos = encode_genomatrixstream_from_tuples(columns,genos,format,modelmap=modelmap)
-    return GenomatrixStream(genos, format, samples=samples, loci=loci, unique=unique, packed=True, materialized=False)
+    columns,models,genos = encode_genomatrixstream_from_tuples(columns,genos,format,modelmap=modelmap)
+    return GenomatrixStream(genos, format, samples=samples, loci=loci, unique=unique,
+                                   packed=True, materialized=False)
 
   @staticmethod
-  def from_strings(genos, format, genorepr, samples=None, loci=None, unique=False,
+  def from_strings(genos, format, genorepr, samples=None, loci=None, unique=True,
                packed=False, modelmap=None):
     '''
     Alternate constructor that builds a new GenomatrixStream object from a
@@ -768,8 +760,9 @@ class GenomatrixStream(GenotypeStream):
     else:
       raise ValueError('Invalid genotype matrix format')
 
-    columns,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=modelmap)
-    return GenomatrixStream(genos, format, samples=samples, loci=loci, unique=unique, packed=True, materialized=False)
+    columns,models,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=modelmap)
+    return GenomatrixStream(genos, format, samples=samples, loci=loci, unique=unique,
+                                   packed=True, materialized=False)
 
   def clone(self, genos, **kwargs):
     '''
@@ -856,7 +849,7 @@ class GenomatrixStream(GenotypeStream):
       return self
 
     genos = self.transformed(repack=True)
-    return genos.clone(list(genos), materialized=True)
+    return genos.clone(list(genos.use_stream()), materialized=True)
 
   def transformed(self, transform=None, mergefunc=None, **kwargs):
     '''
@@ -923,8 +916,6 @@ class GenomatrixStream(GenotypeStream):
       rowtransform = transform.samples
       coltransform = transform.loci
 
-    genos = self
-
     # Apply 6 stage transformation process:
     #
     # 1) Row include and exclude
@@ -937,6 +928,8 @@ class GenomatrixStream(GenotypeStream):
     #    o again, update row medatadata
     # 5) Adjust representation
     # 6) Order and repack
+
+    genos = self
 
     # Apply row includes and excludes
     if rowtransform.exclude:
@@ -1090,7 +1083,8 @@ class GenomatrixStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
     '''
-    rows,genos = transpose_generator(self.columns, list(self.transformed(repack=True)))
+    genos = self.materialize()
+    rows,tgenos = transpose_generator(self.columns, genos.use_stream())
 
     assert self.rows is None or all(r1==r2 for r1,r2 in izip(self.rows,rows))
 
@@ -1101,7 +1095,7 @@ class GenomatrixStream(GenotypeStream):
     else:
       format = 'ldat'
 
-    return self.clone(genos, format=format, packed=False, materialized=False)
+    return genos.clone(tgenos, format=format, packed=False, materialized=False)
 
   def as_genotriples(self):
     '''
@@ -1157,10 +1151,10 @@ class GenomatrixStream(GenotypeStream):
     if mergefunc is not None:
       genos = genos.merged(mergefunc)
 
-    if genos.format == 'ldat':
-      return genos
-    else:
-      return genos.transposed()
+    if genos.format != 'ldat':
+      genos = genos.transposed()
+
+    return genos
 
   def as_sdat(self, mergefunc=None):
     '''
@@ -1187,10 +1181,11 @@ class GenomatrixStream(GenotypeStream):
     if mergefunc is not None:
       genos = genos.merged(mergefunc)
 
-    if genos.format == 'sdat':
-      return genos
-    else:
-      return genos.transposed()
+    if genos.format != 'sdat':
+      genos = genos.transposed()
+
+    return genos
+
 
 #######################################################################################
 
@@ -1347,7 +1342,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   ...          ('l2', [(None, None), (None, None),  (None, None)]),
   ...          ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
   ...          ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
-  >>> samples,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',modelmap)
+  >>> samples,models,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',modelmap)
   >>> samples
   ('s1', 's2', 's3')
   >>> for label,row in new_rows:
@@ -1361,7 +1356,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   >>> genos = [('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')]),
   ...          ('s2', [(None, None), (None, None), (None, None), (None, None)]),
   ...          ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])]
-  >>> loci,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
+  >>> loci,models,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for label,row in new_rows:
@@ -1377,7 +1372,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   ...          ('l2', [(None, None), (None, None),  (None, None)]),
   ...          ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
   ...          ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
-  >>> samples,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat')
+  >>> samples,models,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat')
   >>> samples
   ('s1', 's2', 's3')
   >>> for label,row in new_rows:
@@ -1391,7 +1386,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   >>> genos = [('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')]),
   ...          ('s2', [(None, None), (None, None), (None, None), (None, None)]),
   ...          ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])]
-  >>> loci,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
+  >>> loci,models,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for label,row in new_rows:
@@ -1400,71 +1395,67 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   s2 [(None, None), (None, None), (None, None), (None, None)] True
   s3 [('G', 'G'), (None, None), (None, None), ('T', 'T')] True
   '''
-  if modelmap is None and format=='ldat':
+  if modelmap is None:
+    modelmap = {}
+
+  models = []
+
+  if format=='ldat':
     def _load():
       n = len(columns)
 
-      descrcache = {}
-      modelcache = {}
+      def _genokey(genos):
+        gset = set(tuple(sorted(g)) for g in genos)
+        gset.discard( (None,None) )
+        return tuple(sorted(gset))
 
-      for label,row in genos:
-        genotypes = tuple(sorted(set(tuple(sorted(g)) for g in row)))
-
-        descr = descrcache.get(genotypes)
-        if descr is None:
-          model = UnphasedMarkerModel()
-          for g in genotypes:
-            model.add_genotype(g)
-          descr = descrcache[genotypes] = GenotypeArrayDescriptor( [model]*n )
-
-        row = GenotypeArray(descr,row)
-
-        yield label,row
-
-  elif modelmap is None and format=='sdat':
-    def _load():
-      n = len(columns)
-
-      models = [ UnphasedMarkerModel() for c     in columns ]
-      adds   = [ model.add_genotype    for model in models  ]
-      cache  = [ {}                    for c     in columns ]
-      descr = GenotypeArrayDescriptor(models)
-
-      for label,row in genos:
-        row = GenotypeArray(descr,(a(g) for a,g in izip(adds,row)))
-        yield label,row
-
-  elif modelmap is not None and format=='sdat':
-    def _load():
-      n = len(columns)
-      models = [ modelmap[c] for c in columns ]
-
-      descr = GenotypeArrayDescriptor(models)
-      for label,row in genos:
-        row = GenotypeArray(descr,row)
-        yield label,row
-
-  elif modelmap is not None and format=='ldat':
-    def _load():
-      n = len(columns)
-
-      modelcache = {}
+      modelcache = dict( (_genokey(m.genos),m) for m in models )
       descrcache = {}
 
       for label,row in genos:
-        model = modelmap[label]
+        model = modelmap.get(label)
+        if not model:
+          key = _genokey(row)
+          model = modelcache.get(key)
+          if not model:
+            model = modelcache[key] = UnphasedMarkerModel()
+            for g in key:
+              model.add_genotype(g)
 
-        if model not in modelcache:
+        descr = descrcache.get(model)
+        if not descr:
           descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
-        else:
-          descr = descrcache[model]
 
-        row = GenotypeArray(descr,row)
-        yield label,row
+        models.append(model)
+        yield label,GenotypeArray(descr,row)
+
+  elif format=='sdat':
+    n = len(columns)
+    updates = []
+
+    for i,column in enumerate(columns):
+      if column in modelmap:
+        models.append(modelmap[column])
+      else:
+        model = UnphasedMarkerModel()
+        models.append(model)
+        updates.append( (i,model.add_genotype) )
+
+    def _load():
+      descr = GenotypeArrayDescriptor(models)
+
+      if not updates:
+        for label,row in genos:
+          yield label,GenotypeArray(descr,row)
+      else:
+        for label,row in genos:
+          for i,add in updates:
+            add(row[i])
+          yield label,GenotypeArray(descr,row)
   else:
-    raise RuntimeError('Kaboom?')
+    raise ValueError('Uknown format')
 
-  return columns,_load()
+  return columns,models,_load()
 
 
 def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=None):
@@ -1488,11 +1479,12 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   ...          ('l2', ['  ', '',   '  ']),
   ...          ('l3', ['AA', '  ', '  ']),
   ...          ('l4', ['GT', '  ', 'TT'] )]
-  >>> samples,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,modelmap)
+  >>> samples,models,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,modelmap)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in new_rows:
   ...   print row
+
   ('l1', [('A', 'A'), (None, None), ('G', 'G')])
   ('l2', [(None, None), (None, None), (None, None)])
   ('l3', [('A', 'A'), (None, None), (None, None)])
@@ -1502,7 +1494,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   >>> genos = [('s1', ['AA', '  ', 'AA', 'GT']),
   ...          ('s2', ['  ', '',   '  ', '  ']),
   ...          ('s3', ['GG', '  ', '  ', 'TT'])]
-  >>> loci,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp,modelmap)
+  >>> loci,models,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp,modelmap)
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for row in new_rows:
@@ -1516,7 +1508,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   ...          ('l2', ['  ', '',   '  ']),
   ...          ('l3', ['AA', '  ', '  ']),
   ...          ('l4', ['GT', '  ', 'TT'] )]
-  >>> samples,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp)
+  >>> samples,models,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in new_rows:
@@ -1530,7 +1522,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   >>> genos = [('s1', ['AA', '  ', 'AA', 'GT']),
   ...          ('s2', ['  ', '',   '  ', '  ']),
   ...          ('s3', ['GG', '  ', '  ', 'TT'])]
-  >>> loci,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp)
+  >>> loci,models,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp)
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for row in new_rows:
@@ -1539,109 +1531,96 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   ('s2', [(None, None), (None, None), (None, None), (None, None)])
   ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
   '''
-  if modelmap is None and format=='ldat':
-    def _load():
-      n = len(columns)
-      repr  = genorepr.from_string
+  if modelmap is None:
+    modelmap = {}
 
-      descrcache = {}
-      modelcache = {}
+  models = []
 
-      for label,row in genos:
-        genostrs  = set(row)
-        genoreprs = tuple(sorted(genorepr.from_strings(genostrs)))
-
-        descr = descrcache.get(genoreprs)
-        if descr is None:
-          model = UnphasedMarkerModel()
-          for g in genoreprs:
-            model.add_genotype(g)
-          cache = modelcache[genoreprs] = dict( (genorepr.to_string(g),g) for g in model.genotypes )
-          for g in genorepr.missing_geno_strs:
-            cache[g] = model[None,None]
-          descr = descrcache[genoreprs] = GenotypeArrayDescriptor( [model]*n )
-        else:
-          cache = modelcache[genoreprs]
-
-        try:
-          row = GenotypeArray(descr,imap(getitem, repeat(cache), row) )
-        except KeyError:
-          row = GenotypeArray(descr,imap(repr, row))
-
-        yield label,row
-
-  elif modelmap is None and format=='sdat':
+  if format=='ldat':
     def _load():
       n = len(columns)
 
-      models = [ UnphasedMarkerModel() for c     in columns ]
-      adds   = [ model.add_genotype    for model in models  ]
-      cache  = [ {}                    for c     in columns ]
-      descr = GenotypeArrayDescriptor(models)
-
-      repr = genorepr.from_string
-
-      for label,row in genos:
-        try:
-          row = GenotypeArray(descr,imap(getitem, cache, row) )
-        except KeyError:
-          for a,c,g in izip(adds,cache,row):
-            c[g] = a(repr(g))
-          row = GenotypeArray(descr,imap(getitem, cache, row) )
-
-        yield label,row
-
-  elif modelmap is not None and format=='sdat':
-    def _load():
-      n = len(columns)
-
-      modelcache = {}
-      models     = [ modelmap[c]                     for c     in columns ]
-      genocache  = [ modelcache.setdefault(model,{}) for model in models  ]
-      adds       = [ model.add_genotype              for model in models  ]
-
-      for model,cache in modelcache.iteritems():
-        cache.update( (genorepr.to_string(g),g) for g in model.genotypes )
-        for g in genorepr.missing_geno_strs:
-          cache[g] = model[None,None]
-
-      descr = GenotypeArrayDescriptor(models)
+      modelcache  = {}
+      descrcache  = {}
+      strcache    = {}
+      to_string    = genorepr.to_string
+      from_strings = genorepr.from_strings
 
       for label,row in genos:
-        row = GenotypeArray(descr,imap(getitem, genocache, row) )
-        yield label,row
+        model = modelmap.get(label)
+        if not model:
+          key = tuple(sorted(from_strings(set(row))))
+          model = modelcache.get(key)
+          if not model:
+            model = modelcache[key] = UnphasedMarkerModel()
+            for g in key:
+              model.add_genotype(g)
 
-  elif modelmap is not None and format=='ldat':
-    def _load():
-      n = len(columns)
-
-      repr = genorepr.from_string
-
-      modelcache = {}
-      descrcache = {}
-
-      for label,row in genos:
-        model = modelmap[label]
-
-        if model not in modelcache:
-          cache = modelcache[model] = dict( (genorepr.to_string(g),g) for g in model.genotypes )
-          for g in genorepr.missing_geno_strs:
-            cache[g] = model[None,None]
+        descr = descrcache.get(model)
+        if not descr:
           descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
-        else:
-          cache = modelcache[model]
-          descr = descrcache[model]
+
+        cache = strcache.get(model)
+        if cache is None:
+          cache = strcache[model] = dict( (to_string(g),g) for g in model.genotypes )
+          for g in genorepr.missing_geno_strs:
+            cache[g] = model[None,None]
+
+        models.append(model)
 
         try:
-          row = GenotypeArray(descr,imap(getitem, repeat(cache), row) )
+          yield label,GenotypeArray(descr,imap(getitem, repeat(cache), row))
         except KeyError:
-          row = GenotypeArray(descr,imap(repr, row))
+          gset = set(row)
+          cache.update( (g,model[r]) for g,r in izip(gset,from_strings(gset)) )
+          yield label,GenotypeArray(descr,imap(getitem, repeat(cache), row))
+
+  elif format=='sdat':
+    def _load():
+      n = len(columns)
+      updates   = []
+      cachemap  = {}
+      cachelist = []
+
+      to_string    = genorepr.to_string
+      from_strings = genorepr.from_strings
+
+      for i,column in enumerate(columns):
+        if column in modelmap:
+          model = modelmap[column]
+          models.append(model)
+          update = model.get_genotype
+        else:
+          model = UnphasedMarkerModel()
+          update = model.add_genotype
+          models.append(model)
+
+        cache = cachemap.get(model)
+        if cache is None:
+          cache = cachemap[model] = dict( (to_string(g),g) for g in model.genotypes )
+          for g in genorepr.missing_geno_strs:
+            cache[g] = model[None,None]
+
+        cachelist.append(cache)
+        updates.append( (update,cache) )
+
+      repr  = genorepr.from_string
+      descr = GenotypeArrayDescriptor(models)
+
+      for label,row in genos:
+        try:
+          row = GenotypeArray(descr,imap(getitem, cachelist, row) )
+        except KeyError:
+          for (update,cache),gstr,g in izip(updates,row,from_strings(row)):
+            cache[gstr] = update(g)
+          row = GenotypeArray(descr,imap(getitem, cachelist, row) )
 
         yield label,row
-  else:
-    raise RuntimeError('Kaboom?')
 
-  return columns,_load()
+  else:
+    raise ValueError('Uknown format')
+
+  return columns,models,_load()
 
 
 def encode_genotriples_from_tuples(triples,modelmap=None):
@@ -2634,7 +2613,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
 
   if columns is None or not order:
     columns,rows,data = xtab(triples, rowkeyfunc, colkeyfunc, valuefunc, mergefunc)
-    genos = izip(rows,data)
+    genos = tuple(izip(rows,data))
     rows = tuple(rows)
   else:
     columns,genos = rowsby(triples, columns, rowkeyfunc, colkeyfunc, valuefunc, mergefunc)
