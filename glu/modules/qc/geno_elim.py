@@ -25,8 +25,7 @@ from   itertools         import izip,chain
 from   operator          import itemgetter
 
 from   glu.lib.utils     import autofile,hyphen
-from   glu.lib.genoreprs import snp
-from   glu.lib.genodata  import load_genomatrixstream
+from   glu.lib.genolib   import load_genomatrixstream,snp
 
 
 errbylochead1 = ['','LEVEL_1_ERRORS','','LEVEL_2_ERRORS','','LEVEL_3_ERRORS']

@@ -25,11 +25,10 @@ import time
 from   itertools             import izip, groupby
 from   operator              import itemgetter
 
-from   glu.lib.utils         import autofile, hyphen, percent, pair_generator, pick
+from   glu.lib.utils         import percent, pair_generator, pick
+from   glu.lib.fileutils     import autofile, hyphen, load_map
 from   glu.lib.union_find    import union_find
-from   glu.lib.genoreprs     import get_genorepr
-from   glu.lib.genomerge     import get_genomerger
-from   glu.lib.genodata      import load_map, load_genostream
+from   glu.lib.genolib       import load_genostream, get_genorepr, get_genomerger
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
 

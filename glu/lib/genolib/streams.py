@@ -17,19 +17,20 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from   types       import NoneType
-from   operator    import itemgetter, getitem
-from   collections import defaultdict
-from   itertools   import izip,islice,ifilter,imap,chain,groupby,repeat
+from   types             import NoneType
+from   operator          import itemgetter, getitem
+from   collections       import defaultdict
+from   itertools         import izip,islice,ifilter,imap,chain,groupby,repeat
 
-from   utils       import pick,tally,unique
-from   fileutils   import load_list,load_map
-from   imerge      import imerge
-from   xtab        import xtab,rowsby
-from   genomerge   import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
-from   genoarray   import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
-                          model_from_alleles
-from   genoreprs   import snp
+from   glu.lib.utils     import pick,tally,unique
+from   glu.lib.fileutils import load_list,load_map
+from   glu.lib.imerge    import imerge
+from   glu.lib.xtab      import xtab,rowsby
+
+from   reprs             import snp
+from   merge             import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
+from   genoarray         import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
+                                model_from_alleles
 
 
 #FIXME: This function is here to be used as a genorepr when native genotype
@@ -1470,7 +1471,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   @param        genos: genomatrix
   @type         genos: genomatrix generator
 
-  >>> from genoreprs import snp
+  >>> from reprs import snp
   >>> defmodel  = model_from_alleles('ACGT',allow_hemizygote=True)
   >>> modelmap = defaultdict(lambda: defmodel)
 
@@ -1663,7 +1664,7 @@ def encode_genotriples_from_strings(triples,genorepr,modelmap=None):
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
 
-  >>> from genoreprs import snp
+  >>> from reprs import snp
   >>> triples = [('s3', 'l1', 'GG'),('s3', 'l2', 'AA'),
   ...            ('s2', 'l3', 'GT'),('s1', 'l1', 'TT'),
   ...            ('s1', 'l1', 'GG'),('s2', 'l2', 'AA')]
@@ -1940,7 +1941,7 @@ def merge_sorted_genotriples(triples,mergefunc):
   @return         : sorted, merged genotriple stream
   @rtype          : sequence
 
-  >>> from genoreprs import snp
+  >>> from reprs import snp
   >>> triples = [('l1','s1','AA'),('l1','s1','  '),('l1','s2','AB'),('l2','s1','AA'),
   ...            ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
   >>> triples = GenotripleStream.from_strings(triples,snp)
@@ -3628,11 +3629,3 @@ def _test_genodata():
 
 if __name__ == '__main__':
   _test_genodata()
-
-
-###################################################
-#                                                 #
-# IMPORT GENOIO MODULE FOR BACKWARD COMPATIBILITY #
-from genoio import *                              #
-#                                                 #
-###################################################

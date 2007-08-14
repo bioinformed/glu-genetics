@@ -24,11 +24,12 @@ import re
 import sys
 import csv
 
-from   operator         import itemgetter
+from   operator          import itemgetter
 
-from   glu.lib.utils    import autofile, hyphen
-from   glu.lib.xtab     import rowsby
-from   glu.lib.genodata import load_list,load_map,save_genomatrix
+from   glu.lib.utils     import autofile, hyphen
+from   glu.lib.xtab      import rowsby
+from   glu.lib.fileutils import load_list,load_map
+from   glu.lib.genolib   import save_genostream
 
 
 DATA_HEADER = ['SNP Name','Sample ID','Allele1 - Forward','Allele2 - Forward','GC Score','X','Y','X Raw','Y Raw']
@@ -139,9 +140,10 @@ def main():
   data = datastream(genos,options.rowkey,options.colkey,options.datakey)
 
   columns,rows = rowsby(data, columns, itemgetter(0), itemgetter(1), itemgetter(2), merge_genos)
+  genos = GenomatrixStream.from_strings(rows,'ldat',samples=columns,genorepr=snp)
 
   out = hyphen(options.output,sys.stdout)
-  save_genomatrix(out,columns,rows,snp)
+  save_genostream(out,genos,snp)
 
 
 if __name__ == '__main__':

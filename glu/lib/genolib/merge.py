@@ -19,12 +19,12 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   operator       import itemgetter
-from   itertools      import izip,starmap,dropwhile
-from   collections    import defaultdict
+from   operator          import itemgetter
+from   itertools         import izip,starmap,dropwhile
+from   collections       import defaultdict
 
-from   utils          import tally
-from   fileutils      import autofile,hyphen
+from   glu.lib.utils     import tally
+from   glu.lib.fileutils import autofile,hyphen
 
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)

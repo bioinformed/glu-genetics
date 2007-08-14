@@ -19,15 +19,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools             import izip, chain
-from   textwrap              import fill
+from   itertools          import izip, chain
+from   textwrap           import fill
 
-from   glu.lib.utils         import percent
-from   glu.lib.fileutils     import autofile, hyphen
-from   glu.lib.union_find    import union_find
-from   glu.lib.genoreprs     import snp
-from   glu.lib.genodata      import load_map, load_genomatrixstream
-from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
+from   glu.lib.utils      import percent
+from   glu.lib.fileutils  import autofile, hyphen, load_map
+from   glu.lib.union_find import union_find
+from   glu.lib.genolib    import load_genomatrixstream, snp
+from   glu.lib.sections   import save_section, SectionWriter, save_metadata_section
 
 
 try:

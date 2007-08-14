@@ -27,10 +27,9 @@ import sys
 from   operator          import itemgetter
 from   itertools         import islice, chain
 
-from   glu.lib.utils     import autofile
-from   glu.lib.genoreprs import snp
+from   glu.lib.fileutils import autofile, load_map
+from   glu.lib.genolib   import load_genostream, snp
 from   glu.lib.remap     import remap_alleles, remap_category
-from   glu.lib.genodata  import load_genostream, load_map
 from   glu.lib.hwp       import hwp_exact_biallelic
 from   glu.lib.sections  import save_section, SectionWriter, save_metadata_section
 
@@ -253,8 +252,8 @@ def concordance(refgenos,samples,loci,compgenos,sampleeq,locuseq,sampleconcord,l
 
 # FIXME: Move to global sequence representation module
 def make_remap(amap):
-  return dict( ((b1,b2),(c1,c2)) ) for b1,c1 in amap
-                                   for b2,c2 in amap )
+  return dict( ((b1,b2),(c1,c2))  for b1,c1 in amap
+                                  for b2,c2 in amap )
 
 complement_map = 'AT','TA','CG','GC',(None,None)
 

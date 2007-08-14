@@ -19,13 +19,12 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools          import izip
-from   textwrap           import fill
+from   itertools        import izip
+from   textwrap         import fill
 
-from   glu.lib.utils      import percent
-from   glu.lib.genoreprs  import snp
-from   glu.lib.genodata   import load_genomatrixstream
-from   glu.lib.sections   import save_section, SectionWriter, save_metadata_section
+from   glu.lib.utils    import percent
+from   glu.lib.genolib  import load_genomatrixstream, snp
+from   glu.lib.sections import save_section, SectionWriter, save_metadata_section
 
 
 # FIXME: Use an output stream (-o)

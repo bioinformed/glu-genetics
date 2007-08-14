@@ -21,18 +21,19 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import csv
 
-from   operator    import getitem, itemgetter
-from   collections import defaultdict
-from   itertools   import izip,islice,dropwhile,imap,repeat
+from   operator          import getitem, itemgetter
+from   collections       import defaultdict
+from   itertools         import izip,islice,dropwhile,imap,repeat
 
-from   utils       import tally
-from   fileutils   import autofile,namefile,load_table,guess_format
-from   genodata    import GenotripleStream, GenomatrixStream
-from   genoarray   import model_from_alleles
-from   genoreprs   import snp,hapmap,marker
-from   genobinary  import BinaryGenomatrixWriter,BinaryGenotripleWriter,   \
-                          save_genotriples_binary,load_genotriples_binary, \
-                          save_genomatrix_binary, load_genomatrix_binary
+from   glu.lib.utils     import tally
+from   glu.lib.fileutils import autofile,namefile,load_table,guess_format
+
+from   streams           import GenotripleStream, GenomatrixStream
+from   genoarray         import model_from_alleles
+from   reprs             import snp,hapmap,marker
+from   binary            import BinaryGenomatrixWriter,BinaryGenotripleWriter,   \
+                                save_genotriples_binary,load_genotriples_binary, \
+                                save_genomatrix_binary, load_genomatrix_binary
 
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',

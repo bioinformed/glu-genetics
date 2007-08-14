@@ -27,9 +27,8 @@ import csv
 import sys
 from   operator          import itemgetter
 from   glu.lib.utils     import autofile, peekfirst
-from   glu.lib.genoreprs import snp
 from   glu.lib.remap     import remap_alleles, remap_category
-from   glu.lib.genodata  import load_genomatrixstream
+from   glu.lib.genolib   import load_genomatrixstream,snp
 
 
 def align_genotypes(genos1, genos2):

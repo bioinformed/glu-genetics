@@ -25,8 +25,7 @@ import sqlite3
 
 from itertools        import chain,islice
 
-from glu.lib.utils    import autofile,hyphen
-from glu.lib.genodata import load_list
+from glu.lib.fileutils    import autofile,hyphen,load_list
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',

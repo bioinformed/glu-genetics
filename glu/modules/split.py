@@ -27,11 +27,10 @@ __license__   = 'See GLU license for terms by running: glu license'
 import os
 import sys
 
-from   glu.lib.utils     import pick
-from   glu.lib.fileutils import hyphen, load_map
-from   glu.lib.genoreprs import get_genorepr
-from   glu.lib.genoio    import guess_informat, load_genostream, \
-                                TextGenomatrixWriter, TextGenotripleWriter
+from   glu.lib.utils      import pick
+from   glu.lib.fileutils  import hyphen, load_map
+from   glu.lib.genolib    import get_genorepr
+from   glu.lib.genolib.io import load_genostream, TextGenomatrixWriter, TextGenotripleWriter
 
 
 def genomatrix_multiplexer(format, header, matrix, samplegroups, locusgroups,
@@ -465,13 +464,9 @@ def main():
     return
   prefix,suffix = split_fullname(filename,options.destdir)
 
-  format = options.format
-  if format is None:
-    format = guess_informat(args[0])
-
-  genorepr     = get_genorepr(options.genorepr)
-  infile       = hyphen(args[0],sys.stdin)
-  genos        = load_genostream(infile,format,genorepr=genorepr)
+  genorepr = get_genorepr(options.genorepr)
+  infile   = hyphen(args[0],sys.stdin)
+  genos    = load_genostream(infile,format=options.format,genorepr=genorepr)
 
   if genos.format in ('sdat','ldat'):
     matrix_split(genos, genorepr, prefix, suffix, options)

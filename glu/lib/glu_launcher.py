@@ -157,6 +157,8 @@ def main():
     module = __import__('glu.modules.' + modulename, fromlist=['main'])
   except ImportError:
     sys.stderr.write('Unable to import module %s.  Please verify module name and try again.\n' % modulename)
+    if glu_options.verbose:
+      sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
     return
 
   try:

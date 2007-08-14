@@ -26,9 +26,7 @@ from   operator             import itemgetter
 
 from   glu.lib.utils        import autofile,hyphen
 from   glu.lib.sections     import read_sections
-from   glu.lib.genodata     import save_genostream, GenomatrixStream, \
-                                   guess_informat_list, guess_outformat
-from   glu.lib.genoreprs    import snp
+from   glu.lib.genolib      import save_genostream, GenomatrixStream
 from   glu.lib.sequence     import norm_snp_seq, complement_base
 
 
@@ -187,7 +185,7 @@ def build_abmap(loci,usermap):
     abmap[locus,'A'] = a,a
     abmap[locus,'B'] = b,b
     abmap[locus,'H'] = a,b
-    abmap[locus,'U'] = None
+    abmap[locus,'U'] = None,None
   return abmap
 
 
@@ -227,14 +225,6 @@ def main():
   if options.output == '-' and not options.outformat:
     options.outformat = 'sdat'
 
-  if not options.outformat:
-    options.outformat = guess_outformat(options.output)
-
-  if not options.outformat:
-    parser.print_help()
-    print >> sys.stderr, 'Error: Output data format must be specified'
-    return
-
   user_abmap = {}
   if options.manifest:
     print >> sys.stderr, 'Processing Illumina manifest file...',
@@ -259,9 +249,9 @@ def main():
 
   abmap   = build_abmap(loci,user_abmap)
   samples = convert_ab_genos(loci, samples, abmap)
-  genos   = GenomatrixStream(samples, 'sdat', loci=loci, snp)
+  genos   = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci)
 
-  save_genostream(hyphen(options.output,sys.stdout),genos,options.outformat)
+  save_genostream(hyphen(options.output,sys.stdout),genos)
 
 
 if __name__ == '__main__':

@@ -23,8 +23,7 @@ from   textwrap              import fill
 
 from   glu.lib.utils         import percent
 from   glu.lib.fileutils     import autofile, hyphen, load_list
-from   glu.lib.genoreprs     import snp
-from   glu.lib.genodata      import load_genomatrixstream
+from   glu.lib.genolib       import load_genomatrixstream,snp
 from   glu.lib.hwp           import hwp_exact_biallelic, hwp_chisq_biallelic, count_genos
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 

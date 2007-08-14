@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 '''
-File:          transform2.py
+File:          maf.py
 
-Authors:       Brian Staats  (staatsb@mail.nih.gov)
-               Xiang Deng      (dengx@mail.nih.gov)
-               Jun Lu          (lujun@mail.nih.gov)
-               Kevin Jacobs (jacobske@bioinformed.com)
+Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
 Created:       2006-06-29
 
@@ -22,11 +19,10 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   operator              import itemgetter
+from   operator        import itemgetter
 
-from   glu.lib.utils         import autofile,hyphen,tally
-from   glu.lib.genoreprs     import get_genorepr
-from   glu.lib.genodata      import load_genostream, guess_informat_list, guess_outformat
+from   glu.lib.utils   import autofile,hyphen,tally
+from   glu.lib.genolib import load_genostream, get_genorepr
 
 
 def option_parser():
@@ -41,10 +37,8 @@ def option_parser():
                     help='The file input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
   ioopts.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of transformed data (default is "-" for standard out)')
-
   ioopts.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
-
   ioopts.add_option('-l', '--limit', dest='limit', metavar='N', type='int', default=None,
                     help='Limit the number of rows of data to N for testing purposes')
 
@@ -73,9 +67,6 @@ def main():
   if not args:
     parser.print_help()
     return
-
-  if not options.format:
-    options.format = guess_informat_list(args)
 
   genorepr  = get_genorepr(options.genorepr)
 

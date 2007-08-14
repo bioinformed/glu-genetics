@@ -30,7 +30,7 @@ from   scipy          import stats
 
 from   utils          import tally,pick
 from   fileutils      import autofile,namefile,load_list,load_map,load_table
-from   genodata       import load_genostream
+from   genolib        import load_genostream
 
 
 def contingency_table_indicators(ys,gs):
