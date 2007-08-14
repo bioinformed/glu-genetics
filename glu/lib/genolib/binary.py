@@ -101,10 +101,10 @@ class BinaryGenomatrixWriter(object):
     ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
     '''
     if format not in ('ldat','sdat'):
-      raise ValueError('format must be either ldat or sdat')
+      raise IOError('format must be either ldat or sdat')
 
     if compressed_filename(filename):
-      raise ValueError('Binary genotype files must not have a compressed extension')
+      raise IOError('Binary genotype files must not have a compressed extension')
 
     self.filename = filename
     self.format   = format
@@ -268,7 +268,7 @@ class BinaryGenomatrixWriter(object):
     '''
     Destructor to close the writer cleanly if it has yet to be closed
     '''
-    if self.state == OPEN:
+    if getattr(self,'state',None) == OPEN:
       self.close()
 
 
@@ -311,7 +311,7 @@ class BinaryGenotripleWriter(object):
     @param    chunksize: size of chunks to write/compress in bytes
     '''
     if compressed_filename(filename):
-      raise ValueError('Binary genotype files must not have a compressed extension')
+      raise IOError('Binary genotype files must not have a compressed extension')
 
     # Initialize self.gfile in case the next statement fails for __del__
     self.gfile = None
@@ -494,7 +494,7 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
   ('s2', 'l2', ('C', 'C'))
   '''
   if compressed_filename(filename):
-    raise ValueError('Binary genotype files must not have a compressed extension')
+    raise IOError('Binary genotype files must not have a compressed extension')
 
   gfile = tables.openFile(filename,mode='r')
   format = gfile.root._v_attrs.format
