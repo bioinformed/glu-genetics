@@ -19,14 +19,14 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-__all__ = ['Genotype','UnphasedGenotypeModel','GenotypeArray','GenotypeError']
+__all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeError','GenotypeArrayDescriptor']
 
 
 class GenotypeError(ValueError): pass
 
 
 try:
-  from   _genoarray import GenotypeArray, Genotype, GenotypeArrayDescriptor,UnphasedMarkerModel
+  from   _genoarray import GenotypeArray, Genotype, GenotypeArrayDescriptor, UnphasedMarkerModel
 
 except ImportError:
   from   array     import array
