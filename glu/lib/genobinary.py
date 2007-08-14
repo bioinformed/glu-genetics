@@ -22,6 +22,11 @@ __all__ = ['BinaryGenomatrixWriter','BinaryGenotripleWriter',
            'save_genotriples_binary','load_genotriples_binary',
            'save_genomatrix_binary', 'load_genomatrix_binary']
 
+# Temporary hack to ensure that we import the local GLU tree
+if __name__ == '__main__':
+  import sys
+  sys.path.insert(0,'../..')
+
 import time
 
 from   operator    import itemgetter
@@ -30,6 +35,7 @@ from   itertools   import izip,groupby,imap
 import tables
 
 from   utils       import ilen
+from   fileutils   import compressed_filename
 from   genodata    import GenomatrixStream, GenotripleStream
 from   genoarray   import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
@@ -100,6 +106,9 @@ class BinaryGenomatrixWriter(object):
     '''
     if format not in ('ldat','sdat'):
       raise ValueError('format must be either ldat or sdat')
+
+    if compressed_filename(filename):
+      raise ValueError('Binary genotype files must not have a compressed extension')
 
     self.filename = filename
     self.format   = format
@@ -263,7 +272,7 @@ class BinaryGenomatrixWriter(object):
     '''
     Destructor to close the writer cleanly if it has yet to be closed
     '''
-    if self.state in (NOTOPEN,OPEN):
+    if self.state == OPEN:
       self.close()
 
 
@@ -305,6 +314,12 @@ class BinaryGenotripleWriter(object):
     @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @param    chunksize: size of chunks to write/compress in bytes
     '''
+    if compressed_filename(filename):
+      raise ValueError('Binary genotype files must not have a compressed extension')
+
+    # Initialize self.gfile in case the next statement fails for __del__
+    self.gfile = None
+
     self.gfile = tables.openFile(filename,mode='w')
     self.gfile.root._v_attrs.format = 'genotriple'
 
@@ -482,6 +497,9 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
+  if compressed_filename(filename):
+    raise ValueError('Binary genotype files must not have a compressed extension')
+
   gfile = tables.openFile(filename,mode='r')
   format = gfile.root._v_attrs.format
 
@@ -773,6 +791,9 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
   ('l2', [(None, None), ('C', 'T'), ('C', 'T')])
   ('l3', [('T', 'T'), ('G', 'T'), ('G', 'G')])
   '''
+  if compressed_filename(filename):
+    raise ValueError('Binary genotype files must not have a compressed extension')
+
   gfile = tables.openFile(filename,mode='r')
   format_found = gfile.root._v_attrs.format
 
@@ -951,6 +972,8 @@ def test(descr,filename,command,genotypes):
 
 def main():
   from   random    import shuffle
+
+  from   utils     import ilen
   from   genoreprs import snp
   from   genoio    import load_genostream, save_genostream
 
@@ -960,7 +983,7 @@ def main():
     matrix = load_genostream(f,'hapmap').materialize()
     format = 'hapmap'
   else:
-    f = '/home/jacobske/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_CASE_22.ldat.gz'
+    f = '/home/jacobske/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_CASE.ldat.gz'
     matrix = load_genostream(f,genorepr=snp).materialize()
     format = matrix.format
 

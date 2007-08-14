@@ -121,14 +121,34 @@ def namefile(filething):
 _autofile_errors = (ImportError,ValueError,OSError)
 
 
+def compressed_filename(filename):
+  '''
+  >>> compressed_filename('subjects.sdat')
+  ''
+  >>> compressed_filename('subjects.sdat.gz')
+  'gz'
+  >>> compressed_filename('../subjects.sdat')
+  ''
+  >>> compressed_filename('../subjects.sdat.gz')
+  'gz'
+  '''
+  if not isstr(filename):
+    return ''
+
+  filename = os.path.expanduser(filename)
+  parts = os.path.basename(filename).split('.')
+  if parts and parts[-1] in COMPRESSED_SUFFIXES:
+    return parts[-1]
+  return ''
+
+
 def autofile(filename, mode='r'):
   # Pass non-string filename objects back as file-objects
   if not isstr(filename):
     return filename
 
   filename = os.path.expanduser(filename)
-  parts = os.path.basename(filename).split('.')
-  if parts and parts[-1] in COMPRESSED_SUFFIXES:
+  if compressed_filename(filename):
     try:
       f = OSGzipFile_popen(filename, mode)
     except _autofile_errors:
