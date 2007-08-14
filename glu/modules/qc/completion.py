@@ -23,7 +23,7 @@ from   itertools        import izip
 from   textwrap         import fill
 
 from   glu.lib.utils    import percent
-from   glu.lib.genolib  import load_genomatrixstream, snp
+from   glu.lib.genolib  import load_genostream, snp
 from   glu.lib.sections import save_section, SectionWriter, save_metadata_section
 
 
@@ -205,18 +205,17 @@ def main():
     parser.print_help()
     return
 
-  genos  = load_genomatrixstream(args[0],options.format,snp)
-  format = genos.format
+  genos  = load_genostream(args[0],options.format,snp)
 
-  if format=='sdat':
+  if format not in ('sdat','ldat'):
+    genos = genos.as_ldat()
+
+  if genos.format=='sdat':
     rowlabel='Sample'
     collabel='Loci'
-  elif format=='ldat':
+  elif genos.format=='ldat':
     rowlabel='Loci'
     collabel='Samples'
-  else:
-    rowlabel='Rows'
-    collabel='Columns'
 
   results,rowresults,colresults = completion(genos, options.droppedrows, options.droppedcols)
 

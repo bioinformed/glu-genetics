@@ -28,7 +28,7 @@ import sys
 from   operator          import itemgetter
 from   glu.lib.utils     import autofile, peekfirst
 from   glu.lib.remap     import remap_alleles, remap_category
-from   glu.lib.genolib   import load_genomatrixstream,snp
+from   glu.lib.genolib   import load_genostream,snp
 
 
 def align_genotypes(genos1, genos2):
@@ -88,8 +88,8 @@ def main():
     parser.print_help()
     return
 
-  test           = load_genomatrixstream(args[0], options.testformat).as_ldat()
-  reference      = load_genomatrixstream(args[1], options.refformat).as_ldat()
+  test           = load_genostream(args[0], options.testformat).as_ldat()
+  reference      = load_genostream(args[1], options.refformat).as_ldat()
   test,reference = align_genotypes(test,reference)
   concordance(test,reference)
 

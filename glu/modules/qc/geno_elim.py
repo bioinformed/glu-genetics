@@ -25,7 +25,7 @@ from   itertools         import izip,chain
 from   operator          import itemgetter
 
 from   glu.lib.utils     import autofile,hyphen
-from   glu.lib.genolib   import load_genomatrixstream,snp
+from   glu.lib.genolib   import load_genostream,snp
 
 
 errbylochead1 = ['','LEVEL_1_ERRORS','','LEVEL_2_ERRORS','','LEVEL_3_ERRORS']
@@ -646,7 +646,7 @@ def main():
     parser.print_help()
     return
 
-  genos = iter(load_genomatrixstream(options.genofile,snp).as_ldat())
+  genos = iter(load_genostream(options.genofile,snp).as_ldat())
   individuals = genos.next()
 
   if options.errdetails:
