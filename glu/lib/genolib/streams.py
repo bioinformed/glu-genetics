@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          genodata.py
+File:          streams.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
@@ -20,7 +20,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 from   types             import NoneType
 from   operator          import itemgetter, getitem
 from   collections       import defaultdict
-from   itertools         import izip,islice,ifilter,imap,chain,groupby,repeat
+from   itertools         import izip,ifilter,imap,chain,groupby,repeat
 
 from   glu.lib.utils     import pick,tally,unique
 from   glu.lib.fileutils import load_list,load_map
@@ -28,35 +28,55 @@ from   glu.lib.imerge    import imerge
 from   glu.lib.xtab      import xtab,rowsby
 
 from   reprs             import snp
+from   transform         import GenoTransform, prove_unique_transform
 from   merge             import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
 from   genoarray         import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
                                 model_from_alleles
 
-
-#FIXME: This function is here to be used as a genorepr when native genotype
-#       strings are required.  However, it may move to glu.lib.utils.
-def intern_list(seq):
-  '''
-  A string list functor that automatically interns all elements passed to it
-
-  >>> l  = ['a','b','c','d']
-  >>> l1 = intern_list( c+c for c in l )   # Ensure strings are not shared
-  >>> l2 = intern_list( c+c for c in l )   # local constants
-  >>> all( s1 is s2 is intern(s1) for s1,s2 in izip(l1,l2) )
-  True
-  >>> l1 = list( c+c for c in l )          # Ensure strings are not shared
-  >>> l2 = list( c+c for c in l )          # local constants
-  >>> all( s1 is s2 is intern(s1) for s1,s2 in izip(l1,l2) )
-  False
-  '''
-  return list(imap(intern,seq))
-
-
-#######################################################################################
-
-
 class GenotypeStream(object):
   __slots__ = []
+  def __init__(self, stream):
+    self.__private_stream_do_not_touch = stream
+
+  def __iter__(self):
+    '''
+    Returns the embedded genotriple stream and marks it as used (ie
+    unavailable for further operations) if not already used.  Otherwise,
+    raises a RuntimeError exception.
+
+    @return: genotriple stream
+    @rtype :  sequence of sample, locus, and genotype
+    '''
+    return iter(self.use_stream())
+
+  def used_stream(self):
+    '''
+    Returns True if the genotriple stream has been used as an iterable and is
+    thus no longer available.  Otherwise, returns False.
+
+    @return: availability of the genotriple stream
+    @rtype : bool
+    '''
+    return self.__private_stream_do_not_touch is None
+
+  def use_stream(self):
+    '''
+    Returns the embedded genotriple stream and marks it as used (ie
+    unavailable for further operations) if not already used.  Otherwise,
+    raises a RuntimeError exception.
+
+    @return: genotriple stream
+    @rtype :  sequence of sample, locus, and genotype
+    '''
+    if self.used_stream():
+      raise RuntimeError, 'Genotriple stream already used'
+
+    if not self.materialized:
+      self.__private_stream_do_not_touch,genos = None,self.__private_stream_do_not_touch
+    else:
+      genos = self.__private_stream_do_not_touch
+
+    return genos
 
 
 class GenotripleStream(GenotypeStream):
@@ -65,7 +85,8 @@ class GenotripleStream(GenotypeStream):
   '''
   format = 'genotriple'
 
-  def __init__(self, triples, samples=None, loci=None, order=None, unique=False, materialized=False):
+  def __init__(self, triples, samples=None, loci=None, models=None, order=None,
+                              unique=False, materialized=False):
     '''
     Create a new GenotripleStream object
 
@@ -101,6 +122,8 @@ class GenotripleStream(GenotypeStream):
     if order not in (None,'locus','sample'):
       raise ValueError('invalid GenotripleStream order specified')
 
+    GenotypeStream.__init__(self, triples)
+
     if not isinstance(samples,(NoneType,set)):
       samples = set(samples)
 
@@ -110,10 +133,9 @@ class GenotripleStream(GenotypeStream):
     self.samples      = samples
     self.loci         = loci
     self.order        = order
+    self.models       = models
     self.unique       = bool(unique)
     self.materialized = materialized or isinstance(triples, (list,tuple))
-
-    self.__private_triples_do_not_touch = triples
 
   @staticmethod
   def from_streams(genos, mergefunc=None, order=None):
@@ -186,7 +208,7 @@ class GenotripleStream(GenotypeStream):
     sequence of triples with genotypes in tuple
     '''
     triples = encode_genotriples_from_tuples(triples, modelmap)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, models=modelmap, unique=unique)
 
   @staticmethod
   def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False, modelmap=None):
@@ -195,7 +217,7 @@ class GenotripleStream(GenotypeStream):
     sequence of triples with genotypes in a string format
     '''
     triples = encode_genotriples_from_strings(triples, genorepr, modelmap)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, models=modelmap, unique=unique)
 
   def clone(self, triples, **kwargs):
     '''
@@ -216,51 +238,11 @@ class GenotripleStream(GenotypeStream):
     kwargs.setdefault('samples',      self.samples)
     kwargs.setdefault('loci',         self.loci)
     kwargs.setdefault('order',        self.order)
+    kwargs.setdefault('models',       self.models)
     kwargs.setdefault('unique',       self.unique)
     kwargs.setdefault('materialized', self.materialized)
 
     return GenotripleStream(triples, **kwargs)
-
-  def __iter__(self):
-    '''
-    Returns the embedded genotriple stream and marks it as used (ie
-    unavailable for further operations) if not already used.  Otherwise,
-    raises a RuntimeError exception.
-
-    @return: genotriple stream
-    @rtype :  sequence of sample, locus, and genotype
-    '''
-    return iter(self.use_stream())
-
-  def used_stream(self):
-    '''
-    Returns True if the genotriple stream has been used as an iterable and is
-    thus no longer available.  Otherwise, returns False.
-
-    @return: availability of the genotriple stream
-    @rtype : bool
-    '''
-    return self.__private_triples_do_not_touch is None
-
-  def use_stream(self):
-    '''
-    Returns the embedded genotriple stream and marks it as used (ie
-    unavailable for further operations) if not already used.  Otherwise,
-    raises a RuntimeError exception.
-
-    @return: genotriple stream
-    @rtype :  sequence of sample, locus, and genotype
-    '''
-
-    if self.used_stream():
-      raise RuntimeError, 'Genotriple stream already used'
-
-    if not self.materialized:
-      self.__private_triples_do_not_touch,triples = None,self.__private_triples_do_not_touch
-    else:
-      triples = self.__private_triples_do_not_touch
-
-    return triples
 
   def materialize(self):
     '''
@@ -556,8 +538,8 @@ class GenomatrixStream(GenotypeStream):
   '''
   A stream of genomatrix by sample or locus with optional metadata
   '''
-  def __init__(self, genos, format, samples=None, loci=None, unique=True,
-                                    materialized=False, packed=False):
+  def __init__(self, genos, format, samples=None, loci=None, models=None,
+                     unique=True, materialized=False, packed=False):
     '''
     Create a new GenomatrixStream object
 
@@ -596,9 +578,10 @@ class GenomatrixStream(GenotypeStream):
                          compressed array format
     @type        packed: bool
     '''
-
     if format not in ('sdat','ldat'):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
+
+    GenotypeStream.__init__(self, genos)
 
     if loci and not isinstance(loci,tuple):
       loci = tuple(loci)
@@ -633,11 +616,10 @@ class GenomatrixStream(GenotypeStream):
     self.format       = format
     self.samples      = samples
     self.loci         = loci
+    self.models       = models
     self.unique       = unique
     self.materialized = materialized
     self.packed       = packed
-
-    self.__private_genos_do_not_touch = genos
 
   @staticmethod
   def from_streams(genos, format, mergefunc=None):
@@ -744,8 +726,8 @@ class GenomatrixStream(GenotypeStream):
       raise ValueError('Invalid genotype matrix format')
 
     columns,models,genos = encode_genomatrixstream_from_tuples(columns,genos,format,modelmap=modelmap)
-    return GenomatrixStream(genos, format, samples=samples, loci=loci, unique=unique,
-                                   packed=True, materialized=False)
+    return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
+                                   unique=unique, packed=True, materialized=False)
 
   @staticmethod
   def from_strings(genos, format, genorepr, samples=None, loci=None, unique=True,
@@ -762,8 +744,8 @@ class GenomatrixStream(GenotypeStream):
       raise ValueError('Invalid genotype matrix format')
 
     columns,models,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=modelmap)
-    return GenomatrixStream(genos, format, samples=samples, loci=loci, unique=unique,
-                                   packed=True, materialized=False)
+    return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
+                                   unique=unique, packed=True, materialized=False)
 
   def clone(self, genos, **kwargs):
     '''
@@ -784,55 +766,15 @@ class GenomatrixStream(GenotypeStream):
     kwargs.setdefault('format',       self.format)
     kwargs.setdefault('samples',      self.samples)
     kwargs.setdefault('loci',         self.loci)
+    kwargs.setdefault('models',       self.models)
     kwargs.setdefault('unique',       self.unique)
     kwargs.setdefault('materialized', self.materialized)
     kwargs.setdefault('packed',       self.packed)
 
     return GenomatrixStream(genos, **kwargs)
 
-  def __iter__(self):
-    '''
-    Returns the embedded genomatrix stream and marks it as used (ie
-    unavailable for further operations) if not already used.  Otherwise,
-    raises a RuntimeError exception.
-
-    @return: genomatrix stream
-    @rtype : sequence of sample, locus, and genotype
-    '''
-    return iter(self.use_stream())
-
-  def used_stream(self):
-    '''
-    Returns True if the genomatrix stream has been used as an iterable and is
-    thus no longer available.  Otherwise, returns False.
-
-    @return: availability of the genotriple stream
-    @rtype : bool
-    '''
-    return self.__private_genos_do_not_touch is None
-
-  def use_stream(self):
-    '''
-    Returns the embedded genomatrix stream and marks it as used (ie
-    unavailable for further operations) if not already used.  Otherwise,
-    raises a RuntimeError exception.
-
-    @return: genomatrix stream
-    @rtype : sequence of sample, locus, and genotype
-    '''
-    if self.used_stream():
-      raise RuntimeError, 'Genomatrix stream already used'
-
-    if not self.materialized:
-      self.__private_genos_do_not_touch,genos = None,self.__private_genos_do_not_touch
-    else:
-      genos = self.__private_genos_do_not_touch
-
-    return genos
-
   rows    = property(_get_rows,   _set_rows)
   columns = property(_get_columns,_set_columns)
-  genos   = property(use_stream)
 
   def materialize(self):
     '''
@@ -944,7 +886,7 @@ class GenomatrixStream(GenotypeStream):
     if coltransform.include is not None:
       genos = filter_genomatrixstream_by_column(genos,coltransform.include)
 
-    unique = prove_unique_transform(transform=transform,loci=genos.loci,samples=genos.samples,unique=genos.unique)
+    genos.unique = prove_unique_transform(transform=transform,loci=genos.loci,samples=genos.samples,unique=genos.unique)
 
     # Apply renamings
     if rowtransform.rename:
@@ -1018,13 +960,10 @@ class GenomatrixStream(GenotypeStream):
 
     genos = self
     if roworder is not None:
-      genos = genos.transformed(repack=True)
+      genos = reorder_genomatrixstream_rows(genos,roworder)
 
     if columnorder is not None:
       genos = reorder_genomatrixstream_columns(genos,columnorder)
-
-    if roworder is not None:
-      genos = reorder_genomatrixstream_rows(genos,roworder)
 
     return genos
 
@@ -1045,8 +984,7 @@ class GenomatrixStream(GenotypeStream):
       mergefunc = mergefunc_transpose_adapter(mergefunc)
 
     if merge_rows:
-      # Pack, since merge will materialize
-      genos = merge_genomatrixstream(self.transformed(repack=True), mergefunc)
+      genos = merge_genomatrixstream(self, mergefunc)
     else:
       genos = merge_genomatrixstream_columns(self, mergefunc)
 
@@ -1085,13 +1023,9 @@ class GenomatrixStream(GenotypeStream):
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
     '''
     genos = self.materialize()
-    rows,tgenos = transpose_generator(self.columns, genos.use_stream())
+    rows,tgenos = transpose_generator(genos.columns, genos.use_stream())
 
-    assert self.rows is None or all(r1==r2 for r1,r2 in izip(self.rows,rows))
-
-    self.rows = tuple(rows)
-
-    if self.format == 'ldat':
+    if genos.format == 'ldat':
       format = 'sdat'
     else:
       format = 'ldat'
@@ -1190,135 +1124,6 @@ class GenomatrixStream(GenotypeStream):
 
 #######################################################################################
 
-list_type = (NoneType,set,dict,list,tuple)
-map_type  = (NoneType,dict)
-
-
-class GenoTransform(object):
-  '''
-  Create a GenoTransform object to specify various transformation on the genodata.
-  Supported operations: include/exclude/rename samples or loci; optional filter to remove missing genotypes
-  '''
-  def __init__(self, include_samples, exclude_samples, rename_samples, order_samples,
-                     include_loci,    exclude_loci,    rename_loci,    order_loci,
-                     rename_alleles=None, filter_missing=False, repack=False):
-    '''
-    Create a new GenoTransform object with supplied metadata,
-    which are used to specify all the operations of transforming the genostream
-    and thus must be accurate or else incorrect results are virtually guaranteed.
-    When in doubt, do not specify them, as each algorithm can compensate.
-
-    @param include_samples: filter samples such that they must appear in the set (optional)
-    @type  include_samples: set
-    @param exclude_samples: filter samples such that they must not appear in the set (optional)
-    @type  exclude_samples: set
-    @param    include_loci: filter loci such that they must appear in the set (optional)
-    @type     include_loci: set
-    @param    exclude_loci: filter loci such that they must not appear in the set (optional)
-    @type     exclude_loci: set
-    @param  rename_samples: rename any samples that appear in the supplied dictionary to the
-                            associated value (optional)
-    @type   rename_samples: dict from str -> str
-    @param     rename_loci: rename any loci that appear in the supplied dictionary to the
-                            associated value (optional)
-    @type      rename_loci: dict from str -> str
-    @param   order_samples: reorder samples such based on the order of the supplied list (optional)
-    @type    order_samples: list
-    @param      order_loci: reorder loci such based on the order of the supplied list (optional)
-    @type       order_loci: list
-    @param  rename_alleles: rename alleles from any loci and allele name to new allele name
-    @type   rename_alleles: dict from str -> old_allele str -> new_allele str
-    @param  filter_missing: filter missing genotypes from the stream
-    @type   filter_missing: bool
-    @param          repack: trigger repacking of genotypes to ensure that the most compact storage
-                            method is used
-    @type           repack: bool
-    @return               : transformed genotriple stream
-    @rtype                : GenotripleStream
-    '''
-    self.samples = GenoSubTransform(include_samples, exclude_samples, rename_samples, order_samples)
-    self.loci    = GenoSubTransform(include_loci,    exclude_loci,    rename_loci,    order_loci)
-
-    if not isinstance(rename_alleles, map_type):
-      rename_alleles = load_rename_alleles_file(rename_alleles)
-
-    self.filter_missing_genotypes = filter_missing
-    self.rename_alleles           = rename_alleles
-    self.repack                   = repack
-
-  @staticmethod
-  def from_options(options):
-    '''
-    Create a new GenoTransform object from command line option list
-
-    @return: transformed genotriple stream
-    @rtype : GenotripleStream
-    '''
-    return GenoTransform(options.includesamples, options.excludesamples, options.renamesamples, options.ordersamples,
-                         options.includeloci,    options.excludeloci,    options.renameloci,    options.orderloci,
-                         rename_alleles=options.renamealleles, filter_missing=options.filtermissing)
-
-  @staticmethod
-  def from_kwargs(**kwargs):
-    '''
-    Create a new GenoTransform object from key word arguments
-
-    @return: transformed genotriple stream
-    @rtype : GenotripleStream
-    '''
-    transform = GenoTransform(include_samples=kwargs.pop('include_samples',None),
-                              exclude_samples=kwargs.pop('exclude_samples',None),
-                               rename_samples=kwargs.pop('rename_samples', None),
-                                order_samples=kwargs.pop('order_samples',  None),
-                                 include_loci=kwargs.pop('include_loci',   None),
-                                 exclude_loci=kwargs.pop('exclude_loci',   None),
-                                  rename_loci=kwargs.pop('rename_loci',    None),
-                                   order_loci=kwargs.pop('order_loci',     None),
-                               filter_missing=kwargs.pop('filter_missing', False),
-                                       repack=kwargs.pop('repack',         False),
-                               rename_alleles=kwargs.pop('rename_alleles', None))
-
-    if kwargs:
-      raise TypeError, "'%s' is an invalid keyword argument for this function" % kwargs.popitem()[0]
-
-    return transform
-
-
-class GenoSubTransform(object):
-  '''
-  A GenoSubTransform object with metadata related to samples or loci transformation
-  '''
-  def __init__(self, include, exclude, rename, order):
-    '''
-    Create a new GenoSubTransform object
-
-    @param include: filter samples/loci such that they must appear in the set (optional)
-    @type  include: set
-    @param exclude: filter samples/loci such that they must not appear in the set (optional)
-    @type  exclude: set
-    @param  rename: rename any samples/loci that appear in the supplied dictionary to the
-                            associated value (optional)
-    @type   rename: dict from str -> str
-    '''
-    if not isinstance(include, list_type):
-      include = set(load_list(include))
-
-    if not isinstance(exclude, list_type):
-      exclude = set(load_list(exclude))
-
-    if not isinstance(rename, map_type):
-      rename  = load_map(rename)
-
-    if not isinstance(order, list_type):
-      order = load_list(order)
-
-    self.include = include
-    self.exclude = exclude
-    self.rename  = rename
-    self.order   = order
-
-
-#######################################################################################
 
 def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   '''
@@ -1333,7 +1138,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   @return            : tuple of columns and a genomatrix generator in packed format
   @rtype             : 2-tuple of list of str and genomatrix generator
 
-  >>> defmodel  = model_from_alleles('ACGT',allow_hemizygote=True)
+  >>> defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
   >>> modelmap = defaultdict(lambda: defmodel)
 
   With modelmap:
@@ -1410,7 +1215,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
         gset.discard( (None,None) )
         return tuple(sorted(gset))
 
-      modelcache = dict( (_genokey(m.genos),m) for m in models )
+      modelcache = dict( (_genokey(m.genotypes),m) for m in models )
       descrcache = {}
 
       for label,row in genos:
@@ -1485,7 +1290,6 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   ('s1', 's2', 's3')
   >>> for row in new_rows:
   ...   print row
-
   ('l1', [('A', 'A'), (None, None), ('G', 'G')])
   ('l2', [(None, None), (None, None), (None, None)])
   ('l3', [('A', 'A'), (None, None), (None, None)])
@@ -2015,13 +1819,13 @@ def merge_genomatrixstream_columns(genos, mergefunc):
   assert mergefunc is not None
 
   merge_indices = defaultdict(list)
+  merge_models  = defaultdict(list)
   new_columns   = []
 
   for i,column in enumerate(genos.columns):
     if column not in merge_indices:
       new_columns.append(column)
     merge_indices[column].append(i)
-
   new_columns = tuple(new_columns)
 
   # Trivial path: no merge is needed
@@ -2229,6 +2033,11 @@ def merge_genomatrixstream(genos, mergefunc):
 
   new_columns = tuple(new_columns)
 
+  # FIXME: Check if merging is needed
+
+  # Repack, since we're about to materialize
+  genos = genos.transformed(repack=True)
+
   new_rows   = []
 
   def _merger():
@@ -2411,88 +2220,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
     new_genos = genos[0].clone(_merger(),loci=new_columns,samples=new_rows,packed=False,materialized=False,unique=True)
 
   return new_genos
-
-
-#######################################################################################
-
-
-def prove_bijective_mapping(items,transform):
-  '''
-  Construct the minimal sample reverse map by removing excluded items
-  to verify that no two map to the same identifier.
-
-  @param     items: sequence of samples/loci if known, otherwise None
-  @type      items: sequence of str or None
-  @param transform: transformation object
-  @type  transform: GenoTransform object
-  @return         : uniqueness of the mapping
-  @rtype          : bool
-
-  >>> samples = ['s1', 'ns1', 's2','s3']
-  >>> loci = ['l1','l2','l3','l4']
-  >>> rename_samples = {'s1':'ns1','s2':'ns2','s3':'ns3'}
-  >>> include_samples = ['s1', 'ns1', 's2']
-  >>> rename_loci = {'l1':'nl1','l2':'nl2','l3':'nl3','l4':'nl4'}
-  >>> include_loci = ['l1','l2','l3']
-  >>> transform = GenoTransform(include_samples, None, rename_samples,None,include_loci,None,rename_loci,None)
-  >>> prove_bijective_mapping(samples,transform.samples)
-  False
-  >>> prove_bijective_mapping(loci,transform.loci)
-  True
-  '''
-  # Construct the minimal sample reverse map by removing excluded items
-  # and verify that no two items map to the same identifier.
-  if not transform.rename:
-    return True
-
-  # Cannot prove uniqueness when a renaming without knowing the universe of
-  # possible items
-  if items is None and transform.include is None:
-    return False
-  elif items is not None and transform.include is not None:
-    items = set(items) & set(transform.include)
-  elif transform.include is not None:
-    items = set(transform.include)
-
-  # Construct the minimal sample reverse map by removing excluded items
-  # to verify that no two map to the same identifier.
-  reverse_map = {}
-  for item in items:
-    renamed = transform.rename.get(item,item)
-    reverse_map.setdefault(renamed,set()).add(item)
-
-  # Mapping is unique if and only if all reverse map values are unique
-  return all( len(v)<=1 for v in reverse_map.itervalues() )
-
-
-def prove_unique_transform(transform=None,samples=None,loci=None,unique=False):
-  '''
-  Prove uniqueness of transformation operations
-
-  @param transform: transformation object (optional)
-  @type  transform: GenoTransform object
-  @param   samples: optional set of samples refered to by the triples
-  @type    samples: sequence, set, or None
-  @param      loci: optional set of samples refered to by the triples
-  @type       loci: sequence, set, or None
-  @param    unique: flag indicating if repeated elements do not exist within the stream
-  @type     unique: bool
-  @return         : uniqueness of resulting triples
-  @rtype          : bool
-  '''
-
-  # If the data aren't unique coming in, then we must assume they will not
-  # be after a transformation
-  if not unique:
-    return False
-
-  if transform is None:
-    return True
-
-  # Construct the minimal sample reverse map by removing excluded samples
-  # and loci to verify that no two samples map to the same identifier.
-  return   (prove_bijective_mapping(samples, transform.samples) and
-            prove_bijective_mapping(loci,    transform.loci))
 
 
 #######################################################################################
@@ -3156,13 +2883,11 @@ def rename_genomatrixstream_column(genos,colmap):
   return genos
 
 
-# FIXME: Optimize trivial case
 def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   '''
-  Filter the genotype matrix data by a column set.
-  Depending on the value of the exclude flag, the column set will
-  be used either for inclusion(exclude=False) or exclusion(exclude=True)
-  purpose.
+  Filter the genotype matrix data by a column set.  Depending on the
+  value of the exclude flag, the column set will be used either for
+  inclusion (exclude=False) or exclusion (exclude=True).
 
   @param columns: matrix column names
   @type  columns: sequence of strs
@@ -3222,7 +2947,10 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   if genos.format=='ldat':
     new_genos=genos.clone(_filter(),samples=columns,packed=False,materialized=False)
   else:
-    new_genos=genos.clone(_filter(),loci=columns,packed=False,materialized=False)
+    models = genos.models
+    if models is not None:
+      models = pick(models,indices)
+    new_genos=genos.clone(_filter(),loci=columns,models=models,packed=False,materialized=False)
 
   return new_genos
 
@@ -3305,10 +3033,17 @@ def reorder_genomatrixstream_columns(genos,labels):
     for label,row in rows:
       yield label,pick(row[:], indices)
 
+  models = genos.models
+  if genos.format=='sdat' and models is not None:
+    models = pick(models,indices)
+
   if genos.format=='ldat':
     new_genos = genos.clone(_reorder(),samples=new_columns,materialized=False,packed=False)
   else:
-    new_genos = genos.clone(_reorder(),loci=new_columns,materialized=False,packed=False)
+    models = genos.models
+    if models is not None:
+      models = pick(models,indices)
+    new_genos = genos.clone(_reorder(),loci=new_columns,models=models,materialized=False,packed=False)
 
   return new_genos
 
@@ -3358,28 +3093,29 @@ def reorder_genomatrixstream_rows(genos, labels):
        ...
   ValueError: Duplicated row label: s2
   '''
-  genos    = genos.materialize()
-  rowset   = set(l for l,row in genos)
+  genos    = genos.transformed(repack=True).materialize()
+  rowset   = set(genos.rows)
   labelset = set(labels)
-  extras   = sorted(l for l,row in genos if l not in labelset)
-  order    = [ l for l in labels if l in rowset ] + list(extras)
-  remap    = dict( (l,i) for i,(l,row) in enumerate(genos) )
+  extras   = sorted(r for r in genos.rows if r not in labelset)
+  order    = [ l for l in labels if l in rowset ] + extras
+  remap    = dict( (r,i) for i,r in enumerate(genos.rows))
 
   try:
     indices = [ remap.pop(l) for l in order ]
   except KeyError:
     raise ValueError, 'Duplicated row label: %s' % l
 
-  data = genos.use_stream()
-
+  # FIXME: Update models
   def _reorder():
-    local_data = data
-    assert isinstance(local_data,(list,tuple))
+    data = genos.use_stream()
     for i in indices:
-      yield local_data[i]
+      yield data[i]
 
   if genos.format=='ldat':
-    new_genos = genos.clone(_reorder(),loci=order,unique=True,materialized=False)
+    models = genos.models
+    if models is not None:
+      models = pick(models,indices)
+    new_genos = genos.clone(_reorder(),loci=order,models=models,unique=True,materialized=False)
   else:
     new_genos = genos.clone(_reorder(),samples=order,unique=True,materialized=False)
 
@@ -3479,6 +3215,7 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
   ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
   '''
   # FIXME: Implement fast path when rows are known
+  # FIXME: Update models
   def _filter():
     if exclude:
       for label,row in genos:
@@ -3489,13 +3226,12 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
         if label in rowset:
           yield label,row
 
-  if genos.rows is not None:
+  rows = genos.rows
+  if rows is not None:
     if exclude:
-      rows = tuple(label for label in genos.rows if label not in rowset)
+      rows = tuple(label for label in rows if label not in rowset)
     else:
-      rows = tuple(label for label in genos.rows if label in rowset)
-  else:
-    rows = None
+      rows = tuple(label for label in rows if label     in rowset)
 
   if genos.format=='ldat':
     new_genos=genos.clone(_filter(),loci=rows,materialized=False)
@@ -3575,57 +3311,10 @@ def transpose_generator(columns, rows, missing=None):
   return rowlabels,_transpose_generator()
 
 
-# FIXME: May need to know about packing
-def transpose_matrix(columns, rows, missing=None):
-  '''
-  Transpose a matrix of row labels and row data in memory.
-
-  Requires the input data to be fully materialized, and produces a fully
-  materialized transpose.
-
-  @param  columns: matrix column names
-  @type   columns: sequence of strs
-  @param     rows: sequence of pairs of row labels and row data
-  @type      rows: sequence of label and sequence pairs
-  @param  columns: sequence of column labels corresponding to each row
-  @type   columns: sequence of labels
-  @return        : tuple of column labels and generator of list of row labels and row data
-  @rtype         : tuple
-
-  >>> r = [('r1','abc'),
-  ...      ('r2','def'),
-  ...      ('r3','ghi')]
-  >>> rowlabels,c = transpose_matrix(['c1','c2','c3'],r)
-  >>> rowlabels
-  ('r1', 'r2', 'r3')
-  >>> for clabel,cdata in c:
-  ...   print clabel,cdata
-  c1 ['a', 'd', 'g']
-  c2 ['b', 'e', 'h']
-  c3 ['c', 'f', 'i']
-  '''
-  n = len(rows)
-  m = len(columns)
-
-  if not n or not m:
-    return [],[]
-
-  rowlabels,rows = zip(*rows)
-
-  e = [missing]*n
-  newrows = [ list(e) for i in xrange(m) ]
-
-  for i,genos in enumerate(rows):
-    for j,geno in enumerate(genos):
-      newrows[j][i] = geno
-
-  return rowlabels,zip(columns,newrows)
-
-
-def _test_genodata():
+def test():
   import doctest
   return doctest.testmod()
 
 
 if __name__ == '__main__':
-  _test_genodata()
+  test()

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          genobinary.py
+File:          binary.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 

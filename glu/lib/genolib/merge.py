@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          genomerge.py
+File:          merge.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 

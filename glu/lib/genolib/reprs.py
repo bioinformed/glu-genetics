@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          genoreprs.py
+File:          reprs.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
