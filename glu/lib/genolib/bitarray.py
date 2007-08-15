@@ -181,7 +181,10 @@ def main():
   def mkarray(bytes):
     return array.array('B',bytes)
 
-  imps = ('Python',getbits_python,setbits_python),('C',getbits_c,setbits_c)
+  imps = [('Python',getbits_python,setbits_python)]
+  
+  if 'getbits_c' in globals():
+    imps.append( ('C',getbits_c,setbits_c) )
 
   # Walk 1s/0s across a byte array with no/all bits set
   # Test over the following parameters:
