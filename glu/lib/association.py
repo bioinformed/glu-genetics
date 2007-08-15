@@ -360,7 +360,7 @@ def build_models(phenofile, genofile, options,deptype=int):
 
   reference_alleles = load_map(options.refalleles) if options.refalleles else None
 
-  models = LocusModelBuilder(loci.samples,header,phenos,loci.genorepr,
+  models = LocusModelBuilder(loci.samples,header,phenos,
                              reference_alleles=reference_alleles,
                              minmaf=options.minmaf,mingenos=options.mingenos)
 
@@ -749,14 +749,13 @@ class LocusModel(object):
 
 # FIXME: Needs docs+tests
 class LocusModelBuilder(object):
-  def __init__(self,locus_header,pheno_header,phenos,genorepr,
+  def __init__(self,locus_header,pheno_header,phenos,
                     reference_alleles=None,minmaf=0.01,mingenos=10):
 
     self.locus_header      = locus_header
     self.pheno_header      = pheno_header
     self.reference_alleles = reference_alleles or {}
     self.minmaf            = minmaf
-    self.genorepr          = genorepr
     self.mingenos          = mingenos
 
     # Ensure phenotypes are materialized
@@ -776,9 +775,8 @@ class LocusModelBuilder(object):
     subterms    = {}
 
     for lname in set(term.loci()):
-      genos  = list(self.genorepr.genos_from_reps(loci[lname]))
       ref    = self.reference_alleles.get(lname)
-      lmodel = BiallelicLocusModel(lname,genos,self.geno_indices,ref)
+      lmodel = BiallelicLocusModel(lname,loci[lname],self.geno_indices,ref)
       if len(lmodel.alleles) != 2 or lmodel.maf < self.minmaf:
         return None
       model_loci[lname] = lmodel
