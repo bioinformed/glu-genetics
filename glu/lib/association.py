@@ -733,9 +733,11 @@ class BiallelicLocusModel(object):
       if a1 != reference_allele:
         a1,a2 = a2,a1
 
-    self.tests   = [ (a1,a1), (a1,a2), (a2,a2) ]
+    model        = genos[0].model
+    self.tests   = [ model.add_genotype( (a1,a1) ),
+                     model.add_genotype( (a1,a2) ),
+                     model.add_genotype( (a2,a2) ) ]
     self.genomap = dict( (g,i) for i,g in enumerate(self.tests) )
-    self.genomap[a2,a1] = 1
 
 
 class LocusModel(object):
