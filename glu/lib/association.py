@@ -30,7 +30,7 @@ from   scipy          import stats
 
 from   utils          import tally,pick
 from   fileutils      import autofile,namefile,load_list,load_map,load_table
-from   genolib        import load_genostream
+from   genolib        import load_genostream, get_genorepr
 
 
 def contingency_table_indicators(ys,gs):
@@ -333,7 +333,8 @@ def build_models(phenofile, genofile, options,deptype=int):
   header,phenos = load_phenos(phenofile,deptype=deptype)
   phenos        = list(phenos)
   phenocount1   = len(phenos)
-  loci          = load_genostream(genofile,options.format).as_ldat()
+  genorepr      = get_genorepr(options.genorepr)
+  loci          = load_genostream(genofile,format=options.format,genorepr=genorepr).as_ldat()
 
   if options.includeloci or options.excludeloci:
     loci = loci.transformed(include_loci=options.includeloci,

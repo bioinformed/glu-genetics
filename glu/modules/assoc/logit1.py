@@ -46,6 +46,8 @@ def option_parser():
 
   parser.add_option('-f', '--format', dest='format', metavar='NAME',
                     help='Format of the input data. Values=ldat, sdat, hapmap, genotriple')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
+                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output summary results to FILE')
   parser.add_option('-O', '--details', dest='details', metavar='FILE',
