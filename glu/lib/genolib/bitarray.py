@@ -182,7 +182,7 @@ def main():
     return array.array('B',bytes)
 
   imps = [('Python',getbits_python,setbits_python)]
-  
+
   if 'getbits_c' in globals():
     imps.append( ('C',getbits_c,setbits_c) )
 
