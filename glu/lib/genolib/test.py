@@ -20,7 +20,11 @@ def test():
   from   glu.lib.genolib import binary,bitarray,genoarray,io,merge,reprs,streams
   import streams as local_streams
 
-  if not os.path.samefile(streams.__file__,local_streams.__file__):
+  # Standardize on the .py source, since one can load the .py and the other the .pyc
+  packagefile =  streams.__file__.replace('.pyc','.py')
+  localfile   =  local_streams.__file__.replace('.pyc','.py')
+
+  if not os.path.samefile(packagefile,localfile):
     raise ImportError('Your PYTHONPATH is not set correctly to find this GLU tree')
 
   for module in binary,bitarray,genoarray,io,merge,reprs,streams:
