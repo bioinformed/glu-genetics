@@ -20,11 +20,13 @@ import sys
 import csv
 
 from   operator          import itemgetter
-from   itertools         import izip,starmap,dropwhile
+from   itertools         import izip,starmap,dropwhile,repeat
 from   collections       import defaultdict
 
 from   glu.lib.utils     import tally
 from   glu.lib.fileutils import autofile,hyphen
+
+from   genoarray         import model_from_alleles
 
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)
@@ -45,26 +47,31 @@ class Unique(object):
   whenever input data are required to be unique, as this will be enforced
   rigorously.
 
+  >>> model = model_from_alleles('AB')
+  >>> missing = model[None,None]
+  >>> A,B='A','B'
+  >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
   >>> unique = Unique()
-  >>> unique(None)
+  >>> unique(model,[])
   (4, (None, None))
-  >>> unique(['AA'])
-  (0, 'AA')
-  >>> unique([None])
+  >>> unique(model,[AA])
+  (0, ('A', 'A'))
+  >>> unique(model,[missing])
   (4, (None, None))
-  >>> unique([None,None])
+  >>> unique(model,[missing,missing])
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
-  >>> unique(['AA','AA'])
+  >>> unique(model,[AA,AA,AA])
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
-  >>> unique(['AA','AB'])
+  >>> unique(model,[AA,AB])
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
-  >>> unique(['AA',None])
+  >>> unique(model,[AA,missing])
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
@@ -73,7 +80,7 @@ class Unique(object):
     '''
     '''
 
-  def __call__(self,genos):
+  def __call__(self,model,genos):
     '''
     @param       genos: genotypes
     @type        genos: sequence
@@ -81,11 +88,11 @@ class Unique(object):
     @rtype            : int,str
     '''
     if not genos:
-      return MISSING,(None, None)
+      return MISSING,model[None,None]
     elif len(genos) == 1:
       geno = genos[0]
       if not geno:
-        return MISSING,(None,None)
+        return MISSING,geno
       else:
         return UNAMBIGUOUS,geno
     else:
@@ -107,32 +114,33 @@ class Vote(object):
    3) discordant:   two or more non-missing genotypes that do not meet voting threshold
    4) missing:      zero or more missing genotypes only
 
+  >>> model = model_from_alleles('AB')
+  >>> missing = model[None,None]
+  >>> A,B='A','B'
+  >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
   >>> vote = Vote(1.0)
-  >>> vote(None)
+  >>> vote(model,missing)
   (4, (None, None))
-  >>> vote(['AA'])
-  (0, 'AA')
-  >>> vote([1])
-  (0, 1)
-  >>> vote([1,1])
-  (1, 1)
-  >>> vote([None,None,None])
+  >>> vote(model,[AA])
+  (0, ('A', 'A'))
+  >>> vote(model,[missing,missing,missing])
   (4, (None, None))
-  >>> vote(['AA',None,None,None])
-  (1, 'AA')
-  >>> vote(['AA','AA',None,'AA','AA','AA'])
-  (1, 'AA')
-  >>> vote(['AA','AA',None,'AA','AB','AA'])
+  >>> vote(model,[AA,missing,missing,missing])
+  (1, ('A', 'A'))
+  >>> vote(model,[AA,AA,missing,AA,AA,AA])
+  (1, ('A', 'A'))
+  >>> vote(model,[AA,AA,missing,AA,AB,AA])
   (3, (None, None))
   >>> vote = Vote(0.8)
-  >>> vote(['AA','AA',None,'AA','AB','AA'])
-  (2, 'AA')
+  >>> vote(model,[AA,AA,missing,AA,AB,AA])
+  (2, ('A', 'A'))
   >>> vote = Vote(0.4)
-  >>> vote(['AT','AT','AA','TT','AC',None,None])
-  (2, 'AT')
-  >>> vote(['AA','AA','AA','BB','BB','BB'])
+  >>> vote(model,[AB,AB,AA,BB,missing,missing])
+  (2, ('A', 'B'))
+  >>> vote(model,[AA,AA,AA,BB,BB,BB])
   (3, (None, None))
-  >>> vote(['AA','AA','BB','BB','AB'])
+  >>> vote(model,[AA,AA,BB,BB,AB])
   (3, (None, None))
   '''
   def __init__(self, threshold=1.0):
@@ -140,9 +148,9 @@ class Vote(object):
     @param   threshold: cut-off value to be voted as a consensus
     @type    threshold: float
     '''
-    self.threshold   = threshold
+    self.threshold = threshold
 
-  def __call__(self,genos):
+  def __call__(self,model,genos):
     '''
     @param       genos: genotypes
     @type        genos: sequence
@@ -151,11 +159,11 @@ class Vote(object):
     '''
     # Fast path
     if not genos:
-      return MISSING,(None, None)
+      return MISSING,model[None,None]
     elif len(genos)==1:
       geno = genos[0]
       if not geno:
-        return MISSING,(None,None)
+        return MISSING,geno
       else:
         return UNAMBIGUOUS,geno
 
@@ -163,9 +171,9 @@ class Vote(object):
     genocounts = tally(g for g in genos if g)
 
     if not genocounts:
-      return MISSING,(None, None)
+      return MISSING,model[None,None]
     elif len(genocounts) == 1:
-      return CONCORDANT,iter(genocounts).next()
+      return CONCORDANT,genocounts.popitem()[0]
 
     counts = sorted(genocounts.iteritems(), key=itemgetter(1))
 
@@ -180,7 +188,7 @@ class Vote(object):
     if votes >= self.threshold and winner > runnerup:
       return CONSENSUS,counts[-1][0]
     else:
-      return DISCORDANT,(None, None)
+      return DISCORDANT,model[None,None]
 
 
 class Ordered(object):
@@ -201,58 +209,55 @@ class Ordered(object):
   3) discordant:   two or more non-missing genotypes that do not meet voting threshold
   4) missing:      zero or more missing genotypes only
 
+  >>> model = model_from_alleles('AB')
+  >>> missing = model[None,None]
+  >>> A,B='A','B'
+  >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
   >>> ordered = Ordered(0)
-  >>> ordered(None)
+  >>> ordered(model,missing)
   (4, (None, None))
-  >>> ordered(['AA'])
-  (0, 'AA')
-  >>> ordered([1])
-  (0, 1)
-  >>> ordered([1,1])
-  (1, 1)
-  >>> ordered([None,None,None])
+  >>> ordered(model,[AA])
+  (0, ('A', 'A'))
+  >>> ordered(model,[missing,missing,missing])
   (4, (None, None))
-  >>> ordered(['AA',None,None,None])
-  (1, 'AA')
-  >>> ordered(['AA','AA',None,'AA','AA','AA'])
-  (1, 'AA')
-  >>> ordered(['AA','AA',None,'AA','AB','AA'])
-  (2, 'AA')
-  >>> ordered(['AA','AA',None,'AA','AB','AA'])
-  (2, 'AA')
-  >>> ordered(['AT','AT','AA','TT','AC',None,None])
-  (2, 'AT')
-  >>> ordered(['AA','AA','BB','BB','BB'])
-  (2, 'AA')
-  >>> ordered(['AA','AA','BB','BB','AB'])
-  (2, 'AA')
+  >>> ordered(model,[AA,missing,missing,missing])
+  (1, ('A', 'A'))
+  >>> ordered(model,[AA,AA,missing,AA,AA,AA])
+  (1, ('A', 'A'))
+  >>> ordered(model,[AA,AA,missing,AA,AB,AA])
+  (2, ('A', 'A'))
+  >>> ordered(model,[AA,AA,missing,AA,AB,AA])
+  (2, ('A', 'A'))
+  >>> ordered(model,[AB,AB,AA,BB,AB,missing,missing])
+  (2, ('A', 'B'))
+  >>> ordered(model,[AA,AA,BB,BB,BB])
+  (2, ('A', 'A'))
+  >>> ordered(model,[AA,AA,BB,BB,AB])
+  (2, ('A', 'A'))
+
   >>> ordered = Ordered()
-  >>> ordered(None)
+  >>> ordered(model,missing)
   (4, (None, None))
-  >>> ordered(['AA'])
-  (0, 'AA')
-  >>> ordered([1])
-  (0, 1)
-  >>> ordered([1,1])
-  (1, 1)
-  >>> ordered([None,None,None])
+  >>> ordered(model,[AA])
+  (0, ('A', 'A'))
+  >>> ordered(model,[missing,missing,missing])
   (4, (None, None))
-  >>> ordered(['AA',None,None,None])
-  (1, 'AA')
-  >>> ordered(['AA','AA',None,'AA','AA','AA'])
-  (1, 'AA')
-  >>> ordered(['AA','AA',None,'AA','AB','AA'])
-  (2, 'AA')
-  >>> ordered(['AA','AA',None,'AA','AB','AA'])
-  (2, 'AA')
-  >>> ordered(['AT','AT','AA','TT','AC',None,None])
+  >>> ordered(model,[AA,missing,missing,missing])
+  (1, ('A', 'A'))
+  >>> ordered(model,[AA,AA,missing,AA,AA,AA])
+  (1, ('A', 'A'))
+  >>> ordered(model,[AA,AA,missing,AA,AB,AA])
+  (2, ('A', 'A'))
+  >>> ordered(model,[AA,AA,missing,AA,AB,AA])
+  (2, ('A', 'A'))
+  >>> ordered(model,[AB,AB,AA,BB,AA,missing,missing])
   (3, (None, None))
-  >>> ordered(['AA','AA','AA','BB','BB','BB'])
-  (2, 'AA')
-  >>> ordered(['AA','AA','BB','BB','AB'])
+  >>> ordered(model,[AA,AA,AA,BB,BB,BB])
+  (2, ('A', 'A'))
+  >>> ordered(model,[AA,AA,BB,BB,AB])
   (3, (None, None))
   '''
-
   def __init__(self, threshold=0.4999999):
     '''
     @param   threshold: cut-off value to be voted as a consensus
@@ -260,7 +265,7 @@ class Ordered(object):
     '''
     self.threshold   = threshold
 
-  def __call__(self,genos):
+  def __call__(self,model,genos):
     '''
     @param       genos: genotypes
     @type        genos: sequence
@@ -269,11 +274,11 @@ class Ordered(object):
     '''
     # Fast path
     if not genos:
-      return MISSING,(None, None)
+      return MISSING,model[None,None]
     elif len(genos)==1:
       geno = genos[0]
       if not geno:
-        return MISSING,(None,None)
+        return MISSING,geno
       else:
         return UNAMBIGUOUS,geno
 
@@ -293,7 +298,7 @@ class Ordered(object):
     if votes >= self.threshold:
       return CONSENSUS,geno
     else:
-      return DISCORDANT,(None, None)
+      return DISCORDANT,model[None,None]
 
 
 class Merger(object):
@@ -326,7 +331,7 @@ class Merger(object):
     self.samplestats = defaultdict(zeros)
     self.locusstats  = defaultdict(zeros)
 
-  def __call__(self,sample,locus,genos):
+  def __call__(self,sample,locus,model,genos):
     '''
     Merge a group of genotypes into a consensus for a given sample and locus
     and build merge statistics
@@ -340,25 +345,33 @@ class Merger(object):
     @return      : consensus genotype
     @rtype       : object
 
+    >>> model = model_from_alleles('AB')
+    >>> missing = model[None,None]
+    >>> A,B='A','B'
+    >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
     >>> samples  = ['s1','s1','s2','s2','s3','s3']
     >>> loci     = ['l1','l2','l3','l1','l2','l3']
-    >>> genosets = [['AA','AA',None,'AA','AB','AA'],None,['AA','AB','AB'],[None,None],[None],['AA']]
+    >>> genosets = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
     >>> merger = Merger(Vote(threshold = 0.8))
-    >>> list(starmap(merger,izip(samples,loci,genosets)))
-    ['AA', (None, None), (None, None), (None, None), (None, None), 'AA']
+    >>> list(starmap(merger,izip(samples,loci,repeat(model),genosets)))
+    [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
     >>> sorted(merger.samplestats.iteritems())
     [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
     >>> sorted(merger.locusstats.iteritems())
     [('l1', [0, 0, 1, 0, 1]), ('l2', [0, 0, 0, 0, 2]), ('l3', [1, 0, 0, 1, 0])]
+
     >>> merger = Merger(Vote(threshold = 0.8))
-    >>> list(starmap(mergefunc_transpose_adapter(merger),izip(loci,samples,genosets)))
-    ['AA', (None, None), (None, None), (None, None), (None, None), 'AA']
+    >>> merger_adapt = mergefunc_transpose_adapter(merger)
+    >>> list(starmap(merger_adapt,izip(loci,samples,repeat(model),genosets)))
+    [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
     >>> sorted(merger.samplestats.iteritems())
     [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
     >>> sorted(merger.locusstats.iteritems())
     [('l1', [0, 0, 1, 0, 1]), ('l2', [0, 0, 0, 0, 2]), ('l3', [1, 0, 0, 1, 0])]
     '''
-    concordclass,geno = self.votefunc(genos)
+    concordclass,geno = self.votefunc(model,genos)
 
     self.samplestats[sample][concordclass] += 1
     self.locusstats[locus][concordclass]   += 1
@@ -413,16 +426,25 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   '''
   Retrieve merge statistics from the object and write to files by sample/locus
 
+  >>> model = model_from_alleles('AB')
+  >>> missing = model[None,None]
+  >>> A,B='A','B'
+  >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
   >>> import StringIO
   >>> samples  = ['s1','s1','s1','s1','s2','s2','s2','s2','s3','s3','s3','s3','s4','s4','s4','s4']
   >>> loci     = ['l1','l2','l3','l4','l1','l2','l3','l4','l1','l2','l3','l4','l1','l2','l3','l4']
-  >>> genosets = [['AA','AA',None,'AA','AB','AA'],['AA','AB','AB'],['AA','AA','AA'],[None,None],
-  ...            [None],['AA'],['AA',None,None,None],['AT','AT','AA','TT','AC',None,None],
-  ...            ['AB'],['AA'],['AA','AA','AA','AA','AB'],['AB','AB'],
-  ...            ['AA','AB','AB'],['AA','AA'],['AA',None,None,None],['AA','AA','AA']]
+  >>> genosets = [[AA,AA,missing,AA,AB,AA],[AA,AB,AB],[AA,AA,AA],[missing,missing],
+  ...            [missing],[AA],[AA,missing,missing,missing],[AB,AB,AA,'BB',AB,missing,missing],
+  ...            [AB],[AA],[AA,AA,AA,AA,AB],[AB,AB],
+  ...            [AA,AB,AB],[AA,AA],[AA,missing,missing,missing],[AA,AA,AA]]
+
   >>> merger = Merger(Vote(threshold = 0.8))
-  >>> list(starmap(merger, izip(samples,loci,genosets)))
-  ['AA', (None, None), 'AA', (None, None), (None, None), 'AA', 'AA', (None, None), 'AB', 'AA', 'AA', 'AB', (None, None), 'AA', 'AA', 'AA']
+  >>> list(starmap(merger, izip(samples,loci,repeat(model),genosets))) # doctest: +NORMALIZE_WHITESPACE
+  [('A', 'A'), (None, None), ('A', 'A'), (None, None), (None, None), ('A', 'A'),
+   ('A', 'A'), (None, None), ('A', 'B'), ('A', 'A'), ('A', 'A'), ('A', 'B'),
+   (None, None), ('A', 'A'), ('A', 'A'), ('A', 'A')]
+
   >>> sampleout = StringIO.StringIO()
   >>> locusout  = StringIO.StringIO()
   >>> output_merge_statistics(merger,sampleout,locusout)
@@ -472,8 +494,8 @@ def mergefunc_transpose_adapter(mergefunc):
   '''
   Return a new mergefunc that transposes the calling convention for samples and loci
   '''
-  def _mergefunc_transpose_adapter(locus,sample,genos):
-    return mergefunc(sample,locus,genos)
+  def _mergefunc_transpose_adapter(locus,sample,model,genos):
+    return mergefunc(sample,locus,model,genos)
   return _mergefunc_transpose_adapter
 
 

@@ -119,6 +119,8 @@ class GenotripleStream(GenotypeStream):
                          (multiply iterable) data type
     @type  materialized: bool
     '''
+    assert models is not None
+
     if order not in (None,'locus','sample'):
       raise ValueError('invalid GenotripleStream order specified')
 
@@ -168,7 +170,7 @@ class GenotripleStream(GenotypeStream):
     ('s1', 'l1', ('G', 'G'))
     ('s1', 'l2', ('A', 'A'))
     ('s2', 'l1', (None, None))
-    ('s2', 'l2', ('T', 'T'))
+    ('s2', 'l2', (None, None))
     ('s3', 'l1', ('T', 'T'))
     ('s3', 'l2', (None, None))
     '''
@@ -206,16 +208,88 @@ class GenotripleStream(GenotypeStream):
     '''
     Alternate constructor that builds a new GenotripleStream object from a
     sequence of triples with genotypes in tuple
+
+    >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+    ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
+    >>> triples = GenotripleStream.from_tuples(triples)
+    >>> for row in triples:
+    ...   print row
+    ('s1', 'l1', ('G', 'G'))
+    ('s1', 'l2', ('A', 'A'))
+    ('s2', 'l1', ('G', 'T'))
+    ('s2', 'l2', ('T', 'T'))
+    ('s3', 'l1', ('G', 'G'))
+    ('s3', 'l2', ('A', 'A'))
     '''
+    if modelmap is None:
+      modelmap = {}
     triples = encode_genotriples_from_tuples(triples, modelmap)
     return GenotripleStream(triples, samples=samples, loci=loci, order=order, models=modelmap, unique=unique)
+
+  def to_tuples(self):
+    '''
+    Iterate over genotriples with genotypes coded as tuples
+
+    >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+    ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
+    >>> triples = GenotripleStream.from_tuples(triples).to_tuples()
+    >>> for row in triples:
+    ...   print row
+    ('s1', 'l1', ('G', 'G'))
+    ('s1', 'l2', ('A', 'A'))
+    ('s2', 'l1', ('G', 'T'))
+    ('s2', 'l2', ('T', 'T'))
+    ('s3', 'l1', ('G', 'G'))
+    ('s3', 'l2', ('A', 'A'))
+    '''
+    for sample,locus,geno in self:
+      yield sample,locus,geno.alleles()
+
+  def to_strings(self,genorepr):
+    '''
+    Iterate over genotriples with genotypes coded as strings
+
+    >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
+    ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
+    ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
+    >>> triples = GenotripleStream.from_tuples(triples).to_strings(snp)
+    >>> for row in triples:
+    ...   print row
+    ('s1', 'l1', 'GG')
+    ('s1', 'l2', 'AA')
+    ('s2', 'l1', 'GT')
+    ('s2', 'l2', 'TT')
+    ('s3', 'l1', 'GG')
+    ('s3', 'l2', 'AA')
+    '''
+    repr = genorepr.to_string
+    for sample,locus,geno in self:
+      yield sample,locus,repr(geno)
 
   @staticmethod
   def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False, modelmap=None):
     '''
     Alternate constructor that builds a new GenotripleStream object from a
     sequence of triples with genotypes in a string format
+
+    >>> triples = [('l1','s1','AA'),('l1','s1','  '),('l1','s2','AB'),('l2','s1','AA'),
+    ...            ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
+    >>> triples = GenotripleStream.from_strings(triples,snp)
+    >>> for row in triples:
+    ...   print row
+    ('l1', 's1', ('A', 'A'))
+    ('l1', 's1', (None, None))
+    ('l1', 's2', ('A', 'B'))
+    ('l2', 's1', ('A', 'A'))
+    ('l2', 's1', ('A', 'A'))
+    ('l3', 's1', ('B', 'B'))
+    ('l3', 's1', ('B', 'B'))
+    ('l3', 's1', ('A', 'B'))
     '''
+    if modelmap is None:
+      modelmap = {}
     triples = encode_genotriples_from_strings(triples, genorepr, modelmap)
     return GenotripleStream(triples, samples=samples, loci=loci, order=order, models=modelmap, unique=unique)
 
@@ -304,7 +378,7 @@ class GenotripleStream(GenotypeStream):
     ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
     ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
     >>> triples = GenotripleStream.from_tuples(triples)
-    >>> for row in GenotripleStream(triples).transformed(include_loci=['l1'],exclude_samples=['s3']):
+    >>> for row in triples.transformed(include_loci=['l1'],exclude_samples=['s3']):
     ...   print row
     ('s1', 'l1', ('G', 'G'))
     ('s2', 'l1', ('G', 'T'))
@@ -372,7 +446,7 @@ class GenotripleStream(GenotypeStream):
     ...            ('s2','l1', ('G', 'T')),('s3','l2', ('T', 'T')),
     ...            ('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
     >>> triples = GenotripleStream.from_tuples(triples)
-    >>> for row in GenotripleStream(triples).sorted():
+    >>> for row in triples.sorted():
     ...   print row
     ('s1', 'l1', ('G', 'G'))
     ('s1', 'l2', ('A', 'A'))
@@ -406,7 +480,7 @@ class GenotripleStream(GenotypeStream):
     ...            ('s2','l1', ('G', 'T')),('s2','l2', ('A', 'A')),
     ...            ('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
     >>> triples = GenotripleStream.from_tuples(triples)
-    >>> for row in GenotripleStream(triples).merged(VoteMerger(),order='locus'):
+    >>> for row in triples.merged(VoteMerger(),order='locus'):
     ...   print row
     ('s1', 'l1', (None, None))
     ('s2', 'l1', ('G', 'T'))
@@ -416,10 +490,12 @@ class GenotripleStream(GenotypeStream):
     if self.unique:
       return self
 
-    if self.order not in ('sample','locus'):
-      return self.sorted(order).merged(mergefunc)
+    genos = self
 
-    return merge_sorted_genotriples(self,mergefunc)
+    if self.order not in ('sample','locus'):
+      genos = genos.sorted(order)
+
+    return merge_sorted_genotriples(genos,mergefunc)
 
   def as_genotriples(self):
     '''
@@ -445,10 +521,10 @@ class GenotripleStream(GenotypeStream):
     >>> triples = [('s1','l1',('G', 'G')),('s1','l2',('A', 'A')),
     ...            ('s2','l1',('G', 'T')),('s2','l2',('T', 'T')),
     ...            ('s3','l1',('G', 'G')),('s3','l2',('A', 'A'))]
-    >>> triples = list(GenotripleStream.from_tuples(triples))
+    >>> triples = GenotripleStream.from_tuples(triples).materialize()
 
     >>> merge = VoteMerger()
-    >>> ldat = GenotripleStream(triples).as_ldat(merge)
+    >>> ldat = triples.as_ldat(merge)
     >>> ldat.samples
     ('s1', 's2', 's3')
     >>> for row in ldat:
@@ -456,7 +532,7 @@ class GenotripleStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
 
-    >>> ldat = GenotripleStream(triples,loci=['l1','l2']).as_ldat(merge)
+    >>> ldat = triples.clone(triples,loci=['l1','l2'],samples=None).as_ldat(merge)
     >>> ldat.samples
     ('s1', 's2', 's3')
     >>> for row in ldat:
@@ -464,7 +540,7 @@ class GenotripleStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
 
-    >>> ldat = GenotripleStream(triples,samples=['s1','s2','s3']).as_ldat(merge)
+    >>> ldat = triples.clone(triples,samples=['s1','s2','s3'],loci=None).as_ldat(merge)
     >>> ldat.samples
     ('s1', 's2', 's3')
     >>> for row in ldat:
@@ -492,10 +568,10 @@ class GenotripleStream(GenotypeStream):
     >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
     ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
     ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
-    >>> triples = list(GenotripleStream.from_tuples(triples))
+    >>> triples = GenotripleStream.from_tuples(triples).materialize()
 
     >>> merge = VoteMerger()
-    >>> sdat = GenotripleStream(triples).as_sdat(merge)
+    >>> sdat = triples.as_sdat(merge)
     >>> sdat.loci
     ('l1', 'l2')
     >>> sdat.samples
@@ -506,7 +582,7 @@ class GenotripleStream(GenotypeStream):
     ('s2', [('G', 'T'), ('T', 'T')])
     ('s3', [('G', 'G'), ('A', 'A')])
 
-    >>> sdat = GenotripleStream(triples,loci=['l1','l2']).as_sdat(merge)
+    >>> sdat = triples.clone(triples,loci=['l1','l2'],samples=None).as_sdat(merge)
     >>> sdat.loci
     ('l1', 'l2')
     >>> sdat.samples
@@ -517,7 +593,7 @@ class GenotripleStream(GenotypeStream):
     ('s2', [('G', 'T'), ('T', 'T')])
     ('s3', [('G', 'G'), ('A', 'A')])
 
-    >>> sdat = GenotripleStream(triples,samples=['s1','s2','s3']).as_sdat(merge)
+    >>> sdat = triples.clone(triples,samples=['s1','s2','s3'],loci=None).as_sdat(merge)
     >>> sdat.loci
     ('l1', 'l2')
     >>> sdat.samples
@@ -578,6 +654,8 @@ class GenomatrixStream(GenotypeStream):
                          compressed array format
     @type        packed: bool
     '''
+    assert models is not None
+
     if format not in ('sdat','ldat'):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
 
@@ -678,7 +756,8 @@ class GenomatrixStream(GenotypeStream):
       genos = genos[0].transformed(mergefunc=mergefunc)
 
     # Inputs are all matricies, without knowledge of uniqueness of rows.
-    elif formats <= set(['ldat','sdat']):
+    # FIXME!!!!  merge_genomatrixstream_list is currently br0ken
+    elif 0 and formats <= set(['ldat','sdat']):
       genos = [ (g.as_ldat() if format=='ldat' else g.as_sdat()) for g in genos ]
       genos = merge_genomatrixstream_list(genos, mergefunc)
 
@@ -717,6 +796,15 @@ class GenomatrixStream(GenotypeStream):
     '''
     Alternate constructor that builds a new GenomatrixStream object from a
     genotype matrix stream with genotypes in a string format.
+
+    >>> samples = ['s1', 's2', 's3']
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
+    >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
+    >>> for row in genos:
+    ...  print row
+    ('l1', [('G', 'G'), ('G', 'T'), ('T', 'T')])
+    ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])
     '''
     if format=='ldat':
       columns = samples
@@ -746,6 +834,39 @@ class GenomatrixStream(GenotypeStream):
     columns,models,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=modelmap)
     return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
                                    unique=unique, packed=True, materialized=False)
+
+  def to_tuples(self):
+    '''
+    Iterate over genotypes coded as tuples
+
+    >>> samples = ['s1', 's2', 's3']
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
+    >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples).to_tuples()
+    >>> for row in genos:
+    ...  print row
+    ('l1', [('G', 'G'), ('G', 'T'), ('T', 'T')])
+    ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])
+    '''
+    for label,row in self:
+      yield label,[ g.alleles() for g in row ]
+
+  def to_strings(self,genorepr):
+    '''
+    Iterate over genotypes coded as strings
+
+    >>> samples = ['s1', 's2', 's3']
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
+    >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples).to_strings(snp)
+    >>> for row in genos:
+    ...  print row
+    ('l1', ['GG', 'GT', 'TT'])
+    ('l2', ['AA', 'TT', 'AT'])
+    '''
+    repr = genorepr.to_strings
+    for label,row in self:
+      yield label,repr(row)
 
   def clone(self, genos, **kwargs):
     '''
@@ -974,14 +1095,15 @@ class GenomatrixStream(GenotypeStream):
     if self.unique:
       return self
 
+    if self.format == 'ldat':
+      mergefunc = mergefunc_transpose_adapter(mergefunc)
+
+    # FIXME: Move logic into merge_genomatrixstream
     merge_rows = self.rows    is None or len(self.rows)    != len(set(self.rows))
     merge_cols = self.columns is None or len(self.columns) != len(set(self.columns))
 
     if not merge_rows and not merge_cols:
       return self
-
-    if self.format == 'ldat':
-      mergefunc = mergefunc_transpose_adapter(mergefunc)
 
     if merge_rows:
       genos = merge_genomatrixstream(self, mergefunc)
@@ -1217,16 +1339,22 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
 
       modelcache = dict( (_genokey(m.genotypes),m) for m in models )
       descrcache = {}
+      known      = set(modelmap)
 
       for label,row in genos:
         model = modelmap.get(label)
+        key   = None
+
         if not model:
           key = _genokey(row)
           model = modelcache.get(key)
           if not model:
-            model = modelcache[key] = UnphasedMarkerModel()
-            for g in key:
-              model.add_genotype(g)
+            model = modelcache[key] = modelmap[label] = UnphasedMarkerModel()
+
+        if model not in known:
+          key = key or _genokey(row)
+          for g in key:
+            model.add_genotype(g)
 
         descr = descrcache.get(model)
         if not descr:
@@ -1238,13 +1366,16 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   elif format=='sdat':
     n = len(columns)
     updates = []
+    known   = set(modelmap)
 
     for i,column in enumerate(columns):
       if column in modelmap:
-        models.append(modelmap[column])
+        model = modelmap[column]
       else:
-        model = UnphasedMarkerModel()
-        models.append(model)
+        model = modelmap[column] = UnphasedMarkerModel()
+
+      models.append(model)
+      if column not in known:
         updates.append( (i,model.add_genotype) )
 
     def _load():
@@ -1348,18 +1479,24 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
       modelcache  = {}
       descrcache  = {}
       strcache    = {}
+      known       = set(modelmap)
       to_string    = genorepr.to_string
       from_strings = genorepr.from_strings
 
       for label,row in genos:
         model = modelmap.get(label)
+        key   = None
+
         if not model:
           key = tuple(sorted(from_strings(set(row))))
           model = modelcache.get(key)
           if not model:
-            model = modelcache[key] = UnphasedMarkerModel()
-            for g in key:
-              model.add_genotype(g)
+            model = modelcache[key] = modelmap[label] = UnphasedMarkerModel()
+
+        if model not in known:
+          key = key or tuple(sorted(from_strings(set(row))))
+          for g in key:
+            model.add_genotype(g)
 
         descr = descrcache.get(model)
         if not descr:
@@ -1386,6 +1523,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
       updates   = []
       cachemap  = {}
       cachelist = []
+      known     = set(modelmap)
 
       to_string    = genorepr.to_string
       from_strings = genorepr.from_strings
@@ -1394,9 +1532,12 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
         if column in modelmap:
           model = modelmap[column]
           models.append(model)
-          update = model.get_genotype
+          if column in known:
+            update = model.get_genotype
+          else:
+            update = model.add_genotype
         else:
-          model = UnphasedMarkerModel()
+          model = modelmap[column] = UnphasedMarkerModel()
           update = model.add_genotype
           models.append(model)
 
@@ -1580,8 +1721,8 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   striples = sorted(triples,key=keyfunc)
 
   # Extract sample and locus sets since this can be done quickly with materialized lists
-  samples = list(unique(imap(itemgetter(0), striples)))
-  loci    = list(unique(imap(itemgetter(1), striples)))
+  samples = set(imap(itemgetter(0), striples))
+  loci    = set(imap(itemgetter(1), striples))
 
   return triples.clone(striples,samples=samples,loci=loci,materialized=True,order=order)
 
@@ -1600,7 +1741,7 @@ def combine_unsorted_genotriple_list(triplelist):
   >>> trip2 = [('s1','l1', ('G', 'G')),('s2','l2', ('A', 'A'))]
   >>> trip1 = GenotripleStream.from_tuples(trip1)
   >>> trip2 = GenotripleStream.from_tuples(trip2)
-  >>> triplelist = [GenotripleStream(trip1),GenotripleStream(trip2)]
+  >>> triplelist = [trip1,trip2]
   >>> combined = combine_unsorted_genotriple_list(triplelist)
   >>> for row in combined:
   ...   print row
@@ -1643,10 +1784,11 @@ def combine_unsorted_genotriple_list(triplelist):
   else:
     unique  = False
 
-  triples = chain(*triplelist)
+  # FIXME: Reencoding from tuples is uuuugly
+  genos = chain(*[ t.to_tuples() for t in triplelist ])
 
   # Return a new baby triplestream object
-  return GenotripleStream(triples, samples=samples, loci=loci, order=None, unique=unique)
+  return GenotripleStream.from_tuples(genos,samples=samples,loci=loci,unique=unique)
 
 
 def combine_sorted_genotriple_list(triplelist):
@@ -1661,9 +1803,9 @@ def combine_sorted_genotriple_list(triplelist):
   >>> trip1 = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
   ...          ('s2','l2', ('A', 'T')),('s3','l1', ('T', 'T'))]
   >>> trip2 = [('s2','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
-  >>> trip1 = GenotripleStream.from_tuples(trip1)
-  >>> trip2 = GenotripleStream.from_tuples(trip2)
-  >>> triplelist = [GenotripleStream(trip1,order='sample'),GenotripleStream(trip2,order='sample')]
+  >>> trip1 = GenotripleStream.from_tuples(trip1,order='sample')
+  >>> trip2 = GenotripleStream.from_tuples(trip2,order='sample')
+  >>> triplelist = [trip1,trip2]
   >>> combined = combine_sorted_genotriple_list(triplelist)
   >>> for row in combined:
   ...   print row
@@ -1721,11 +1863,12 @@ def combine_sorted_genotriple_list(triplelist):
   else:
     raise ValueError, 'Invalid order specified'
 
-  # Perform the merge, marking all of the inputs as used
-  triples = imerge(triplelist,key=key)
+  # FIXME: Reencoding from tuples is uuuugly
+  triples = [ t.to_tuples() for t in triplelist ]
+  triples = imerge(triples,key=key)
 
   # Return a new baby triplestream object
-  return GenotripleStream(triples, samples=samples, loci=loci, order=order, unique=unique)
+  return GenotripleStream.from_tuples(triples,samples=samples,loci=loci,order=order,unique=unique)
 
 
 #######################################################################################
@@ -1752,9 +1895,16 @@ def merge_sorted_genotriples(triples,mergefunc):
   >>> list(merge_sorted_genotriples(triples,VoteMerger()))
   [('l1', 's1', ('A', 'A')), ('l1', 's2', ('A', 'B')), ('l2', 's1', ('A', 'A')), ('l3', 's1', (None, None))]
   '''
+  assert triples.models is not None
+
   def _merge():
+    get2 = itemgetter(2)
+    modelmap = triples.models
     for (sample,locus),trips in groupby(triples, itemgetter(0,1)):
-      yield sample,locus,mergefunc(sample,locus,map(itemgetter(2),trips))
+      genos = map(get2,trips)
+      assert len(genos) < 2 or all(genos[0].model is g.model for g in genos)
+      geno  = mergefunc(sample,locus,modelmap[locus],genos)
+      yield sample,locus,geno
 
   return triples.clone(_merge(),unique=True,materialized=False)
 
@@ -1801,10 +1951,10 @@ def merge_genomatrixstream_columns(genos, mergefunc):
   ('s4', [('A', 'T'), (None, None), ('T', 'T')])
 
   >>> loci = ('l1','l2','l1')
-  >>> rows = [('s1',[('A', 'A'),   (None, None),  ('G', 'G')]),
-  ...         ('s2',[ (None, None),  ('A', 'C'),   (None, None)]),
-  ...         ('s3',[('A', 'A'),  ('A', 'A'),   (None, None)]),
-  ...         ('s4',[('G', 'A'),   (None, None),  ('G', 'T')])]
+  >>> rows = [('s1',[ ('A','A'), (None,None), ('G', 'G')]),
+  ...         ('s2',[(None,None), ('A','C'), (None,None)]),
+  ...         ('s3',[ ('A','A'),  ('A','A'), (None,None)]),
+  ...         ('s4',[ ('G','A'), (None,None), ('G','G') ])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> genos = merge_genomatrixstream_columns(genos,VoteMerger())
   >>> genos.loci
@@ -1833,23 +1983,48 @@ def merge_genomatrixstream_columns(genos, mergefunc):
     return genos
 
   # Non-trivial path: one or more columns must be merged
-  def _merger():
-    rows_seen = set()
-    for row_label,row in genos:
-      if row_label in rows_seen:
-        raise ValueError('row labels required to be unique')
+  if genos.format == 'ldat':
+    def _merger():
+      rows_seen = set()
+      for i,(row_label,row) in enumerate(genos):
+        if row_label in rows_seen:
+          raise ValueError('row labels required to be unique')
 
-      rows_seen.add(row_label)
+        rows_seen.add(row_label)
 
-      merge_columns = ([row[i] for i in merge_indices[col_label]] for col_label in new_columns)
-      new_row = list(imap(mergefunc,repeat(row_label),genos.columns,merge_columns))
+        merge_columns = ([row[j] for j in merge_indices[col_label]] for col_label in new_columns)
+        new_row = list(imap(mergefunc,repeat(row_label), genos.columns,
+                                      repeat(genos.models[i]), merge_columns))
 
-      yield row_label,new_row
+        yield row_label,new_row
 
-  if genos.format=='ldat':
     new_genos = genos.clone(_merger(),samples=new_columns,packed=False,materialized=False,unique=True)
+
   else:
-    new_genos = genos.clone(_merger(),loci=new_columns,packed=False,materialized=False,unique=True)
+    new_models = []
+
+    def _merger():
+      rows_seen = set()
+
+      for c in new_columns:
+        mset = set(genos.models[i] for i in merge_indices[c])
+        if len(mset) != 1:
+          raise ValueError('Incompatible genotype models in merge')
+        new_models.append(mset.pop())
+
+      for i,(row_label,row) in enumerate(genos):
+        if row_label in rows_seen:
+          raise ValueError('row labels required to be unique')
+
+        rows_seen.add(row_label)
+
+        merge_columns = ([row[j] for j in merge_indices[col_label]] for col_label in new_columns)
+        new_row = list(imap(mergefunc,repeat(row_label), genos.columns, new_models, merge_columns))
+
+        yield row_label,new_row
+
+    new_genos = genos.clone(_merger(),loci=new_columns,models=new_models,
+                                      packed=False,materialized=False,unique=True)
 
   return new_genos
 
@@ -1912,28 +2087,51 @@ def merge_genomatrixstream_rows(genos, mergefunc):
   '''
   assert mergefunc is not None
 
-  non_unique = any( n>1 for n in tally(genos.columns).itervalues() )
+  genos = genos.materialize()
 
-  if non_unique:
+  if len(set(genos.columns)) != len(genos.columns):
     raise ValueError('column labels required to be unique')
 
   merge_rows = defaultdict(list)
   new_rows   = []
 
-  for row_label,row in genos:
+  for i,(row_label,row) in enumerate(genos):
     if row_label not in merge_rows:
       new_rows.append(row_label)
-    merge_rows[row_label].append(row)
+    merge_rows[row_label].append(i)
 
-  def _merger():
-    for row_label in new_rows:
-      merge_columns = izip(*merge_rows.pop(row_label))
-      new_row = list(imap(mergefunc,repeat(row_label),genos.columns,merge_columns))
-      yield row_label,new_row
+  if genos.format == 'ldat':
+    new_models = []
 
-  if genos.format=='ldat':
-    new_genos = genos.clone(_merger(),loci=new_rows,packed=False,materialized=False,unique=True)
+    def _merger():
+      data = genos.use_stream()
+      for row_label in new_rows:
+        indices = merge_rows.pop(row_label)
+
+        mset = set(pick(genos.models,indices))
+        if len(mset) != 1:
+          raise ValueError('Incompatible genotype models in merge')
+        model = mset.pop()
+        new_models.append(model)
+
+        merge_columns = izip(*[ data[i][1] for i in indices ])
+        new_row = list(imap(mergefunc,repeat(row_label),genos.columns,
+                                      repeat(model),merge_columns))
+        yield row_label,new_row
+
+    new_genos = genos.clone(_merger(),loci=new_rows,models=new_models,
+                            packed=False,materialized=False,unique=True)
+
   else:
+    def _merger():
+      data = genos.use_stream()
+      models = genos.models
+      for row_label in new_rows:
+        indices = merge_rows.pop(row_label)
+        merge_columns = izip(*[ data[i][1] for i in indices ])
+        new_row = list(imap(mergefunc,repeat(row_label),genos.columns,models,merge_columns))
+        yield row_label,new_row
+
     new_genos = genos.clone(_merger(),samples=new_rows,packed=False,materialized=False,unique=True)
 
   return new_genos
@@ -1979,8 +2177,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ('s3', [('A', 'A'), (None, None), (None, None)])
   ('s4', [('A', 'T'), (None, None), ('T', 'T')])
   >>> sorted(merger.samplestats.iteritems())
-
+  [('s1', [2, 0, 0, 0, 1]), ('s2', [0, 0, 0, 0, 3]), ('s3', [1, 0, 0, 0, 2]), ('s4', [2, 0, 0, 0, 1])]
   >>> sorted(merger.locusstats.iteritems())
+  [('l1', [3, 0, 0, 0, 1]), ('l2', [0, 0, 0, 0, 4]), ('l3', [2, 0, 0, 0, 2])]
 
   >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'T') ]),
   ...         ('s2',[(None, None), ('A', 'C'),   (None, None)]),
@@ -1997,8 +2196,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ('s1', [(None, None), ('A', 'A'), ('G', 'T')])
   ('s2', [(None, None), ('A', 'C'), (None, None)])
   >>> sorted(merger.samplestats.iteritems())
-
+  [('s1', [0, 2, 0, 1, 0]), ('s2', [1, 0, 0, 0, 2])]
   >>> sorted(merger.locusstats.iteritems())
+  [('l1', [0, 0, 0, 1, 1]), ('l2', [1, 1, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
 
   >>> loci = ('l1','l2','l1')
   >>> rows = [('s1',[(None, None), (None, None),  ('C', 'T')]),
@@ -2016,74 +2216,99 @@ def merge_genomatrixstream(genos, mergefunc):
   ('s1', [(None, None), ('A', 'A')])
   ('s2', [('T', 'T'), ('A', 'G')])
   >>> sorted(merger.samplestats.iteritems())
-
+  [('s1', [0, 1, 0, 1, 0]), ('s2', [1, 1, 0, 0, 0])]
   >>> sorted(merger.locusstats.iteritems())
-
+  [('l1', [0, 1, 0, 1, 0]), ('l2', [1, 1, 0, 0, 0])]
   '''
   assert mergefunc is not None
 
-  merge_indices = defaultdict(list)
+  merge_rows = genos.rows    is None or len(genos.rows)    != len(set(genos.rows))
+  merge_cols = genos.columns is None or len(genos.columns) != len(set(genos.columns))
+
+  if not merge_rows and not merge_cols:
+    return genos
+
+  if not merge_rows:
+    return merge_genomatrixstream_columns(genos, mergefunc)
+  elif not merge_cols:
+    return merge_genomatrixstream_rows(genos, mergefunc)
 
   columns = genos.columns
-  new_columns = []
+  new_indices = []
+  merge_indices = defaultdict(list)
   for i,column in enumerate(columns):
     if column not in merge_indices:
-      new_columns.append(column)
+      new_indices.append(i)
     merge_indices[column].append(i)
 
-  new_columns = tuple(new_columns)
+  new_columns = pick(columns,new_indices)
 
-  # FIXME: Check if merging is needed
+  assert columns != new_columns
 
-  # Repack, since we're about to materialize
-  genos = genos.transformed(repack=True)
+  genos = genos.materialize()
 
-  new_rows   = []
-
-  def _merger():
-    merge_rows = defaultdict(list)
-
-    for row_label,row in genos:
-      if row_label not in merge_rows:
-        new_rows.append(row_label)
-      merge_rows[row_label].append(row)
-
-    if new_columns == columns:
-      # Optimize case where columns are unique as in merge_genomatrix_rows
-      for row_label in new_rows:
-        # Form list of all genotypes at each new column, freeing used rows
-        merge_columns = izip(*merge_rows.pop(row_label))
-
-        # Merge genotypes
-        new_row = list(imap(mergefunc,repeat(row_label),columns,merge_columns))
-
-        # Yield new row
-        yield row_label,new_row
-
-    else:
-      # Otherwise, apply fully general merge over duplicate rows and columns
-      for row_label in new_rows:
-        # Form list of all genotypes at each new column
-        merge_columns = ([ row[i] for row in merge_rows[row_label] for i in merge_indices[col_label] ]
-                                  for col_label in new_columns)
-
-        # Merge genotypes
-        new_row = list(imap(mergefunc,repeat(row_label),new_columns,merge_columns))
-
-        # Free used rows
-        del merge_rows[row_label]
-
-        # Yield new row
-        yield row_label,new_row
+  new_rows = []
+  merge_rows = defaultdict(list)
+  for i,(row_label,row) in enumerate(genos):
+    if row_label not in merge_rows:
+      new_rows.append(row_label)
+    merge_rows[row_label].append(i)
 
   if genos.format=='ldat':
-    new_genos = genos.clone(_merger(),samples=new_columns,loci=new_rows,packed=False,materialized=False,unique=True)
+    new_models = []
+
+    def _merger():
+      # Apply fully general merge over duplicate rows and columns
+      data = genos.use_stream()
+
+      for row_label in new_rows:
+        # Form list of all genotypes at each new column
+        indices = merge_rows.pop(row_label)
+        rows = [ data[i][1] for i in indices ]
+
+        mset = set(pick(genos.models,indices))
+        if len(mset) != 1:
+          raise ValueError('Incompatible genotype models in merge')
+        model = mset.pop()
+        new_models.append(model)
+
+        merge_columns = ([ row[i] for row in rows for i in merge_indices[column] ]
+                                  for column in new_columns)
+        new_row = list(imap(mergefunc,repeat(row_label),new_columns,
+                                      repeat(model),merge_columns))
+        yield row_label,new_row
+
+    new_genos = genos.clone(_merger(),samples=new_columns,loci=new_rows,models=new_models,
+                            packed=False,materialized=False,unique=True)
+
   else:
-    new_genos = genos.clone(_merger(),loci=new_columns,samples=new_rows,packed=False,materialized=False,unique=True)
+    new_models = []
+    for column in new_columns:
+      mset = set(pick(genos.models,merge_indices[column]))
+      if len(mset) != 1:
+        raise ValueError('Incompatible genotype models in merge')
+      new_models.append(mset.pop())
+
+    def _merger():
+      # Apply fully general merge over duplicate rows and columns
+      data = genos.use_stream()
+
+      for row_label in new_rows:
+        # Form list of all genotypes at each new column
+        indices = merge_rows.pop(row_label)
+        rows = [ data[i][1] for i in indices ]
+        merge_columns = ([ row[i] for row in rows for i in merge_indices[column] ]
+                                  for column in new_columns)
+        new_row = list(imap(mergefunc,repeat(row_label),new_columns,new_models,merge_columns))
+        yield row_label,new_row
+
+    new_genos = genos.clone(_merger(),loci=new_columns,samples=new_rows,models=new_models,
+                                      packed=False,materialized=False,unique=True)
 
   return new_genos
 
 
+# FIXME: Br0ken -- needs to be model-aware
 def merge_genomatrixstream_list(genos, mergefunc):
   '''
   Take a sequence of genotype matrix streams and merge all genotypes
@@ -2139,7 +2364,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
   >>> samples =          ('s1',         's2',        's3')
   >>> rows1 = [('l1',[ ('G', 'G'),   ('G', 'T'),  ('T', 'T')]),
   ...          ('l2',[ ('A', 'A'),   ('T', 'T'),  ('A', 'T')])]
-  >>> rows2 = [('l1',[(None, None),  ('A', 'T'),  ('T', 'T')]),
+  >>> rows2 = [('l1',[(None, None),  ('T', 'T'),  ('G', 'G')]),
   ...          ('l3',[ ('A', 'A'),  (None, None), ('A', 'T')])]
   >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples).materialize()
   >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples).materialize()
@@ -2168,10 +2393,12 @@ def merge_genomatrixstream_list(genos, mergefunc):
   columns = [ g.columns for g in genos ]
   if all(columns[0]==c for c in columns):
     # Pass-through from merge_genomatrix
+    mgenos = chain( *[ g.to_tuples() for g in genos ] )
+
     if format=='ldat':
-      genos = genos[0].clone(chain(*genos),loci=None,packed=False,materialized=False,unique=False)
+      genos = GenomatrixStream.from_tuples(mgenos,format,samples=columns[0],unique=False)
     else:
-      genos = genos[0].clone(chain(*genos),samples=None,packed=False,materialized=False,unique=False)
+      genos = GenomatrixStream.from_tuples(mgenos,format,loci=columns[0],unique=False)
 
     return merge_genomatrixstream(genos, mergefunc)
 
@@ -2224,7 +2451,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
 #######################################################################################
 
-
 def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   '''
   Build genomatrix from genotriples using either the xtab or the rowsby
@@ -2266,9 +2492,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   ...            ('s2','l1', ('G', 'T')),('s2','l1', ('T', 'T')),
   ...            ('s3','l1', ('G', 'G')),('s3','l1', ('G', 'G'))]
   >>> triples = GenotripleStream.from_tuples(triples).sorted('sample')
-  >>> genos = build_genomatrixstream_from_genotriples(triples,'sdat',merge)
-  >>> for row in genos:
-  ...   print row
+  >>> build_genomatrixstream_from_genotriples(triples,'sdat',merge)
   Traceback (most recent call last):
        ...
   NonUniqueGenotypeError: Non-unique genotype found
@@ -2322,14 +2546,25 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   >>> sorted(merge.locusstats.iteritems())
   [('l1', [3, 0, 0, 0, 0]), ('l2', [3, 0, 0, 0, 0])]
   '''
+  modelmap = triples.models
+
   columns = None
   if format == 'sdat':
     rowkeyfunc,colkeyfunc,valuefunc = itemgetter(0),itemgetter(1),itemgetter(2)
     columns = tuple(sorted(triples.loci)) if triples.loci else None
+
+    def aggfunc(sample,locus,genos):
+      model = modelmap[locus]
+      return mergefunc(sample,locus,model,genos)
+
   elif format == 'ldat':
     rowkeyfunc,colkeyfunc,valuefunc = itemgetter(1),itemgetter(0),itemgetter(2)
-    mergefunc = mergefunc_transpose_adapter(mergefunc)
     columns = tuple(sorted(triples.samples)) if triples.samples else None
+
+    def aggfunc(locus,sample,genos):
+      model = modelmap[locus]
+      return mergefunc(sample,locus,model,genos)
+
   else:
     raise NotImplementedError,'triple to %s format conversion is not supported' % format
 
@@ -2340,19 +2575,38 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     order = False
 
   if columns is None or not order:
-    columns,rows,data = xtab(triples, rowkeyfunc, colkeyfunc, valuefunc, mergefunc)
-    genos = tuple(izip(rows,data))
-    rows = tuple(rows)
+    columns,rows,data = xtab(triples, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
+    genos  = tuple(izip(rows,data))
+    rows   = tuple(rows)
+    if format=='ldat':
+      models = [ modelmap[row] for row in rows ]
+    else:
+      models = [ modelmap[column] for column in columns ]
   else:
-    columns,genos = rowsby(triples, columns, rowkeyfunc, colkeyfunc, valuefunc, mergefunc)
-    # FIXME: One day we should be able to trust triples.rows
+    columns,genos = rowsby(triples, columns, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
     rows = None
+
+    models = []
+    if format=='sdat':
+      # Must generate first row to capture models
+      try:
+        row1 = genos.next()
+        models = [ modelmap[column] for column in columns ]
+        genos = chain([row1],genos)
+      except StopIteration:
+        pass
+    else:
+      def _build(genos):
+        for locus,row in genos:
+          models.append( modelmap[locus] )
+          yield locus,row
+      genos = _build(genos)
 
   columns = tuple(columns)
   if format=='ldat':
-    new_genos = GenomatrixStream(genos,format,samples=columns,loci=rows,unique=True)
+    new_genos = GenomatrixStream(genos,format,samples=columns,loci=rows,models=models,unique=True)
   else:
-    new_genos = GenomatrixStream(genos,format,loci=columns,samples=rows,unique=True)
+    new_genos = GenomatrixStream(genos,format,loci=columns,samples=rows,models=models,unique=True)
 
   return new_genos
 
@@ -2671,13 +2925,16 @@ def build_genotriples_from_genomatrix(genos):
   '''
   if genos.format=='ldat':
     order = 'locus'
+    models = {}
     def _build():
       samples = genos.samples
-      for locus,row in genos:
+      for i,(locus,row) in enumerate(genos):
+        models[locus] = genos.models[i]
         for sample,geno in izip(samples, row):
           yield sample,locus,geno
   else:
     order = 'sample'
+    models = dict( izip(genos.columns,genos.models) )
     def _build():
       loci = genos.loci
       for sample,row in genos:
@@ -2691,7 +2948,8 @@ def build_genotriples_from_genomatrix(genos):
                            or sorted(genos.loci)    != list(genos.loci)):
     order = None
 
-  return GenotripleStream(_build(), unique=genos.unique, samples=genos.samples, loci=genos.loci, order=order)
+  return GenotripleStream(_build(),samples=genos.samples,loci=genos.loci,models=models,
+                                   order=order, unique=genos.unique)
 
 
 def rename_genotriples(triples,samplemap,locusmap):
@@ -2726,13 +2984,14 @@ def rename_genotriples(triples,samplemap,locusmap):
   S2 L1 ('T', 'T')
   S2 L2 ('A', 'A')
   '''
+  # FIXME: Rename without going back to tuples, when possible
   def _rename():
     for sample,locus,geno in triples:
       if samplemap is not None:
         sample = samplemap.get(sample,sample)
       if locusmap is not None:
         locus = locusmap.get(locus,locus)
-      yield sample,locus,geno
+      yield sample,locus,geno.alleles()
 
   samples = triples.samples
   if samples and samplemap:
@@ -2742,7 +3001,8 @@ def rename_genotriples(triples,samplemap,locusmap):
   if loci and locusmap:
     loci = set(locusmap.get(l,l) for l in loci)
 
-  return triples.clone(_rename(),samples=samples,loci=loci,order=None,unique=False)
+  # FIXME: We can do more to prove uniqueness
+  return GenotripleStream.from_tuples(_rename(),samples=samples,loci=loci,order=None,unique=False)
 
 
 def filter_genotriples(triples,sampleset,locusset,exclude=False):
@@ -2870,15 +3130,48 @@ def rename_genomatrixstream_column(genos,colmap):
   ...   print row
   ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
   ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
+
+  >>> loci = ('l1','l2','l3')
+  >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'G') ]),
+  ...         ('s2',[(None, None),  ('T','T'),   (None, None)]),
+  ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
+  ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T') ])]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).materialize()
+
+  >>> colmap = {'l2':'l1'}
+  >>> genos = rename_genomatrixstream_column(genos,colmap)
+  >>> genos.loci
+  ('l1', 'l1', 'l3')
+  >>> genos.unique
+  False
+  >>> for row in genos:
+  ...   print row
+  ('s1', [('A', 'A'), (None, None), ('G', 'G')])
+  ('s2', [(None, None), ('T', 'T'), (None, None)])
+  ('s3', [('A', 'A'), (None, None), (None, None)])
+  ('s4', [('A', 'T'), (None, None), ('T', 'T')])
   '''
-  columns = tuple(colmap.get(name,name) for name in genos.columns)
-  if columns == genos.columns:
+  new_columns = tuple(colmap.get(name,name) for name in genos.columns)
+
+  if new_columns == genos.columns:
     return genos
 
+  unique_columns = (len(genos.columns) == len(set(new_columns)))
+  unique = genos.unique and unique_columns
+
   if genos.format=='ldat':
-    genos = genos.clone(genos.use_stream(), samples=columns)
+    genos = genos.clone(genos.use_stream(), samples=new_columns, unique=unique)
+  elif unique_columns:
+    genos = genos.clone(genos.use_stream(), loci=new_columns, unique=unique)
   else:
-    genos = genos.clone(genos.use_stream(), loci=columns)
+    # Non-unique sdat means that the descriptor must change
+    def _rename(genos):
+      for row_label,row in genos:
+        yield row_label,[ g.alleles() for g in row ]
+
+    # FIXME: We can specify a model map here
+    genos = GenomatrixStream.from_tuples(_rename(genos), 'sdat', loci=new_columns,
+                                         samples=genos.samples, unique=False)
 
   return genos
 
@@ -3105,7 +3398,6 @@ def reorder_genomatrixstream_rows(genos, labels):
   except KeyError:
     raise ValueError, 'Duplicated row label: %s' % l
 
-  # FIXME: Update models
   def _reorder():
     data = genos.use_stream()
     for i in indices:
@@ -3161,6 +3453,7 @@ def rename_genomatrixstream_row(genos,rowmap):
   else:
     rows = None
 
+  # FIXME: ldat must recode models for non-unique rows
   if genos.format=='ldat':
     new_genos = genos.clone(_rename(),loci=rows,materialized=False)
   else:

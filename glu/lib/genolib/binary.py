@@ -352,15 +352,18 @@ class BinaryGenotripleWriter(object):
     locusmap  = self.locusmap
     modelmap  = self.modelmap
 
+    locusnum =  locusmap.setdefault(locus, len(locusmap))
+    if locusnum not in modelmap:
+      modelmap[locusnum] = geno.model
+    else:
+      assert geno.model is modelmap[locusnum]
+
     row = self.genotypes.row
-    locusnum      =  locusmap.setdefault(locus, len(locusmap))
     row['sample'] = samplemap.setdefault(sample,len(samplemap))
     row['locus']  = locusnum
     row['geno']   = geno.index
     row.append()
 
-    if locusnum not in modelmap:
-      modelmap[locusnum] = geno.model
 
   def writerows(self, triples):
     '''
@@ -372,23 +375,29 @@ class BinaryGenotripleWriter(object):
     if self.gfile is None:
       raise IOError('Cannot write to closed writer object')
 
-    sd = self.samplemap.setdefault
-    sl = self.samplemap.__len__
-    ld = self.locusmap.setdefault
-    ll = self.locusmap.__len__
+    locusmap  = self.locusmap
+    modelmap  = self.modelmap
+    samplemap = self.samplemap
 
-    modelmap = self.modelmap
+    sd = samplemap.setdefault
+    sl = samplemap.__len__
+    ld = locusmap.setdefault
+    ll = locusmap.__len__
 
     row = self.genotypes.row
     for sample,locus,geno in triples:
       locusnum      = ld(locus,ll())
+
+      if locusnum not in modelmap:
+        modelmap[locusnum] = geno.model
+      else:
+        assert geno.model is modelmap[locusnum]
+
       row['sample'] = sd(sample,sl())
       row['locus']  = locusnum
       row['geno']   = geno.index
       row.append()
 
-      if locusnum not in modelmap:
-        modelmap[locusnum] = geno.model
 
   def close(self):
     '''
@@ -512,9 +521,9 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
       yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
     gfile.close()
 
-  # FIXME: fill in modelmap
   # FIXME: Order must be restored
-  return GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique)
+  modelmap = dict( izip(loci,models) )
+  return GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique,models=modelmap)
 
 
 def save_strings(gfile,name,data,filters=None,maxlen=None):
@@ -947,9 +956,11 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
 
   # FIXME: We also know rows
   if format=='ldat':
-    genos=GenomatrixStream(_load(),format,samples=columns,unique=unique,packed=True)
+    genos=GenomatrixStream(_load(),format,samples=columns,loci=rows,models=models,
+                                          unique=unique,packed=True)
   else:
-    genos=GenomatrixStream(_load(),format,loci=columns,unique=unique,packed=True)
+    genos=GenomatrixStream(_load(),format,loci=columns,samples=rows,models=models,
+                                          unique=unique,packed=True)
 
   return genos
 
