@@ -32,7 +32,7 @@ class GenoTransform(object):
   '''
   def __init__(self, include_samples, exclude_samples, rename_samples, order_samples,
                      include_loci,    exclude_loci,    rename_loci,    order_loci,
-                     rename_alleles=None, filter_missing=False, repack=False):
+                     recode_models=None, rename_alleles=None, repack=False, filter_missing=False):
     '''
     Create a new GenoTransform object with supplied metadata,
     which are used to specify all the operations of transforming the genostream
@@ -73,9 +73,10 @@ class GenoTransform(object):
     if not isinstance(rename_alleles, map_type):
       rename_alleles = load_rename_alleles_file(rename_alleles)
 
-    self.filter_missing_genotypes = filter_missing
+    self.recode_models            = recode_models
     self.rename_alleles           = rename_alleles
     self.repack                   = repack
+    self.filter_missing_genotypes = filter_missing
 
   @staticmethod
   def from_options(options):
@@ -105,9 +106,10 @@ class GenoTransform(object):
                                  exclude_loci=kwargs.pop('exclude_loci',   None),
                                   rename_loci=kwargs.pop('rename_loci',    None),
                                    order_loci=kwargs.pop('order_loci',     None),
-                               filter_missing=kwargs.pop('filter_missing', False),
+                                recode_models=kwargs.pop('recode_models',  None),
+                               rename_alleles=kwargs.pop('rename_alleles', None),
                                        repack=kwargs.pop('repack',         False),
-                               rename_alleles=kwargs.pop('rename_alleles', None))
+                               filter_missing=kwargs.pop('filter_missing', False))
 
     if kwargs:
       raise TypeError, "'%s' is an invalid keyword argument for this function" % kwargs.popitem()[0]

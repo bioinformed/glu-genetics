@@ -415,6 +415,10 @@ class GenotripleStream(GenotypeStream):
     if transform.rename_alleles is not None:
       triples = rename_genotriples_alleles(triples, transform.rename_alleles)
 
+    # FIXME: recoding and renaming can be combined
+    if transform.recode_models:
+      triples = recode_genotriples(triples, transform.recode_models)
+
     if transform.samples.order is not None and transform.loci.order is not None:
       if transform.samples.order is not None:
         order = 'samples'
@@ -1019,8 +1023,11 @@ class GenomatrixStream(GenotypeStream):
     if transform.filter_missing_genotypes:
       genos = filter_genomatrixstream_missing(genos)
 
-    if transform.rename_alleles is not None:
+    if transform.rename_alleles:
       genos = rename_genomatrixstream_alleles(genos,transform.rename_alleles)
+
+    if transform.recode_models is not None:
+      genos = recode_genomatrixstream(genos, transform.recode_models)
 
     # Ordering by [] and None are distinct cases: the first will order in lexicographical order
     # as a side-effect, while the latter should not alter order.
@@ -1247,6 +1254,145 @@ class GenomatrixStream(GenotypeStream):
 #######################################################################################
 
 
+def recode_genomatrixstream(genos, modelmap):
+  '''
+  Returns a new genomatrix with the genotypes encoded to a new internal representation
+
+  @param      columns: matrix column names
+  @type       columns: sequence of strs
+  @param        genos: genomatrix
+  @type         genos: genomatrix generator
+  @param     new_repr: internal representation of genotypes to be transformed to
+  @type      new_repr: UnphasedMarkerRepresentation or similar object
+  @return            : tuple of columns and a genomatrix generator in packed format
+  @rtype             : 2-tuple of list of str and genomatrix generator
+
+  >>> defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
+  >>> modelmap = {'l1':defmodel,'l2':defmodel,'l3':defmodel,'l4':defmodel}
+
+  >>> samples = ('s1', 's2', 's3')
+  >>> genos = [('l1', [ ('A', 'A'),  (None, None),   ('G', 'G') ]),
+  ...          ('l2', [(None, None), (None, None),  (None, None)]),
+  ...          ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
+  ...          ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
+  >>> genos = GenomatrixStream.from_tuples(genos, 'ldat', samples=samples)
+  >>> genos = recode_genomatrixstream(genos,modelmap).materialize()
+  >>> genos.samples
+  ('s1', 's2', 's3')
+  >>> all(model is defmodel for model in genos.models)
+  True
+  >>> for (label,row),model in izip(genos,genos.models):
+  ...   print label,row,model is defmodel,all(isinstance(g,Genotype) for g in row)
+  l1 [('A', 'A'), (None, None), ('G', 'G')] True True
+  l2 [(None, None), (None, None), (None, None)] True True
+  l3 [('A', 'A'), (None, None), (None, None)] True True
+  l4 [('G', 'T'), (None, None), ('T', 'T')] True True
+
+  >>> loci = ('l1','l2','l3', 'l4')
+  >>> genos = [('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')]),
+  ...          ('s2', [(None, None), (None, None), (None, None), (None, None)]),
+  ...          ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])]
+  >>> genos = GenomatrixStream.from_tuples(genos, 'sdat', loci=loci)
+  >>> genos = recode_genomatrixstream(genos,modelmap)
+  >>> genos.loci
+  ('l1', 'l2', 'l3', 'l4')
+  >>> all(model is defmodel for model in genos.models)
+  True
+  >>> for (label,row),model in izip(genos,genos.models):
+  ...   print label,row,all(isinstance(g,Genotype) for g in row)
+  s1 [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')] True
+  s2 [(None, None), (None, None), (None, None), (None, None)] True
+  s3 [('G', 'G'), (None, None), (None, None), ('T', 'T')] True
+
+  >>> samples =          ('s1',         's2',        's3')
+  >>> rows1 = [('l1',[ ('G', 'G'),   ('G', 'T'),  ('T', 'T')]),
+  ...          ('l2',[ ('A', 'A'),   ('T', 'T'),  ('A', 'T')])]
+  >>> rows2 = [('l1',[(None, None),  ('T', 'T'),  ('G', 'G')]),
+  ...          ('l3',[ ('A', 'A'),  (None, None), ('A', 'T')])]
+  >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples)
+  >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples)
+  >>> modelmap = {}
+  >>> genos1 = recode_genomatrixstream(genos1, modelmap).materialize()
+  >>> sorted(modelmap.keys())
+  ['l1', 'l2']
+  >>> genos2 = recode_genomatrixstream(genos2, modelmap).materialize()
+  >>> sorted(modelmap.keys())
+  ['l1', 'l2', 'l3']
+  >>> for locus,model in izip(genos1.loci,genos1.models):
+  ...   assert modelmap[locus] is model
+  >>> for locus,model in izip(genos2.loci,genos2.models):
+  ...   assert modelmap[locus] is model
+  '''
+  models = []
+
+  # FIXME: Optimize the case for ldat when rows are known and no models change
+  if genos.format=='ldat':
+    def _recode():
+      n = len(genos.samples)
+
+      descrcache = {}
+      packed = genos.packed
+
+      for i,(label,row) in enumerate(genos):
+        old_model = genos.models[i]
+
+        # Cache the descriptor for this model, since we're likely to see it again
+        if packed:
+          descrcache[old_model] = row.descriptor
+
+        # Get the new model and the descriptor
+        # Get the new model or fix the old model
+        model = modelmap.setdefault(label,old_model)
+
+        # Get or build the descriptor
+        descr = descrcache.get(model)
+        if not descr:
+          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
+
+        # If the model changed, recode by adding all genotypes and packing
+        if old_model is not model:
+          for g in set(row):
+            model.add_genotype(g.alleles())
+          row = GenotypeArray(descr,row)
+
+        # Otherwise, only repack if necessary
+        elif not packed:
+          row = GenotypeArray(descr,row)
+
+        models.append(model)
+        yield label,row
+
+  elif genos.format=='sdat':
+    # Find all models that must be updated
+    updates = []
+    for i,(locus,old_model) in enumerate(izip(genos.loci,genos.models)):
+      # Get the new model or fix the old model
+      model = modelmap.setdefault(locus,old_model)
+      if model is not old_model:
+        updates.append( (i,model.add_genotype) )
+      models.append(model)
+
+    # If none, then return the stream unchanged
+    if not updates:
+      return genos
+
+    # Otherwise, recode by adding genotypes from all changed
+    # models and packing.
+    def _recode():
+      descr = GenotypeArrayDescriptor(models)
+      for label,row in genos:
+        # Update all changed models to ensure they contain the needed alleles
+        for i,add in updates:
+          add(row[i].alleles())
+
+        # Repack and return new row
+        yield label,GenotypeArray(descr,row)
+  else:
+    raise ValueError('Uknown format')
+
+  return genos.clone(_recode(),models=models,packed=True,materialized=False)
+
+
 def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
@@ -1364,7 +1510,6 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
         yield label,GenotypeArray(descr,row)
 
   elif format=='sdat':
-    n = len(columns)
     updates = []
     known   = set(modelmap)
 
@@ -2342,10 +2487,10 @@ def merge_genomatrixstream_list(genos, mergefunc):
   >>> samples1 =        ('s1',       's2',       's3')
   >>> rows1 = [('l1',[('G', 'G'),   ('A', 'A'),  ('A', 'G')]),
   ...          ('l2',[('A', 'A'),   ('T', 'T'),  ('A', 'T')])]
-  >>> samples2 =         ('s1',       's3',        's4')
   >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples1).materialize()
 
-  >>> rows2 = [('l1',[(None, None), ('A', 'G'),  ('A', 'G')]),
+  >>> samples2 =         ('s1',       's3',        's4')
+  >>> rows2 = [('l1',[(None, None), ('G', 'G'),  ('A', 'G')]),
   ...          ('l3',[('A', 'A'),  (None, None), ('A', 'T')])]
   >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples2).materialize()
 
@@ -2390,15 +2535,25 @@ def merge_genomatrixstream_list(genos, mergefunc):
   if not all(g.format==format for g in genos):
     raise ValueError('Input genotypes must all be in same format')
 
+  modelmap = {}
+  genos = [ g.transformed(recode_models=modelmap) for g in genos ]
+
   columns = [ g.columns for g in genos ]
   if all(columns[0]==c for c in columns):
     # Pass-through from merge_genomatrix
-    mgenos = chain( *[ g.to_tuples() for g in genos ] )
-
-    if format=='ldat':
-      genos = GenomatrixStream.from_tuples(mgenos,format,samples=columns[0],unique=False)
+    # FIXME: We may actually know all of the rows
+    if format=='sdat':
+      genos = genos[0].clone(chain(*genos),samples=None,unique=False,materialized=False,packed=True)
     else:
-      genos = GenomatrixStream.from_tuples(mgenos,format,loci=columns[0],unique=False)
+      models = []
+      def _combine(genos):
+        for g in genos:
+          for i,labelrow in enumerate(g):
+            models.append(g.models[i])
+            yield labelrow
+
+      genos = genos[0].clone(_combine(genos),models=models,loci=None,
+                             unique=False,materialized=False,packed=True)
 
     return merge_genomatrixstream(genos, mergefunc)
 
@@ -2423,28 +2578,50 @@ def merge_genomatrixstream_list(genos, mergefunc):
   new_rows    = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(),   key=itemgetter(1))))
   n = len(new_columns)
 
-  def _merger():
-    # Fully general merge over duplicate rows and columns
-    for row_label in new_rows:
-      # Form lists of all genotypes at each new column for all rows with row_label
-      new_row = [ [] for i in xrange(n) ]
-
-      # Iterate over input rows and schema, find the cooresponding column
-      # mappings, and append the relevant genotypes
-      for i,rows in merge_rows.pop(row_label).iteritems():
-        for j,k in merge_columns.get(i,[]):
-           new_row[k] += (row[j] for row in rows)
-
-      # Merge genotypes
-      new_row = list(imap(mergefunc,repeat(row_label),new_columns,new_row))
-
-      # Yield new row
-      yield row_label,new_row
-
   if format=='ldat':
-    new_genos = genos[0].clone(_merger(),samples=new_columns,loci=new_rows,packed=False,materialized=False,unique=True)
+    models = [ modelmap[row_label] for row_label in new_rows ]
+    def _merger():
+      # Fully general merge over duplicate rows and columns
+      for row_label,model in izip(new_rows,models):
+        # Form lists of all genotypes at each new column for all rows with row_label
+        new_row = [ [] for i in xrange(n) ]
+
+        # Iterate over input rows and schema, find the cooresponding column
+        # mappings, and append the relevant genotypes
+        for i,rows in merge_rows.pop(row_label).iteritems():
+          for j,k in merge_columns[i]:
+             new_row[k] += (row[j] for row in rows)
+
+        # Merge genotypes
+        new_row = list(imap(mergefunc,repeat(row_label),new_columns,repeat(model),new_row))
+
+        # Yield new row
+        yield row_label,new_row
+
+    new_genos = genos[0].clone(_merger(),samples=new_columns,loci=new_rows,models=models,
+                                         packed=False,materialized=False,unique=True)
   else:
-    new_genos = genos[0].clone(_merger(),loci=new_columns,samples=new_rows,packed=False,materialized=False,unique=True)
+    def _merger():
+      # Fully general merge over duplicate rows and columns
+      models = [ modelmap[column] for column in new_columns ]
+      for row_label in new_rows:
+        # Form lists of all genotypes at each new column for all rows with row_label
+        new_row = [ [] for i in xrange(n) ]
+
+        # Iterate over input rows and schema, find the cooresponding column
+        # mappings, and append the relevant genotypes
+        for i,rows in merge_rows.pop(row_label).iteritems():
+          for j,k in merge_columns[i]:
+             new_row[k] += (row[j] for row in rows)
+
+        # Merge genotypes
+        new_row = list(imap(mergefunc,repeat(row_label),new_columns,models,new_row))
+
+        # Yield new row
+        yield row_label,new_row
+
+    new_genos = genos[0].clone(_merger(),loci=new_columns,samples=new_rows,models=models,
+                                         packed=False,materialized=False,unique=True)
 
   return new_genos
 
