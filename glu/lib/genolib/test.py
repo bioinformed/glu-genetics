@@ -13,11 +13,11 @@ Requires:      Python 2.5, glu
 Revision:      $Id$
 '''
 
-def test():
+def test(report=True):
   import os
   import doctest
 
-  from   glu.lib.genolib import binary,bitarray,genoarray,io,merge,reprs,streams
+  from   glu.lib.genolib import bitarray,binary,text,genoarray,io,merge,reprs,streams
   import streams as local_streams
 
   # Standardize on the .py source, since one can load the .py and the other the .pyc
@@ -27,7 +27,7 @@ def test():
   if not os.path.samefile(packagefile,localfile):
     raise ImportError('Your PYTHONPATH is not set correctly to find this GLU tree')
 
-  for module in binary,bitarray,genoarray,io,merge,reprs,streams:
+  for module in bitarray,binary,text,genoarray,io,merge,reprs,streams:
     doctest.testmod(module,report=False)
   doctest.master.summarize()
 
