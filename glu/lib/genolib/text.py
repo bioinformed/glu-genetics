@@ -47,7 +47,7 @@ def unique_check_genomatrixstream(genos):
                being the column meta-data
   @type rows: sequence
 
-  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'])
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[])
   >>> unique_check_genomatrixstream(genos)
   Traceback (most recent call last):
        ...
@@ -214,8 +214,6 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelma
 
       yield label,genos
 
-  #defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
-  #modelmap = defaultdict(lambda: defmodel)
   if format=='ldat':
     genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,modelmap=modelmap)
   else:
