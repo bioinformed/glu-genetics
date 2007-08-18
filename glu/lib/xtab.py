@@ -55,7 +55,7 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
 
       if aggregatefunc:
         for colkey,j in colkeys.iteritems():
-          row[j] = aggregatefunc(rowkey, colkey, row[j] or None)
+          row[j] = aggregatefunc(rowkey, colkey, row[j])
 
       yield rowkey,row
 
