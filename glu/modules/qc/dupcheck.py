@@ -13,59 +13,100 @@ Requires:      Python 2.5, glu
 Revision:      $Id$
 '''
 
+from   __future__ import division
+
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
+
 
 import sys
 import csv
 
-from   itertools          import izip, chain
-from   textwrap           import fill
+from   itertools                 import izip, chain
+from   textwrap                  import fill
+from   collections               import defaultdict
 
-from   glu.lib.utils      import percent
-from   glu.lib.fileutils  import autofile, hyphen, load_map
-from   glu.lib.union_find import union_find
-from   glu.lib.genolib    import load_genostream, snp
-from   glu.lib.sections   import save_section, SectionWriter, save_metadata_section
+from   glu.lib.utils             import percent, pair_generator
+from   glu.lib.fileutils         import autofile, hyphen, load_map
+from   glu.lib.union_find        import union_find
+from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
-
-try:
-  from dupcheckc import match_byte_array as match
-
-except ImportError:
-  print >> sys.stderr, 'WARNING: Using pure-Python version of dupcheck match function'
-
-  def match(g1, g2):
-    i = n = 0
-    for a,b in izip(g1,g2):
-      # If data are not missing
-      if a and b:
-        # Check for match
-        if a is b:
-          i += 1
-        # Count total comparisons
-        n += 1
-
-    return i,n
+from   glu.lib.genolib.io        import load_genostream
+from   glu.lib.genolib.merge     import get_genomerger
+from   glu.lib.genolib.reprs     import get_genorepr, snp, hapmap
+from   glu.lib.genolib.genoarray import genoarray_concordance, model_from_alleles
 
 
-def duplicate(genos1, genos2, threshold=0.75):
-  matches,genos = match(genos1, genos2)
+# Here for comparison purposes to experiment with unoptomized genotype
+# comparisons
+def block_pair_generator(samples,blocksize=100):
+  '''
+  Generate all distinct pairs of genotype vectors using a blocking
+  algorithm.  Blocking is helpful because genotypes are stored in a
+  bit-packed format and unpacking is fairly expensive.  Thus they are
+  unpacked in chunks so that the total number of unpacking operations is
+  reduced by a factor of the blocksize.
 
-  dup = genos and float(matches)/genos >= threshold
-  return dup,matches,genos
+  Example using 6 input samples and a block size of 2:
 
+  >>> samples = [ (i,'ACGT') for i in range(5) ]
+  >>> pairs = list(block_pair_generator(samples,blocksize=2))
 
-def generate_pairs(data):
-  n = len(data)
+  We expect (n-1)(n-2)/2 pairs, a total of 10 for 6 inputs
 
-  for i in xrange(n):
-    i1 = data[i]
+  >>> len(pairs)
+  10
 
-    for j in xrange(i+1,n):
-      i2 = data[j]
+  We can see that the pairs are distinct and seem to cover all of the
+  possibilities.
 
-      yield i1,i2
+  >>> for p1,p2 in pairs:
+  ...   print p1,p2
+  (0, 'ACGT') (1, 'ACGT')
+  (0, 'ACGT') (2, 'ACGT')
+  (0, 'ACGT') (3, 'ACGT')
+  (1, 'ACGT') (2, 'ACGT')
+  (1, 'ACGT') (3, 'ACGT')
+  (0, 'ACGT') (4, 'ACGT')
+  (1, 'ACGT') (4, 'ACGT')
+  (2, 'ACGT') (3, 'ACGT')
+  (2, 'ACGT') (4, 'ACGT')
+  (3, 'ACGT') (4, 'ACGT')
+
+  This is more easily seen after sorting the pairs.
+
+  >>> for p1,p2 in sorted(pairs):
+  ...   print p1,p2
+  (0, 'ACGT') (1, 'ACGT')
+  (0, 'ACGT') (2, 'ACGT')
+  (0, 'ACGT') (3, 'ACGT')
+  (0, 'ACGT') (4, 'ACGT')
+  (1, 'ACGT') (2, 'ACGT')
+  (1, 'ACGT') (3, 'ACGT')
+  (1, 'ACGT') (4, 'ACGT')
+  (2, 'ACGT') (3, 'ACGT')
+  (2, 'ACGT') (4, 'ACGT')
+  (3, 'ACGT') (4, 'ACGT')
+  '''
+  blocks = (len(samples)+blocksize-1)//blocksize
+
+  for i in xrange(blocks):
+    block1 = [ (id,row[:]) for id,row in samples[i*blocksize:(i+1)*blocksize] ]
+    n = len(block1)
+
+    # Output within-block pairs
+    for j in range(n):
+      for k in range(j+1,n):
+        yield block1[j],block1[k]
+
+    # Output inter-block pairs
+    for j in xrange(i+1,blocks):
+      block2 = [ (id,row[:]) for id,row in samples[j*blocksize:(j+1)*blocksize] ]
+      m = len(block2)
+
+      for j in range(n):
+        for k in range(m):
+          yield block1[j],block2[k]
 
 
 def sum_dupsets(data, union=None):
@@ -128,6 +169,7 @@ def save_results(sw, observed_dupset, expected_dups, unexpected_dups, unexpected
   save_section(sw, 'unexpected_duplicates_detected',  [(i1,i2,m,g) for i1,i2,m,g in unexpected_dups] )
   save_section(sw, 'expected_duplicates_undetected',  [(i1,i2,m,g) for i1,i2,m,g in unexpected_nondups] )
 
+
 def option_parser():
   import optparse
 
@@ -136,6 +178,11 @@ def option_parser():
 
   parser.add_option('-f','--format',  dest='format',
                     help='Input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
+                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',
+                    help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
+                         'Values=vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=vote:1')
   parser.add_option('-e', '--duplicates', dest='duplicates', metavar='FILE',
                     help='A csv file containing expected duplicates')
   parser.add_option('-d', '--dupout', dest='dupout', metavar='FILE',
@@ -146,8 +193,6 @@ def option_parser():
                     help='Threshold for the percentage of identity chasred between two individuals (default=85)')
   parser.add_option('-m', '--mincount', dest='mincount', metavar='N', type='int', default=20,
                     help='Minimum concordant genotypes to be considered informative for duplicate checking')
-  parser.add_option('-s', '--samplemap', dest='samplemap', metavar='FILE',
-                    help='Remap sample names based on map file')
   parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
 
@@ -168,32 +213,31 @@ def main():
 
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
-  if options.samplemap:
-    samplemap = load_map(options.samplemap)
-
   expected_dupset = union_find()
   observed_dupset = union_find()
 
   if options.duplicates:
     print >> sys.stderr, 'Loading expected duplicate data...',
     for dupset in csv.reader(autofile(options.duplicates), 'excel-tab'):
-      if options.samplemap:
-        dupset = [ samplemap[dup] for dup in dupset ]
       for dup in dupset:
         expected_dupset.union(dupset[0],dup)
     print >> sys.stderr, 'Done.'
 
   print >> sys.stderr, 'Loading data...',
-  samples = load_genostream(args[0], options.format, snp).as_sdat()
+  genorepr = get_genorepr(options.genorepr)
+  merger   = get_genomerger(options.merge)
 
-  if not samples.packed:
-    samples = samples.transformed(repack=True)
+  # FIXME: Ensure an 8-bit genotype representation to allow
+  #        genoarray_concordance to use accelerated version.  This may not
+  #        be sufficient for binary input formats, which will require
+  #        recoding.
+  if genorepr in (snp,hapmap):
+    defmodel = model_from_alleles('ACGTAB', max_alleles=22)
+    modelmap = defaultdict(lambda: defmodel)
+  else:
+    modelmap = None
 
-  if options.samplemap:
-    samples = samples.transformed(rename_samples=options.samplemap)
-
-  # Materialize samples
-  samples = list(samples)
+  genos = load_genostream(args[0], options.format, genorepr, modelmap=modelmap).as_sdat().materialize()
 
   print >> sys.stderr, 'Done.'
 
@@ -228,20 +272,16 @@ Output:
 
 ''' % (threshold*100,options.mincount))
 
-  pairs = generate_pairs(samples)
-
   expected_dups      = []
   unexpected_dups    = []
   unexpected_nondups = []
 
   unexpected_dupset = union_find()
 
-  for (i1,genos1),(i2,genos2) in pairs:
-    obs_dup,matches,genos = duplicate(genos1, genos2, threshold)
+  for (i1,genos1),(i2,genos2) in pair_generator(genos.use_stream()):
+    matches,comparisons = genoarray_concordance(genos1, genos2)
 
-    if matches < options.mincount:
-      obs_dup = False
-
+    obs_dup = matches>=options.mincount and comparisons and float(matches)/comparisons >= threshold
     exp_dup = (i1,i2) in expected_dupset
 
     if not obs_dup and not exp_dup:
@@ -250,7 +290,7 @@ Output:
     if obs_dup:
       observed_dupset.union(i1,i2)
 
-    d = (i1,i2,matches,genos)
+    d = (i1,i2,matches,comparisons)
     if obs_dup and exp_dup:
       expected_dups.append(d)
       expected_dupset.union(i1,i2)
@@ -271,21 +311,17 @@ Output:
     union_out = autofile(options.dupout, 'w')
     write_dupsets(options.dupout, observed_dupset)
 
-  n,m = len(expected_dups)+len(unexpected_dups),len(samples)
-  out.write('All DUPLICATE INDIVIDUALS: %d/%d = %5.2f%%\n' % (n,m,percent(n,m)))
+  out.write('All DUPLICATE INDIVIDUALS:\n')
   alldups = chain(expected_dups,unexpected_dups)
   duplicate_output_summary(out,sum_dupsets(alldups, observed_dupset))
 
-  n,m = len(expected_dups),len(samples)
-  out.write('EXPECTED DUPLICATE INDIVIDUALS: %d/%d = %5.2f%%\n' % (n,m,percent(n,m)))
+  out.write('EXPECTED DUPLICATE INDIVIDUALS:\n')
   duplicate_output_summary(out,sum_dupsets(expected_dups))
 
-  n,m = len(unexpected_dups),len(samples)
-  out.write('UNEXPECTED DUPLICATE INDIVIDUALS: %d/%d = %5.2f%%\n' % (n,m,percent(n,m)))
+  out.write('UNEXPECTED DUPLICATE INDIVIDUALS:\n')
   duplicate_output_summary(out,sum_dupsets(unexpected_dups))
 
-  n,m = len(unexpected_nondups),len(samples)
-  out.write('EXPECTED DUPLICATE INDIVIDUALS NOT DETECTED: %d/%d = %5.2f%%\n' % (n,m,percent(n,m)))
+  out.write('EXPECTED DUPLICATE INDIVIDUALS NOT DETECTED:\n')
   duplicate_output_summary(out,sum_dupsets(unexpected_nondups))
 
   out.write('EXPECTED DUPLICATE INDIVIDUALS DETECTED\n')
@@ -298,5 +334,11 @@ Output:
   duplicate_output_details(out,unexpected_nondups)
 
 
+def test():
+  import doctest
+  doctest.testmod()
+
+
 if __name__ == '__main__':
+  test()
   main()

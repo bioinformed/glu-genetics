@@ -67,7 +67,6 @@ setup (name             = 'glu',
                        Extension('glu.lib.genolib._genoarray',     ['glu/lib/genolib/_genoarray.c',
                                                                     'glu/lib/genolib/bitarrayc.c'],
                                                                    include_dirs = [numpy.get_include()]),
-                       Extension('glu.modules.qc.dupcheckc',       sources = ['glu/modules/qc/dupcheckc.c']),
                        Extension('glu.modules.tagzilla.tagzillac', sources = ['glu/modules/tagzilla/tagzillac.c']),
                        Extension('glu.modules.tagzilla.pqueue',    sources = ['glu/modules/tagzilla/pqueue.c']),
                      ])

@@ -26,11 +26,14 @@ class GenotypeError(ValueError): pass
 
 
 try:
-  from   _genoarray import GenotypeArray, Genotype, GenotypeArrayDescriptor, UnphasedMarkerModel
+  #raise ImportError    # Uncomment to test pure-Python implementation
+  from   _genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor, UnphasedMarkerModel,
+                            genoarray_concordance)
 
 except ImportError:
   from   array     import array
   from   math      import log, ceil
+  from   itertools import izip
 
   from   bitarray  import getbits,setbits
 
@@ -84,18 +87,20 @@ except ImportError:
       return len([a for a in self.alleles() if a is not None])
 
     def __repr__(self):
-      return '<Genotype: %s/%s at 0x%X>' % (self.allele1,self.allele2,id(self))
+      #return '<Genotype: %s/%s at 0x%X>' % (self.allele1,self.allele2,id(self))
+      return repr(self.alleles())
 
     def __eq__(self,other):
       geno_self  = isinstance(self,Genotype)
-      geno_other = isinstance(self,Genotype)
+      geno_other = isinstance(other,Genotype)
+
       if geno_self and geno_other:
         return self is other
 
       if geno_self:
-        self = geno.alleles()
+        self = self.alleles()
       if geno_other:
-        other = geno.alleles()
+        other = other.alleles()
 
       if not isinstance(self, tuple) or len(self) !=2 or \
          not isinstance(other,tuple) or len(other)!=2:
@@ -105,14 +110,15 @@ except ImportError:
 
     def __ne__(self,other):
       geno_self  = isinstance(self,Genotype)
-      geno_other = isinstance(self,Genotype)
+      geno_other = isinstance(other,Genotype)
+
       if geno_self and geno_other:
         return self is not other
 
       if geno_self:
-        self = geno.alleles()
+        self = self.alleles()
       if geno_other:
-        other = geno.alleles()
+        other = other.alleles()
 
       if not isinstance(self, tuple) or len(self) !=2 or \
          not isinstance(other,tuple) or len(other)!=2:
@@ -122,9 +128,9 @@ except ImportError:
 
     def __lt__(self,other):
       if isinstance(self,Genotype):
-        self = geno.alleles()
-      if isinstance(self,Genotype):
-        other = geno.alleles()
+        self = self.alleles()
+      if isinstance(other,Genotype):
+        other = other.alleles()
 
       if not isinstance(self, tuple) or len(self) !=2 or \
          not isinstance(other,tuple) or len(other)!=2:
@@ -134,9 +140,9 @@ except ImportError:
 
     def __le__(self,other):
       if isinstance(self,Genotype):
-        self = geno.alleles()
-      if isinstance(self,Genotype):
-        other = geno.alleles()
+        self = self.alleles()
+      if isinstance(other,Genotype):
+        other = other.alleles()
 
       if not isinstance(self, tuple) or len(self) !=2 or \
          not isinstance(other,tuple) or len(other)!=2:
@@ -236,9 +242,12 @@ except ImportError:
       assert geno.model is model
       setbits(self.data, startbit, geno.index, width)
 
+    def __repr__(self):
+      return repr(list(self))
+
 
   class UnphasedMarkerModel(object):
-    __slots__ = ('alleles','genotypes','genomap','bit_width', 'allow_hemizygote')
+    __slots__ = ('alleles','genotypes','genomap','bit_width','allow_hemizygote','max_alleles')
 
     def __init__(self, allow_hemizygote=False, max_alleles=2):
       self.genomap          = {}
@@ -260,7 +269,7 @@ except ImportError:
       new_width = genotype_bit_width(n,self.allow_hemizygote)
       if new_width > self.bit_width:
         raise GenotypeError('Allele cannot be added to model due to fixed bit width')
-      self.alleles.append(a)
+      self.alleles.append(allele)
 
       return n
 
@@ -270,7 +279,7 @@ except ImportError:
     __getitem__ = get_genotype
 
     def add_genotype(self, geno):
-      g = self.genomap.get_genotype(geno)
+      g = self.genomap.get(geno)
 
       # If the genotype has not already been seen for this locus
       if g is not None:
@@ -285,7 +294,7 @@ except ImportError:
       allele2 = self.alleles[index2]
 
       # Create and save new genotype
-      g = Genotype(self, index1, index2, len(self.genotypes))
+      g = Genotype(self, allele1, allele2, len(self.genotypes))
 
       if not self.allow_hemizygote and g.hemizygote():
         raise GenotypeError('Genotype model does not all hemizygous genotypes')
@@ -295,6 +304,23 @@ except ImportError:
       self.genomap[allele2,allele1] = g
 
       return g
+
+
+  def genoarray_concordance(genos1, genos2):
+    '''
+    Generate simple concordance statistics from two genotype arrays
+    '''
+    if len(genos1) != len(genos2):
+      raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
+
+    concordant = comparisons = 0
+    for a,b in izip(genos1,genos2):
+      if a and b:
+        if a is b:
+          concordant += 1
+        comparisons += 1
+
+    return concordant,comparisons
 
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
@@ -316,9 +342,11 @@ def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
 
   return model
 
+
 def model_from_genotypes(genotypes, allow_hemizygote=None, max_alleles=None):
   alleles = sorted(set(a for g in genoset for a in g if a is not None))
   return model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote, max_alleles)
+
 
 def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
   genoset = set(genotypes)
@@ -359,6 +387,7 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
 
   return model
 
+
 def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
   if max_alleles is None:
     max_alleles = len(set(alleles))
@@ -373,6 +402,35 @@ def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygo
 
   return model
 
+
+def test_concordance():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> genos1 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
+  >>> genos2 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
+  >>> genoarray_concordance(genos1,genos2)
+  (4, 4)
+
+  >>> genos1 = GenotypeArray(descr, [NN,NN,NN,NN,NN,NN])
+  >>> genos2 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
+  >>> genoarray_concordance(genos1,genos2)
+  (0, 0)
+
+  >>> genos1 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
+  >>> genos2 = GenotypeArray(descr, [NN,NN,NN,NN,NN,NN])
+  >>> genoarray_concordance(genos1,genos2)
+  (0, 0)
+
+  >>> genos1 = GenotypeArray(descr, [AA,AB,AB,BB,NN,BB])
+  >>> genos2 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
+  >>> genoarray_concordance(genos1,genos2)
+  (1, 3)
+  '''
 
 def main():
   import time
