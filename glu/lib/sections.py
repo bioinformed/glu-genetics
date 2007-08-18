@@ -207,9 +207,8 @@ def save_metadata_section(swriter, **kwargs):
   >>> sio = StringIO.StringIO()
   >>> sw = SectionWriter(sio)
   >>> save_metadata_section(sw, analysis='completion', project='GR-0460')
-  >>> sorted(sio.getvalue().split('\\r\\n'))
-  ... # doctest: +ELLIPSIS
-  ['', '[header]', 'analysis\\tcompletion', "argv\\t['sections.py']", 'cwd\\t...', 'generated\\t...', 'project\\tGR-0460', 'uname\\t...', 'user\\t...']
+  >>> sorted(sio.getvalue().split('\\r\\n')) # doctest: +ELLIPSIS
+  ['', '[header]', 'analysis\\tcompletion', "argv\\t['...']", 'cwd\\t...', 'generated\\t...', 'project\\tGR-0460', 'uname\\t...', 'user\\t...']
   '''
   header = kwargs.pop('section','header')
 
