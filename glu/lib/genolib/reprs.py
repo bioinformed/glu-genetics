@@ -234,14 +234,14 @@ class UnphasedMarkerRepresentation(object):
     if len(alleles) != 2:
       raise ValueError('Invalid genotype: %s' % geno)
 
-    rep = tuple(sorted(self.allelestr.get(a,a) for a in alleles))
+    rep = tuple(sorted(self.allelestr.setdefault(a,a) for a in alleles))
 
     if not rep or rep == self.missingrep:
       missingrep = self.missingrep
       self.strcache[geno] = missingrep
       return missingrep
 
-    self.strcache[geno] = rep
+    self.strcache[intern(geno)] = rep
     return rep
 
   def from_strings(self,genos):
