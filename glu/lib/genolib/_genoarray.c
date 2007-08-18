@@ -179,7 +179,7 @@ genotype_allele2_get(GenotypeObject *self)
 
 static PyMemberDef genotype_members[] = {
 	{"model",   T_OBJECT_EX, offsetof(GenotypeObject, model),   RO, "UnphasedMarkerModel"},
-	{"index",   T_ULONG,     offsetof(GenotypeObject, index),   RO, "index"},
+	{"index",   T_UINT,      offsetof(GenotypeObject, index),   RO, "index"},
 	{NULL}  /* Sentinel */
 };
 
@@ -624,8 +624,8 @@ genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 {
 	PyObject *index;
 
-        if(allele != Py_None && !PyString_Check(allele))
-        {
+	if(allele != Py_None && !PyString_Check(allele))
+	{
 		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
 		return NULL;
 	}
@@ -645,10 +645,10 @@ genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 {
 	Py_ssize_t result;
 
-        assert(!PyErr_Occurred());
+	assert(!PyErr_Occurred());
 
-        if(allele != Py_None && !PyString_Check(allele))
-        {
+	if(allele != Py_None && !PyString_Check(allele))
+	{
 		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
 		return -1;
 	}
@@ -870,7 +870,7 @@ genomodel_init(UnphasedMarkerModelObject *self, PyObject *args, PyObject *kw)
 	self->allow_hemizygote = PyObject_IsTrue(allow_hemizygote);
 	if((short)self->allow_hemizygote == -1) return -1;
 
-        self->max_alleles = n;
+	self->max_alleles = n;
 	self->genomap     = PyDict_New();
 	self->alleles     = PyList_New(0);
 	self->genotypes   = PyList_New(0);
@@ -1711,7 +1711,8 @@ genoarray_concordance_bytes(PyObject *self, PyObject *args)
 {
 	GenotypeArrayObject *genos1, *genos2;
 	const unsigned char *g1, *g2;
-	Py_ssize_t len1, len2, concordant, comparisons, i;
+	const unsigned int *offsets;
+	Py_ssize_t len, len1, len2, concordant, comparisons, i;
 
 	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
 		return NULL;
@@ -1730,13 +1731,24 @@ genoarray_concordance_bytes(PyObject *self, PyObject *args)
 
 	if(genos1->descriptor != genos2->descriptor)
 	{
-		PyErr_SetString(PyExc_TypeError,"genos1 and genos2 must share the same descriptor");
+		PyErr_SetString(PyExc_ValueError,"genos1 and genos2 must share the same descriptor");
 		return NULL;
 	}
 
 	if(genos1->descriptor->homogeneous != 8)
 	{
-		PyErr_SetString(PyExc_TypeError, "genotype arrays must have homogeneous 8 bit width");
+		PyErr_SetString(PyExc_ValueError, "genotype arrays must have homogeneous 8 bit width");
+		return NULL;
+	}
+
+	len = descr_length(genos1->descriptor);
+	if(len < 0) return NULL;
+
+	offsets = (const unsigned int *)PyArray_DATA(genos1->descriptor->offsets);
+
+	if(offsets[0] != 0)
+	{
+		PyErr_SetString(PyExc_ValueError, "genotype array data must begin with zero offset");
 		return NULL;
 	}
 
@@ -1752,19 +1764,18 @@ genoarray_concordance_bytes(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (len1 != len2)
+	if (len1 != len2 || len>len1)
 	{
-		PyErr_Format(PyExc_ValueError,
-		             "genotype array sizes do not match: %zd != %zd",
+		PyErr_Format(PyExc_ValueError, "genotype array sizes do not match: %zd != %zd",
 			     len1, len2);
 		return NULL;
 	}
 
 	concordant = comparisons = 0;
-	for(i = 0; i < len1; ++i)
+	for(i = 0; i < len; ++i)
 	{
-		unsigned char a = g1[i];
-		unsigned char b = g2[i];
+		const unsigned char a = g1[i];
+		const unsigned char b = g2[i];
 
 		/* If both genotypes are not missing */
 		if(a && b)
@@ -1790,8 +1801,11 @@ genoarray_concordance(PyObject *self, PyObject *args)
 	{
 		GenotypeArrayObject *g1 = (GenotypeArrayObject *)genos1;
 		GenotypeArrayObject *g2 = (GenotypeArrayObject *)genos2;
+		unsigned int   *offsets = (unsigned int *)PyArray_DATA(g1->descriptor->offsets);
 		if(g1->descriptor == g2->descriptor &&
-		   g1->descriptor->homogeneous == 8)
+		   g1->descriptor->homogeneous == 8 &&
+		   descr_length(g1->descriptor) > 0 &&
+		   offsets[0] == 0)
 			return genoarray_concordance_bytes(self, args);
 	}
 
@@ -1805,8 +1819,7 @@ genoarray_concordance(PyObject *self, PyObject *args)
 	len2 = PySequence_Fast_GET_SIZE(genos2);
 
 	if (len1 != len2) {
-		PyErr_Format(PyExc_ValueError,
-		             "genotype array sizes do not match: %zd != %zd",
+		PyErr_Format(PyExc_ValueError,"genotype array sizes do not match: %zd != %zd",
 			     len1, len2);
 		goto error;
 	}
