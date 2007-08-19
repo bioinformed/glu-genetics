@@ -1549,7 +1549,15 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
       else:
         for sample,row in genos:
           for i,add in updates:
-            add(row[i])
+            # Aggressively form homozygote genotypes and cache them.  Thus
+            # we only see cache misses when we encounter previously
+            # unobserved alleles.
+            g = g1,g2 = row[i]
+            if g1!=g2:
+              add( (g1,g1) )
+              add( (g2,g2) )
+            add(g)
+
           yield sample,GenotypeArray(descr,row)
   else:
     raise ValueError('Uknown format')
@@ -1712,6 +1720,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
       cache = cachemap.get(model)
       if cache is None:
         cache = cachemap[model] = dict( (to_string(g),g) for g in model.genotypes )
+        cache.update( (genorepr.to_string_from_alleles((g[1],g[0])),g) for g in model.genotypes )
         for g in genorepr.missing_geno_strs:
           cache[g] = model[None,None]
 
@@ -1727,7 +1736,17 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
           row = GenotypeArray(descr,imap(getitem, cachelist, row) )
         except KeyError:
           for (update,cache),gstr,g in izip(updates,row,from_strings(row)):
+            # Aggressively form homozygote genotypes and cache them.  Thus
+            # we only see cache misses when we encounter previously
+            # unobserved alleles or when genotype formatting is off.
+            g1,g2 = g
+            if g1!=g2:
+              gh = g1,g1
+              cache[genorepr.to_string_from_alleles(gh)] = update(gh)
+              gh = g2,g2
+              cache[genorepr.to_string_from_alleles(gh)] = update(gh)
             cache[gstr] = update(g)
+
           row = GenotypeArray(descr,imap(getitem, cachelist, row) )
 
         yield sample,row

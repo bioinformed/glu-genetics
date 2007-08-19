@@ -74,7 +74,6 @@ class UnphasedMarkerRepresentation(object):
 
     self.allelerep  = {None:self.missing_allele_str}
     self.allelestr  = dict( (m,None) for m in missing_allele_strs )
-    self.missingrep = (None,None)
     self.missing    = None
     self.strcache   = {}
 
@@ -113,23 +112,52 @@ class UnphasedMarkerRepresentation(object):
     >>> marker.to_string( model[None,None])
     ''
     '''
-    rep = rep.alleles()
+    return self.to_string_from_alleles(rep.alleles())
 
+  def to_string_from_alleles(self,rep):
+    '''
+    Transform a genotype tuple to a genotype string
+
+    @param rep: genotype in tuple format
+    @type  rep: object
+    @return   : genotype in string format
+    @rtype    : str
+
+    >>> model=model_from_alleles('AG',allow_hemizygote=True)
+    >>> snp.to_string_from_alleles( ('A','A') )
+    'AA'
+    >>> snp.to_string_from_alleles( (None, 'A') )
+    ' A'
+    >>> snp.to_string_from_alleles( ('A', None) )
+    'A '
+    >>> snp.to_string_from_alleles( (None,None))
+    '  '
+    >>> hapmap.to_string_from_alleles( ('A','A') )
+    'AA'
+    >>> hapmap.to_string_from_alleles( (None, 'A') )
+    'NA'
+    >>> hapmap.to_string_from_alleles( ('A', None) )
+    'AN'
+    >>> hapmap.to_string_from_alleles( (None,None))
+    'NN'
+    >>> marker.to_string_from_alleles( ('A','A') )
+    'A/A'
+    >>> marker.to_string_from_alleles( (None, 'A') )
+    '/A'
+    >>> marker.to_string_from_alleles( ('A', None) )
+    'A/'
+    >>> marker.to_string_from_alleles( (None,None))
+    ''
+    '''
     strcache = self.strcache
     if rep in strcache:
       return strcache[rep]
 
-    if not rep or rep == self.missingrep:
+    if rep == (None,None):
       if self.missing_geno_str is not Nothing:
-        strcache[rep] = self.missing_geno_str
         return self.missing_geno_str
-      trep = self.missingrep
-    else:
-      trep = rep
-
-    trep = self.delimiter.join(self.allelerep.get(a,a) for a in trep)
-    strcache[rep] = trep
-    return trep
+    gstr = strcache[rep] = self.delimiter.join(self.allelerep.setdefault(a,a) for a in rep)
+    return gstr
 
   def to_strings(self,reps):
     '''
@@ -222,9 +250,8 @@ class UnphasedMarkerRepresentation(object):
       return strcache[geno]
 
     if geno in self.missing_geno_strs:
-      missingrep = self.missingrep
-      self.strcache[geno] = missingrep
-      return missingrep
+      rep = self.strcache[geno] = (None,None)
+      return rep
 
     if self.delimiter:
       alleles = geno.split(self.delimiter)
@@ -234,14 +261,9 @@ class UnphasedMarkerRepresentation(object):
     if len(alleles) != 2:
       raise ValueError('Invalid genotype: %s' % geno)
 
-    rep = tuple(sorted(self.allelestr.setdefault(a,a) for a in alleles))
+    rep = self.strcache[intern(geno)] = \
+          tuple(sorted(self.allelestr.setdefault(a,a) for a in alleles))
 
-    if not rep or rep == self.missingrep:
-      missingrep = self.missingrep
-      self.strcache[geno] = missingrep
-      return missingrep
-
-    self.strcache[intern(geno)] = rep
     return rep
 
   def from_strings(self,genos):
