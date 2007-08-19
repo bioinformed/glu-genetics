@@ -123,6 +123,7 @@ def load_genomatrix_hapmap(filename,limit=None):
       if len(alleles) != 2 or any(a not in 'ACGT' for a in alleles):
         alleles = tuple(set(a for g in genos for a in g if a!='N'))
 
+      # FIXME: Add error recovery and detection
       assert len(alleles)<=2
       assert len(genos) == n
 
@@ -205,12 +206,12 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelma
     local_intern = intern
     local_strip  = str.strip
 
-    for i,row in enumerate(rows):
+    for row in rows:
       label = local_intern(local_strip(row[0]))
       genos = row[1:]
 
       if len(genos) != n:
-        raise ValueError('Invalid genotype matrix row on line %d of %s' % (i+1,namefile(filename)))
+        raise ValueError('Invalid genotype matrix row on line %d of %s' % (rows.line_num+1,namefile(filename)))
 
       yield label,genos
 
@@ -531,11 +532,11 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,modelmap=None
     local_strip  = str.strip
     repr         = genorepr.from_string
 
-    for i,row in enumerate(rows):
+    for row in rows:
       if not row:
         continue
       elif len(row) != 3:
-        raise ValueError('Invalid genotriple on line %d of %s' % (i+1,namefile(filename)))
+        raise ValueError('Invalid genotriple on line %d of %s' % (rows.line_num+1,namefile(filename)))
 
       sample = local_intern(local_strip(row[0]))
       locus  = local_intern(local_strip(row[1]))
