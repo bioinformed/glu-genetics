@@ -2,11 +2,13 @@
 '''
 File:          dupcheck.py
 
-Authors:
+Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
 Created:
 
-Abstract:
+Abstract:      Detect expected and unexpected duplicate samples based on
+               expected sample equivalence and empirical genotype
+               concordance rate
 
 Requires:      Python 2.5, glu
 
@@ -141,7 +143,7 @@ def duplicate_output_summary(out,data):
 
   e = ' '*22
   for r,(p,m,s) in enumerate(data):
-    text = fill(', '.join(s), initial_indent=e,subsequent_indent=e,width=79).lstrip(' ')
+    text = fill(', '.join(sorted(s)), initial_indent=e,subsequent_indent=e,width=79).lstrip(' ')
     out.write('  %4d  %5.1f%%  %4d  %s\n' % (r+1,p,m,text))
   out.write('\n\n')
 
@@ -162,6 +164,7 @@ def write_dupsets(filename, dupsets):
   out = csv.writer(autofile(filename, 'w'),dialect='excel-tab')
   for dset in dupsets.sets():
     out.writerow( list(dset) )
+
 
 def save_results(sw, observed_dupset, expected_dups, unexpected_dups, unexpected_nondups):
   save_section(sw, 'expected_duplicates',             map(list, observed_dupset.sets()) )
@@ -231,13 +234,17 @@ def main():
   #        genoarray_concordance to use accelerated version.  This may not
   #        be sufficient for binary input formats, which will require
   #        recoding.
-  if genorepr in (snp,hapmap):
-    defmodel = model_from_alleles('ACGTAB', max_alleles=22)
+  #        Optimization currently disabled until support for default models
+  #        or alphabets has been added.
+
+  if 0 and genorepr in (snp,hapmap):
+    defmodel = model_from_alleles('ACGTB')
     modelmap = defaultdict(lambda: defmodel)
   else:
     modelmap = None
 
-  genos = load_genostream(args[0], options.format, genorepr, modelmap=modelmap).as_sdat().materialize()
+  genos = load_genostream(args[0], options.format, genorepr, modelmap=modelmap)
+  genos = genos.as_sdat(merger).materialize()
 
   print >> sys.stderr, 'Done.'
 
@@ -286,6 +293,9 @@ Output:
 
     if not obs_dup and not exp_dup:
       continue
+
+    if i1>i2:
+      i1,i2=i2,i1
 
     if obs_dup:
       observed_dupset.union(i1,i2)

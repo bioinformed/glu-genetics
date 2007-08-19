@@ -350,7 +350,9 @@ def main():
   #        genoarray_concordance to use accelerated version.  This may not
   #        be sufficient for binary input formats, which will require
   #        recoding.
-  if genorepr in (snp,hapmap):
+  #        Optimization currently disabled until support for default models
+  #        or alphabets has been added.
+  if 0 and genorepr in (snp,hapmap):
     defmodel = model_from_alleles('ACGTAB', max_alleles=22)
     modelmap = defaultdict(lambda: defmodel)
   else:
