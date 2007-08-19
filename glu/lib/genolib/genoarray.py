@@ -151,7 +151,7 @@ except ImportError:
       return self<=other
 
 
-  def genotype_bit_width(n,allow_hemizygote):
+  def genotype_bit_size(n,allow_hemizygote):
     if allow_hemizygote:
       m = (n+1)*(n+2)//2
     else:
@@ -173,7 +173,7 @@ except ImportError:
 
       offsets[0] = initial_offset
       for i,m in enumerate(models):
-        offsets[i+1] = offsets[i] + m.bit_width
+        offsets[i+1] = offsets[i] + m.bit_size
 
       self.models    = models
       self.offsets   = offsets
@@ -210,7 +210,7 @@ except ImportError:
 
       model    = descr.models[i]
       startbit = descr.offsets[i]
-      width    = model.bit_width
+      width    = model.bit_size
       j        = getbits(self.data, startbit, width)
 
       return model.genotypes[j]
@@ -237,7 +237,7 @@ except ImportError:
 
       model    = descr.models[i]
       startbit = descr.offsets[i]
-      width    = model.bit_width
+      width    = model.bit_size
 
       assert geno.model is model
       setbits(self.data, startbit, geno.index, width)
@@ -247,14 +247,14 @@ except ImportError:
 
 
   class UnphasedMarkerModel(object):
-    __slots__ = ('alleles','genotypes','genomap','bit_width','allow_hemizygote','max_alleles')
+    __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_alleles')
 
     def __init__(self, allow_hemizygote=False, max_alleles=2):
       self.genomap          = {}
       self.genotypes        = []
       self.alleles          = []
       self.max_alleles      = max_alleles
-      self.bit_width        = genotype_bit_width(max_alleles,allow_hemizygote)
+      self.bit_size         = genotype_bit_size(max_alleles,allow_hemizygote)
       self.allow_hemizygote = allow_hemizygote
       self.add_genotype( (None,None) )
 
@@ -266,8 +266,8 @@ except ImportError:
         return self.alleles.index(allele)
 
       n = len(self.alleles)
-      new_width = genotype_bit_width(n,self.allow_hemizygote)
-      if new_width > self.bit_width:
+      new_width = genotype_bit_size(n,self.allow_hemizygote)
+      if new_width > self.bit_size:
         raise GenotypeError('Allele cannot be added to model due to fixed bit width')
       self.alleles.append(allele)
 
@@ -403,7 +403,7 @@ def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygo
   return model
 
 
-def test_concordance():
+def test_concordance_generic():
   '''
   >>> model = model_from_alleles('AB')
   >>> descr = GenotypeArrayDescriptor([model]*6)
@@ -411,26 +411,114 @@ def test_concordance():
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
   >>> NN,AA,AB,BB = model.genotypes
 
-  >>> genos1 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
-  >>> genos2 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
-  >>> genoarray_concordance(genos1,genos2)
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)[:]
+
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN]),g([NN,AA,AB,AB,BB,NN]))
   (4, 4)
-
-  >>> genos1 = GenotypeArray(descr, [NN,NN,NN,NN,NN,NN])
-  >>> genos2 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
-  >>> genoarray_concordance(genos1,genos2)
+  >>> genoarray_concordance(g([NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN]))
   (0, 0)
-
-  >>> genos1 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
-  >>> genos2 = GenotypeArray(descr, [NN,NN,NN,NN,NN,NN])
-  >>> genoarray_concordance(genos1,genos2)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN]),g([NN,NN,NN,NN,NN,NN]))
   (0, 0)
-
-  >>> genos1 = GenotypeArray(descr, [AA,AB,AB,BB,NN,BB])
-  >>> genos2 = GenotypeArray(descr, [NN,AA,AB,AB,BB,NN])
-  >>> genoarray_concordance(genos1,genos2)
+  >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
   (1, 3)
   '''
+
+def test_concordance_4bit():
+  '''
+  >>> model = model_from_alleles('AB',max_alleles=5)
+  >>> model.bit_size
+  4L
+
+  Test even number of genotypes
+
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)
+
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (4, 4)
+  >>> genoarray_concordance(g([NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN]),g([NN,NN,NN,NN,NN,NN]))
+  (0, 0)
+  >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
+  (1, 3)
+
+  Test odd number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*7)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN,AB]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (5, 5)
+  >>> genoarray_concordance(g([NN,NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (0, 0)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN,AA]),g([NN,NN,NN,NN,NN,NN,NN]))
+  (0, 0)
+  >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB,AB]),g([NN,AA,AB,AB,BB,NN,BB]))
+  (1, 4)
+  '''
+
+def test_concordance_2bit():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> model.bit_size
+  2L
+
+  Test even number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)
+
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (4, 4)
+  >>> genoarray_concordance(g([NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN]),g([NN,NN,NN,NN,NN,NN]))
+  (0, 0)
+  >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
+  (1, 3)
+
+  Test odd number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*7)
+
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN,AB]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (5, 5)
+  >>> genoarray_concordance(g([NN,NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (0, 0)
+  >>> genoarray_concordance(g([NN,AA,AB,AB,BB,NN,AA]),g([NN,NN,NN,NN,NN,NN,NN]))
+  (0, 0)
+  >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB,AB]),g([NN,AA,AB,AB,BB,NN,BB]))
+  (1, 4)
+
+  Test fractions of a byte
+
+  >>> descr = GenotypeArrayDescriptor([model]*1)
+  >>> genoarray_concordance(g([AA]),g([AA]))
+  (1, 1)
+  >>> descr = GenotypeArrayDescriptor([model]*2)
+  >>> genoarray_concordance(g([AA,AB]),g([AA,BB]))
+  (1, 2)
+  >>> descr = GenotypeArrayDescriptor([model]*3)
+  >>> genoarray_concordance(g([AA,AB,BB]),g([AA,BB,AA]))
+  (1, 3)
+  >>> descr = GenotypeArrayDescriptor([model]*4)
+  >>> genoarray_concordance(g([AA,AB,BB,AA]),g([AA,BB,AA,BB]))
+  (1, 4)
+  >>> descr = GenotypeArrayDescriptor([model]*5)
+  >>> genoarray_concordance(g([AA,AB,BB,AA,AA]),g([AA,BB,AA,BB,AA]))
+  (2, 5)
+  '''
+
 
 def main():
   import time
@@ -507,7 +595,7 @@ def main():
 
   if 0:
     snp_ab = model_from_alleles('AB',allow_hemizygote=True)
-    print snp_ab.bit_width
+    print snp_ab.bit_size
     print snp_ab.alleles
     print snp_ab.genotypes
     print snp_ab.genomap
