@@ -107,9 +107,9 @@ def completion(genos, droppedrows=0, droppedcols=0):
     rcomp = rowcomp.setdefault(rowkey,[0,0])
     for ccomp,geno in items:
       # Dirty python trick where not missing == 0, missing == 1
-      g = geno==0
-      rcomp[g] += 1
-      ccomp[g] += 1
+      missing = not geno
+      rcomp[missing] += 1
+      ccomp[missing] += 1
 
   print >> sys.stderr, 'Done.'
 
@@ -205,9 +205,9 @@ def main():
     parser.print_help()
     return
 
-  genos  = load_genostream(args[0],options.format,snp)
+  genos = load_genostream(args[0],options.format,snp)
 
-  if format not in ('sdat','ldat'):
+  if genos.format not in ('sdat','ldat'):
     genos = genos.as_ldat()
 
   if genos.format=='sdat':

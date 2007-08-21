@@ -203,9 +203,9 @@ def count_missing(genotriples):
   loccomp = defaultdict(lambda: [0,0])
 
   for sample,locus,geno in genotriples:
-    g = not geno
-    samcomp[sample][g] += 1
-    loccomp[locus][g]  += 1
+    missing = not geno
+    samcomp[sample][missing] += 1
+    loccomp[locus][missing]  += 1
   return samcomp,loccomp
 
 
