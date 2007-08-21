@@ -27,26 +27,30 @@ __license__   = 'See GLU license for terms by running: glu license'
 import os
 import sys
 
-from   glu.lib.utils      import pick
-from   glu.lib.fileutils  import hyphen, load_map
-from   glu.lib.genolib    import get_genorepr
-from   glu.lib.genolib.io import load_genostream, TextGenomatrixWriter, TextGenotripleWriter
+from   collections               import defaultdict
+
+from   glu.lib.utils             import pick
+from   glu.lib.fileutils         import hyphen, load_map
+from   glu.lib.genolib           import get_genorepr
+from   glu.lib.genolib.io        import load_genostream, guess_outformat,               \
+                                        TextGenomatrixWriter, TextGenotripleWriter,     \
+                                        BinaryGenomatrixWriter, BinaryGenotripleWriter
+from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor, GenotypeArray
 
 
-def genomatrix_multiplexer(format, header, matrix, samplegroups, locusgroups,
-                               defaultsamplegroup, defaultlocusgroup):
+def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup, defaultlocusgroup):
   '''
   Sequentially split the contents of a genotype matrix into groups of rows
   and columns based on supplied mappings from row and column labels to group
   identifiers.  No buffering is performed, so partial results are returned
   tagged by the row and column group keys.
   '''
-  if format == 'ldat':
+  if genos.format == 'ldat':
     rowgroups          = locusgroups
     columngroups       = samplegroups
     defaultrowgroup    = defaultlocusgroup
     defaultcolumngroup = defaultsamplegroup
-  elif format == 'sdat':
+  elif genos.format == 'sdat':
     rowgroups          = samplegroups
     columngroups       = locusgroups
     defaultrowgroup    = defaultsamplegroup
@@ -54,41 +58,74 @@ def genomatrix_multiplexer(format, header, matrix, samplegroups, locusgroups,
   else:
     raise ValueError('Unknown genotype matrix format')
 
+  header = genos.columns
+
   rdefault = [defaultrowgroup   ] if defaultrowgroup    else []
   cdefault = [defaultcolumngroup] if defaultcolumngroup else []
 
   if columngroups is not None:
-    groupcols = {}
-    for i,colkey in enumerate(header):
+    groupcols = defaultdict(list)
+    for i,colkey in enumerate(genos.columns):
       for columngroup in columngroups.get(colkey, cdefault):
         if columngroup:
-          groupcols.setdefault(columngroup,[]).append(i)
+          groupcols[columngroup].append(i)
 
-    groupcols = [ (key,indices,pick(header,indices)) for key,indices in groupcols.iteritems() ]
+    if genos.format == 'sdat':
+      groupcols = [ (key,indices,
+                         GenotypeArrayDescriptor(pick(genos.models,indices)),
+                         pick(genos.columns,indices))
+                    for key,indices in groupcols.iteritems() ]
+    else:
+      descrcache = {}
+      groupcols = [ (key,indices,
+                         None,
+                         pick(genos.columns,indices))
+                    for key,indices in groupcols.iteritems() ]
 
   # This used to be a single loop, but performance is an issue and breaking
   # out the cases helps significantly.  One day Python will have a JIT and
   # take care of this for me...
   if columngroups and rowgroups:
-    for rowkey,genos in matrix:
-      for rowgroup in rowgroups.get(rowkey, rdefault):
-        for columngroup,indices,header in groupcols:
-          yield (rowgroup,columngroup),header,rowkey,pick(genos[:],indices)
+    for rowkey,row in genos:
+      models = row.descriptor.models
+      row = row[:]
+      for rowgroup in rowgroups.get(rowkey) or rdefault:
+        if not rowgroup:
+          continue
+        for columngroup,indices,descr,header in groupcols:
+          if not descr:
+            n     = len(indices)
+            model = models[0]
+            descr = descrcache.get( (model,n) )
+          if not descr:
+            descr = descrcache[model,n] = GenotypeArrayDescriptor([model]*n)
+          grow = GenotypeArray(descr,pick(row,indices))
+          yield (rowgroup,columngroup),header,(rowkey,grow)
 
   elif columngroups:
-    for rowkey,genos in matrix:
-      for columngroup,indices,header in groupcols:
-        yield (None,columngroup),header,rowkey,pick(genos[:],indices)
+    for rowkey,row in genos:
+      models = row.descriptor.models
+      row = row[:]
+      for columngroup,indices,descr,header in groupcols:
+        if not descr:
+          n     = len(indices)
+          model = models[0]
+          descr = descrcache.get( (model,n) )
+        if not descr:
+          descr = descrcache[model,n] = GenotypeArrayDescriptor([model]*n)
+        grow = GenotypeArray(descr,pick(row,indices))
+        yield (None,columngroup),header,(rowkey,grow)
 
   elif rowgroups:
-    for rowkey,genos in matrix:
-      for rowgroup in rowgroups.get(rowkey, rdefault):
-        yield (rowgroup,None),header,rowkey,genos
+    for rowkey,row in genos:
+      for rowgroup in rowgroups.get(rowkey) or rdefault:
+        if rowgroup:
+          yield (rowgroup,None),header,(rowkey,row)
 
   elif defaultrowgroup or defaultcolumngroup:
     key = (defaultrowgroup,defaultcolumngroup)
-    for rowkey,genos in matrix:
-      yield key,header,rowkey,genos
+    for row in genos:
+      yield key,header,row
 
 
 def genotriple_multiplexer(triples, samplegroups, locusgroups, sampledefault, locusdefault):
@@ -108,38 +145,56 @@ def genotriple_multiplexer(triples, samplegroups, locusgroups, sampledefault, lo
     for sample,locus,geno in triples:
       for samplegroup in samplegroups.get(sample, sdefault):
         for locusgroup in samplegroups.get(locus, ldefault):
-          yield (samplegroup,locusgroup),sample,locus,geno
+          yield (samplegroup,locusgroup),None,(sample,locus,geno)
 
   elif samplegroups:
     for sample,locus,geno in triples:
       for samplegroup in samplegroups.get(sample, sdefault):
-        yield (samplegroup,None),sample,locus,geno
+        yield (samplegroup,None),None,(sample,locus,geno)
 
   elif locusgroups:
     for sample,locus,geno in triples:
       for locusgroup in locusgroups.get(locus, ldefault):
-        yield (None,locusgroup),sample,locus,geno
+        yield (None,locusgroup),None,(sample,locus,geno)
 
   elif sampledefault or locusdefault:
     key = (sampledefault,locusdefault)
     for sample,locus,geno in triples:
-      yield key,sample,locus,geno
+      yield key,None,(sample,locus,geno)
 
 
-class RollingTextGenomatrixWriter(object):
+def getWriter(filename,format,header=None,genorepr=None,maxrows=None):
+  if maxrows:
+    return RollingWriter(filename,header,format,maxrows,header,genorepr)
+  elif format in ('ldat','sdat'):
+    return TextGenomatrixWriter(filename,format,header,genorepr=genorepr)
+  elif format == 'lbat':
+    return BinaryGenomatrixWriter(filename,'ldat',header)
+  elif format == 'sbat':
+    return BinaryGenomatrixWriter(filename,'sdat',header)
+  elif format in ('trip','genotriple'):
+    return TextGenotripleWriter(filename,genorepr)
+  elif format == 'tbat':
+    return BinaryGenotripleWriter(filename)
+  else:
+    raise ValueError('Unknown format')
+
+
+class RollingWriter(object):
   '''
-  A wrapper around TextGenomatrixWriter that accepts a maximum number of
-  rows per file.  Once that limit is reached, another filed is opened.
+  A wrapper around Text and Binary Writer objects that accepts a maximum
+  number of rows per file.  Once that limit is reached, another filed is
+  opened.
   '''
-  def __init__(self, filename, format, header, genorepr, maxrows):
+  def __init__(self, filename, format, maxrows, header=None, genorepr=None):
     self.filename = filename
     self.format   = format
+    self.maxrows  = maxrows
     self.header   = header
     self.genorepr = genorepr
 
     self.rows     = sys.maxint
     self.cycles   = 0
-    self.maxrows  = maxrows
     self.writer   = None
 
   def cycle(self):
@@ -154,17 +209,17 @@ class RollingTextGenomatrixWriter(object):
       prefix,suffix = split_fullname(self.filename,'')
       filename = build_filename(prefix + '_part', suffix, (self.cycles,) )
 
-    self.writer = TextGenomatrixWriter(filename,self.format,self.header,self.genorepr)
+    self.writer = getWriter(filename,self.format,header=self.header,genorepr=self.genorepr)
 
-  def writerow(self,rowkey,genos):
+  def writerow(self, *row):
     if self.rows >= self.maxrows:
       self.cycle()
     self.rows += 1
-    self.writer.writerow(rowkey,genos)
+    self.writer.writerow(*row)
 
   def writerows(self,rows):
-    for rowkey,genos in rows:
-      self.writerow(rowkey, genos)
+    for row in rows:
+      self.writerow(*row)
 
   def close(self):
     if self.writer is not None:
@@ -181,139 +236,38 @@ class RollingTextGenomatrixWriter(object):
     self.close()
 
 
-class RollingTextGenotripleWriter(object):
-  '''
-  A wrapper around TextGenotripleWriter that accepts a maximum number of
-  rows per file.  Once that limit is reached, another filed is opened.
-  '''
-  def __init__(self, filename, genorepr, maxrows):
-    self.filename = filename
-    self.genorepr = genorepr
-
-    self.rows     = sys.maxint
-    self.cycles   = 0
-    self.maxrows  = maxrows
-    self.writer   = None
-
-  def cycle(self):
-    self.cycles += 1
-    self.rows    = 0
-
-    self.close()
-
-    try:
-      filename = self.filename % self.cycles
-    except TypeError:
-      prefix,suffix = split_fullname(self.filename,'')
-      filename = build_filename(prefix + '_part', suffix, (self.cycles,) )
-
-    self.writer = TextGenotripleWriter(filename,self.genorepr)
-
-  def writerow(self, sample, locus, geno):
-    if self.rows >= self.maxrows:
-      self.cycle()
-    self.rows += 1
-    self.writer.writerow(sample,locus,geno)
-
-  def writerows(self,triples):
-    for sample,locus,geno in triples:
-      self.writerow(sample,locus,geno)
-
-  def close(self):
-    if self.writer is not None:
-      self.writer.close()
-      self.writer = None
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, *exc_info):
-    self.close()
-
-  def __del__(self):
-    self.close()
-
-
-class TextGenomatrixFileMap(object):
+class FileMap(object):
   '''
   Container for TextGenomatrixWriter and RollingTextGenomatrixWriter objects
   stored by a key tuple.
   '''
-  def __init__(self, prefix, suffix, format, header, genorepr, maxrows=None):
-    self.writers  = {}
-    self.prefix   = prefix
-    self.suffix   = suffix
-    self.format   = format
-    self.header   = header
-    self.genorepr = genorepr
-    self.maxrows  = maxrows
+  def __init__(self, prefix, suffix, format, outformat=None, genorepr=None, maxrows=None):
+    self.writers   = {}
+    self.prefix    = prefix
+    self.suffix    = suffix
+    self.format    = format
+    self.outformat = outformat or format
+    self.genorepr  = genorepr
+    self.maxrows   = maxrows
 
-  def emit(self, keys, header, rowkey, genos):
-    self.get_writer(keys, header).writerow(rowkey,genos)
+  def emit(self, keys, header, row):
+    self.get_writer(keys, header).writerow(*row)
 
   def emit_sequence(self, seq):
-    for keys,header,rowkey,genos in seq:
-      self.get_writer(keys, header).writerow(rowkey,genos)
+    for keys,header,row in seq:
+      self.get_writer(keys, header).writerow(*row)
 
-  def get_writer(self, keys, header):
+  def get_writer(self, keys, header=None):
     writer = self.writers.get(keys)
 
     if writer is None:
       filename = build_filename(self.prefix, self.suffix, keys)
 
       if self.maxrows:
-        writer = RollingTextGenomatrixWriter(filename,self.format,header,self.genorepr,self.maxrows)
+        writer = RollingWriter(filename,self.outformat,self.maxrows,header=header,
+                                        genorepr=self.genorepr)
       else:
-        writer = TextGenomatrixWriter(filename,self.format,header,self.genorepr)
-
-      self.writers[keys] = writer
-
-    return writer
-
-  def close(self):
-    for writer in self.writers.itervalues():
-      writer.close()
-    self.writers = {}
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, *exc_info):
-    self.close()
-
-  def __del__(self):
-    self.close()
-
-
-class TextGenotripleFileMap(object):
-  '''
-  Container for TextGenotripleWriter and RollingTextGenotripleWriter objects stored by a
-  key tuple.
-  '''
-  def __init__(self, prefix, suffix, genorepr, maxrows=None):
-    self.writers  = {}
-    self.prefix   = prefix
-    self.suffix   = suffix
-    self.genorepr = genorepr
-    self.maxrows  = maxrows
-
-  def emit(self, keys, sample, locus, geno):
-    self.get_writer(keys).writerow(sample,locus,geno)
-
-  def emit_sequence(self, seq):
-    for keys,sample,locus,geno in seq:
-      self.get_writer(keys).writerow(sample,locus,geno)
-
-  def get_writer(self, keys):
-    writer = self.writers.get(keys)
-
-    if writer is None:
-      filename = build_filename(self.prefix, self.suffix, keys)
-
-      if self.maxrows:
-        writer = RollingTextGenotripleWriter(filename,self.genorepr,self.maxrows)
-      else:
-        writer = TextGenotripleWriter(filename,self.genorepr)
+        writer = getWriter(filename,self.outformat,header=header,genorepr=self.genorepr)
 
       self.writers[keys] = writer
 
@@ -377,45 +331,29 @@ def split_fullname(filename,destdir):
   return prefix,suffix
 
 
-def matrix_split(matrix, genorepr, prefix, suffix, options):
-  format       = matrix.format
-  header       = matrix.columns
-  maxrows      = options.maxrows
-  locusgroups  = load_map(options.locusgroups, unique=False) if options.locusgroups  else None
-  samplegroups = load_map(options.samplegroups,unique=False) if options.samplegroups else None
+def split(genos, outformat, prefix, suffix, options):
+  header       = genos.columns if genos.format in ('sdat','ldat') else None
+  locusgroups  = load_map(options.locusgroups, unique=False,default=options.defaultlocusgroup)  if options.locusgroups  else None
+  samplegroups = load_map(options.samplegroups,unique=False,default=options.defaultsamplegroup) if options.samplegroups else None
 
   if samplegroups is not None or locusgroups is not None:
-    with TextGenomatrixFileMap(prefix,suffix,format,header,genorepr,maxrows) as filecache:
-      mplx = genomatrix_multiplexer(format,header,matrix,samplegroups,locusgroups,
-                                    options.defaultsamplegroup,
-                                    options.defaultlocusgroup)
+    filecache = FileMap(prefix,suffix,genos.format,outformat=outformat,
+                        genorepr=options.genorepr,maxrows=options.maxrows)
 
+    if genos.format in ('sdat','ldat'):
+      mplx = genomatrix_multiplexer(genos,samplegroups,locusgroups,
+                                    options.defaultsamplegroup,options.defaultlocusgroup)
+    else:
+      mplx = genotriple_multiplexer(genos,samplegroups,locusgroups,
+                                    options.defaultsamplegroup,options.defaultlocusgroup)
+
+    with filecache:
       filecache.emit_sequence(mplx)
 
-  elif maxrows:
-    writer = RollingTextGenomatrixWriter('%s.%s' % (prefix,suffix),format,header,genorepr,maxrows)
-    writer.writerows(matrix)
-
-  else:
-    sys.stderr.write('Terminating: No grouping or splitting specified\n')
-
-
-def triple_split(triples, genorepr, prefix, suffix, options):
-  maxrows      = options.maxrows
-  locusgroups  = load_map(options.locusgroups, unique=False) if options.locusgroups  else None
-  samplegroups = load_map(options.samplegroups,unique=False) if options.samplegroups else None
-
-  if locusgroups is not None or samplegroups is not None:
-    with TextGenotripleFileMap(prefix,suffix,genorepr,maxrows) as filecache:
-      mplx = genotriple_multiplexer(triples,samplegroups,locusgroups,
-                                    options.defaultsamplegroup,
-                                    options.defaultlocusgroup)
-
-      filecache.emit_sequence(mplx)
-
-  elif maxrows:
-    writer = RollingTextGenotripleWriter('%s.%s' % (prefix,suffix),genorepr,maxrows)
-    writer.writerows(triples)
+  elif options.maxrows:
+    writer = RollingWriter('%s.%s' % (prefix,suffix),outformat,header=header,
+                                     genorepr=options.genorepr,maxrows=options.maxrows)
+    writer.writerows(genos)
 
   else:
     sys.stderr.write('Terminating: No grouping or splitting specified\n')
@@ -464,16 +402,13 @@ def main():
     return
   prefix,suffix = split_fullname(filename,options.destdir)
 
-  genorepr = get_genorepr(options.genorepr)
-  infile   = hyphen(args[0],sys.stdin)
-  genos    = load_genostream(infile,format=options.format,genorepr=genorepr)
+  options.genorepr = get_genorepr(options.genorepr)
 
-  if genos.format in ('sdat','ldat'):
-    matrix_split(genos, genorepr, prefix, suffix, options)
-  elif genos.format == 'genotriple':
-    triple_split(genos, genorepr, prefix, suffix, options)
-  else:
-    raise ValueError('Unsupported input file format %s' % genos.format)
+  infile   = hyphen(args[0],sys.stdin)
+  genos    = load_genostream(infile,format=options.format,genorepr=options.genorepr)
+
+  outformat = guess_outformat(infile) or options.format or genos.format
+  split(genos, outformat, prefix, suffix, options)
 
 
 if __name__ == '__main__':
