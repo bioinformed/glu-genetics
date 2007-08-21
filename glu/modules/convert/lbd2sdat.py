@@ -26,8 +26,12 @@ from   operator             import itemgetter
 
 from   glu.lib.utils        import autofile,hyphen
 from   glu.lib.sections     import read_sections
-from   glu.lib.genolib      import save_genostream, GenomatrixStream
 from   glu.lib.sequence     import norm_snp_seq, complement_base
+
+from   glu.lib.genolib.reprs     import get_genorepr
+from   glu.lib.genolib.streams   import GenomatrixStream
+from   glu.lib.genolib.io        import save_genostream
+from   glu.lib.genolib.genoarray import model_from_alleles
 
 
 def load_lbd_file(filename, gcthreshold=None):
@@ -178,10 +182,11 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
     yield locus,(a,b)
 
 
-def build_abmap(loci,usermap):
+def build_abmap(loci,usermap,modelmap):
   abmap={}
   for locus in loci:
     a,b = usermap.get(locus, ('A','B') )
+    modelmap[locus]  = model_from_alleles([a,b])
     abmap[locus,'A'] = a,a
     abmap[locus,'B'] = b,b
     abmap[locus,'H'] = a,b
@@ -210,6 +215,8 @@ def option_parser():
                     help='Target strand based on Illumina manifest file: top, bottom, forward, reverse, customer (default), anticustomer, design, antidesign')
   parser.add_option('-F','--outformat',  dest='outformat', metavar='string',
                     help='The file output format for genotype data. Values=sdat, ldat, trip or genotriple')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
+                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('-t', '--gcthreshold', dest='gcthreshold', type='float', metavar='N')
   return parser
 
@@ -247,11 +254,13 @@ def main():
 
     samples = chain(samples,more_samples)
 
-  abmap   = build_abmap(loci,user_abmap)
-  samples = convert_ab_genos(loci, samples, abmap)
-  genos   = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci)
+  modelmap = {}
+  abmap    = build_abmap(loci,user_abmap,modelmap)
+  samples  = convert_ab_genos(loci, samples, abmap)
+  genos    = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci, modelmap=modelmap)
 
-  save_genostream(hyphen(options.output,sys.stdout),genos)
+  genorepr = get_genorepr(options.genorepr)
+  save_genostream(hyphen(options.output,sys.stdout),genos,genorepr=genorepr)
 
 
 if __name__ == '__main__':
