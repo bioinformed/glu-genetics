@@ -353,7 +353,8 @@ def split(genos, outformat, prefix, suffix, options):
   elif options.maxrows:
     writer = RollingWriter('%s.%s' % (prefix,suffix),outformat,header=header,
                                      genorepr=options.genorepr,maxrows=options.maxrows)
-    writer.writerows(genos)
+    with writer:
+      writer.writerows(genos)
 
   else:
     sys.stderr.write('Terminating: No grouping or splitting specified\n')
