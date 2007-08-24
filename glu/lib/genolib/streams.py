@@ -2572,6 +2572,17 @@ def merge_genomatrixstream_list(genos, mergefunc):
   ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T'), (None, None)])
   ('l3', [('A', 'A'), (None, None), (None, None), ('A', 'T')])
 
+  >>> genos = [ g.as_sdat() for g in [genos1,genos2,genos1] ]
+  >>> genos = merge_genomatrixstream_list(genos,VoteMerger())
+  >>> genos.loci
+  ('l1', 'l2', 'l3')
+  >>> for row in genos:
+  ...   print row
+  ('s1', [('G', 'G'), ('A', 'A'), ('A', 'A')])
+  ('s2', [('A', 'A'), ('T', 'T'), (None, None)])
+  ('s3', [(None, None), ('A', 'T'), (None, None)])
+  ('s4', [('A', 'G'), (None, None), ('A', 'T')])
+
   Test fast-path for homogeneous schema:
 
   >>> samples =          ('s1',         's2',        's3')
@@ -2581,6 +2592,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
   ...          ('l3',[ ('A', 'A'),  (None, None), ('A', 'T')])]
   >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples).materialize()
   >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples).materialize()
+
   >>> genos = [genos1,genos2,genos1]
   >>> genos = merge_genomatrixstream_list(genos,VoteMerger())
   >>> genos.samples
@@ -2590,6 +2602,16 @@ def merge_genomatrixstream_list(genos, mergefunc):
   ('l1', [('G', 'G'), (None, None), (None, None)])
   ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])
   ('l3', [('A', 'A'), (None, None), ('A', 'T')])
+
+  >>> genos = [ g.as_sdat() for g in [genos1,genos2,genos1] ]
+  >>> genos = merge_genomatrixstream_list(genos,VoteMerger())
+  >>> genos.loci
+  ('l1', 'l2', 'l3')
+  >>> for row in genos:
+  ...   print row
+  ('s1', [('G', 'G'), ('A', 'A'), ('A', 'A')])
+  ('s2', [(None, None), ('T', 'T'), (None, None)])
+  ('s3', [(None, None), ('A', 'T'), ('A', 'T')])
   '''
   assert mergefunc is not None
 
@@ -2673,9 +2695,9 @@ def merge_genomatrixstream_list(genos, mergefunc):
     new_genos = genos[0].clone(_merger(),samples=new_columns,loci=new_rows,models=models,
                                          packed=False,materialized=False,unique=True)
   else:
+    models = [ modelmap[column] for column in new_columns ]
     def _merger():
       # Fully general merge over duplicate rows and columns
-      models = [ modelmap[column] for column in new_columns ]
       for sample in new_rows:
         # Form lists of all genotypes at each new column for all rows with sample
         new_row = [ [] for i in xrange(n) ]
