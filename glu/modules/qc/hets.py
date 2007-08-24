@@ -58,6 +58,10 @@ def option_parser():
 
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
+  parser.add_option('-f', '--format', dest='format',
+                    help='Input data format, either hapmap,ldat,sdat or counts')
+  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
   parser.add_option('-s', '--samplesubset',   dest='samplesubset', metavar='FILE',
                     help='List of samples to include in the analysis')
   parser.add_option('-l', '--locussubset',    dest='locussubset',  metavar='FILE',
@@ -66,10 +70,6 @@ def option_parser():
                     help='Minimum number of non-missing genotypes')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')
-  parser.add_option('-f', '--format', dest='format', default='sdat',
-                    help='Input data format, either sdat or counts (default=sdat)')
-  parser.add_option('-L', '--limit', dest='limit', metavar='N', type='int',
-                    help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
   return parser
@@ -128,7 +128,8 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genostream(args[0],options.format,snp,limit=options.limit).as_sdat()
+    genorepr = get_genorepr(options.genorepr)
+    loci = load_genostream(args[0],format=options.format,genorepr=genorepr).as_sdat()
 
     if options.locussubset:
       loci = loci.transformed(exclude_loci=options.locussubset)

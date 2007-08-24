@@ -357,22 +357,22 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-f', '--format',          dest='format',          metavar='NAME',
+                    help='Format of the input data. Values=sdat,ldat,hapmap,genotriple')
+  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
   parser.add_option('-o', '--output',          dest='output',          metavar='FILE', default='-',
                     help='Output of completion report')
   parser.add_option('-l', '--limit',           dest='limit',           metavar='N',    default=0 , type='int',
                     help='Limit the number of genotypes considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('-e', '--regions', dest='regions', metavar='FILE',
                     help='Regions of genotypes expected to be genotyped. Used to compute overall completion.')
-  parser.add_option('-f', '--format',          dest='format',          metavar='NAME',
-                    help='Format of the input data. Values=sdat,ldat,hapmap,genotriple')
   parser.add_option('-g', '--samplegroup',     dest='samplegroup',     metavar='FILE',
                     help='Map the sample ids to the grouping variable')
   parser.add_option('-G', '--locusgroup',      dest='locusgroup',      metavar='FILE',
                     help='Map the locus ids to the grouping variable')
   parser.add_option(      '--tabularoutput',   dest='tabularoutput',   metavar='FILE',
                     help='Generate machine readable tabular output of results')
-  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
-                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
 
   return parser
 

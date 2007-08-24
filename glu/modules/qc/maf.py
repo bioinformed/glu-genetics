@@ -31,18 +31,12 @@ def option_parser():
   usage = 'usage: %prog [options] [args]'
   parser = optparse.OptionParser(usage=usage)
 
-  ioopts = optparse.OptionGroup(parser, 'Input/Output Options')
-
-  ioopts.add_option('-f','--format',  dest='format', metavar='string',
+  parser.add_option('-f','--format',  dest='format', metavar='string',
                     help='The file input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
-  ioopts.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output of transformed data (default is "-" for standard out)')
-  ioopts.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
-  ioopts.add_option('-l', '--limit', dest='limit', metavar='N', type='int', default=None,
-                    help='Limit the number of rows of data to N for testing purposes')
-
-  parser.add_option_group(ioopts)
+  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+                    help='Output of transformed data (default is "-" for standard out)')
 
   return parser
 
@@ -69,12 +63,9 @@ def main():
     return
 
   genorepr  = get_genorepr(options.genorepr)
+  data   = load_genostream(args[0],options.format,genorepr=genorepr).as_ldat()
 
-  print >> sys.stderr, 'INPUT : format=%s,repr=%s' % (options.format, options.genorepr)
-
-  data   = load_genostream(args[0],options.format,genorepr,limit=options.limit).as_ldat()
-
-  outfile = hyphen(options.output,sys.stdout)
+  outfile = autofile(hyphen(options.output,sys.stdout),'w')
   out = csv.writer(outfile,dialect='excel-tab')
   for lname,genos in data:
     as,fs = compute_maf(genos)
