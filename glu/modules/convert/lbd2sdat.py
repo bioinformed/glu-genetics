@@ -106,12 +106,12 @@ def load_illumina_manifest(filename):
     heading,contents = sections.next()
     assert heading == 'Heading'
 
-    headings = dict(islice(contents,10))
+    headings = dict(c[:2] for c in islice(contents,10) if len(c) > 1)
     assert headings['Assay Format'] == 'Golden Gate'
 
   # Infinium manifest
   elif heading == 'Heading':
-    contents = dict(contents)
+    contents = dict(c[:2] for c in contents if len(c) > 1)
     assert contents['Assay Format'] in ('Infinium','Infinium II')
 
     heading,contents = sections.next()
@@ -141,8 +141,10 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
   cstrand_idx = find_index(header,['CustomerStrand'])
   dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
   topseq_idx  = find_index(header,['TopGenomicSeq'])
+  max_idx     = max(topseq_idx,dstrand_idx,cstrand_idx,snp_idx,name_idx,assayid_idx)
 
   for assay in manifest:
+    assay  += ['']*(max_idx-len(assay)+1)
     locus   = assay[name_idx]
     snp     = assay[snp_idx]
     cstrand = assay[cstrand_idx].lower()
@@ -151,21 +153,28 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
 
     assert cstrand in ('top','bot')
     assert dstrand in ('top','bot')
+    assert (snp[0],snp[2],snp[4]) == ('[','/',']')
 
     try:
       tstrand,a,b = norm_snp_seq(topseq)
-      tstrand = tstrand.lower()
-      assert tstrand in ('top','bot')
+      tstrand     = tstrand.lower()
+
+      aa,bb = snp[1],snp[3]
+      if tstrand!=dstrand:
+        aa,bb = complement_base(aa),complement_base(bb)
+      assert (a,b) == (aa,bb), 'Sequence alleles do not match assay alleles'
+
     except ValueError:
-      assert (snp[0],snp[2],snp[4]) == ('[','/',']')
       tstrand,a,b = dstrand,snp[1],snp[3]
+
+    assert tstrand in ('top','bot')
 
     if targetstrand in ('forward','reverse'):
       gstrand = assay[assayid_idx].split('_')[2]
       assert gstrand in 'FRU'
       if gstrand == 'U':
         raise ValueError,"Unknown strand for assay '%s'" % locus
-      forward = (tstrand == dstrand) ^ (gstrand == 'F')
+      reverse = (tstrand != dstrand) ^ (gstrand == 'R')
 
     flip =    ((targetstrand == 'customer'     and tstrand != cstrand)
            or  (targetstrand == 'anticustomer' and tstrand == cstrand)
@@ -173,8 +182,8 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
            or  (targetstrand == 'antidesign'   and tstrand == dstrand)
            or  (targetstrand == 'top'          and tstrand != 'top'  )
            or  (targetstrand == 'bottom'       and tstrand != 'bot'  )
-           or  (targetstrand == 'forward'      and     forward       )
-           or  (targetstrand == 'reverse'      and not forward       ))
+           or  (targetstrand == 'forward'      and     reverse       )
+           or  (targetstrand == 'reverse'      and not reverse       ))
 
     if flip:
       a,b = complement_base(a),complement_base(b)
