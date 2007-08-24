@@ -17,9 +17,10 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from   types       import NoneType
-from   collections import defaultdict
+from   types             import NoneType
+from   collections       import defaultdict
 
+from   glu.lib.fileutils import load_list,load_map
 
 list_type = (NoneType,set,dict,list,tuple)
 map_type  = (NoneType,dict)
