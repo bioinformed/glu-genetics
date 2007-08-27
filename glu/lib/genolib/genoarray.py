@@ -247,14 +247,14 @@ except ImportError:
 
 
   class UnphasedMarkerModel(object):
-    __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_alleles')
+    __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_allles')
 
-    def __init__(self, allow_hemizygote=False, max_alleles=2):
+    def __init__(self, allow_hemizygote=False, max_alleles=None):
       self.genomap          = {}
       self.genotypes        = []
       self.alleles          = []
-      self.max_alleles      = max_alleles
-      self.bit_size         = genotype_bit_size(max_alleles,allow_hemizygote)
+      self.max_alleles      = max(2,max_alleles)
+      self.bit_size         = genotype_bit_size(self.max_alleles,allow_hemizygote)
       self.allow_hemizygote = allow_hemizygote
       self.add_genotype( (None,None) )
 
@@ -327,7 +327,7 @@ def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
   alleles = sorted(set(a for a in alleles if a is not None))
   n = len(alleles)
 
-  if max_alleles is None:
+  if not max_alleles:
     max_alleles = n
 
   if allow_hemizygote:
@@ -364,7 +364,7 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
 
   n = len(set(alleles))
 
-  if max_alleles is None:
+  if not max_alleles:
     max_alleles = n
   elif n > max_alleles:
     raise GenotypeError('Genotype model supports at most %d alleles, %d specified' % (max_alleles,n))
@@ -389,7 +389,7 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
 
 
 def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
-  if max_alleles is None:
+  if not max_alleles:
     max_alleles = len(set(alleles))
 
   model = UnphasedMarkerModel(allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)

@@ -861,11 +861,9 @@ genomodel_init(UnphasedMarkerModelObject *self, PyObject *args, PyObject *kw)
 		&allow_hemizygote, &n))
 		return -1;
 
-	if(n == 0)
-	{
-		PyErr_SetString(PyExc_ValueError,"marker model requires max_alleles greater than 0");
-		return -1;
-	}
+	/* Force models to have at least two alleles */
+	if(n < 2)
+		n = 2;
 
 	self->allow_hemizygote = PyObject_IsTrue(allow_hemizygote);
 	if((short)self->allow_hemizygote == -1) return -1;

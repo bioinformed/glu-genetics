@@ -1406,7 +1406,7 @@ def recode_genomatrixstream(genos, modelmap):
   return genos.clone(_recode_genomatrixstream(),models=models,packed=True,materialized=False)
 
 
-def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
+def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None, max_alleles=0):
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
 
@@ -1510,7 +1510,9 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
           key = _genokey(row)
           model = modelcache.get(key)
           if not model:
-            model = modelcache[key] = modelmap[locus] = UnphasedMarkerModel()
+            # We do not know all of the alleles, even for ldat, because of duplicate rows
+            # FIXME: Caching wrong for non-unique
+            model = modelcache[key] = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
             unknown.add(locus)
 
         if locus in unknown:
@@ -1533,7 +1535,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
       try:
         model = modelmap[locus]
       except KeyError:
-        model = modelmap[locus] = UnphasedMarkerModel()
+        model = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
         unknown.add(locus)
 
       models.append(model)
@@ -1565,7 +1567,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None):
   return columns,models,_encode()
 
 
-def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=None):
+def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=None,max_alleles=0):
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
 
@@ -1666,7 +1668,9 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
           key = tuple(sorted(from_strings(set(row))))
           model = modelcache.get(key)
           if not model:
-            model = modelcache[key] = modelmap[locus] = UnphasedMarkerModel()
+            # We do not know all of the alleles, even for ldat, because of duplicate rows
+            # FIXME: Caching wrong for non-unique
+            model = modelcache[key] = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
             unknown.add(locus)
 
         if locus in unknown:
@@ -1712,7 +1716,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
         else:
           update = model.add_genotype
       except KeyError:
-        model = modelmap[locus] = UnphasedMarkerModel()
+        model = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
         update = model.add_genotype
         unknown.add(locus)
         models.append(model)
@@ -1795,7 +1799,7 @@ def recode_genotriples(triples,modelmap):
   return triples.clone(_recode(),models=new_models,materialized=False)
 
 
-def encode_genotriples_from_tuples(triples,modelmap=None):
+def encode_genotriples_from_tuples(triples,modelmap=None,max_alleles=0):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
@@ -1820,13 +1824,15 @@ def encode_genotriples_from_tuples(triples,modelmap=None):
     modelmap = {}
 
   for sample,locus,geno in triples:
-    model = modelmap.get(locus)
-    if not model:
-      modelmap[locus] = model = UnphasedMarkerModel()
+    try:
+      model = modelmap[locus]
+    except KeyError:
+      model = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
+
     yield sample,locus,model.add_genotype(geno)
 
 
-def encode_genotriples_from_strings(triples,genorepr,modelmap=None):
+def encode_genotriples_from_strings(triples,genorepr,modelmap=None,max_alleles=0):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
@@ -1848,14 +1854,14 @@ def encode_genotriples_from_strings(triples,genorepr,modelmap=None):
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   '''
-  repr = genorepr.from_string
+  local_repr = genorepr.from_string
   if modelmap is None:
     modelmap = {}
   for sample,locus,geno in triples:
     model = modelmap.get(locus)
     if not model:
-      modelmap[locus] = model = UnphasedMarkerModel()
-    yield sample,locus,model.add_genotype(repr(geno))
+      modelmap[locus] = model = UnphasedMarkerModel(max_alleles=max_alleles)
+    yield sample,locus,model.add_genotype(local_repr(geno))
 
 
 #######################################################################################
