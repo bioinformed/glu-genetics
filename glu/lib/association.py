@@ -356,7 +356,7 @@ def build_models(phenofile, genofile, options,deptype=int):
   phenocount2 = len(phenos)
 
   if phenocount1 != phenocount2:
-    print >> sys.stderr, '[NOTICE] After applying excluding %d subjects remain, %d subjects excluded' % (phenocount2,phenocount1-phenocount2)
+    print >> sys.stderr, '[NOTICE] After exclusions, %d subjects remain, %d subjects excluded' % (phenocount2,phenocount1-phenocount2)
 
   reference_alleles = load_map(options.refalleles) if options.refalleles else None
 
