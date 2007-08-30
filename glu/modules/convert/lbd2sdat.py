@@ -155,26 +155,34 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
     assert dstrand in ('top','bot')
     assert (snp[0],snp[2],snp[4]) == ('[','/',']')
 
+    # Alleles on the design strand
+    aa,bb = snp[1],snp[3]
+
     try:
       tstrand,a,b = norm_snp_seq(topseq)
       tstrand     = tstrand.lower()
-
-      aa,bb = snp[1],snp[3]
-      if tstrand!=dstrand:
-        aa,bb = complement_base(aa),complement_base(bb)
-      assert (a,b) == (aa,bb), 'Sequence alleles do not match assay alleles'
-
+      assert tstrand == 'top'
     except ValueError:
-      tstrand,a,b = dstrand,snp[1],snp[3]
+      tstrand,a,b = dstrand,aa,bb
 
-    assert tstrand in ('top','bot')
+    if dstrand!=tstrand:
+      aa = complement_base(aa)
+      bb = complement_base(bb)
+
+    if (a,b) == (aa,bb):
+      raise ValueError('Sequence alleles do not match assay alleles')
 
     if targetstrand in ('forward','reverse'):
+      # Get the strand orientation of the design sequence
       gstrand = assay[assayid_idx].split('_')[2]
       assert gstrand in 'FRU'
       if gstrand == 'U':
-        raise ValueError,"Unknown strand for assay '%s'" % locus
-      reverse = (tstrand != dstrand) ^ (gstrand == 'R')
+        raise ValueError("Unknown strand for assay '%s'" % locus)
+
+      # Alleles are forward strand if the tstrand matches the design strand
+      # and the design is on the forward strand or the converse of both
+      # conditions is true.
+      forward = (tstrand != dstrand) ^ (gstrand == 'F')
 
     flip =    ((targetstrand == 'customer'     and tstrand != cstrand)
            or  (targetstrand == 'anticustomer' and tstrand == cstrand)
@@ -182,8 +190,8 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
            or  (targetstrand == 'antidesign'   and tstrand == dstrand)
            or  (targetstrand == 'top'          and tstrand != 'top'  )
            or  (targetstrand == 'bottom'       and tstrand != 'bot'  )
-           or  (targetstrand == 'forward'      and     reverse       )
-           or  (targetstrand == 'reverse'      and not reverse       ))
+           or  (targetstrand == 'forward'      and not forward       )
+           or  (targetstrand == 'reverse'      and     forward       ))
 
     if flip:
       a,b = complement_base(a),complement_base(b)
