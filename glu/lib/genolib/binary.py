@@ -745,7 +745,6 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
     writer.writerows(genos.transformed(repack=True))
 
 
-#FIXME: Fill in modelmap
 def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,chunksize=4096,scratch=32*1024*1024):
   '''
   Load the genotype matrix data from file.
@@ -809,22 +808,29 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
   if format not in ('ldat','sdat'):
     raise ValieError, 'Unknown format: %s' % format
 
-  cols   = map(intern,map(str,gfile.root.cols[:]))
-  rows   = map(intern,map(str,gfile.root.rows[:]))
+  columns = tuple(imap(intern,map(str,gfile.root.cols[:])))
+  rows    = tuple(imap(intern,map(str,gfile.root.rows[:])))
+
+  if format_found == 'sdat':
+    samples  = rows
+    loci     = columns
+  else:
+    samples  = columns
+    loci     = rows
 
   if unique:
-    if len(set(cols)) != len(cols):
+    if len(set(columns)) != len(columns):
       raise ValueError('Non-unique column identifiers')
     if len(set(rows)) != len(rows):
       raise ValueError('Non-unique column identifiers')
 
   models = list(load_models(gfile))
+  assert len(models) == len(loci)
+
+  modelmap = dict( izip(loci,models) )
 
   if format == format_found == 'sdat':
-    columns = tuple(cols)
-
     def _load():
-      assert len(models) == len(cols)
       descr = GenotypeArrayDescriptor(models)
 
       chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
@@ -843,10 +849,7 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
       gfile.close()
 
   elif format == format_found == 'ldat':
-    columns = tuple(cols)
-
     def _load():
-      assert len(models) == len(rows)
       descrcache = {}
 
       chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
@@ -862,7 +865,7 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
           model = mods.next()
           descr = descrcache.get(model)
           if descr is None:
-            descr = descrcache[model] = GenotypeArrayDescriptor( [model]*len(cols) )
+            descr = descrcache[model] = GenotypeArrayDescriptor( [model]*len(samples) )
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
           yield label,g
@@ -870,8 +873,6 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
       gfile.close()
 
   if format == 'ldat' and format_found == 'sdat':
-    columns = tuple(rows)
-
     def _load():
       descr = GenotypeArrayDescriptor(models)
 
@@ -888,11 +889,11 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
         startbit = stopbit
 
         # Note: O(N) sequential search.  This could be done via binary search
-        while (stopbit-startbit) < chunkbits and stop < len(cols):
+        while (stopbit-startbit) < chunkbits and stop < len(columns):
           stop   += 1
           stopbit = descr.offsets[stop]
 
-        labels     = cols[start:stop]
+        labels     = columns[start:stop]
         startbyte  = int(startbit//8)
         stopbyte   = int((stopbit+7)//8)
         offset     = int(startbit%8)
@@ -913,10 +914,7 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
       gfile.close()
 
   elif format == 'sdat' and format_found == 'ldat':
-    columns = tuple(rows)
-
     def _load():
-      assert len(models) == len(rows)
       descr = GenotypeArrayDescriptor(models)
 
       chunkrows,chunkcols = gfile.root.genotypes.chunkshape
@@ -931,11 +929,11 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
         startbit = stopbit
 
         # Note: O(N) sequential search.  This could be done via binary search
-        while (stopbit-startbit) < chunkbits and stop < len(cols):
+        while (stopbit-startbit) < chunkbits and stop < len(columns):
           stop   += 1
           stopbit = descr.offsets[stop]
 
-        labels     = cols[start:stop]
+        labels     = columns[start:stop]
         startbyte  = int(startbit//8)
         stopbyte   = int((stopbit+7)//8)
         offset     = int(startbit%8)
@@ -954,15 +952,8 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
 
       gfile.close()
 
-  # FIXME: We also know rows
-  if format=='ldat':
-    genos=GenomatrixStream(_load(),format,samples=columns,loci=rows,models=models,
-                                          unique=unique,packed=True)
-  else:
-    genos=GenomatrixStream(_load(),format,loci=columns,samples=rows,models=models,
-                                          unique=unique,packed=True)
-
-  return genos
+  return GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,
+                                         unique=unique,packed=True)
 
 
 def test(descr,filename,command,genotypes):
@@ -980,9 +971,8 @@ def test(descr,filename,command,genotypes):
 def main():
   from   random    import shuffle
 
-  from   utils     import ilen
-  from   genoreprs import snp
-  from   genoio    import load_genostream, save_genostream
+  from   glu.lib.genolib.reprs import snp
+  from   glu.lib.genolib.io    import load_genostream, save_genostream
 
   if 0:
     f      = '/usr/local/share/hapmap/build21/fwd_strand/non-redundant/genotypes_chr22_CEU_r21a_nr_fwd.txt.gz'
@@ -990,7 +980,7 @@ def main():
     matrix = load_genostream(f,'hapmap').materialize()
     format = 'hapmap'
   else:
-    f = '/home/jacobske/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_CASE.ldat.gz'
+    f = '/home/jacobske/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_CASE_22.ldat.gz'
     matrix = load_genostream(f,genorepr=snp).materialize()
     format = matrix.format
 
@@ -1116,7 +1106,7 @@ def _test():
 
 if __name__ == '__main__':
   _test()
-  if 1:
+  if 0:
     pass
   elif 1:
     main()
