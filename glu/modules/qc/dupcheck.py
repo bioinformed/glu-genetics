@@ -240,6 +240,9 @@ def main():
   if 0 and genorepr in (snp,hapmap):
     defmodel = model_from_alleles('ACGTB')
     modelmap = defaultdict(lambda: defmodel)
+  elif 0:
+    defmodel = model_from_alleles('',max_alleles=45)
+    modelmap = defaultdict(lambda: defmodel)
   else:
     modelmap = None
 

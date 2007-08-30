@@ -310,8 +310,8 @@ def option_parser():
                     help='A tab-delimited file with expected duplicates on each row, or with columns of sid,pid')
   parser.add_option('-d', '--dupout', dest='dupout', metavar='FILE',
                     help='Output of duplicate sets')
-  parser.add_option('-f','--format',  dest='format', metavar='string', default='sdat',
-                    help='The file input format for genotype data. Values=hapmap, ldat, sdat (default), trip or genotriple')
+  parser.add_option('-f','--format',  dest='format', metavar='string',
+                    help='The file input format for genotype data. Values=hapmap, ldat, sdat (preferred), trip or genotriple')
   parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',
@@ -354,6 +354,9 @@ def main():
   #        or alphabets has been added.
   if 0 and genorepr in (snp,hapmap):
     defmodel = model_from_alleles('ACGTAB', max_alleles=22)
+    modelmap = defaultdict(lambda: defmodel)
+  elif 0:
+    defmodel = model_from_alleles('',max_alleles=45)
     modelmap = defaultdict(lambda: defmodel)
   else:
     modelmap = None
