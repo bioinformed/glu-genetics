@@ -33,6 +33,9 @@ from   merge             import UniqueMerger, VoteMerger, mergefunc_transpose_ad
 from   genoarray         import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
                                 model_from_alleles
 
+# Debugging flag
+DEBUG=False
+
 class GenotypeStream(object):
   __slots__ = []
   def __init__(self, stream):
@@ -120,6 +123,7 @@ class GenotripleStream(GenotypeStream):
     @type  materialized: bool
     '''
     assert models is not None
+    assert isinstance(models,dict)
 
     if order not in (None,'locus','sample'):
       raise ValueError('invalid GenotripleStream order specified')
@@ -701,6 +705,33 @@ class GenomatrixStream(GenotypeStream):
     self.materialized = materialized
     self.packed       = packed
 
+  if DEBUG:
+    def __iter__(self):
+      '''
+      Returns the embedded genotriple stream and marks it as used (ie
+      unavailable for further operations) if not already used.  Otherwise,
+      raises a RuntimeError exception.
+
+      @return: genotriple stream
+      @rtype :  sequence of sample, locus, and genotype
+      '''
+      if self.format=='ldat':
+        def _check(rows):
+          for (label,row),model in izip(rows,self.models):
+            assert not self.packed or isinstance(row,GenotypeArray)
+            assert not self.packed or model is row.descriptor.models[0]
+            assert all(g.model is model for g in row)
+            yield label,row
+        return _check(self.use_stream())
+      else:
+        def _check(rows):
+          for label,row in rows:
+            assert all(g.model is model for model,g in izip(self.models,row))
+            yield label,row
+        return _check(self.use_stream())
+
+      return iter(self.use_stream())
+
   @staticmethod
   def from_streams(genos, format, mergefunc=None):
     '''
@@ -816,7 +847,8 @@ class GenomatrixStream(GenotypeStream):
     else:
       raise ValueError('Invalid genotype matrix format')
 
-    columns,models,genos = encode_genomatrixstream_from_tuples(columns,genos,format,modelmap=modelmap)
+    columns,models,genos = encode_genomatrixstream_from_tuples(columns,genos,format,
+                                   modelmap=modelmap,unique=unique)
     return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
                                    unique=unique, packed=True, materialized=False)
 
@@ -834,7 +866,8 @@ class GenomatrixStream(GenotypeStream):
     else:
       raise ValueError('Invalid genotype matrix format')
 
-    columns,models,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=modelmap)
+    columns,models,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,
+                                   modelmap=modelmap,unique=unique)
     return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
                                    unique=unique, packed=True, materialized=False)
 
@@ -1098,22 +1131,7 @@ class GenomatrixStream(GenotypeStream):
     '''
     Merge genotypes for rows and columns with the same labels
     '''
-    if self.unique:
-      return self
-
-    # FIXME: Move logic into merge_genomatrixstream
-    merge_rows = self.rows    is None or len(self.rows)    != len(set(self.rows))
-    merge_cols = self.columns is None or len(self.columns) != len(set(self.columns))
-
-    if not merge_rows and not merge_cols:
-      return self
-
-    if merge_rows:
-      genos = merge_genomatrixstream(self, mergefunc)
-    else:
-      genos = merge_genomatrixstream_columns(self, mergefunc)
-
-    return genos
+    return merge_genomatrixstream(self, mergefunc)
 
   def transposed(self):
     '''
@@ -1311,7 +1329,17 @@ def recode_genomatrixstream(genos, modelmap):
   >>> genos1 = recode_genomatrixstream(genos1, modelmap).materialize()
   >>> sorted(modelmap)
   ['l1', 'l2']
+  >>> for locus,row in genos1:
+  ...   print locus,row
+  l1 [('G', 'G'), ('G', 'T'), ('T', 'T')]
+  l2 [('A', 'A'), ('T', 'T'), ('A', 'T')]
+
   >>> genos2 = recode_genomatrixstream(genos2, modelmap).materialize()
+  >>> for locus,row in genos2:
+  ...   print locus,row
+  l1 [(None, None), ('T', 'T'), ('G', 'G')]
+  l3 [('A', 'A'), (None, None), ('A', 'T')]
+
   >>> sorted(modelmap)
   ['l1', 'l2', 'l3']
   >>> for locus,model in izip(genos1.loci,genos1.models):
@@ -1334,6 +1362,7 @@ def recode_genomatrixstream(genos, modelmap):
 
         # Cache the descriptor for this model, since we're likely to see it again
         if packed:
+          assert old_model is row.descriptor.models[0]
           descrcache[old_model] = row.descriptor
 
         # Get the new model or fix the old model
@@ -1406,7 +1435,8 @@ def recode_genomatrixstream(genos, modelmap):
   return genos.clone(_recode_genomatrixstream(),models=models,packed=True,materialized=False)
 
 
-def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None, max_alleles=0):
+def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None,
+                                                 max_alleles=0, unique=False):
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
 
@@ -1481,6 +1511,26 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None, m
   s1 [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')] True
   s2 [(None, None), (None, None), (None, None), (None, None)] True
   s3 [('G', 'G'), (None, None), (None, None), ('T', 'T')] True
+
+  See if we can provide a subtle cache bug when models are cached too
+  aggressively for non-unique loci:
+
+  >>> samples = ('s1',)
+  >>> genos = [('l1', [ ('A','A') ]),
+  ...          ('l2', [ ('A','A') ]),
+  ...          ('l1', [ ('A','T') ]),
+  ...          ('l2', [ ('A','G') ])]
+  >>> modelmap = {}
+  >>> samples,models,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',modelmap)
+  >>> new_rows = list(new_rows)
+  >>> samples
+  ('s1',)
+  >>> for label,row in new_rows:
+  ...   print label,row,all(isinstance(g,Genotype) for g in row)
+  l1 [('A', 'A')] True
+  l2 [('A', 'A')] True
+  l1 [('A', 'T')] True
+  l2 [('A', 'G')] True
   '''
   if modelmap is None:
     modelmap = {}
@@ -1507,16 +1557,26 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None, m
         try:
           model = modelmap[locus]
         except KeyError:
-          key = _genokey(row)
-          model = modelcache.get(key)
-          if not model:
-            # We do not know all of the alleles, even for ldat, because of duplicate rows
-            # FIXME: Caching wrong for non-unique
-            model = modelcache[key] = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
-            unknown.add(locus)
+          if unique:
+            # If we can assume that loci are unique, then aggressively reuse
+            # models with compatible alleles
+            key   = _genokey(row)
+            model = modelcache.get(key)
+            if not model:
+              # We do not know all of the alleles, even for ldat, because of duplicate rows
+              # FIXME: Caching wrong for non-unique
+              model = modelcache[key] = UnphasedMarkerModel(max_alleles=max_alleles)
+          else:
+            # We cannot assume loci are unique and that we've seen all
+            # possible alleles, so always create a new model
+            model = UnphasedMarkerModel(max_alleles=max_alleles)
+
+          # Mark this locus as having unknown alleles and add it to modelmap
+          unknown.add(locus)
+          modelmap[locus] = model
 
         if locus in unknown:
-          key = key or _genokey(row)
+          key = key or set(row)
           for g in key:
             model.add_genotype(g)
 
@@ -1524,6 +1584,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None, m
         if not descr:
           descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
 
+        assert descr.models[0] is model
         models.append(model)
         yield locus,GenotypeArray(descr,row)
 
@@ -1567,7 +1628,8 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None, m
   return columns,models,_encode()
 
 
-def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=None,max_alleles=0):
+def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=None,
+                                                 max_alleles=0,unique=False):
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
 
@@ -1638,6 +1700,26 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   ('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')])
   ('s2', [(None, None), (None, None), (None, None), (None, None)])
   ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
+
+  See if we can provide a subtle cache bug when models are cached too
+  aggressively for non-unique loci:
+
+  >>> samples = ('s1',)
+  >>> genos = [('l1', [ ('AA') ]),
+  ...          ('l2', [ ('AA') ]),
+  ...          ('l1', [ ('AT') ]),
+  ...          ('l2', [ ('AG') ])]
+  >>> modelmap = {}
+  >>> samples,models,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,modelmap)
+  >>> new_rows = list(new_rows)
+  >>> samples
+  ('s1',)
+  >>> for label,row in new_rows:
+  ...   print label,row,all(isinstance(g,Genotype) for g in row)
+  l1 [('A', 'A')] True
+  l2 [('A', 'A')] True
+  l1 [('A', 'T')] True
+  l2 [('A', 'G')] True
   '''
   if modelmap is None:
     modelmap = {}
@@ -1656,22 +1738,27 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
       from_strings = genorepr.from_strings
 
       for locus,row in genos:
+        key = None
+
         # Use try-except to allow the use of a defaultdict
         try:
           model = modelmap[locus]
         except KeyError:
-          model = None
+          if unique:
+            # If we can assume that loci are unique, then aggressively reuse
+            # models with compatible alleles
+            key = tuple(sorted(from_strings(set(row))))
+            model = modelcache.get(key)
+            if not model:
+              model = modelcache[key] = UnphasedMarkerModel(max_alleles=max_alleles)
+          else:
+            # We cannot assume loci are unique and that we've seen all
+            # possible alleles, so always create a new model
+            model = UnphasedMarkerModel(max_alleles=max_alleles)
 
-        key = None
-
-        if not model:
-          key = tuple(sorted(from_strings(set(row))))
-          model = modelcache.get(key)
-          if not model:
-            # We do not know all of the alleles, even for ldat, because of duplicate rows
-            # FIXME: Caching wrong for non-unique
-            model = modelcache[key] = modelmap[locus] = UnphasedMarkerModel(max_alleles=max_alleles)
-            unknown.add(locus)
+          # Mark this locus as having unknown alleles and add it to modelmap
+          unknown.add(locus)
+          modelmap[locus] = model
 
         if locus in unknown:
           key = key or tuple(sorted(from_strings(set(row))))
@@ -2389,9 +2476,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s2',[(None, None), (None, None), (None, None)]),
   ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
   ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T')])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
 
-  >>> merger=VoteMerger()
+  >>> merger= VoteMerger()
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
   ('l1', 'l2', 'l3')
@@ -2410,7 +2497,7 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s2',[(None, None), ('A', 'C'),   (None, None)]),
   ...         ('s1',[ ('A', 'A'),  ('A', 'A'),   (None, None)]),
   ...         ('s1',[ ('A', 'T'), (None, None),  ('G', 'T') ])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
 
   >>> merger=VoteMerger()
   >>> genos = merge_genomatrixstream(genos,merger)
@@ -2430,7 +2517,7 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s2',[(None, None),  ('A', 'G'),   ('T', 'T')]),
   ...         ('s1',[ ('C', 'C'),   ('A', 'A'),  (None, None)]),
   ...         ('s1',[ ('C', 'T'),  (None, None),  ('C', 'T')])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
 
   >>> merger=VoteMerger()
   >>> genos = merge_genomatrixstream(genos,merger)
@@ -2446,6 +2533,9 @@ def merge_genomatrixstream(genos, mergefunc):
   [('l1', [0, 1, 0, 1, 0]), ('l2', [1, 1, 0, 0, 0])]
   '''
   assert mergefunc is not None
+
+  if genos.unique:
+    return genos
 
   merge_rows = genos.rows    is None or len(genos.rows)    != len(set(genos.rows))
   merge_cols = genos.columns is None or len(genos.columns) != len(set(genos.columns))
@@ -2639,17 +2729,17 @@ def merge_genomatrixstream_list(genos, mergefunc):
     # Pass-through from merge_genomatrix
     # FIXME: We may actually know all of the rows
     if format=='sdat':
-      genos = genos[0].clone(chain(*genos),samples=None,unique=False,materialized=False,packed=True)
+      genos = genos[0].clone(chain(*genos),samples=None,unique=False,materialized=False)
     else:
       models = []
       def _combine(genos):
         for g in genos:
-          for i,labelrow in enumerate(g):
-            models.append(g.models[i])
+          for labelrow,model in izip(g,g.models):
+            models.append(model)
             yield labelrow
 
       genos = genos[0].clone(_combine(genos),models=models,loci=None,
-                             unique=False,materialized=False,packed=True)
+                             unique=False,materialized=False)
 
     return merge_genomatrixstream(genos, mergefunc)
 
@@ -3089,14 +3179,22 @@ def filter_genomatrixstream_missing(genos):
   # seen, then only this simple filter is required to process the remaining
   # rows and the rest need not be materialized.  This can be a huge
   # performance improvement for many datasets with no missing columns.
-  def _filter():
-    for lname,row in genos:
-      if any(row):
-        yield lname,row
 
   if genos.format=='ldat':
-    new_genos = genos.clone(_filter(),loci=None,materialized=False)
+    models = []
+    def _filter():
+      for (lname,row),model in izip(genos,genos.models):
+        if any(row):
+          models.append(model)
+          yield lname,row
+
+    new_genos = genos.clone(_filter(),loci=None,models=models,materialized=False)
   else:
+    def _filter():
+      for lname,row in genos:
+        if any(row):
+          yield lname,row
+
     new_genos = genos.clone(_filter(),samples=None,materialized=False)
 
   rows = []
@@ -3117,7 +3215,7 @@ def filter_genomatrixstream_missing(genos):
       return new_genos.clone(chain(rows,data),materialized=False)
 
   # Full materialize was necessary and some columns need to be filtered
-  columns_notseen = pick(new_genos.columns, sorted(columns_notseen))
+  columns_notseen = set(pick(new_genos.columns, columns_notseen))
   new_genos = new_genos.clone(rows)
   return filter_genomatrixstream_by_column(new_genos,columns_notseen,exclude=True)
 
@@ -3769,16 +3867,37 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
   ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
   '''
   # FIXME: Implement fast path when rows are known
-  # FIXME: Update models
-  def _filter():
+  if genos.format=='sdat':
     if exclude:
-      for label,row in genos:
-        if label not in rowset:
-          yield label,row
+      models = [ model for label,model in izip(genos.columns,genos.models)
+                                       if label not in rowset ]
+      def _filter():
+        for label,row in genos:
+          if label not in rowset:
+            yield label,row
     else:
-      for label,row in genos:
-        if label in rowset:
-          yield label,row
+      models = [ model for label,model in izip(genos.columns,genos.models)
+                                       if label in rowset ]
+
+      def _filter():
+        for label,row in genos:
+          if label in rowset:
+            yield label,row
+
+  else:
+    models = []
+    if exclude:
+      def _filter():
+        for (label,row),model in izip(genos,genos.models):
+          if label not in rowset:
+            models.append(model)
+            yield label,row
+    else:
+      def _filter():
+        for (label,row),model in izip(genos,genos.models):
+          if label in rowset:
+            models.append(model)
+            yield label,row
 
   rows = genos.rows
   if rows is not None:
@@ -3788,9 +3907,9 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
       rows = tuple(label for label in rows if label     in rowset)
 
   if genos.format=='ldat':
-    new_genos=genos.clone(_filter(),loci=rows,materialized=False)
+    new_genos=genos.clone(_filter(),loci=rows,models=models,materialized=False)
   else:
-    new_genos=genos.clone(_filter(),samples=rows,materialized=False)
+    new_genos=genos.clone(_filter(),samples=rows,models=models,materialized=False)
 
   return new_genos
 
