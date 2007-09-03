@@ -25,7 +25,7 @@ from   scipy               import stats
 from   glu.lib.fileutils   import autofile,hyphen
 from   glu.lib.glm         import GLogit
 
-from   glu.lib.association import build_models,print_results,get_term,NULL
+from   glu.lib.association import build_models,print_results,get_term,format_pvalue,NULL
 
 
 #####
@@ -181,13 +181,13 @@ def main():
     wt,df_w = g.wald_test(indices=indices).test()
     lt,df_l = g.lr_test(indices=indices).test()
 
-    sp = stats.distributions.chi2.sf(st,df_s)
-    wp = stats.distributions.chi2.sf(wt,df_w)
-    lp = stats.distributions.chi2.sf(lt,df_l)
+    sp = format_pvalue(stats.distributions.chi2.sf(st,df_s))
+    wp = format_pvalue(stats.distributions.chi2.sf(wt,df_w))
+    lp = format_pvalue(stats.distributions.chi2.sf(lt,df_l))
 
-    out.write('\t%.5f\t%.7f' % (st,sp))
-    out.write('\t%.5f\t%.7f' % (wt,wp))
-    out.write('\t%.5f\t%.7f' % (lt,lp))
+    out.write('\t%.5f\t%s' % (st,sp))
+    out.write('\t%.5f\t%s' % (wt,wp))
+    out.write('\t%.5f\t%s' % (lt,lp))
 
     assert df_s == df_w == df_l
     out.write('\t%d' % df_s)
@@ -203,9 +203,9 @@ def main():
     if options.details and min(sp,wp,lp) <= options.detailsmaxp:
       details.write('\nRESULTS: %s\n\n' % lname)
       print_results(details,model,g)
-      details.write('Score test           : X2=%9.5f, df=%d, p=%12.10f\n' % (st,df_s,sp))
-      details.write('Wald test            : X2=%9.5f, df=%d, p=%12.10f\n' % (wt,df_w,wp))
-      details.write('Likelihood ratio test: X2=%9.5f, df=%d, p=%12.10f\n' % (lt,df_l,lp))
+      details.write('Score test           : X2=%9.5f, df=%d, p=%s\n' % (st,df_s,sp))
+      details.write('Wald test            : X2=%9.5f, df=%d, p=%s\n' % (wt,df_w,wp))
+      details.write('Likelihood ratio test: X2=%9.5f, df=%d, p=%s\n' % (lt,df_l,lp))
       details.write('\n')
       details.write('-'*79)
       details.write('\n')

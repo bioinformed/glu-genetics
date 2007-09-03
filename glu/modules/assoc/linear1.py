@@ -24,7 +24,7 @@ from   scipy.linalg        import LinAlgError
 from   glu.lib.utils       import pick,tally
 from   glu.lib.fileutils   import autofile,hyphen
 from   glu.lib.glm         import Linear
-from   glu.lib.association import build_models,get_term,NULL,print_results_linear
+from   glu.lib.association import build_models,get_term,NULL,print_results_linear,format_pvalue
 
 
 def option_parser():
@@ -124,18 +124,18 @@ def main():
       continue
 
     sf = stats.distributions.chi2.sf
-    pw = sf(w,df)
-    ps = sf(s,df)
+    pw = format_pvalue(sf(w,df))
+    ps = format_pvalue(sf(s,df))
     out.write('\t'.join( [lname,
-                          '%6.3f' % w, '%d' % df ,'%12.10f' % pw,
-                          '%6.3f' % s, '%d' % df ,'%12.10f' % ps] ))
+                          '%6.3f' % w, '%d' % df ,pw,
+                          '%6.3f' % s, '%d' % df ,ps] ))
     out.write('\n')
 
     if options.details and min(pw,ps) <= options.detailsmaxp:
       details.write('\nRESULTS: %s\n\n' % lname)
       print_results_linear(details,model,g)
-      details.write('Wald Test:  X2=%6.3f, df=%d, p=%12.10f\n' % (w,df,pw))
-      details.write('Score Test: X2=%6.3f, df=%d, p=%12.10f\n' % (s,df,ps))
+      details.write('Wald Test:  X2=%6.3f, df=%d, p=%s\n' % (w,df,pw))
+      details.write('Score Test: X2=%6.3f, df=%d, p=%s\n' % (s,df,ps))
       details.write('-'*79)
       details.write('\n')
 

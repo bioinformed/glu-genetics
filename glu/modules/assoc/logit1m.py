@@ -23,7 +23,7 @@ from   numpy               import exp
 from   scipy               import stats
 
 from   glu.lib.glm         import GLogit
-from   glu.lib.association import build_models,print_results,TREND,NULL
+from   glu.lib.association import build_models,print_results,format_pvalue,TREND,NULL
 
 
 def option_parser():
@@ -121,19 +121,22 @@ def main():
     g = GLogit(model2.y,model2.X)
     g.fit()
     st,df = g.score_test(indices=[3]).test()
-    sys.stdout.write('\t%8.5f\t%d\t%9.7f' % (st,df,stats.distributions.chi2.sf(st,df)))
+    p = format_pvalue(stats.distributions.chi2.sf(st,df))
+    sys.stdout.write('\t%8.5f\t%d\t%9.7f' % (st,df,p))
     sys.stdout.write('\t%.3f' % exp(g.beta[3,0]))
 
     # Compute 2 df score test on just the interaction terms
     g = GLogit(model3.y,model3.X)
     g.fit()
     st,df = g.score_test(indices=(4,5)).test()
-    sys.stdout.write('\t%8.5f\t%d\t%9.7f' % (st,df,stats.distributions.chi2.sf(st,df)))
+    p = format_pvalue(stats.distributions.chi2.sf(st,df))
+    sys.stdout.write('\t%8.5f\t%d\t%9.7f' % (st,df,p))
     sys.stdout.write('\t%.3f\t%.3f\t%.3f' % (exp(g.beta[3,0]),exp(g.beta[4,0]),exp(g.beta[5,0])))
 
     # Compute 3 df score test on the main effect and interaction terms
     st,df = g.score_test(indices=(3,4,5)).test()
-    sys.stdout.write('\t%8.5f\t%d\t%9.7f' % (st,df,stats.distributions.chi2.sf(st,df)))
+    p = format_pvalue(stats.distributions.chi2.sf(st,df))
+    sys.stdout.write('\t%8.5f\t%d\t%9.7f' % (st,df,p))
     sys.stdout.write('\n')
 
 

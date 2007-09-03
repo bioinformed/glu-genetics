@@ -27,7 +27,8 @@ from   glu.lib.fileutils   import autofile,hyphen,load_list
 from   glu.lib.genolib     import load_genostream
 from   glu.lib.glm         import GLogit
 
-from   glu.lib.association import print_results,build_models,NULL,GENO,ADOM,TREND,DOM,REC
+from   glu.lib.association import print_results,build_models,format_pvalue, \
+                                  NULL,GENO,ADOM,TREND,DOM,REC
 
 
 def option_parser():
@@ -76,26 +77,26 @@ def eval_model(lname,k,model,details,detailsmaxp):
   try:
     g = GLogit(model.y,model.X,vars=model.vars)
     L,b,W = g.fit()
-    ps = pw = 1
+    ps = pw = format_pvalue(1)
     if k:
       st,df = g.score_test(indices=range(1,k+1)).test()
       wt,df = g.wald_test(indices=range(1,k+1)).test()
       sf = stats.distributions.chi2.sf
-      ps = sf(st,df)
-      pw = sf(wt,df)
+      ps = format_pvalue(sf(st,df))
+      pw = format_pvalue(sf(wt,df))
   except LinAlgError:
     return res
 
   if k == 2:
     res = ['%.6f'  % L,
-           '%8.5f' % st, '%d' % df, '%9.8f' % ps,
-           '%8.5f' % wt, '%d' % df, '%9.8f' % pw,
+           '%8.5f' % st, '%d' % df, ps,
+           '%8.5f' % wt, '%d' % df, pw,
            '%7.4f' % exp(b[1,0]), '%7.4f' % exp(b[2,0]),
             '%.6f' % W[1,1], '%.6f' % W[2,2], '%.6f' % W[1,2]]
   elif k == 1:
     res = ['%.6f'  % L,
-           '%8.5f' % st, '%d' % df, '%9.8f' % ps,
-           '%8.5f' % wt, '%d' % df, '%9.8f' % pw,
+           '%8.5f' % st, '%d' % df, ps,
+           '%8.5f' % wt, '%d' % df, pw,
            '%7.4f' % exp(b[1,0]), '%.6f' % W[1,1]]
   elif k == 0:
     res = ['%.6f' % L]

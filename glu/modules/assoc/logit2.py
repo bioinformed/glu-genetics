@@ -27,7 +27,7 @@ from   scipy.linalg        import LinAlgError
 from   glu.lib.fileutils   import load_list
 from   glu.lib.glm         import GLogit
 
-from   glu.lib.association import print_results,build_models,NULL,GENO,TREND
+from   glu.lib.association import print_results,build_models,format_pvalue,NULL,GENO,TREND
 
 
 def option_parser():
@@ -200,9 +200,9 @@ def main():
 
       sf = stats.distributions.chi2.sf
       print '\t'.join([lname1,lname2,
-                       '%8.5f' % st1, '%d' % df1, '%9.8f' % sf(st1,df1),
-                       '%8.5f' % st2, '%d' % df2, '%9.8f' % sf(st2,df2),
-                       '%8.5f' % st,  '%d' % df,  '%9.8f' % sf(st, df)])
+                       '%8.5f' % st1, '%d' % df1, '%9.8f' % format_pvalue(sf(st1,df1)),
+                       '%8.5f' % st2, '%d' % df2, '%9.8f' % format_pvalue(sf(st2,df2)),
+                       '%8.5f' % st,  '%d' % df,  '%9.8f' % format_pvalue(sf(st, df ))])
 
 
 if __name__ == '__main__':

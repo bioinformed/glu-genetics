@@ -22,7 +22,7 @@ import sys
 from   scipy               import stats
 
 from   glu.lib.glm         import GLogit
-from   glu.lib.association import print_results,build_models,TREND,NULL
+from   glu.lib.association import print_results,build_models,TREND,NULL,format_pvalue
 
 
 def option_parser():
@@ -89,8 +89,8 @@ def main():
 
   lrt = -2*(L0-L1)
   df  = len(trend_terms)
-  p   = stats.distributions.chi2.sf(lrt,df)
-  print '-2(lnL0-lnL1) ~ X2 = %.2f, df=%d, p=%.10g' % (lrt,df,p)
+  p   = format_pvalue(stats.distributions.chi2.sf(lrt,df))
+  print '-2(lnL0-lnL1) ~ X2 = %.2f, df=%d, p=%s' % (lrt,df,p)
 
 
 if __name__ == '__main__':
