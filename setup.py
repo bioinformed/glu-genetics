@@ -44,7 +44,7 @@ Operating System :: Unix
 #entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
 
 setup (name             = 'glu',
-       version          = '0.6dev',
+       version          = '0.60',
        author           = 'Kevin Jacobs',
        author_email     = 'jacobske@mail.nih.gov',
        maintainer       = 'Kevin Jacobs',
