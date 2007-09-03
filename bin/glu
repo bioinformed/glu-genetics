@@ -6,23 +6,17 @@ import sys
 if sys.version_info < (2,5):
   sys.stderr.write('FATAL ERROR: GLU requires Python version 2.5 or newer to run.  Found:\n')
   sys.stderr.write(sys.version)
-  os.exit(1)
+  sys.exit(1)
 
 try:
-  import pkg_resources as _pr # activate namespace packages (manipulates __path__)
-  del _pr
+  import pkg_resources # activate namespace packages (manipulates __path__)
 except ImportError:
   pass
-
-glu_path = os.environ.get('GLU_PATH')
-
-if glu_path:
-  sys.path.insert(0, glu_path)
 
 try:
   import glu.lib.glu_launcher
 except ImportError:
   sys.stderr.write('FATAL ERROR: Cannot find GLU installation.  Set GLU_PATH to override the default search location')
-  os.exit(1)
+  sys.exit(1)
 
 glu.lib.glu_launcher.main()
