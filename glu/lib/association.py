@@ -19,7 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   math           import ceil
+from   math           import ceil,log
 from   itertools      import izip
 from   collections    import defaultdict
 from   operator       import itemgetter
@@ -31,6 +31,33 @@ from   scipy          import stats
 from   utils          import tally,pick
 from   fileutils      import autofile,namefile,load_list,load_map,load_table
 from   genolib        import load_genostream, get_genorepr
+
+
+LOGE_10 = log(10)
+
+def log10(n):
+  return log(n)/LOGE_10
+
+
+def format_pvalue(p,scale=8):
+  '''
+  Format pvalues sensibly
+
+  >>> format_pvalue(1)
+  '1.0000000'
+  >>> format_pvalue(1./3)
+  '0.3333333'
+  >>> format_pvalue(0.001256)
+  '0.0012560'
+  >>> format_pvalue(0.0001256)
+  '1.256e-04'
+  >>> format_pvalue(0.00001256)
+  '1.256e-05'
+  '''
+  if -2*log10(p)>(scale-1):
+    return '%%#0.0%de' % (scale-5) % p
+  else:
+    return '%%#0.0%df' % (scale-1) % p
 
 
 def contingency_table_indicators(ys,gs):
@@ -288,7 +315,7 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
   def _phenos():
     warn_msg = '[WARNING] Subject "%s" dropped on line #%04d due to missing data in column "%s"\n'
     note_msg = '[NOTICE] Read phenotypes from %s: ' \
-               '%d covariates, %d lines, %d valid records, %d records dropped, %d distinct subjects\n'
+               '%d covariates, %d valid records, %d records dropped, %d distinct subjects\n'
 
     dropped  = 0
     subjects = defaultdict(int)
@@ -309,7 +336,7 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
       yield row
 
     if verbose:
-      errs.write(note_msg % (namefile(filename),len(header)-2,i,i+1-dropped,dropped,len(subjects)))
+      errs.write(note_msg % (namefile(filename),len(header)-2,i+1-dropped,dropped,len(subjects)))
 
     # Check for duplicate subjects
     dups = [ (pid,n) for pid,n in subjects.iteritems() if n>1 ]
@@ -894,7 +921,8 @@ def print_results(out,locus_model,linear_model,verbose=1):
     out.write('Variable                       Coef.   Std.Err.     OR        Z     Pr > |Z| \n')
     out.write('------------------------ ----------- ---------- ---------- ------- ----------\n')
     for k,var in enumerate(vars):
-      out.write('%-25s %10.6f %10.6f %10.6f %7.2f %10.8f\n' % (var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],p[0,k]))
+      pv = format_pvalue(10,p[0,k])
+      out.write('%-25s %10.6f %10.6f %10.6f %7.2f %s\n' % (var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],pv))
     out.write('\n')
   else:
     out.write('TYPE       Variable                  Coef.   Std.Err.     OR        Z     Pr > |Z| \n')
@@ -902,7 +930,8 @@ def print_results(out,locus_model,linear_model,verbose=1):
     for i,cat in enumerate(linear_model.categories[1:]):
       for j,var in enumerate(vars):
         k = i*n+j
-        out.write('%-10s %-20s %10.6f %10.6f %10.6f %7.2f %10.8f\n' % (cat,var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],p[0,k]))
+        pv = format_pvalue(10,p[0,k])
+        out.write('%-10s %-20s %10.6f %10.6f %10.6f %7.2f %s\n' % (cat,var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],pv))
       out.write('\n')
 
   out.write('\n')
@@ -936,7 +965,8 @@ def print_results_linear(out,locus_model,linear_model,verbose=1):
   out.write('Variable                  Coef.   Std.Err.    T     Pr > |T| \n')
   out.write('------------------- ----------- ---------- ------- ----------\n')
   for i,var in enumerate(vars):
-    out.write('%-20s %10.6f %10.6f %7.2f %10.8f\n' % (var,b[0,i],stde[0,i],t[0,i],p[0,i]))
+    pv = format_pvalue(p[0,i])
+    out.write('%-20s %10.6f %10.6f %7.2f %s\n' % (var,b[0,i],stde[0,i],t[0,i],pv))
   out.write('\n')
 
 
