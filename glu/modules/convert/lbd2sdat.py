@@ -169,7 +169,7 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
       aa = complement_base(aa)
       bb = complement_base(bb)
 
-    if (a,b) == (aa,bb):
+    if (a,b) != (aa,bb):
       raise ValueError('Sequence alleles do not match assay alleles')
 
     if targetstrand in ('forward','reverse'):
