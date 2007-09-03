@@ -40,11 +40,11 @@ Prerequistites for using GLU:
 
 GLU requires the following free and open source packages:
 
-	Python   2.5.1 or newer from http://www.python.org/
-	NumPy    1.0.3 or newer from http://numpy.scipy.org/
-	SciPy    0.5.3 or newer from http://www.scipy.org/
-	PyTables 2.0   or newer from http://www.pytables.org/
-        SQLite   2.4.1 or newer from http://www.sqlite.org/
+	Python   2.5.1   or newer from http://www.python.org/
+	NumPy    1.0.3.1 or newer from http://numpy.scipy.org/
+	SciPy    0.5.3   or newer from http://www.scipy.org/
+	PyTables 2.0     or newer from http://www.pytables.org/
+        SQLite   2.4.1   or newer from http://www.sqlite.org/
 
 Prerequistites of the prerequistites:
 
