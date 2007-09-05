@@ -58,8 +58,8 @@ class GenoTransform(object):
     @type    order_samples: list
     @param      order_loci: reorder loci such based on the order of the supplied list (optional)
     @type       order_loci: list
-    @param  rename_alleles: rename alleles from any loci and allele name to new allele name
-    @type   rename_alleles: dict from str -> old_allele str -> new_allele str
+    @param  rename_alleles: rename alleles for any loci in the supplied dictionary from old allele name to new allele name
+    @type   rename_alleles: dict from old_allele str -> new_allele str
     @param  filter_missing: filter missing genotypes from the stream
     @type   filter_missing: bool
     @param          repack: trigger repacking of genotypes to ensure that the most compact storage
@@ -209,7 +209,7 @@ def prove_unique_transform(transform=None,samples=None,loci=None,unique=False):
   @type  transform: GenoTransform object
   @param   samples: optional set of samples refered to by the triples
   @type    samples: sequence, set, or None
-  @param      loci: optional set of samples refered to by the triples
+  @param      loci: optional set of loci refered to by the triples
   @type       loci: sequence, set, or None
   @param    unique: flag indicating if repeated elements do not exist within the stream
   @type     unique: bool

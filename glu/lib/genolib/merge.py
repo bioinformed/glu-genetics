@@ -336,12 +336,12 @@ class Merger(object):
     Merge a group of genotypes into a consensus for a given sample and locus
     and build merge statistics
 
-    @param sample: sample id
+    @param sample: sample identifier
     @type  sample: str
-    @param  locus: locus id
+    @param  locus: locus identifier
     @type   locus: str
-    @param  genos: sequence of genotypes
-    @type   genos: sequence of objects
+    @param  genos: genotypes
+    @type   genos: sequence
     @return      : consensus genotype
     @rtype       : object
 
@@ -391,15 +391,15 @@ def OrderedMerger(threshold=0.4999999):
   return Merger(Ordered(threshold=threshold))
 
 
-def get_genomerger(reprname):
+def get_genomerger(mergername):
   '''
   Retrieve the supported genotype merge algorithm. Otherwise raises an ValueError exception.
 
-  @param reprname: genotype merger name
-  @type  reprname: str
-  @return        : genotype merge object
+  @param mergername: genotype merger name
+  @type  mergername: str
+  @return          : genotype merge object
   '''
-  parts = reprname.split(':')
+  parts = mergername.split(':')
 
   if not parts:
     raise ValueError, 'Missing merge algorithm specified'

@@ -270,10 +270,10 @@ class UnphasedMarkerRepresentation(object):
     '''
     Transform a sequence of genotype strings to internal format
 
-    @param geno: sequence of genotype strings
-    @type  geno: sequence of str
-    @return    : sequence of genotype in internal format
-    @rtype     : sequence of objects
+    @param genos: sequence of genotype strings
+    @type  genos: sequence of str
+    @return     : sequence of genotype in internal format
+    @rtype      : sequence of objects
 
     >>> snp.from_strings(['AA','AB','BA',' A','A ','  ',''])
     [('A', 'A'), ('A', 'B'), ('A', 'B'), (None, 'A'), (None, 'A'), (None, None), (None, None)]

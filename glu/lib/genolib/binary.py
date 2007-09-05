@@ -146,7 +146,7 @@ class BinaryGenomatrixWriter(object):
 
     @param rowkey: row identifier
     @type  rowkey: str
-    @param  genos: sequence of genotypes in an internal representation, to
+    @param  genos: genotypes in an internal representation, to
                    be converted to the appropiate string representation by
                    the supplied genorepr class.
     @type   genos: sequence
@@ -305,9 +305,8 @@ class BinaryGenotripleWriter(object):
   '''
   def __init__(self,filename,compress=True,chunksize=232960):
     '''
-    @param     filename: file name or file object
+    @param     filename: a file name or file object
     @type      filename: str or file object
-    @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @param    chunksize: size of chunks to write/compress in bytes
     '''
     if compressed_filename(filename):
@@ -369,8 +368,9 @@ class BinaryGenotripleWriter(object):
     '''
     Write a genotype sequence of triples (sample,locus,genotype)
 
-    @param  triples: sequence of (sample,locus,genotype)
-    @type   triples: sequence of (str,str,genotype representation)
+    @param   triples: a sequence of genotriples(str,str,genotype representation). e.g.
+                      ('s1','l1','AA'),...
+    @type    triples: sequence
     '''
     if self.gfile is None:
       raise IOError('Cannot write to closed writer object')
@@ -454,8 +454,10 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
 
   @param filename: a file name or file object
   @type  filename: str or file object
-  @param  triples: genotype triple data
+  @param  triples: a sequence of genotriples(str,str,genotype representation). e.g.
+                   ('s1','l1','AA'),...
   @type   triples: sequence
+
 
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
@@ -480,7 +482,7 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
   '''
   Load genotype triples from file
 
-  @param     filename: file name or file object
+  @param     filename: a file name or file object
   @type      filename: str or file object
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None
@@ -694,7 +696,7 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
   @type      filename: str or file object
   @param      columns: matrix column names
   @type       columns: sequence of strs
-  @param       matrix: the genotype matrix data
+  @param       matrix: genotype matrix data
   @type        matrix: sequence
   @param       format: text string output in the first header field to
                        indicate data format (default is blank)
@@ -758,7 +760,7 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
   @type        format: string
   @param        limit: limit the number of columms loaded
   @type         limit: int or None
-  @param       unique: verify that rows and columns are uniquely labeled
+  @param       unique: flag indicating if repeated row or column elements do not exist
                        (default is True)
   @type        unique: bool
   @return:             format and sequence of column names followed by

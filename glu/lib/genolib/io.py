@@ -105,14 +105,14 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
-  @param filename: file name or file object
+  @param filename: a file name or file object
   @type  filename: str or file object
-  @param   format: format of input genomatrix, 'hapmap', 'ldat' or 'sdat'
+  @param   format: format of input file , 'hapmap', 'ldat', 'sdat', 'trip', 'genotriple'
+                   'lbat', 'sbat', or 'tbat'
   @type    format: str
   @param    limit: limit the number of samples loaded
   @type     limit: int or None
-  @param genorepr: object representing the input/output encoding and
-                   internal representation of genotypes
+  @param genorepr: internal representation of genotypes for the input/output
   @type  genorepr: UnphasedMarkerRepresentation or similar object
   @param   unique: flag indicating if repeated row or column elements do not exist
   @type    unique: bool
@@ -173,14 +173,15 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
   '''
   Write genotype data to file in one of the specified formats (ldat, sdat, trip, genotriple).
 
-  @param  filename: file name or file object
+  @param  filename: a file name or file object
   @type   filename: str or file object
-  @param     genos: genomatrix/genotriple
-  @type      genos: genomatrix/genotriple generator
-  @param    format: format of input
+  @param     genos: genomatrix/genotriple stream
+  @type      genos: sequence
+  @param    format: format of input file , 'ldat', 'sdat', 'trip', 'genotriple'
+                    'lbat', 'sbat', or 'tbat'
   @type     format: str
-  @param mergefunc: optional function to merge multiple genotypes into a consensus genotype
-  @type  mergefunc: function or None
+  @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+  @type  mergefunc: callable
   '''
   if format is None:
     format = guess_outformat(filename)
@@ -218,13 +219,15 @@ def transform_files(infiles,informat,ingenorepr,
 
   @param     infiles: list of input file names or file objects
   @type      infiles: str or file objects
-  @param    informat: input file format for all input files
+  @param    informat: format of input file, 'hapmap', 'ldat', 'sdat', 'trip', 'genotriple'
+                      'lbat', 'sbat', or 'tbat'
   @type     informat: str
   @param  ingenorepr: internal genotype representation for the input
   @type   ingenorepr: UnphasedMarkerRepresentation or similar object
   @param    outfiles: output file name or file object
   @type     outfiles: str or file object
-  @param   outformat: output file format
+  @param   outformat: format of output file , 'ldat', 'sdat', 'trip', 'genotriple'
+                      'lbat', 'sbat', or 'tbat'
   @type    outformat: str
   @param outgenorepr: internal genotype representation for the output
   @type  outgenorepr: UnphasedMarkerRepresentation or similar object
