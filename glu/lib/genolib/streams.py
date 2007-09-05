@@ -108,14 +108,13 @@ class GenotripleStream(GenotypeStream):
     operatings, with no additional random-access features of a true
     materialized class.
 
-    @param      triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                         ('s1','l1','AA'),...
+    @param      triples: sequence of genotriples(str,str,genotype representation)
     @type       triples: sequence
     @param      samples: optional set of samples refered to by the triples
     @type       samples: sequence, set, or None
     @param         loci: optional set of loci refered to by the triples
     @type          loci: sequence, set, or None
-    @param        order: sort order, 'sample' or 'locus', or None, Default is 'None'
+    @param        order: sort order, 'sample' or 'locus', or None, Default is None
     @type         order: str or None
     @param       unique: flag indicating if repeated elements do not exist within the stream
     @type        unique: bool
@@ -151,9 +150,9 @@ class GenotripleStream(GenotypeStream):
 
     @param     genos: genostreams
     @type      genos: list
-    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type  mergefunc: callable
-    @param     order: sort order, 'sample' or 'locus', or None, Default is 'None'
+    @param     order: sort order, 'sample' or 'locus', or None, Default is None
     @type      order: str or None
     @return         : combined genotriple stream
     @rtype          : sequence of sample, locus, and genotype
@@ -352,7 +351,7 @@ class GenotripleStream(GenotypeStream):
     @type            genos: sequence
     @param       transform: transformation object (optional)
     @type        transform: GenoTransform object
-    @param       mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param       mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type        mergefunc: callable
     @param include_samples: filter samples such that they must appear in the set (optional)
     @type  include_samples: set
@@ -476,7 +475,7 @@ class GenotripleStream(GenotypeStream):
     Thus, one must not expect that the resulting stream be in the suggested
     order.
 
-    @param  mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param  mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type   mergefunc: callable
     @param      order: sort order, either 'samples', 'locus'.  Default is 'sample'
     @type       order: str
@@ -520,7 +519,7 @@ class GenotripleStream(GenotypeStream):
     though unordered streams do require materialization.  A merge function is
     required for non-unique streams.
 
-    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type  mergefunc: callable
     @return         : genotriples converted into a genomatrix stream
     @rtype          : GenomatrixStream
@@ -567,7 +566,7 @@ class GenotripleStream(GenotypeStream):
     though unordered streams do require materialization.  A merge function is
     required for non-unique streams.
 
-    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type  mergefunc: callable
     @return         : genotriples converted into a genomatrix stream
     @rtype          : GenomatrixStream
@@ -742,7 +741,7 @@ class GenomatrixStream(GenotypeStream):
     @type      genos: list
     @param    format: format of input genomatrix, either 'ldat' or 'sdat'
     @type     format: str
-    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type  mergefunc: callable
     @return         : combined genotriple stream
     @rtype          : sequence of sample, locus, and genotype
@@ -966,7 +965,7 @@ class GenomatrixStream(GenotypeStream):
     @type            genos: sequence
     @param       transform: transformation object (optional)
     @type        transform: GenoTransform object
-    @param       mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param       mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type        mergefunc: callable
     @param include_samples: filter samples such that they must appear in the set (optional)
     @type  include_samples: set
@@ -1209,7 +1208,7 @@ class GenomatrixStream(GenotypeStream):
     '''
     Return a genomatrix stream in ldat format.
 
-    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type  mergefunc: callable
     @return         : ldat genomatrix stream
     @rtype          : GenomatrixStream
@@ -1239,7 +1238,7 @@ class GenomatrixStream(GenotypeStream):
     '''
     Return a genomatrix stream in sdat format.
 
-    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+    @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
     @type  mergefunc: callable
     @return         : sdat genomatrix stream
     @rtype          : GenomatrixStream
@@ -1853,7 +1852,7 @@ def recode_genotriples(triples,modelmap):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
-  @param      triples: a sequence of genotriples(str,str,genotype representation). e.g.
+  @param      triples: sequence of genotriples(str,str,genotype representation). e.g.
                        ('s1','l1','AA'),...
   @type       triples: sequence
   @return            : genotriple in bitpacked format
@@ -1892,8 +1891,7 @@ def encode_genotriples_from_tuples(triples,modelmap=None,max_alleles=0):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
-  @param      triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                       ('s1','l1','AA'),...
+  @param      triples: sequence of genotriples(str,str,genotype representation)
   @type       triples: sequence
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
@@ -1926,8 +1924,7 @@ def encode_genotriples_from_strings(triples,genorepr,modelmap=None,max_alleles=0
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
-  @param      triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                       ('s1','l1','AA'),...
+  @param      triples: sequence of genotriples(str,str,genotype representation)
   @type       triples: sequence
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
@@ -1974,8 +1971,7 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   parameter and spill very large streams to disk and perform a multi-phase
   offline merge sort.
 
-  @param   triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                    ('s1','l1','AA'),...
+  @param   triples: sequence of genotriples(str,str,genotype representation)
   @type    triples: sequence
   @param     order: sort order, either 'samples', 'locus'
   @type      order: str
@@ -2213,8 +2209,7 @@ def merge_sorted_genotriples(triples,mergefunc):
   supplied merge function is used to produce a consensus genotype for each
   sample and locus.
 
-  @param   triples: a sequence of sorted genotriples(str,str,genotype representation). e.g.
-                    ('s1','l1','AA'),...
+  @param   triples: sequence of sorted genotriples(str,str,genotype representation)
   @type    triples: sequence
   @param mergefunc: function to merge multiple genotypes into a consensus genotype.
   @type  mergefunc: callable
@@ -3102,8 +3097,7 @@ def rename_genotriples_alleles(triples, rename_alleles):
   '''
   Returns a new genotriple stream with the alleles renamed
 
-  @param      triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                       ('s1','l1','AA'),...
+  @param      triples: sequence of genotriples(str,str,genotype representation)
   @type       triples: sequence
   @return            : genotriple with the new internal format
   @rtype             : genotriple generator
@@ -3231,8 +3225,7 @@ def filter_genotriples_missing(triples):
   '''
   Filter out the genotriple if its genotype is missing.
 
-  @param triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                  ('s1','l1','AA'),...
+  @param triples: sequence of genotriples(str,str,genotype representation)
   @type  triples: sequence
   @return       : iterator with missing genotype in the triples being filtered out.
   @rtype        : iterator
@@ -3329,8 +3322,7 @@ def rename_genotriples(triples,samplemap,locusmap):
   and locusmap. If there is not mapping for a particular sample or locus,
   the original name will be used.
 
-  @param   triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                    ('s1','l1','AA'),...
+  @param   triples: sequence of genotriples(str,str,genotype representation)
   @type    triples: sequence
   @param samplemap: map between the current sample name and a new name
   @type  samplemap: dict
@@ -3381,8 +3373,7 @@ def filter_genotriples(triples,sampleset,locusset,exclude=False):
   Depending on the value of exclude flag, both sets will be treated
   as either inclusion sets(exclude=False) or exclusion sets(exclude=True).
 
-  @param   triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                    ('s1','l1','AA'),...
+  @param   triples: sequence of genotriples(str,str,genotype representation)
   @type    triples: sequence
   @param sampleset: set of sample names
   @type  sampleset: set
@@ -3455,8 +3446,7 @@ def remap_genotriples(triples,samplemap,locusmap):
   and will also filter out the genotriple if either sample or locus is
   not in the samplemap or locusmap.
 
-  @param   triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                    ('s1','l1','AA'),...
+  @param   triples: sequence of genotriples(str,str,genotype representation)
   @type    triples: sequence
   @param samplemap: map between the current sample name and a new name
   @type  samplemap: dict

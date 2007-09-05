@@ -180,7 +180,7 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
   @param    format: format of input file , 'ldat', 'sdat', 'trip', 'genotriple'
                     'lbat', 'sbat', or 'tbat'
   @type     format: str
-  @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is 'None'
+  @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
   @type  mergefunc: callable
   '''
   if format is None:

@@ -368,8 +368,7 @@ class BinaryGenotripleWriter(object):
     '''
     Write a genotype sequence of triples (sample,locus,genotype)
 
-    @param   triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                      ('s1','l1','AA'),...
+    @param   triples: a sequence of genotriples(str,str,genotype representation)
     @type    triples: sequence
     '''
     if self.gfile is None:
@@ -454,8 +453,7 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
 
   @param filename: a file name or file object
   @type  filename: str or file object
-  @param  triples: a sequence of genotriples(str,str,genotype representation). e.g.
-                   ('s1','l1','AA'),...
+  @param  triples: a sequence of genotriples(str,str,genotype representation)
   @type   triples: sequence
 
 
