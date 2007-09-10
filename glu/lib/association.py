@@ -25,7 +25,7 @@ from   collections    import defaultdict
 from   operator       import itemgetter
 
 from   numpy          import array,matrix,asarray,asanyarray,zeros,zeros_like, \
-                             exp,nan,abs,arange,median,sqrt
+                             exp,nan,abs,arange,median,sqrt,inf
 from   scipy          import stats
 
 from   utils          import tally,pick
@@ -36,6 +36,8 @@ from   genolib        import load_genostream, get_genorepr
 LOGE_10 = log(10)
 
 def log10(n):
+  if n in (0.0,-0.0,0):
+    return -inf
   return log(n)/LOGE_10
 
 
