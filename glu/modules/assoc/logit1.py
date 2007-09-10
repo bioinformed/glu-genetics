@@ -161,15 +161,14 @@ def main():
     elif k>2:
       raise ValueError,'Unexpected number of parameters in model (n=%d,k=%d)' % (n,k)
 
-    # Construct genotype parameter indices
-    indices = []
-    for j in range(cats-1):
-      indices.extend( range(j*n+1,j*n+k+1) )
-
     out.write(lname)
 
     ### SCORE TEST ###
     g = GLogit(model.y,model.X)
+
+    # Construct genotype parameter indices
+    indices = [ j*n+i for i in range(1,k+1)
+                      for j in range(len(g.categories)-1) ]
 
     # FIXME: Can use initial_betas to possibly speed things up
     #g.fit(initial_beta=initial_beta[k])
