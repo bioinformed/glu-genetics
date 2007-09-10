@@ -150,7 +150,6 @@ except ImportError:
 
       return self<=other
 
-
   def genotype_bit_size(n,allow_hemizygote):
     if allow_hemizygote:
       m = (n+1)*(n+2)//2
@@ -158,7 +157,6 @@ except ImportError:
       m = n*(n+1)//2 + 1
 
     return int(ceil(log(m)/log(2.0)))
-
 
   def byte_array_size(nbits):
     return int(ceil(nbits/8))
@@ -247,27 +245,27 @@ except ImportError:
 
 
   class UnphasedMarkerModel(object):
-  '''
-  bit-packed unphased marker representation where the genotype representation
-  and internal representation are the same.
-  '''
+    '''
+    bit-packed unphased marker representation where the genotype representation
+    and internal representation are the same.
+    '''
 
     __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_allles')
 
     def __init__(self, allow_hemizygote=False, max_alleles=None):
-    '''
-    Construct a new UnphasedMarkerModel
+      '''
+      Construct a new UnphasedMarkerModel
 
-    This class represents bidirectional mappings of genotypes between
-    strings and Python objects.  The object representation of a genotype is
-    a list of two alleles or up to the max_alleles. Given this representation,
-    alleles need not be known in advance.  
+      This class represents bidirectional mappings of genotypes between
+      strings and Python objects.  The object representation of a genotype is
+      a list of two alleles or up to the max_alleles. Given this representation,
+      alleles need not be known in advance.  
 
-    @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation
-    @type   allow_hemizygote: bool
-    @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
-    @type        max_alleles: int or None
-    '''
+      @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation
+      @type   allow_hemizygote: bool
+      @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+      @type        max_alleles: int or None
+      '''
 
       self.genomap          = {}
       self.genotypes        = []

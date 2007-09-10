@@ -350,12 +350,11 @@ class GenotripleStream(GenotypeStream):
                          allows iteration multiple times
     @type  materialized: bool
 
-
     For example:
 
     stream.clone(triples, materialized=False)
 
-     is equivalent to
+    is equivalent to
 
     GenotripleStream(triples, samples=stream.samples, loci=stream.loci,
                               order=stream.order, unique=stream.unique,
@@ -894,7 +893,6 @@ class GenomatrixStream(GenotypeStream):
     @param     modelmap: map between a locus and an new internal representation of genotypes
     @type      modelmap: dict
 
-
     >>> samples = ['s1', 's2', 's3']
     >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
     ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
@@ -1011,7 +1009,6 @@ class GenomatrixStream(GenotypeStream):
     @param       packed: flag indicating if genotypes are packed into a
                          compressed array format
     @type        packed: bool
-
 
     For example:
 
@@ -1759,7 +1756,6 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   @type        unique: bool
   @return            : tuple of columns and a genomatrix generator in packed format
   @rtype             : 2-tuple of list of str and genomatrix generator
-
 
   >>> from reprs import snp
   >>> defmodel  = model_from_alleles('ACGT',allow_hemizygote=True)
@@ -2942,6 +2938,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
 
 #######################################################################################
+
 
 def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   '''

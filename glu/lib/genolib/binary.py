@@ -372,7 +372,6 @@ class BinaryGenotripleWriter(object):
     row['geno']   = geno.index
     row.append()
 
-
   def writerows(self, triples):
     '''
     Write a genotype sequence of triples (sample,locus,genotype)
@@ -405,7 +404,6 @@ class BinaryGenotripleWriter(object):
       row['locus']  = locusnum
       row['geno']   = geno.index
       row.append()
-
 
   def close(self):
     '''
@@ -469,7 +467,6 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
   @type   compress: bool
   @param chunksize: size of chunks to write/compress in bytes
   @type  chunksize: int
-
 
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
