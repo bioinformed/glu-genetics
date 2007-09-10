@@ -1,0 +1,28 @@
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Genotype Library and Utilities - Preferred Input File Formats
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Use of preferred file formats will make GLU run most efficiently
+
+    ================== ====================== ================ ===============
+          Module                            File Format
+    ------------------ -------------------------------------------------------
+                          LDAT/LBAT/HAPMAP         SDAT/SBAT       TRIP/TBAT
+    ================== ====================== ================ ===============
+    Data management
+      split                       x                     x              x
+      transform                   x                     x              x
+    Quality control
+      qc.completion               x                     x              x
+      qc.concordance*             x
+      qc.dupcheck                                       x
+      qc.hets                                           x
+      qc.hwp                      x
+      qc.maf                      x
+    Association tests
+      assoc.linear1               x
+      assoc.logit1                x
+    ================== ====================== ================ ===============
+
+*Note: for qc.concordance, LDAT is the preferred format for the reference
+file. Any format can be used for the comparison file.*
