@@ -66,7 +66,7 @@ def main():
   genorepr = get_genorepr(options.genorepr)
   genos    = load_genostream(infile,options.format,genorepr=genorepr)
 
-  out = hyphen(options.output,sys.stdout)
+  out = autofile(hyphen(options.output,sys.stdout),'w')
 
   out.write('Filename    : %s\n' % namefile(infile))
   out.write('Format      : %s\n' % genos.format)
