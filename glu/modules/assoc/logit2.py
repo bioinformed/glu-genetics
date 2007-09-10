@@ -24,7 +24,7 @@ from   itertools           import chain
 from   scipy               import stats
 from   scipy.linalg        import LinAlgError
 
-from   glu.lib.fileutils   import load_list
+from   glu.lib.fileutils   import autofile,hyphen,load_list
 from   glu.lib.glm         import GLogit
 
 from   glu.lib.association import print_results,build_models,format_pvalue,NULL,GENO,TREND
@@ -76,14 +76,17 @@ def window(loci,n):
   items = collections.deque()
   loci = iter(loci)
 
+  # Fill queue to at most n+1 items
   for locus in loci:
     items.append(locus)
     if len(items) == n+1:
       break
 
+  # Return first partition
   l = list(items)
   yield [],l[0],l[1:]
 
+  # Return middle windows
   i = 0
   for locus in loci:
     if i==n:
@@ -95,6 +98,7 @@ def window(loci,n):
     l = list(items)
     yield l[:i],l[i],l[i+1:]
 
+  # Return final partitions
   l = list(items)
   for i in xrange(i,len(l)-1):
     i += 1
@@ -109,6 +113,8 @@ def main():
     parser.print_help()
     return
 
+  out = autofile(hyphen(options.output,sys.stdout) or sys.stdout,'w')
+
   loci,models = build_models(args[0], args[1], options)
 
   subset = None
@@ -122,14 +128,16 @@ def main():
     null = GLogit(null_model.y,null_model.X,vars=null_model.vars)
     null.fit()
 
-    print_results(sys.stdout,null_model,null)
+    print_results(out,null_model,null)
 
   headers = ['Ref_Locus',  'Alt_Locus',
              'Ref_Score',  'DF', 'p-value',
              'Alt_Score',  'DF', 'p-value',
-             'Cond_Score', 'DF', 'p-value']
+             'Cond_Score', 'DF', 'p-value',
+             'Joint_Score','DF', 'p-value']
 
-  print '\t'.join(headers)
+  out.write('\t'.join(headers))
+  out.write('\n')
 
   # For each locus
   for left,locus,right in window(loci,options.window):
@@ -138,21 +146,23 @@ def main():
     if subset is not None and lname1 not in subset:
       continue
 
-    model1_term = GENO(lname1)
-    model1 = models.build_model(model1_term, dict([locus]))
-
-    if not model1:
-      model1_term = TREND(lname1)
+    for mod1 in GENO,TREND:
+      model1_term = mod1(lname1)
       model1 = models.build_model(model1_term, dict([locus]))
-
-    if not model1:
+      if model1:
+        break
+    else:
       continue
 
+    g  = GLogit(model1.y,model1.X,vars=model1.vars)
+    n  = len(model1.vars)
     k1 = len(model1_term)
 
+    indices = [ j*n+i for i in range(1,1+k1)
+                      for j in range(len(g.categories)-1) ]
+
     try:
-      g = GLogit(model1.y,model1.X,vars=model1.vars)
-      st1,df1 = g.score_test(indices=range(1,1+k1)).test()
+      st1,df1 = g.score_test(indices=indices).test()
     except LinAlgError:
       continue
 
@@ -160,21 +170,22 @@ def main():
       lmap = dict([locus,other])
       lname2 = other[0]
 
-      model2_term = GENO(lname2)+NULL(lname1)
-      model2 = models.build_model(model2_term, lmap)
-
-      if not model2:
-        model2_term = TREND(lname2)+NULL(lname1)
+      for mod2 in GENO,TREND:
+        model2_term = mod2(lname2)+NULL(lname1)
         model2 = models.build_model(model2_term, lmap)
-
-      if not model2:
+        if model2:
+          break
+      else:
         continue
 
+      g  = GLogit(model2.y,model2.X,vars=model2.vars)
+      n  = len(model2.vars)
       k2 = len(model2_term)
+      indices = [ j*n+i for i in range(1,1+k2)
+                        for j in range(len(g.categories)-1) ]
 
       try:
-        g = GLogit(model2.y,model2.X,vars=model2.vars)
-        st2,df2 = g.score_test(indices=range(1,1+k2)).test()
+        st2,df2 = g.score_test(indices=indices).test()
       except LinAlgError:
         continue
 
@@ -184,25 +195,38 @@ def main():
 
       if not model:
         interaction_term = NULL(lname1)+NULL(lname2)
-        term = model1_term+model2_term+interaction_term
+        term  = model1_term+model2_term+interaction_term
         model = models.build_model(model1_term+model2_term, lmap)
 
       if not model:
         continue
 
-      k  = len(term)
+      g = GLogit(model.y,model.X,vars=model.vars)
+      n = len(model.vars)
+      k = len(term)
+      indices = [ j*n+i for i in range(1+k1,1+k)
+                        for j in range(len(g.categories)-1) ]
 
       try:
-        g = GLogit(model.y,model.X,vars=model.vars)
-        st,df = g.score_test(indices=range(1+k1,1+k)).test()
+        st,df = g.score_test(indices=indices).test()
       except LinAlgError:
         continue
 
+      indices = [ j*n+i for i in range(1,1+k)
+                        for j in range(len(g.categories)-1) ]
+
+      try:
+        stj,dfj = g.score_test(indices=indices).test()
+      except LinAlgError:
+        stj,dfj = 0,k
+
       sf = stats.distributions.chi2.sf
-      print '\t'.join([lname1,lname2,
-                       '%8.5f' % st1, '%d' % df1, '%9.8f' % format_pvalue(sf(st1,df1)),
-                       '%8.5f' % st2, '%d' % df2, '%9.8f' % format_pvalue(sf(st2,df2)),
-                       '%8.5f' % st,  '%d' % df,  '%9.8f' % format_pvalue(sf(st, df ))])
+      out.write('\t'.join([lname1,lname2,
+                       '%8.5f' % st1, '%d' % df1, format_pvalue(sf(st1,df1)),
+                       '%8.5f' % st2, '%d' % df2, format_pvalue(sf(st2,df2)),
+                       '%8.5f' % st,  '%d' % df,  format_pvalue(sf(st, df )),
+                       '%8.5f' % stj, '%d' % dfj, format_pvalue(sf(stj,dfj))]))
+      out.write('\n')
 
 
 if __name__ == '__main__':
