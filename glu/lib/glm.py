@@ -25,8 +25,6 @@ from numpy        import array,matrix,asmatrix,asarray,asarray_chkfinite,asanyar
 from scipy        import linalg
 from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 
-from utils        import tally
-
 CONV = 1e-8
 COND = 1e-6
 
@@ -1306,34 +1304,36 @@ class GLogit(object):
     return asmatrix(b,dtype=float),asmatrix(W,dtype=float)
 
 
-  def score_test(self,indices=None):
-    return GLogitScoreTest(self,indices=indices)
+  def score_test(self,parameters=None,indices=None):
+    return GLogitScoreTest(self,parameters=parameters,indices=indices)
 
 
-  def wald_test(self,indices=None):
-    return GLogitWaldTest(self,indices=indices)
+  def wald_test(self,parameters=None,indices=None):
+    return GLogitWaldTest(self,parameters=parameters,indices=indices)
 
 
-  def lr_test(self,indices=None):
-    return GLogitLRTest(self,indices=indices)
+  def lr_test(self,parameters=None,indices=None):
+    return GLogitLRTest(self,parameters=parameters,indices=indices)
 
 
 class GLogitScoreTest(object):
-  def __init__(self,model,indices=None):
+  def __init__(self,model,parameters=None,indices=None):
     y = model.y
     X = model.X
     k = len(model.categories)-1
     n = X.shape[1]
 
-    if indices is None:
-      indices = []
-      for i in xrange(k):
-        s = i*n
-        indices += range(s+1,s+n)
+    if parameters is None and indices is None:
+      indices  = [ j*n+i for i in range(1,n)
+                         for j in range(k) ]
+    elif parameters is not None:
+      pindices = [ j*n+i for i in parameters
+                         for j in range(k) ]
+      indices  = sorted(set(indices or []) | set(pindices))
 
     # Form null design matrix by finding the rows of the design matrix
     # that are to be scored and excluding those from the null model
-    design_indices = tally(i%n for i in indices)
+    design_indices = set(i%n for i in indices)
     null_indices   = [ i for i in xrange(n) if i not in design_indices ]
     X_null = X[:,null_indices]
 
@@ -1423,17 +1423,20 @@ class GLogitWaldTest(object):
   specified as a list of indices from 0..n-1.  This limitation will be
   lifted soon.
   '''
-  def __init__(self,model,indices=None):
+  def __init__(self,model,parameters=None,indices=None):
+    k = len(model.categories)-1
+    n = model.X.shape[1]
+
+    if parameters is None and indices is None:
+      indices  = [ j*n+i for i in range(1,n)
+                         for j in range(k) ]
+    elif parameters is not None:
+      pindices = [ j*n+i for i in parameters
+                         for j in range(k) ]
+      indices  = sorted(set(indices or []) | set(pindices))
+
     if model.beta is None:
       model.fit()
-
-    if indices is None:
-      n = model.X.shape[1]
-      k = len(model.categories)-1
-      indices = []
-      for i in xrange(k):
-        s = i*n
-        indices += xrange(s+1,s+n)
 
     self.model   = model
     self.indices = indices
@@ -1459,21 +1462,23 @@ class GLogitLRTest(object):
   is fit and -2(l_null-l_model) is distributed as a chi-squared distribution
   with len(indices) degrees of freedom.
   '''
-  def __init__(self,model,initial_beta=None,indices=None):
+  def __init__(self,model,initial_beta=None,parameters=None,indices=None):
     y = model.y
     X = model.X
     k = len(model.categories)-1
     m,n = X.shape
 
-    if indices is None:
-      indices = []
-      for i in xrange(k):
-        s = i*n
-        indices += range(s+1,s+n)
+    if parameters is None and indices is None:
+      indices  = [ j*n+i for i in range(1,n)
+                         for j in range(k) ]
+    elif parameters is not None:
+      pindices = [ j*n+i for i in parameters
+                         for j in range(k) ]
+      indices  = sorted(set(indices or []) | set(pindices))
 
     # Form null design matrix by finding the rows of the design matrix
     # that are to be scored and excluding those from the null model
-    design_indices = tally(i%n for i in indices)
+    design_indices = set(i%n for i in indices)
     null_indices   = [ i for i in xrange(n) if i not in design_indices ]
     X_null = X[:,null_indices]
 
@@ -1664,24 +1669,26 @@ class Linear(object):
 
     return L,beta,W,ss
 
-  def score_test(self,indices=None):
-    return LinearScoreTest(self,indices=indices)
+  def score_test(self,parameters=None,indices=None):
+    return LinearScoreTest(self,parameters=parameters,indices=indices)
 
-  def wald_test(self,indices=None):
-    return LinearWaldTest(self,indices=indices)
+  def wald_test(self,parameters=None,indices=None):
+    return LinearWaldTest(self,parameters=parameters,indices=indices)
 
-  def lr_test(self,indices=None):
-    return LinearLRTest(self,indices=indices)
+  def lr_test(self,parameters=None,indices=None):
+    return LinearLRTest(self,parameters=parameters,indices=indices)
 
 
 class LinearScoreTest(object):
-  def __init__(self,model,indices=None):
+  def __init__(self,model,parameters=None,indices=None):
     y = model.y
     X = model.X
     n = X.shape[1]
 
-    if indices is None:
-      indices = xrange(1,n)
+    if parameters is None and indices is None:
+      indices = range(1,n)
+    else:
+      indices = sorted(set(indices or []) | set(parameters or []))
 
     design_indices = set(indices)
     null_indices = [ i for i in xrange(n) if i not in design_indices ]
@@ -1739,10 +1746,12 @@ class LinearWaldTest(object):
   specified as a list of indices from 0..n-1.  This limitation will be
   lifted soon.
   '''
-  def __init__(self,model,indices=None):
-    if indices is None:
+  def __init__(self,model,parameters=None,indices=None):
+    if parameters is None and indices is None:
       n = model.X.shape[1]
-      indices = xrange(1,n)
+      indices = range(1,n)
+    else:
+      indices = sorted(set(indices or []) | set(parameters or []))
 
     self.model   = model
     self.indices = indices
@@ -1770,13 +1779,15 @@ class LinearLRTest(object):
   is fit and -2(l_null-l_model) is distributed as a chi-squared distribution
   with len(indices) degrees of freedom.
   '''
-  def __init__(self,model,indices=None):
+  def __init__(self,model,parameters=None,indices=None):
     y = model.y
     X = model.X
     n = X.shape[1]
 
-    if indices is None:
-      indices = xrange(1,n)
+    if parameters is None and indices is None:
+      indices = range(1,n)
+    else:
+      indices = sorted(set(indices or []) | set(parameters or []))
 
     design_indices = set(indices)
     null_indices = [ i for i in xrange(n) if i not in design_indices ]
