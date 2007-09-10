@@ -163,10 +163,10 @@ class UnphasedMarkerRepresentation(object):
     '''
     Transform a sequence of genotypes in internal format to a genotype strings
 
-    @param rep: genotypes in internal format
-    @type  rep: sequence
-    @return   : genotypes in string format
-    @rtype    : sequence
+    @param reps: genotypes in internal format
+    @type  reps: sequence
+    @return    : genotypes in string format
+    @rtype     : sequence
 
     >>> model=model_from_alleles('AG',allow_hemizygote=True)
     >>> genos = [ model[g] for g in [('A','A'),(None,'A'),(None,None)] ]

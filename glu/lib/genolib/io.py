@@ -45,10 +45,20 @@ OUTPUT_FORMATS = ('ldat','sdat','trip','genotriple','lbat','sbat','tbat')
 
 
 def guess_informat(filename):
+  '''
+  @param filename: a file name or file object
+  @type  filename: str or file object
+  '''
+
   return guess_format(filename, INPUT_FORMATS)
 
 
 def guess_informat_list(filenames):
+  '''
+  @param filename: a file name or file object
+  @type  filename: str or file object
+  '''
+
   formats = set( guess_informat(f) for f in filenames )
   formats.discard(None)
   if len(formats) == 1:
@@ -57,12 +67,20 @@ def guess_informat_list(filenames):
 
 
 def guess_outformat(filename):
+  '''
+  @param filename: a file name or file object
+  @type  filename: str or file object
+  '''
+
   return guess_format(filename, OUTPUT_FORMATS)
 
 
 def load_rename_alleles_file(filename):
   '''
   Load an allele renameing file
+
+  @param filename: a file name or file object
+  @type  filename: str or file object
 
   >>> from StringIO import StringIO
   >>> data = StringIO('l1\\tA,C,G,T\\tT,G,C,A\\nl3\\tA\\tC\\nl5\\tA,B\\tC,T')
@@ -108,14 +126,16 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   @param filename: a file name or file object
   @type  filename: str or file object
   @param   format: format of input file , 'hapmap', 'ldat', 'sdat', 'trip', 'genotriple'
-                   'lbat', 'sbat', or 'tbat'
+                   'lbat', 'sbat', or 'tbat'. Default is None
   @type    format: str
-  @param    limit: limit the number of samples loaded
-  @type     limit: int or None
-  @param genorepr: internal representation of genotypes for the input/output
+  @param genorepr: internal representation of genotypes for the input/output. Default is None
   @type  genorepr: UnphasedMarkerRepresentation or similar object
-  @param   unique: flag indicating if repeated row or column elements do not exist
+  @param    limit: limit the number of samples loaded. Default is None
+  @type     limit: int or None
+  @param   unique: flag indicating if repeated row or column elements do not exist. Default is None
   @type    unique: bool
+  @para  modelmap: map between a locus and an new internal representation of genotypes. Default is None
+  @type  modelmap: dict
   @return        : loaded genomatrix stream
   @rtype         : GenomatrixStream
 
@@ -178,10 +198,14 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
   @param     genos: genomatrix/genotriple stream
   @type      genos: sequence
   @param    format: format of input file , 'ldat', 'sdat', 'trip', 'genotriple'
-                    'lbat', 'sbat', or 'tbat'
+                    'lbat', 'sbat', or 'tbat'. Default is None
   @type     format: str
+  @param  genorepr: internal representation of genotypes for the input/output. Default is None
+  @type   genorepr: UnphasedMarkerRepresentation or similar object
   @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
   @type  mergefunc: callable
+  @param  compress: flag indicating if a compressed format is desired. Default is True
+  @type   compress: bool
   '''
   if format is None:
     format = guess_outformat(filename)
@@ -233,6 +257,8 @@ def transform_files(infiles,informat,ingenorepr,
   @type  outgenorepr: UnphasedMarkerRepresentation or similar object
   @param   transform: transformation object (optional)
   @type    transform: GenoTransform object
+  @param   mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
+  @type    mergefunc: callable
   @param       limit: limit the number of samples loaded
   @type        limit: int or None
   @return           : transformed genodata

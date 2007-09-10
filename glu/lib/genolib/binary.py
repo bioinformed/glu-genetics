@@ -57,6 +57,11 @@ class BinaryGenomatrixWriter(object):
     @param       format: text string output in the first header field to
                          indicate data format (default is blank)
     @type        format: str
+    @param     compress: flag indicating if compression should be used when writing a binary genotype file.
+                         Default is True.
+    @type      compress: bool
+    @param      scratch: the buffer space available to use while reading or writing a binary file.
+    @type       scratch: int
 
     Example of writing an sdat file:
 
@@ -307,7 +312,11 @@ class BinaryGenotripleWriter(object):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
+    @param     compress: flag indicating if compression should be used when writing a binary genotype file.
+                         Default is True.
+    @type      compress: bool
     @param    chunksize: size of chunks to write/compress in bytes
+    @type     chunksize: int
     '''
     if compressed_filename(filename):
       raise IOError('Binary genotype files must not have a compressed extension')
@@ -451,10 +460,15 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
   '''
   Write the genotype triple data to file.
 
-  @param filename: a file name or file object
-  @type  filename: str or file object
-  @param  triples: a sequence of genotriples(str,str,genotype representation)
-  @type   triples: sequence
+  @param  filename: a file name or file object
+  @type   filename: str or file object
+  @param   triples: a sequence of genotriples(str,str,genotype representation)
+  @type    triples: sequence
+  @param  compress: flag indicating if compression should be used when writing a binary genotype file.
+                   Default is True.
+  @type   compress: bool
+  @param chunksize: size of chunks to write/compress in bytes
+  @type  chunksize: int
 
 
   >>> import tempfile
@@ -482,10 +496,15 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
 
   @param     filename: a file name or file object
   @type      filename: str or file object
+  @param       unique: flag indicating if repeated row or column elements do not exist
+                       (default is True)
+  @type        unique: bool
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None
-  @return: sequence of tuples of sample name, locus name, and genotype representation
-  @rtype:  generator
+  @param     modelmap: map between a locus and an new internal representation of genotypes
+  @type      modelmap: dict
+  @return:             sequence of tuples of sample name, locus name, and genotype representation
+  @rtype:              generator
 
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
@@ -663,6 +682,9 @@ def load_models(gfile):
   Load models from an HDF5 binary genotype file
 
   Implements model compression upon input.
+
+  @param   gfile: output file
+  @type    gfile: PyTables HDF5 file instance
   '''
   alleles         = map(str,gfile.root.model_alleles[:])
   alleles[0]      = None
@@ -692,13 +714,13 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
 
   @param     filename: a file name or file object
   @type      filename: str or file object
-  @param      columns: matrix column names
-  @type       columns: sequence of strs
-  @param       matrix: genotype matrix data
-  @type        matrix: sequence
-  @param       format: text string output in the first header field to
-                       indicate data format (default is blank)
-  @type        format: string
+  @param        genos: genomatrix/genotriple stream
+  @type         genos: sequence
+  @param     compress: flag indicating if compression should be used when writing a binary genotype file.
+                       Default is True.
+  @type      compress: bool
+  @param      scratch: the buffer space available to use while reading or writing a binary file.
+  @type       scratch: int
 
   Example of writing an sdat file:
 
@@ -761,6 +783,12 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
   @param       unique: flag indicating if repeated row or column elements do not exist
                        (default is True)
   @type        unique: bool
+  @param     modelmap: map between a locus and an new internal representation of genotypes
+  @type      modelmap: dict
+  @param    chunksize: size of chunks to write/compress in bytes
+  @type     chunksize: int
+  @param      scratch: the buffer space available to use while reading or writing a binary file.
+  @type       scratch: int
   @return:             format and sequence of column names followed by
                        tuples of row label and row data
   @rtype:              tuple of string and generator

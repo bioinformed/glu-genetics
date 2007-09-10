@@ -82,6 +82,8 @@ class Unique(object):
 
   def __call__(self,model,genos):
     '''
+    @param       model: new internal representation of genotypes
+    @type        model: UnphasedMarkerRepresentation or similar object
     @param       genos: genotypes
     @type        genos: sequence
     @return           : concordance class, the consensus genotype
@@ -145,13 +147,15 @@ class Vote(object):
   '''
   def __init__(self, threshold=1.0):
     '''
-    @param   threshold: cut-off value to be voted as a consensus
+    @param   threshold: cut-off value to be voted as a consensus. Default is 1.0
     @type    threshold: float
     '''
     self.threshold = threshold
 
   def __call__(self,model,genos):
     '''
+    @param       model: new internal representation of genotypes
+    @type        model: UnphasedMarkerRepresentation or similar object
     @param       genos: genotypes
     @type        genos: sequence
     @return           : concordance class, the consensus genotype
@@ -260,13 +264,15 @@ class Ordered(object):
   '''
   def __init__(self, threshold=0.4999999):
     '''
-    @param   threshold: cut-off value to be voted as a consensus
+    @param   threshold: cut-off value to be voted as a consensus. Default is 0.4999999
     @type    threshold: float
     '''
     self.threshold   = threshold
 
   def __call__(self,model,genos):
     '''
+    @param       model: new internal representation of genotypes
+    @type        model: UnphasedMarkerRepresentation or similar object
     @param       genos: genotypes
     @type        genos: sequence
     @return           : concordance class, the consensus genotype
@@ -307,7 +313,7 @@ class Merger(object):
   have been processed.
 
   Two statistics objects are maintained, samplestats and locustats.  They
-  are dictionaries from sample and locus, respectively, to a three element
+  are dictionaries from sample and locus, respectively, to a five element
   list contianing the following genotype counts:
 
   0) unambiguous:  exactly one genotype and non-missing
@@ -340,6 +346,8 @@ class Merger(object):
     @type  sample: str
     @param  locus: locus identifier
     @type   locus: str
+    @param  model: new internal representation of genotypes
+    @type   model: UnphasedMarkerRepresentation or similar object
     @param  genos: genotypes
     @type   genos: sequence
     @return      : consensus genotype
@@ -398,6 +406,7 @@ def get_genomerger(mergername):
   @param mergername: genotype merger name
   @type  mergername: str
   @return          : genotype merge object
+  @rtype           : merger object
   '''
   parts = mergername.split(':')
 
@@ -425,6 +434,13 @@ def get_genomerger(mergername):
 def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   '''
   Retrieve merge statistics from the object and write to files by sample/locus
+
+  @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
+  @type   mergefunc: callable
+  @param samplefile: output file name or file object for merge stats by sample
+  @type  samplefile: str or file object
+  @param  locusfile: output file name or file object for merge stats by locus
+  @type   locusfile: str or file object
 
   >>> model = model_from_alleles('AB')
   >>> missing = model[None,None]
@@ -477,6 +493,9 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
 def build_concordance_output(stats):
   '''
   Calculate concordance rate and format all the results for output
+
+  @param  stats: a list of merge stats for each sample/locus on the genotypes that was processed
+  @type   stats: dict from str -> list
   '''
   for key,(unambiguous,concordant,consensus,discordant,missing) in stats.iteritems():
     total = unambiguous+concordant+discordant+consensus+missing
@@ -493,6 +512,9 @@ def build_concordance_output(stats):
 def mergefunc_transpose_adapter(mergefunc):
   '''
   Return a new mergefunc that transposes the calling convention for samples and loci
+
+  @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
+  @type   mergefunc: callable
   '''
   def _mergefunc_transpose_adapter(locus,sample,model,genos):
     return mergefunc(sample,locus,model,genos)

@@ -247,9 +247,28 @@ except ImportError:
 
 
   class UnphasedMarkerModel(object):
+  '''
+  bit-packed unphased marker representation where the genotype representation
+  and internal representation are the same.
+  '''
+
     __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_allles')
 
     def __init__(self, allow_hemizygote=False, max_alleles=None):
+    '''
+    Construct a new UnphasedMarkerModel
+
+    This class represents bidirectional mappings of genotypes between
+    strings and Python objects.  The object representation of a genotype is
+    a list of two alleles or up to the max_alleles. Given this representation,
+    alleles need not be known in advance.  
+
+    @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation
+    @type   allow_hemizygote: bool
+    @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+    @type        max_alleles: int or None
+    '''
+
       self.genomap          = {}
       self.genotypes        = []
       self.alleles          = []
@@ -309,6 +328,13 @@ except ImportError:
   def genoarray_concordance(genos1, genos2):
     '''
     Generate simple concordance statistics from two genotype arrays
+
+    @param genos1: the first genotypearray that was passed in
+    @type  genos1: GenotypeArray object
+    @param genos2: the second genotypearray that was passed in
+    @type  genos2: GenotypeArray object
+    @return      : a tuple of concordance stats
+    @rtype       : tuple of ints
     '''
     if len(genos1) != len(genos2):
       raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
@@ -324,6 +350,20 @@ except ImportError:
 
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
+  '''
+  Build an UnphasedMarkerModel from the alleles that were passed in
+
+  @param           alleles: sequence of alleles
+  @param           alleles: sequence of strings
+  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @type   allow_hemizygote: bool
+  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @type        max_alleles: int or None
+  @return:                  the UnphasedMarkerModel built from the supplied alleles 
+  @rtype:                   an UnphasedMarkerModel object
+
+  '''
+
   alleles = sorted(set(a for a in alleles if a is not None))
   n = len(alleles)
 
@@ -344,11 +384,39 @@ def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
 
 
 def model_from_genotypes(genotypes, allow_hemizygote=None, max_alleles=None):
+  '''
+  Build an UnphasedMarkerModel from the genotypes that were passed in
+
+  @param         genotypes: sequence of genotypes
+  @param         genotypes: sequence of strings
+  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @type   allow_hemizygote: bool
+  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @type        max_alleles: int or None
+  @return:                  the UnphasedMarkerModel built from the supplied genotypes
+  @rtype:                   an UnphasedMarkerModel object
+  '''
+
   alleles = sorted(set(a for g in genoset for a in g if a is not None))
   return model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote, max_alleles)
 
 
 def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
+  '''
+  Build an UnphasedMarkerModel from the alleles and genotypes that were passed in
+
+  @param           alleles: sequence of alleles
+  @param           alleles: sequence
+  @param         genotypes: sequence of genotypes
+  @param         genotypes: sequence
+  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @type   allow_hemizygote: bool
+  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @type        max_alleles: int or None
+  @return:                  the UnphasedMarkerModel built from the supplied alleles and genotypes
+  @rtype:                   an UnphasedMarkerModel object
+  '''
+
   genoset = set(genotypes)
 
   if not allow_hemizygote:
@@ -389,6 +457,21 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
 
 
 def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
+  '''
+  Build an UnphasedMarkerModel from the alleles and genotypes that were passed in
+
+  @param           alleles: sequence of alleles
+  @param           alleles: sequence
+  @param         genotypes: sequence of genotypes
+  @param         genotypes: sequence
+  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @type   allow_hemizygote: bool
+  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @type        max_alleles: int or None
+  @return:                  the UnphasedMarkerModel built from the supplied alleles and genotypes
+  @rtype:                   an UnphasedMarkerModel object
+  '''
+
   if not max_alleles:
     max_alleles = len(set(alleles))
 

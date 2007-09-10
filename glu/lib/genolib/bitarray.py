@@ -73,16 +73,16 @@ def getbits_python(data, i, readlen):
 
 def setbits_python(data, i, value, writelen):
   '''
-  From data, read bits [i,i+readlen)
+  From data, write bits [i,i+writelen)
 
-  @param    data: input data
-  @type     data: byte array
-  @param       i: bit index into data from which to begin reading
-  @type        i: int
-  @param readlen: number of bits to read in range 1..32
-  @type  readlen: int
-  @return       : integer comprised of bits [i,i+readlen) of data as the least significant bits
-  @rtype        : int
+  @param     data: input data
+  @type      data: byte array
+  @param        i: bit index into data from which to begin reading
+  @type         i: int
+  @param writelen: number of bits to write in range 1..32
+  @type  writelen: int
+  @return        : integer comprised of bits [i,i+writelen) of data as the least significant bits
+  @rtype         : int
   '''
   if i < 0:
     i += len(data)*8

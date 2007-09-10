@@ -87,11 +87,8 @@ def load_genomatrix_hapmap(filename,limit=None):
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param        limit: limit the number of samples loaded
+  @param        limit: limit the number of samples loaded. Default is None
   @type         limit: int or None
-  @param     genorepr: function to convert list genotype strings to desired
-                       internal representation
-  @type      genorepr: unary function
   @return            : rows of genotypes with the first row being the sample names
   @rtype             : generator
   '''
@@ -156,6 +153,8 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelma
   @param       unique: verify that rows and columns are uniquely labeled
                        (default is True)
   @type        unique: bool
+  @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
+  @type      modelmap: dict
   @return            : format and sequence of column names followed by
                        tuples of row label and row data
   @rtype             : tuple of string and generator
@@ -467,11 +466,8 @@ def save_genomatrix_text(filename,genos,genorepr):
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param       matrix: genotype matrix data
-  @type        matrix: sequence
-  @param       format: text string output in the first header field to
-                       indicate data format (default is blank)
-  @type        format: string
+  @param        genos: genomatrix stream
+  @type         genos: sequence
   @param     genorepr: function to convert internal genotype representation
                        to the desired string representation
   @type      genorepr: unary function
@@ -500,11 +496,16 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,modelmap=None
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param        limit: limit the number of genotypes loaded
-  @type         limit: int or None
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
+  @param       unique: verify that rows and columns are uniquely labeled
+                       (default is True)
+  @type        unique: bool
+  @param        limit: limit the number of genotypes loaded
+  @type         limit: int or None
+  @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
+  @type      modelmap: dict
   @return            : sequence of tuples of sample name, locus name, and genotype representation
   @rtype             : generator
 

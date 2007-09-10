@@ -114,6 +114,8 @@ class GenotripleStream(GenotypeStream):
     @type       samples: sequence, set, or None
     @param         loci: optional set of loci refered to by the triples
     @type          loci: sequence, set, or None
+    @param       models: new internal representation of genotypes
+    @type        models: UnphasedMarkerRepresentation or similar object
     @param        order: sort order, 'sample' or 'locus', or None, Default is None
     @type         order: str or None
     @param       unique: flag indicating if repeated elements do not exist within the stream
@@ -211,6 +213,19 @@ class GenotripleStream(GenotypeStream):
     Alternate constructor that builds a new GenotripleStream object from a
     sequence of triples with genotypes in tuple
 
+    @param      triples: sequence of genotriples(str,str,genotype representation)
+    @type       triples: sequence
+    @param      samples: optional set of samples refered to by the triples. Default is None
+    @type       samples: sequence, set, or None
+    @param         loci: optional set of loci refered to by the triples. Default is None
+    @type          loci: sequence, set, or None
+    @param        order: sort order, 'sample' or 'locus', or None, Default is None
+    @type         order: str or None
+    @param       unique: flag indicating if repeated elements do not exist within the stream. Default is 'False'
+    @type        unique: bool
+    @param     modelmap: map between a locus and an new internal representation of genotypes
+    @type      modelmap: dict
+
     >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
     ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
     ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
@@ -253,6 +268,9 @@ class GenotripleStream(GenotypeStream):
     '''
     Iterate over genotriples with genotypes coded as strings
 
+    @param genorepr: internal representation of genotypes
+    @type  genorepr: UnphasedMarkerRepresentation or similar object
+
     >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
     ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
     ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
@@ -275,6 +293,21 @@ class GenotripleStream(GenotypeStream):
     '''
     Alternate constructor that builds a new GenotripleStream object from a
     sequence of triples with genotypes in a string format
+
+    @param      triples: sequence of genotriples(str,str,genotype representation)
+    @type       triples: sequence
+    @param     genorepr: internal representation of genotypes
+    @type      genorepr: UnphasedMarkerRepresentation or similar object
+    @param      samples: optional set of samples refered to by the triples. Default is None
+    @type       samples: sequence, set, or None
+    @param         loci: optional set of loci refered to by the triples. Default is None
+    @type          loci: sequence, set, or None
+    @param        order: sort order, 'sample' or 'locus', or None, Default is None
+    @type         order: str or None
+    @param       unique: flag indicating if repeated elements do not exist within the stream. Default is 'False'
+    @type        unique: bool
+    @param     modelmap: map between a locus and an new internal representation of genotypes
+    @type      modelmap: dict
 
     >>> triples = [('l1','s1','AA'),('l1','s1','  '),('l1','s2','AB'),('l2','s1','AA'),
     ...            ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
@@ -300,6 +333,23 @@ class GenotripleStream(GenotypeStream):
     Alternative constructor that builds a new GenotripleStream object
     with attributes based on self, but updated with the specified keyword
     arguments.
+
+    @param      triples: sequence of genotriples(str,str,genotype representation)
+    @type       triples: sequence
+    @param      samples: list of samples, required for ldat
+    @type       samples: list
+    @param         loci: list of loci, required for sdat
+    @type          loci: list
+    @param        order: sort order, either 'samples', 'locus'
+    @type         order: str
+    @param       models: new internal representation of genotypes
+    @type        models: UnphasedMarkerRepresentation or similar object
+    @param       unique: flag indicating if repeated row or column elements do not exist
+    @type        unique: bool
+    @param materialized: flag indicating if this stream is materialized and
+                         allows iteration multiple times
+    @type  materialized: bool
+
 
     For example:
 
@@ -347,8 +397,6 @@ class GenotripleStream(GenotypeStream):
     genotriple stream will be guaranteed to contain unique rows and columns
     (see merged function).
 
-    @param           genos: genotriple stream
-    @type            genos: sequence
     @param       transform: transformation object (optional)
     @type        transform: GenoTransform object
     @param       mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
@@ -651,6 +699,8 @@ class GenomatrixStream(GenotypeStream):
     @type       samples: list
     @param         loci: list of loci, required for sdat
     @type          loci: list
+    @param       models: new internal representation of genotypes
+    @type        models: UnphasedMarkerRepresentation or similar object
     @param       unique: flag indicating if repeated row or column elements do not exist
     @type        unique: bool
     @param materialized: flag indicating if this stream is materialized and
@@ -831,6 +881,20 @@ class GenomatrixStream(GenotypeStream):
     Alternate constructor that builds a new GenomatrixStream object from a
     genotype matrix stream with genotypes in a string format.
 
+    @param        genos: genomatrix stream
+    @type         genos: sequence
+    @param       format: format of input genomatrix, either 'ldat' or 'sdat'
+    @type        format: str
+    @param      samples: list of samples, required for ldat
+    @type       samples: list
+    @param         loci: list of loci, required for sdat
+    @type          loci: list
+    @param       unique: flag indicating if repeated row or column elements do not exist
+    @type        unique: bool
+    @param     modelmap: map between a locus and an new internal representation of genotypes
+    @type      modelmap: dict
+
+
     >>> samples = ['s1', 's2', 's3']
     >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
     ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
@@ -858,6 +922,24 @@ class GenomatrixStream(GenotypeStream):
     '''
     Alternate constructor that builds a new GenomatrixStream object from a
     genotype matrix stream with genotypes in a string format.
+
+    @param        genos: genomatrix stream
+    @type         genos: sequence
+    @param       format: format of input genomatrix, either 'ldat' or 'sdat'
+    @type        format: str
+    @param     genorepr: internal representation of genotypes
+    @type      genorepr: UnphasedMarkerRepresentation or similar object
+    @param      samples: list of samples, required for ldat
+    @type       samples: list
+    @param         loci: list of loci, required for sdat
+    @type          loci: list
+    @param       unique: flag indicating if repeated row or column elements do not exist
+    @type        unique: bool
+    @param       packed: flag indicating if genotypes are packed into a
+                         compressed array format
+    @type        packed: bool
+    @param     modelmap: map between a locus and an new internal representation of genotypes
+    @type      modelmap: dict
     '''
     if format=='ldat':
       columns = samples
@@ -891,6 +973,9 @@ class GenomatrixStream(GenotypeStream):
     '''
     Iterate over genotypes coded as strings
 
+    @param     genorepr: internal representation of genotypes
+    @type      genorepr: UnphasedMarkerRepresentation or similar object
+
     >>> samples = ['s1', 's2', 's3']
     >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
     ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
@@ -909,6 +994,24 @@ class GenomatrixStream(GenotypeStream):
     Alternative constructor that builds a new GenomatrixStream object
     with a new data stream and attributes based on self, but updated with
     specified keyword arguments.
+
+    @param        genos: genomatrix stream
+    @type         genos: sequence
+    @param      samples: list of samples, required for ldat
+    @type       samples: list
+    @param         loci: list of loci, required for sdat
+    @type          loci: list
+    @param       models: new internal representation of genotypes
+    @type        models: UnphasedMarkerRepresentation or similar object
+    @param       unique: flag indicating if repeated row or column elements do not exist
+    @type        unique: bool
+    @param materialized: flag indicating if this stream is materialized and
+                         allows iteration multiple times
+    @type  materialized: bool
+    @param       packed: flag indicating if genotypes are packed into a
+                         compressed array format
+    @type        packed: bool
+
 
     For example:
 
@@ -1130,6 +1233,9 @@ class GenomatrixStream(GenotypeStream):
   def merged(self, mergefunc):
     '''
     Merge genotypes for rows and columns with the same labels
+
+    @param       mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
+    @type        mergefunc: callable
     '''
     return merge_genomatrixstream(self, mergefunc)
 
@@ -1272,12 +1378,10 @@ def recode_genomatrixstream(genos, modelmap):
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
 
-  @param      columns: matrix column names
-  @type       columns: sequence of strs
   @param        genos: genomatrix stream
   @type         genos: sequence
-  @param     new_repr: internal representation of genotypes to be transformed to
-  @type      new_repr: UnphasedMarkerRepresentation or similar object
+  @param     modelmap: map between a locus and a new internal representation of genotypes
+  @type      modelmap: dict
   @return            : tuple of columns and a genomatrix generator in packed format
   @rtype             : 2-tuple of list of str and genomatrix generator
 
@@ -1444,8 +1548,14 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, modelmap=None,
   @type       columns: sequence of strs
   @param        genos: genomatrix stream
   @type         genos: sequence
-  @param     new_repr: internal representation of genotypes to be transformed to
-  @type      new_repr: UnphasedMarkerRepresentation or similar object
+  @param       format: format of input genomatrix, either 'ldat' or 'sdat'
+  @type        format: str
+  @param     modelmap: map between a locus and a new internal representation of genotypes. Default is None
+  @type      modelmap: dict
+  @param  max_alleles: the maximum number of alleles the genotype model supports
+  @type   max_alleles: int or none
+  @param       unique: flag indicating if repeated elements do not exist within the stream. Default is 'False'
+  @type        unique: bool
   @return            : tuple of columns and a genomatrix generator in packed format
   @rtype             : 2-tuple of list of str and genomatrix generator
 
@@ -1633,13 +1743,23 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
   '''
   Returns a new genomatrix with the genotypes encoded to a new internal representation
 
-  @param       format: text string expected in the first header field to
-                       indicate data format, if specified
-  @type        format: string
   @param      columns: matrix column names
   @type       columns: sequence of strs
   @param        genos: genomatrix stream
   @type         genos: sequence
+  @param       format: format of input genomatrix, either 'ldat' or 'sdat'
+  @type        format: str
+  @param     genorepr: internal representation of genotypes for the input/output
+  @type      genorepr: UnphasedMarkerRepresentation or similar object
+  @param     modelmap: map between a locus and a new internal representation of genotypes. Default is None
+  @type      modelmap: dict
+  @param  max_alleles: the maximum number of alleles the genotype model supports. Default is 0
+  @type   max_alleles: int
+  @param       unique: flag indicating if repeated elements do not exist within the stream. Default is 'False'
+  @type        unique: bool
+  @return            : tuple of columns and a genomatrix generator in packed format
+  @rtype             : 2-tuple of list of str and genomatrix generator
+
 
   >>> from reprs import snp
   >>> defmodel  = model_from_alleles('ACGT',allow_hemizygote=True)
@@ -1850,11 +1970,13 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,modelmap=
 
 def recode_genotriples(triples,modelmap):
   '''
-  Returns a new genotriples with the genotypes encoded to the a new internal representation
+  Returns a new genotriples with the genotypes encoded to a new internal representation
 
   @param      triples: sequence of genotriples(str,str,genotype representation). e.g.
                        ('s1','l1','AA'),...
   @type       triples: sequence
+  @param     modelmap: map between a locus and a new internal representation of genotypes
+  @type      modelmap: dict
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
 
@@ -1893,6 +2015,10 @@ def encode_genotriples_from_tuples(triples,modelmap=None,max_alleles=0):
 
   @param      triples: sequence of genotriples(str,str,genotype representation)
   @type       triples: sequence
+  @param     modelmap: map between a locus and a new internal representation of genotypes. Default is 'None'
+  @type      modelmap: dict
+  @param  max_alleles: the maximum number of alleles the genotype model supports. Default is 0
+  @type   max_alleles: int
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
 
@@ -1926,6 +2052,8 @@ def encode_genotriples_from_strings(triples,genorepr,modelmap=None,max_alleles=0
 
   @param      triples: sequence of genotriples(str,str,genotype representation)
   @type       triples: sequence
+  @param     modelmap: map between a locus and a new internal representation of genotypes. Default is 'None'
+  @type      modelmap: dict
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
 
@@ -1971,14 +2099,18 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   parameter and spill very large streams to disk and perform a multi-phase
   offline merge sort.
 
-  @param   triples: sequence of genotriples(str,str,genotype representation)
-  @type    triples: sequence
-  @param     order: sort order, either 'samples', 'locus'
-  @type      order: str
-  @param maxincore: maximum number of triples to process in core (not currently honored)
-  @type  maxincore: int or None
-  @return         : samples, loci, sorted genotriples
-  @rtype          : tuple of list, list, genotriple sequence
+  @param     triples: sequence of genotriples(str,str,genotype representation)
+  @type      triples: sequence
+  @param       order: sort order, either 'samples', 'locus'
+  @type        order: str
+  @param  locusorder: ordered list of loci (optional)
+  @type   locusorder: sequence
+  @param sampleorder: ordered list of samples (optional)
+  @type  sampleorder: sequence
+  @param   maxincore: maximum number of triples to process in core (not currently honored)
+  @type    maxincore: int or None
+  @return           : samples, loci, sorted genotriples
+  @rtype            : tuple of list, list, genotriple sequence
 
   >>> triples = [('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A')),
   ...            ('s2','l2', ('A', 'T')),('s1','l1', ('T', 'T')),
@@ -2248,8 +2380,6 @@ def merge_genomatrixstream_columns(genos, mergefunc):
   cannot be performed in a step-wise fashion (ie., on columns and rows
   separately).
 
-  @param    columns: matrix column names
-  @type     columns: sequence of strs
   @param      genos: genomatrix stream
   @type       genos: sequence
   @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
@@ -2365,8 +2495,6 @@ def merge_genomatrixstream_rows(genos, mergefunc):
   cannot be performed in a step-wise fashion (ie., on columns and rows
   separately).
 
-  @param    columns: matrix column names
-  @type     columns: sequence of strs
   @param      genos: genomatrix stream
   @type       genos: sequence
   @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
@@ -2463,8 +2591,6 @@ def merge_genomatrixstream(genos, mergefunc):
   known.  Results are in an unpacked list representation that may need to be
   repacked.
 
-  @param    columns: matrix column names
-  @type     columns: sequence of strs
   @param      genos: genomatrix stream
   @type       genos: sequence
   @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
@@ -2638,8 +2764,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
   streams, since row labels must be known.  Results are in an unpacked list
   representation that may need to be repacked.
 
-  @param    columns: matrix column names
-  @type     columns: sequence of strs
   @param      genos: genomatrix streams
   @type       genos: sequence
   @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
@@ -2827,18 +2951,12 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     1. the necessary columns are given, and
     2. triples have been ordered appropriately (specified by the order argument).
 
-  @param     genos: genotriple stream
-  @type      genos: sequence
+  @param   triples: sequence of genotriples(str,str,genotype representation)
+  @type    triples: sequence
   @param    format: format genomatrix
   @type     format: string
   @param mergefunc: function to merge multiple genotypes into a consensus genotype
   @type  mergefunc: callable
-  @param   samples: optional sequence of samples if known, otherwise None
-  @type    samples: sequence of str or None
-  @param      loci: optional sequence of loci if known, otherwise None
-  @type       loci: sequence of str or None
-  @param     order: sort order, either 'samples', 'locus'.
-  @type      order: str
   @return         : genomatrix formed from the input triples
   @rtype          : genomatrix generator
 
@@ -2984,10 +3102,10 @@ def pack_genomatrixstream(genos,modelmap=None):
   '''
   Transform a genomatrix into an internal packed representation
 
-  @param    columns: matrix column names
-  @type     columns: sequence of strs
   @param      genos: genomatrix stream
   @type       genos: sequence
+  @param   modelmap: map between a locus and a new internal representation of genotypes. Default is None
+  @type    modelmap: dict
   @return          : genomatrix with a packed internal format
   @rtype           : genomatrix generator
 
@@ -3031,10 +3149,11 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
   '''
   Returns a new genomatrix with the alleles renamed
 
-  @param      columns: matrix column names
-  @type       columns: sequence of strs
-  @param        genos: genomatrix stream
-  @type         genos: sequence
+  @param           genos: genomatrix stream
+  @type            genos: sequence
+  @param  rename_alleles: rename alleles for any loci in the supplied dictionary from old allele name to new allele name
+  @type   rename_alleles: dict from old_allele str -> new_allele str
+
   @return            : genomatrix with a packed internal format
   @rtype             : genomatrix generator
 
@@ -3097,10 +3216,12 @@ def rename_genotriples_alleles(triples, rename_alleles):
   '''
   Returns a new genotriple stream with the alleles renamed
 
-  @param      triples: sequence of genotriples(str,str,genotype representation)
-  @type       triples: sequence
-  @return            : genotriple with the new internal format
-  @rtype             : genotriple generator
+  @param         triples: sequence of genotriples(str,str,genotype representation)
+  @type          triples: sequence
+  @param  rename_alleles: rename alleles for any loci in the supplied dictionary from old allele name to new allele name
+  @type   rename_alleles: dict from old_allele str -> new_allele str
+  @return               : genotriple with the new internal format
+  @rtype                : genotriple generator
 
   >>> triples = [('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A')),
   ...            ('s2','l2', ('A', 'T')),('s1','l1', ('T', 'T')),
@@ -3137,8 +3258,6 @@ def filter_genomatrixstream_missing(genos):
   only missing data.  If there is no such column, only the minimum necessary
   portion of the dataset is materialized.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
   @param   genos: genomatrix stream
   @type    genos: sequence
   @return       : possibly materialized genotype matrix
@@ -3242,10 +3361,10 @@ def filter_genotriples_missing(triples):
 def build_genotriples_from_genomatrix(genos):
   '''
   Generate genotype triples from the locus major genotype matrix.
-  @param rows: genotype matrix data
-  @type  rows: sequence
-  @rtype:      generator
-  @returns:    a genotype triplet stream
+  @param   genos: genomatrix stream
+  @type    genos: sequence
+  @rtype:         generator
+  @returns:       a genotype triplet stream
 
   >>> samples =     ('s1','s2','s3')
   >>> rows = [('l1',['AA','AG','GG']),
@@ -3534,10 +3653,8 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   value of the exclude flag, the column set will be used either for
   inclusion (exclude=False) or exclusion (exclude=True).
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  colset: set of the column names
   @type   colset: set
   @param exclude: flag to exclude rather than include items in colset
@@ -3604,10 +3721,8 @@ def remap_genomatrixstream_column(genos,colmap):
   Rename and filter column labels for a genotype matrix data.  If there is
   no mapping for a column label, then the original label will be used.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  colmap: map between the current column label and a new label
   @type   colmap: dict
   @rtype:         generator
@@ -3623,10 +3738,8 @@ def reorder_genomatrixstream_columns(genos,labels):
   labels provided.  If not all labels appear, the remainder are retained at
   the end of the list in lexicographical order.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  labels: desired column labels
   @type   labels: sequence
   @return       : genomatrix generator
@@ -3696,10 +3809,8 @@ def reorder_genomatrixstream_rows(genos, labels):
   labels provided.  If not all labels appear, the remainder are retained at
   the end of the list in in lexicographical order.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  labels: desired row labels
   @type   labels: sequence
   @return       : genomatrix generator
@@ -3768,10 +3879,8 @@ def rename_genomatrixstream_row(genos,rowmap):
   If there is no mapping for a row label, then the original
   label will be used.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  rowmap: map between the current row label and a new label
   @type   rowmap: dict
   @return       : genotype matrix with renamed row labels
@@ -3816,10 +3925,8 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
   be used either for inclusion(exclude=False) or exclusion(exclude=True)
   purpose.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  rowset: set of the row names
   @type   rowset: set
   @param exclude: flag to exclude rather than include items in rowset
@@ -3907,10 +4014,8 @@ def remap_genomatrixstream_row(genos,rowmap):
   This function will rename the row labels in the genotype matrix
   and will also filter out the row if its label is not in the rowmap
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
+  @param   genos: genomatrix stream
+  @type    genos: sequence
   @param  rowmap: map between the current row label and a new label
   @type   rowmap: dict
   @return       : genotype matrix with remapped rows
@@ -3931,12 +4036,14 @@ def transpose_generator(columns, rows, missing=None):
   Requires the input data to be fully materialized, but allows results to be
   streamed.
 
-  @param columns: matrix column names
-  @type  columns: sequence of strs
-  @param    rows: genotype matrix data
-  @type     rows: sequence
-  @return       : tuple of column labels and generator of tuples of row labels and row data
-  @rtype        : tuple
+  @param  columns: matrix column names
+  @type   columns: sequence of strs
+  @param     rows: genotype matrix data
+  @type      rows: sequence
+  @param  missing: missing genotype representation
+  @type   missing: str or None
+  @return        : tuple of column labels and generator of tuples of row labels and row data
+  @rtype         : tuple
 
   >>> r = [('r1','abc'),
   ...      ('r2','def'),
