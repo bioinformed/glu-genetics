@@ -4,7 +4,7 @@ File:          preprocess.py
 
 Authors:       Zhaoming Wang(wangzha@mail.nih.gov)
                Xiang    Deng(dengx@mail.nih.gov)
-G
+
 Created:       Tue Aug  1 14:45:03 EDT 2006
 
 Abstract:      Generate the input file for find_snps script from SQLite database
@@ -37,6 +37,7 @@ def option_parser():
   usage = 'usage: %prog [options] genome_database'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-c', '--column',     dest='column', default=0)
   parser.add_option('-u', '--upstream',   dest='upstream',   default=20000, type='int',  metavar='N',
                     help='the upstream margin in bases')
   parser.add_option('-d', '--downstream', dest='downstream', default=10000, type='int',  metavar='N',
@@ -50,15 +51,20 @@ def load_features(filename,limit=None):
   return
 
 
-def process(con,rows,options):
+def process(con,header,rows,options):
   up = options.upstream
   dn = options.downstream
+
+  try:
+    column = int(options.column)
+  except ValueError:
+    column = header.index(options.column)
 
   for row in rows:
     if not row:
       continue
 
-    snps = query_snp(con,row[0])
+    snps = query_snp(con,row[column])
 
     if not snps:
       yield row + ['UNKNOWN','','']
@@ -118,8 +124,9 @@ def main():
   out = csv.writer(autofile(out,'w'),dialect='excel-tab')
 
   rows = csv.reader(autofile(hyphen(args[1],sys.stdin)),dialect='excel-tab')
-  out.writerow(rows.next() + HEADER)
-  out.writerows( process(con,rows,options) )
+  header = rows.next()
+  out.writerow(header + HEADER)
+  out.writerows( process(con,header,rows,options) )
 
 
 if __name__=='__main__':
