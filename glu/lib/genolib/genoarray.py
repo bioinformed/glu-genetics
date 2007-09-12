@@ -40,9 +40,25 @@ except ImportError:
   MISSING,HEMIZYGOTE,HETEROZYGOTE,HOMOZYGOTE=range(4)
 
   class Genotype(object):
+    '''
+    bit-packed genotype representation
+    '''
     __slots__ = ('model','allele1','allele2','index','gclass')
 
     def __init__(self, model, allele1, allele2, index):
+      '''
+      Construct a new Genotype and determine the genotype class: 
+      MISSING or HEMIZYGOTE or HOMOZYGOTE or HETEROZYGOTE
+
+      @param    model: genotype representation
+      @type     model: UnphasedMarkerRepresentation or similar object
+      @param  allele1: the first allele
+      @type   allele1: str
+      @param  allele2: the second allele
+      @type   allele2: str
+      @param    index: FIX ME 
+      @type     index: FIX ME
+      '''
       self.model   = model
       self.allele1 = allele1
       self.allele2 = allele2
@@ -63,34 +79,67 @@ except ImportError:
         self.gclass = HETEROZYGOTE
 
     def alleles(self):
+      '''
+      Return a tuple of alleles
+      '''
       return (self.allele1,self.allele2)
 
     def heterozygote(self):
+      '''
+      Test if the Genotype is heterozygote
+      '''
       return self.gclass == HETEROZYGOTE
 
     def homozygote(self):
+      '''
+      Test if the Genotype is homozygote
+      '''
       return self.gclass == HOMOZYGOTE
 
     def hemizygote(self):
+      '''
+      Test if the Genotype is hemizygote
+      '''
       return self.gclass == HEMIZYGOTE
 
     def missing(self):
+      '''
+      Test if the alleles of the Genotype are all missing
+      '''
       return self.gclass == MISSING
 
     def __nonzero__(self):
+      '''
+      Test if the alleles of the Genotype are not all missing
+      '''
       return self.gclass != MISSING
 
     def __getitem__(self,i):
+      '''
+      Retrieve the allele as specified
+      '''
       return self.alleles()[i]
 
     def __len__(self):
+      '''
+      Return the number of alleles of the Genotype
+      '''
       return len([a for a in self.alleles() if a is not None])
 
     def __repr__(self):
+      '''
+      Return a string representation of the alleles
+      '''
       #return '<Genotype: %s/%s at 0x%X>' % (self.allele1,self.allele2,id(self))
       return repr(self.alleles())
 
     def __eq__(self,other):
+      '''
+      Test if the Genotype object that was passed in is the same as the current one
+
+      @param other: the Genotype object to be compared to the current one
+      @type  other: Genotype object
+      '''
       geno_self  = isinstance(self,Genotype)
       geno_other = isinstance(other,Genotype)
 
@@ -109,6 +158,12 @@ except ImportError:
       return self==other
 
     def __ne__(self,other):
+      '''
+      Test if the Genotype object that was passed in is not the same as the current one
+
+      @param other: the Genotype object to be compared to the current one
+      @type  other: Genotype object
+      '''
       geno_self  = isinstance(self,Genotype)
       geno_other = isinstance(other,Genotype)
 
@@ -127,6 +182,13 @@ except ImportError:
       return self!=other
 
     def __lt__(self,other):
+      '''
+      Test if the Genotype object that was passed in has a tuple of two alleles
+      and the tuple is greater in an alphanumerical order compared to the current one
+
+      @param other: the Genotype object to be compared to the current one
+      @type  other: Genotype object
+      '''
       if isinstance(self,Genotype):
         self = self.alleles()
       if isinstance(other,Genotype):
@@ -139,6 +201,16 @@ except ImportError:
       return self<other
 
     def __le__(self,other):
+      '''
+      Test if the Genotype object that was passed in is the same as the current one
+      Or
+      Test if the Genotype object that was passed in has a tuple of two alleles
+      and the tuple is greater in an alphanumerical order compared to the current one
+
+      @param other: the Genotype object to be compared to the current one
+      @type  other: Genotype object
+      '''
+
       if isinstance(self,Genotype):
         self = self.alleles()
       if isinstance(other,Genotype):
@@ -151,6 +223,17 @@ except ImportError:
       return self<=other
 
   def genotype_bit_size(n,allow_hemizygote):
+    '''
+    Return the genotype bit size 
+
+    @param                 n: FIX ME
+    @type                  n: FIX ME
+    @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation
+    @type   allow_hemizygote: bool
+    @return                 : the bit size  
+    @rtype                  : int
+    '''
+
     if allow_hemizygote:
       m = (n+1)*(n+2)//2
     else:
@@ -159,6 +242,12 @@ except ImportError:
     return int(ceil(log(m)/log(2.0)))
 
   def byte_array_size(nbits):
+    '''
+    Return the byte array size
+
+    @param  nbits: bit size 
+    @type   nbits: int
+    '''
     return int(ceil(nbits/8))
 
 
@@ -166,6 +255,9 @@ except ImportError:
     __slots__ = ('models','offsets','byte_size','bit_size')
 
     def __init__(self, models, initial_offset=0):
+      '''
+      Construct a new GenotypeArrayDescriptor
+      '''
       n = len(models)
       offsets = [0]*(n+1)
 
@@ -186,6 +278,14 @@ except ImportError:
     __slots__ = ('descriptor','data')
 
     def __init__(self, descriptor, genos=None):
+      '''
+      Construct a new GenotypeArray out of the GenotypeArrayDescriptor or GenotypeArray object that was passed in
+
+      @param   descriptor: bit-packed genotype array representation
+      @type    descriptor: GenotypeArrayDescriptor or GenotypeArray object
+      @param        genos: genotype stream
+      @type         genos: sequence of genotype strings
+      '''
       if isinstance(descriptor, GenotypeArrayDescriptor):
         self.descriptor = descriptor
       elif isinstance(descriptor, GenotypeArray):
@@ -197,9 +297,18 @@ except ImportError:
         self[:] = genos
 
     def __len__(self):
+      '''
+      Return the number of models in the current GenotypeArray
+      '''
       return len(self.descriptor.models)
 
     def __getitem__(self, i):
+      '''
+      Return the specified genotype in the current GenotypeArray
+
+      @param       i: bit index into data from which to begin reading
+      @type        i: int
+      '''
       descr = self.descriptor
 
       if isinstance(i,slice):
@@ -214,6 +323,14 @@ except ImportError:
       return model.genotypes[j]
 
     def __setitem__(self, i, geno):
+      '''
+      Reset the specified genotype in the current GenotypeArray
+
+      @param       i: bit index into data from which to begin replacing
+      @type        i: int
+      @param    geno: genotype representation
+      @type     geno: slice, tuple, Genotype object
+      '''
       descr = self.descriptor
 
       if isinstance(i,slice):
@@ -276,9 +393,15 @@ except ImportError:
       self.add_genotype( (None,None) )
 
     def get_allele(self, allele):
+      '''
+      Return the allele that was passed in from the current UnphasedMarkerModel
+      '''
       return self.alleles.index(allele)
 
     def add_allele(self, allele):
+      '''
+      Add the allele that was passed in into the current UnphasedMarkerModel
+      '''
       if allele in self.alleles:
         return self.alleles.index(allele)
 
@@ -291,11 +414,17 @@ except ImportError:
       return n
 
     def get_genotype(self, geno):
+      '''
+      Return the genotype that was passed in from the current UnphasedMarkerModel
+      '''
       return self.genomap[geno]
 
     __getitem__ = get_genotype
 
     def add_genotype(self, geno):
+      '''
+      Add the genotype that was passed in into the current UnphasedMarkerModel
+      '''
       g = self.genomap.get(geno)
 
       # If the genotype has not already been seen for this locus
