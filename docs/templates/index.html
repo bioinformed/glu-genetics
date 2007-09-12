@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% set title = 'Overview' %}
+{% set page_links = [
+  (pathto('@rss/recent'), 'application/rss+xml', 'Recent Comments')
+] %}
+{% block body %}
+  <h1>GLU Documentation</h1>
+  <p>
+    GLU is a suite of tools for statistical geneticists, epidemiologists,
+    statisticicians and analysis working with large sets of Single Nucleotide
+    Polymorphism (SNP) in order to find associations between specific variants
+    and specific phenotypes.
+  </p>
+  <p>
+    This is the documentation for GLU
+    {{ release }}{% if last_updated %}, last updated {{ last_updated }}{% endif %}.
+  </p>
+
+  <table class="contentstable" align="center"><tr>
+    <td width="50%">
+      <p class="biglink"><a class="biglink" href="{{ pathto("whatsnew/" + version + ".rst") }}">What's new in GLU {{ version }}?</a><br>
+         <span class="linkdescr">changes since last major release</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("quickstart.rst") }}">Quickstart Guide</a><br>
+         <span class="linkdescr">new? lost? impatient? Start here!</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("user_manual.rst") }}">User Reference Manual</a><br>
+         <span class="linkdescr">file formats and modules</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("dev_manual.rst") }}">Developer Reference Manual</a><br>
+         <span class="linkdescr">customizing and extending GLU</span></p>
+    </td><td width="50%">
+      <p class="biglink"><a class="biglink" href="{{ pathto("INSTALL.rst") }}">Installing GLU</a><br>
+         <span class="linkdescr">how to install GLU</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("license.rst") }}">GLU License Terms</a><br>
+         <span class="linkdescr">boring legal stuff</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("contributors.rst") }}">Contributors</a><br>
+         <span class="linkdescr">contributors to GLU</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("aboutdocs.rst") }}">About the documentation</a><br>
+         <span class="linkdescr">spiffy, aren't they?</span></p>
+    </td></tr>
+  </table>
+
+  <p><strong>Indices and tables:</strong></p>
+  <table class="contentstable" align="center"><tr>
+    <td width="50%">
+      <p class="biglink"><a class="biglink" href="{{ pathto("modindex.rst") }}">Global Module Index</a><br>
+         <span class="linkdescr">quick access to all modules</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("genindex.rst") }}">General Index</a><br>
+         <span class="linkdescr">all functions, classes, terms</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("glossary.rst") }}">Glossary</a><br>
+         <span class="linkdescr">important terms explained</span></p>
+    </td><td width="50%">
+      <p class="biglink"><a class="biglink" href="{{ pathto("search.rst") }}">Search page</a><br>
+         <span class="linkdescr">search this documentation</span></p>
+      <p class="biglink"><a class="biglink" href="{{ pathto("contents.rst") }}">Complete Table of Contents</a><br>
+         <span class="linkdescr">lists all sections and subsections</span></p>
+    </td></tr>
+  </table>
+
+{% endblock %}

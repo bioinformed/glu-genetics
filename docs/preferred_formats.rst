@@ -1,6 +1,6 @@
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-Genotype Library and Utilities - Preferred Input File Formats
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++++++++++++
+Preferred Input File Formats
+++++++++++++++++++++++++++++
 
 Use of preferred file formats will make GLU run most efficiently
 

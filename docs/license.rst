@@ -1,6 +1,8 @@
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - SOFTWARE LICENSE TERMS
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+.. highlightlang:: none
+
++++++++
+License
++++++++
 
 Last amended: 14 June 2007
 

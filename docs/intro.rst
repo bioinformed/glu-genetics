@@ -1,14 +1,14 @@
-+++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - Introduction
-+++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++
+Introduction
+++++++++++++
 
 Welcome to GLU
 ==============
 
-GLU is a suite of tools for statistical geneticists, epidemiologists,
-statisticicians and analysis working with large sets of Single Nucleotide
-Polymorphism (SNP) in order to find associations between specific variants
-and specific phenotypes.
+Genotype Library and Utilities (GLU) is a suite of tools for statistical
+geneticists, epidemiologists, statisticicians and analysis working with
+large sets of Single Nucleotide Polymorphism (SNP) in order to find
+associations between specific variants and specific phenotypes.
 
 GLU provides tools to:
 

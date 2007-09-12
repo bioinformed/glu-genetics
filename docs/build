@@ -1,4 +1,0 @@
-#!/bin/sh
-
-python buildhtml.py --link-stylesheet --stylesheet=glu.css --prune=.svn --prune=modules/.svn
-

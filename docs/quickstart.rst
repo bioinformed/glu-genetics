@@ -1,6 +1,6 @@
-++++++++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - Quick Start Guide
-++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++
+Quick Start Guide
++++++++++++++++++
 
 For those impatient to get started, it is best to begin with a brief review of the available modules, using the
 command::

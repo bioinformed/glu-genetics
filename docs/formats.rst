@@ -1,6 +1,6 @@
-+++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - File Formats
-+++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++
+File Formats
+++++++++++++
 
 GLU recognizes several file formats for specifying
 genotypes and other data used in GLU operations.
@@ -53,7 +53,7 @@ be stored.  Rows may appear in any order and no header line is allowed.
 
 Columns:
 
-  1. Sample name: 
+  1. Sample name:
        User specified sample name with no length limit or format restriction.
 
   2. Locus name:

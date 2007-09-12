@@ -1,0 +1,32 @@
+# Created by Skip Montanaro <skip@mojam.com>.
+
+# Format:
+#	function ':' type ':' [param name] ':' [refcount effect] ':' [comment]
+# If the param name slot is empty, that line corresponds to the function's
+# return value, otherwise it's the type of the named parameter.
+
+# The first line of a function block gives type/refcount information for the
+# function's return value.  Successive lines with the same function name
+# correspond to the function's parameter list and appear in the order the
+# parameters appear in the function's prototype.
+
+# For readability, each function's lines are surrounded by a blank line.
+# The blocks are sorted alphabetically by function name.
+
+# Refcount behavior is given for all PyObject* types: 0 (no change), +1
+# (increment) and -1 (decrement).  A blank refcount field indicates the
+# parameter or function value is not a PyObject* and is therefore not
+# subject to reference counting.  A special case for the value "null"
+# (without quotes) is used for functions which return a PyObject* type but
+# always return NULL.  This is used by some of the PyErr_*() functions, in
+# particular.
+
+# XXX NOTE: the 0/+1/-1 refcount information for arguments is
+# confusing!  Much more useful would be to indicate whether the
+# function "steals" a reference to the argument or not.  Take for
+# example PyList_SetItem(list, i, item).  This lists as a 0 change for
+# both the list and the item arguments.  However, in fact it steals a
+# reference to the item argument!
+
+# The parameter names are as they appear in the API manual, not the source
+# code.

@@ -1,4 +1,4 @@
-Contrubutors
+Contributors
 ============
 
 GLU is developed and maintained primarily by Kevin Jacobs

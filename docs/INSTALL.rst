@@ -1,6 +1,6 @@
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - Installation Guide
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++++++++++++++++++
+Installation Guide
+++++++++++++++++++
 
 GLU provides command-line tools for the management of large amounts of SNP
 genotype data, and programs to check data quality and association between

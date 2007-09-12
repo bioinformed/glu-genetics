@@ -1,6 +1,6 @@
-++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - User Manual
-++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++
+User Manual
++++++++++++
 
 GLU is a suite of tools for statistical geneticists, epidemiologists,
 statisticicians and analysis working with large sets of Single Nucleotide
