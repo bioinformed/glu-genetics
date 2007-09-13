@@ -8,6 +8,7 @@
   INSTALL.rst
   quickstart.rst
   user_manual/index.rst
+  modules/index.rst
   dev_manual/index.rst
 
   license.rst

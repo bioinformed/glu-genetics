@@ -72,7 +72,7 @@ Option                Description
 --------------------  ------------------------------------------------
 \-d  --ordersamples   Order samples based on the order of names in FILE
 \-D  --orderloci      Order loci based on the order of names in FILE
-\-a  --renamealleles  Rename alleles based on file of locus name, tab, 
+\-a  --renamealleles  Rename alleles based on file of locus name, tab,
                       old alleles (comma separated), tab, new alleles (comma separated)
 ====================  ================================================
 
