@@ -1,6 +1,11 @@
-+++++++++++
-User Manual
-+++++++++++
+.. _user_manual-index:
+
++++++++++++++++
+GLU User Manual
++++++++++++++++
+
+:Release: |version|
+:Date: |today|
 
 GLU is a suite of tools for statistical geneticists, epidemiologists,
 statisticicians and analysis working with large sets of Single Nucleotide

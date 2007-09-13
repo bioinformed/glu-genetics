@@ -5,11 +5,10 @@
 .. toctree::
 
   whatsnew/0.61.rst
-  intro.rst
   INSTALL.rst
   quickstart.rst
-  user_manual.rst
-  dev_manual.rst
+  user_manual/index.rst
+  dev_manual/index.rst
 
   license.rst
   contributors.rst

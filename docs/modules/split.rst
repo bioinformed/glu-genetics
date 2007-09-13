@@ -1,11 +1,17 @@
-+++++++++++++++++++++++++++++++++++++++++++++++++
-The Genotype Library and Utilities - Split module
-+++++++++++++++++++++++++++++++++++++++++++++++++
+==========================================
+:mod:`split` --- Split genotype data files
+==========================================
 
-The split module, predictably, is a utility to split a genotype file into subsets
-based on a mapping from sample and/or locus to a partition name.  In
+.. module:: split
+   :synopsis: Split genotype data files
+
+.. index:: module: transform
+
+The split module, predictably, is a utility to split a genotype file into
+subsets based on a mapping from sample and/or locus to a partition name.  In
 addition, large data sets can be split into smaller files, based on a
-maximum number of data rows per file.
+maximum number of data rows per file.  Also, see the :mod:`transform` module
+to perform other transformations than simple splitting.
 
 Typical applications include:
 
@@ -21,29 +27,29 @@ Typical applications include:
 Input/Output Options
 ====================
 
--f  --format
+\-f  --format
   Input format for genotype data. Values=hapmap, ldat, sdat, trip, or genotriple
 
--g  --genorepr
+\-g  --genorepr
   genotype representation.  Values=snp (default), hapmap, marker
 
--d  --destdir
+\-d  --destdir
   Destination directory for output files.  Write to input file directory by default.
 
---maxrows
+\--maxrows
   Split matrix output so that each contains at most N rows of data
 
---locusgroups
+\--locusgroups
   map from locus name to locus group
 
---samplegroups
+\--samplegroups
   map from samples name to sample group
 
---defaultsamplegroup
+\--defaultsamplegroup
   Default group for any unmapped sample
 
---defaultlocusgroup
+\--defaultlocusgroup
   Default group for any unmapped sample
 
---template
+\--template
   Template for names of the output files
