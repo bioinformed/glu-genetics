@@ -41,14 +41,18 @@ except ImportError:
 
   class Genotype(object):
     '''
-    bit-packed genotype representation
+    Python implementation of a genotype representation object.  Genotype
+    objects belong to a specific model, which is responsible for allocation
+    genotypes, managing alleles, and assigning a unique index to each
+    possible genotype within a model.
     '''
+
     __slots__ = ('model','allele1','allele2','index','gclass')
 
     def __init__(self, model, allele1, allele2, index):
       '''
-      Construct a new Genotype and determine the genotype class: 
-      MISSING or HEMIZYGOTE or HOMOZYGOTE or HETEROZYGOTE
+      The Genotype constructor should not be called by users, only by model
+      objects.
 
       @param    model: genotype representation
       @type     model: UnphasedMarkerRepresentation or similar object
@@ -56,8 +60,8 @@ except ImportError:
       @type   allele1: str
       @param  allele2: the second allele
       @type   allele2: str
-      @param    index: FIX ME 
-      @type     index: FIX ME
+      @param    index: index of genotype within the model
+      @type     index: int
       '''
       self.model   = model
       self.allele1 = allele1
@@ -86,43 +90,43 @@ except ImportError:
 
     def heterozygote(self):
       '''
-      Test if the Genotype is heterozygote
+      Return whether this genotype is heterozygous
       '''
       return self.gclass == HETEROZYGOTE
 
     def homozygote(self):
       '''
-      Test if the Genotype is homozygote
+      Return whether this genotype is homozygous
       '''
       return self.gclass == HOMOZYGOTE
 
     def hemizygote(self):
       '''
-      Test if the Genotype is hemizygote
+      Return whether this genotype is hemizygous
       '''
       return self.gclass == HEMIZYGOTE
 
     def missing(self):
       '''
-      Test if the alleles of the Genotype are all missing
+      Return whether this genotype is the missing genotype
       '''
       return self.gclass == MISSING
 
     def __nonzero__(self):
       '''
-      Test if the alleles of the Genotype are not all missing
+      Return whether this genotype is not the missing genotype
       '''
       return self.gclass != MISSING
 
     def __getitem__(self,i):
       '''
-      Retrieve the allele as specified
+      Return the i'th allele, for i in [0,1]
       '''
       return self.alleles()[i]
 
     def __len__(self):
       '''
-      Return the number of alleles of the Genotype
+      Return the number of non-missing alleles
       '''
       return len([a for a in self.alleles() if a is not None])
 
@@ -130,15 +134,17 @@ except ImportError:
       '''
       Return a string representation of the alleles
       '''
-      #return '<Genotype: %s/%s at 0x%X>' % (self.allele1,self.allele2,id(self))
       return repr(self.alleles())
 
     def __eq__(self,other):
       '''
-      Test if the Genotype object that was passed in is the same as the current one
+      Compare this genotype with another genotype or tuple for equality.
 
-      @param other: the Genotype object to be compared to the current one
-      @type  other: Genotype object
+      If other is a genotype, then the comparison is by object identity.
+      If other is a tuple, then the comparison is by allele tuple equivalence.
+
+      @param other: other genotype
+      @type  other: Genotype or tuple
       '''
       geno_self  = isinstance(self,Genotype)
       geno_other = isinstance(other,Genotype)
@@ -159,10 +165,13 @@ except ImportError:
 
     def __ne__(self,other):
       '''
-      Test if the Genotype object that was passed in is not the same as the current one
+      Compare this genotype with another genotype or tuple for inequality.
 
-      @param other: the Genotype object to be compared to the current one
-      @type  other: Genotype object
+      If other is a genotype, then the comparison is by object identity.
+      If other is a tuple, then the comparison is by allele tuple equivalence.
+
+      @param other: other genotype
+      @type  other: Genotype or tuple
       '''
       geno_self  = isinstance(self,Genotype)
       geno_other = isinstance(other,Genotype)
@@ -183,11 +192,11 @@ except ImportError:
 
     def __lt__(self,other):
       '''
-      Test if the Genotype object that was passed in has a tuple of two alleles
-      and the tuple is greater in an alphanumerical order compared to the current one
+      Test if this genotype is less than with another genotype or tuple.
+      Comparison is performed on allele tuples.
 
-      @param other: the Genotype object to be compared to the current one
-      @type  other: Genotype object
+      @param other: other genotype
+      @type  other: Genotype or tuple
       '''
       if isinstance(self,Genotype):
         self = self.alleles()
@@ -202,13 +211,11 @@ except ImportError:
 
     def __le__(self,other):
       '''
-      Test if the Genotype object that was passed in is the same as the current one
-      Or
-      Test if the Genotype object that was passed in has a tuple of two alleles
-      and the tuple is greater in an alphanumerical order compared to the current one
+      Test if this genotype is less than or equal to another genotype or
+      tuple.  Comparison is performed on allele tuples.
 
-      @param other: the Genotype object to be compared to the current one
-      @type  other: Genotype object
+      @param other: other genotype
+      @type  other: Genotype or tuple
       '''
 
       if isinstance(self,Genotype):
@@ -224,13 +231,14 @@ except ImportError:
 
   def genotype_bit_size(n,allow_hemizygote):
     '''
-    Return the genotype bit size 
+    Return the number of bits of storage required to represent a genotypes
+    with n alleles, possibly supporting hemizygote genotypes.
 
-    @param                 n: FIX ME
-    @type                  n: FIX ME
-    @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation
+    @param                 n: number of alleles
+    @type                  n: int
+    @param  allow_hemizygote: flag indicating if hemizygote genotypes are to be supported
     @type   allow_hemizygote: bool
-    @return                 : the bit size  
+    @return                 : number of bits required
     @rtype                  : int
     '''
 
@@ -241,14 +249,16 @@ except ImportError:
 
     return int(ceil(log(m)/log(2.0)))
 
-  def byte_array_size(nbits):
+  def byte_array_size(n):
     '''
-    Return the byte array size
+    Return the number of whole bytes required to represent n bits.
 
-    @param  nbits: bit size 
+    @param  nbits: bit size
     @type   nbits: int
+    @return      : byte size
+    @rtype       : int
     '''
-    return int(ceil(nbits/8))
+    return int(ceil(n/8))
 
 
   class GenotypeArrayDescriptor(object):
@@ -279,12 +289,13 @@ except ImportError:
 
     def __init__(self, descriptor, genos=None):
       '''
-      Construct a new GenotypeArray out of the GenotypeArrayDescriptor or GenotypeArray object that was passed in
+      Construct a new GenotypeArray with given GenotypeArrayDescriptor and
+      optionally initialized with a sequence of genotypes.
 
-      @param   descriptor: bit-packed genotype array representation
-      @type    descriptor: GenotypeArrayDescriptor or GenotypeArray object
-      @param        genos: genotype stream
-      @type         genos: sequence of genotype strings
+      @param   descriptor: genotype array representation
+      @type    descriptor: GenotypeArrayDescriptor or GenotypeArray
+      @param        genos: initial genotypes
+      @type         genos: sequence of genotypes objects or tuples
       '''
       if isinstance(descriptor, GenotypeArrayDescriptor):
         self.descriptor = descriptor
@@ -298,16 +309,22 @@ except ImportError:
 
     def __len__(self):
       '''
-      Return the number of models in the current GenotypeArray
+      Return the length of this array
+
+      @return: array length
+      @rtype : int
       '''
       return len(self.descriptor.models)
 
     def __getitem__(self, i):
       '''
-      Return the specified genotype in the current GenotypeArray
+      Return the i'th genotype or slice
 
-      @param       i: bit index into data from which to begin reading
-      @type        i: int
+      @param i: index or slice
+      @type  i: int or slice
+      @return : i'th genotype if an index is specified, sequence of
+                genotypes if a slice is specified
+      @rtype  : Genotype object or sequence of Genotype objects
       '''
       descr = self.descriptor
 
@@ -324,12 +341,13 @@ except ImportError:
 
     def __setitem__(self, i, geno):
       '''
-      Reset the specified genotype in the current GenotypeArray
+      Set the i'th genotype to geno or slice
 
-      @param       i: bit index into data from which to begin replacing
-      @type        i: int
-      @param    geno: genotype representation
-      @type     geno: slice, tuple, Genotype object
+      @param    i: index or slice
+      @type     i: int or slice
+      @param geno: genotype if an index is specified, sequence of genotypes
+                   if a slice is specified
+      @type  geno: slice, tuple, Genotype object
       '''
       descr = self.descriptor
 
@@ -374,13 +392,14 @@ except ImportError:
       Construct a new UnphasedMarkerModel
 
       This class represents bidirectional mappings of genotypes between
-      strings and Python objects.  The object representation of a genotype is
-      a list of two alleles or up to the max_alleles. Given this representation,
-      alleles need not be known in advance.  
+      strings and Python objects.  The object representation of a genotype
+      is a list of two alleles or up to the max_alleles. Given this
+      representation, the alleles names need not be known in advance, only
+      the maximum number that may be stored within the model.
 
-      @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation
+      @param  allow_hemizygote: flag indicating if hemizygote is allowed
       @type   allow_hemizygote: bool
-      @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+      @param       max_alleles: maximum number of alleles allowed. Default is 2
       @type        max_alleles: int or None
       '''
 
@@ -394,13 +413,26 @@ except ImportError:
 
     def get_allele(self, allele):
       '''
-      Return the allele that was passed in from the current UnphasedMarkerModel
+      Return the representation for a given allele.  If the specified allele
+      does not belong to this model, a ValueError is raised.
+
+      @param allele: allele object
+      @type  allele: object, usually str
+      @return      : allele representation
+      @rtype       : int
       '''
       return self.alleles.index(allele)
 
     def add_allele(self, allele):
       '''
-      Add the allele that was passed in into the current UnphasedMarkerModel
+      Return the representation for a given allele.  If the specified
+      allele does not belong to this model it will be added. A GenotypeError
+      is raised if there is not sufficient space within the model.
+
+      @param allele: allele object
+      @type  allele: object, usually str
+      @return      : allele representation
+      @rtype       : int
       '''
       if allele in self.alleles:
         return self.alleles.index(allele)
@@ -415,7 +447,14 @@ except ImportError:
 
     def get_genotype(self, geno):
       '''
-      Return the genotype that was passed in from the current UnphasedMarkerModel
+      Return the representation for a given genotype tuple.  If the
+      specified genotype tuple does not belong to this model, a KeyError is
+      raised.
+
+      @param geno: genotype tuple
+      @type  geno: 2-tuple of allele objects
+      @return    : genotype object
+      @rtype     : Genotype
       '''
       return self.genomap[geno]
 
@@ -423,7 +462,13 @@ except ImportError:
 
     def add_genotype(self, geno):
       '''
-      Add the genotype that was passed in into the current UnphasedMarkerModel
+      Return the representation for a given genotype tuple.  If the
+      specified genotype tuple does not belong to this model, it will be added.
+
+      @param geno: genotype tuple
+      @type  geno: 2-tuple of allele objects
+      @return    : genotype object
+      @rtype     : Genotype
       '''
       g = self.genomap.get(geno)
 
@@ -456,12 +501,12 @@ except ImportError:
     '''
     Generate simple concordance statistics from two genotype arrays
 
-    @param genos1: the first genotypearray that was passed in
-    @type  genos1: GenotypeArray object
-    @param genos2: the second genotypearray that was passed in
-    @type  genos2: GenotypeArray object
-    @return      : a tuple of concordance stats
-    @rtype       : tuple of ints
+    @param genos1: first input
+    @type  genos1: sequence of genotypes
+    @param genos2: second input
+    @type  genos2: sequence of genotypes
+    @return      : number of concordant genotypes and number of non-missing comparisons made
+    @rtype       : tuple of (int,int)
     '''
     if len(genos1) != len(genos2):
       raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
@@ -478,17 +523,16 @@ except ImportError:
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
   '''
-  Build an UnphasedMarkerModel from the alleles that were passed in
+  Build an UnphasedMarkerModel from the supplied alleles
 
-  @param           alleles: sequence of alleles
-  @param           alleles: sequence of strings
-  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @param           alleles: alleles
+  @param           alleles: sequence of objects
+  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
-  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @param       max_alleles: maximum number of alleles allowed. Default is 2
   @type        max_alleles: int or None
-  @return:                  the UnphasedMarkerModel built from the supplied alleles 
-  @rtype:                   an UnphasedMarkerModel object
-
+  @return                 : model supporting the supplied alleles
+  @rtype                  : UnphasedMarkerModel
   '''
 
   alleles = sorted(set(a for a in alleles if a is not None))
@@ -512,36 +556,39 @@ def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
 
 def model_from_genotypes(genotypes, allow_hemizygote=None, max_alleles=None):
   '''
-  Build an UnphasedMarkerModel from the genotypes that were passed in
+  Build an UnphasedMarkerModel from the supplied genotypes.  All possible
+  genotypes will be added to the model from the alleles found in the
+  supplied genotypes.
 
-  @param         genotypes: sequence of genotypes
-  @param         genotypes: sequence of strings
-  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @param         genotypes: genotypes
+  @param         genotypes: sequence of genotype tuples
+  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
-  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @param       max_alleles: maximum number of alleles allowed. Default is 2
   @type        max_alleles: int or None
-  @return:                  the UnphasedMarkerModel built from the supplied genotypes
-  @rtype:                   an UnphasedMarkerModel object
+  @return                 : model supporting the supplied genotypes
+  @rtype                  : UnphasedMarkerModel
   '''
-
   alleles = sorted(set(a for g in genoset for a in g if a is not None))
   return model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote, max_alleles)
 
 
 def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
   '''
-  Build an UnphasedMarkerModel from the alleles and genotypes that were passed in
+  Build an UnphasedMarkerModel from the supplied alleles and genotypes. All
+  possible genotypes will be added to the model from the alleles found in
+  the supplied genotypes.
 
-  @param           alleles: sequence of alleles
-  @param           alleles: sequence
-  @param         genotypes: sequence of genotypes
-  @param         genotypes: sequence
-  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @param           alleles: alleles
+  @param           alleles: sequence of objects
+  @param         genotypes: genotypes
+  @param         genotypes: sequence of genotype tuples
+  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
-  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @param       max_alleles: maximum number of alleles allowed. Default is 2
   @type        max_alleles: int or None
-  @return:                  the UnphasedMarkerModel built from the supplied alleles and genotypes
-  @rtype:                   an UnphasedMarkerModel object
+  @return                 : model supporting the supplied alleles and genotypes
+  @rtype                  : UnphasedMarkerModel
   '''
 
   genoset = set(genotypes)
@@ -585,18 +632,19 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
 
 def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
   '''
-  Build an UnphasedMarkerModel from the alleles and genotypes that were passed in
+  Build an UnphasedMarkerModel from the supplied alleles and genotypes.
+  Only the supplied alleles and genotypes will be added to the model.
 
-  @param           alleles: sequence of alleles
-  @param           alleles: sequence
-  @param         genotypes: sequence of genotypes
-  @param         genotypes: sequence
-  @param  allow_hemizygote: flag indicating if hemizygote is allowed in the representation. Default is False
+  @param           alleles: alleles
+  @param           alleles: sequence of objects
+  @param         genotypes: genotypes
+  @param         genotypes: sequence of genotype tuples
+  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
-  @param       max_alleles: the maximun number of alleles allowed in the representation. Default is None
+  @param       max_alleles: maximum number of alleles allowed. Default is 2
   @type        max_alleles: int or None
-  @return:                  the UnphasedMarkerModel built from the supplied alleles and genotypes
-  @rtype:                   an UnphasedMarkerModel object
+  @return                 : model supporting the supplied alleles and genotypes
+  @rtype                  : UnphasedMarkerModel
   '''
 
   if not max_alleles:
