@@ -24,6 +24,9 @@ import os
 import sys
 import csv
 import time
+import select
+import fcntl
+import subprocess
 import sqlite3
 
 from   itertools         import groupby,chain
@@ -54,6 +57,11 @@ NHS_PEDIGREES = None
 NHS_GENOTYPES = '/u3/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_%s.ldat.gz'
 NHS_MAP       = '/u3/projects/CGEMS/Scans/Breast/1/raw/snp.map'
 NHS_FORMAT    = 'ldat'
+
+PLCO_PEDIGREES = None
+PLCO_GENOTYPES = '/u3/projects/CGEMS/Scans/Prostate/1/build2/genotypes/STUDY/subjects_STUDY_%s.ldat.gz'
+PLCO_MAP       = '/u3/projects/CGEMS/Scans/Prostate/1/raw/snp.map'
+PLCO_FORMAT    = 'ldat'
 
 
 def query_genes_by_name(con,gene):
@@ -175,9 +183,9 @@ def get_sequences_from_genewindow(snps):
     for snp in snps:
       snpfile.write('%s\n' % snp)
     snpfile.close()
-    args = '%s sequence/sublist.txt sequence/oblig.txt %s' % (snpname,sequencename)
-    os.popen('%s %s 2>/dev/null' % (command,args)).read()
-    return csv.reader(open(sequencename),dialect='excel-tab')
+    args = '%s %s sequence/sublist.txt sequence/oblig.txt %s 2>/dev/null' % (command,snpname,sequencename)
+    subprocess.Popen(args, shell=True).communicate()
+    return csv.reader(file(sequencename),dialect='excel-tab')
   finally:
     os.unlink(snpname)
     try:
@@ -243,8 +251,8 @@ def escape(s):
   return s.replace(' ','\\ ')
 
 
-def get_tags(outdir, project, gene, dprime, r2, populations, chromosome, snps, maf, include, exclude,
-                     designfiles, includefile):
+def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,include,exclude,
+                         designfiles,includefile,cmdprefix):
 
   prefix = '%s_%s_%s' % (project,gene,populations)
 
@@ -259,55 +267,60 @@ def get_tags(outdir, project, gene, dprime, r2, populations, chromosome, snps, m
   try:
     project_chdir(outdir, project, gene)
 
-    command = 'tagzilla'
+    command = []
 
-    command += ' -s subset'
+    if cmdprefix:
+      command.append(cmdprefix)
+
+    command.append('python /usr/local/bin/tagzilla')
+
+    command.append('-s subset')
     file('subset','w').write('\n'.join(snps))
 
     if dprime:
-      command += ' -d %s' % dprime
+      command.append('-d %s' % dprime)
 
     if r2:
-      command += ' -r %s' % r2
+      command.append('-r %s' % r2)
 
     if maf:
-      command += ' -a %s' % maf
+      command.append('-a %s' % maf)
 
     if include and includefile:
-      command += ' -i include'
+      command.append('-i include')
       incs = (set(load_list(includefile)) | set(include)) & set(snps)
       file('include','w').write('\n'.join(sorted(incs)))
     elif includefile:
-      command += ' -i %s' % escape(includefile)
+      command.append('-i %s' % escape(includefile))
     elif include:
-      command += ' -i include'
+      command.append('-i include')
       file('include','w').write('\n'.join(include))
 
     if exclude:
-      command += ' -e exclude'
+      command.append('-e exclude')
       file('exclude','w').write('\n'.join(exclude))
 
     for d in designfiles or []:
-      command += ' -D %s' % escape(d)
+      command.append('-D %s' % escape(d))
 
-    command += ' ' + get_genotypes(populations,chromosome)
+    command.append(get_genotypes(populations,chromosome))
 
-    command += ' -C maxsnp -O loci.out -b sum.txt -B bins.txt'
-    command += ' 2>&1'
-
+    command += ['-C maxsnp','-O loci.out','-b sum.txt','-B bins.txt','2>&1']
+    command  = ' '.join(command)
     #print command
 
-    out = os.popen(command)
-    err = out.read()
-    #print err
-    bins = list(locus_result_sequence('loci.out',{},exclude))
+    return subprocess.Popen(command, cwd=os.getcwd(), shell=True, stdout=subprocess.PIPE)
   finally:
     os.chdir(cwd)
 
-  tags = set()
-  snps = set()
+
+def get_tags(outdir,project,gene,include,exclude):
+  tags     = set()
+  snps     = set()
   obligate = set()
   exclset  = set()
+
+  bins = list(locus_result_sequence(project_file(outdir,project,gene,'loci.out'),{},exclude))
 
   for pop,bin in bins:
     if bin.disposition == 'maximal-bin':
@@ -339,6 +352,93 @@ def strip(r):
   return [ f.strip() for f in r ]
 
 
+def clean_tasks(con,tasks,options):
+  for task in tasks:
+    project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude = task
+
+    if not project:
+      task[0] = 'default'
+
+    if chromosome and start and stop:
+      task[4] = int(start)
+      task[5] = int(stop)
+    else:
+      try:
+        alias,qgene,qchromosome,qstart,qstop,qstrand = query_gene_by_name(con, gene)
+      except KeyError,e:
+        print >> sys.stderr, 'Invalid gene: %s' % e.args[0]
+        continue
+
+      if chromosome and chromosome != qchromosome:
+        print >> sys.stderr, 'Warning: Chromosome does not match for %s (%s != %s)' % \
+                                     (gene,chromosome,qchromosome)
+
+      if None in (qstart,qstop):
+        print >> sys.stderr, 'Gene not mapped: %s' % gene
+        continue
+
+      start,stop = gene_margin(qstart,qstop,qstrand,upstream=options.upstream,
+                                                  downstream=options.downstream)
+
+      task[3] = qchromosome
+      task[4] = start
+      task[5] = stop
+      task[6] = qstrand
+
+    task[10] = set(i.strip() for i in include.split(',') if i.strip())
+    task[11] = set(e.strip() for e in exclude.split(',') if e.strip())
+
+    snps = set(snp[0] for snp in get_snps(con, population, task[3], task[4], task[5]))
+    task.append(snps)
+
+    yield task
+
+
+def setblocking(fd):
+  '''
+  set blocking mode
+  '''
+  flags = fcntl.fcntl(fd, fcntl.F_GETFL)|os.O_NONBLOCK
+  fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+
+
+class SubprocessManager(object):
+  '''
+  Simple subprocess manager
+
+  This object manages a set of concurrently running sub-processes, as
+  returned by the subprocess module, and discards all output.  This allows
+  all subprocesses to run until completion without blocking on output.
+
+  The current implementation probably works on Linux only.
+  '''
+  def __init__(self):
+    self.poll    = select.poll()
+    self.taskmap = {}
+
+  def add(self,proc):
+    fd = proc.stdout.fileno()
+    setblocking(fd)
+    assert fd not in self.taskmap
+    self.taskmap[fd] = proc
+    self.poll.register(fd,select.POLLIN|select.POLLHUP)
+
+  def run(self,timeout=None):
+    done = []
+    for fd,event in self.poll.poll(timeout):
+      proc = self.taskmap[fd]
+      if event&select.POLLIN:
+        proc.stdout.read(8196)
+      if event&select.POLLHUP:
+        done.append(proc)
+        del self.taskmap[fd]
+        self.poll.unregister(fd)
+    return done
+
+  def __len__(self):
+    return len(self.taskmap)
+
+
 def option_parser():
   import optparse
 
@@ -359,6 +459,11 @@ def option_parser():
                           help='Output design sequence from GeneWindow')
   parser.add_option('--dryrun', dest='dryrun', action='store_true',
                           help='Perform a dryrun. Perform all processing except actually tagging')
+  parser.add_option('--maxqueue', dest='maxqueue', default=1, type='int',
+                          help='Maximum number of jobs to queue in parallel')
+  parser.add_option('--cmdprefix', dest='cmdprefix', metavar='VALUE',
+                      help='Command prefix for running tagzilla (useful for scheduling jobs)')
+
   return parser
 
 
@@ -376,6 +481,8 @@ def main():
   taskfile   = csv.reader(autofile(args[1]),dialect='excel-tab')
   header     = taskfile.next()
   tasks      = sorted( extend(strip(t),12) for t in taskfile )
+  tasks      = sorted(clean_tasks(con,tasks,options))
+
   genecounts = {}
   genestuff  = {}
   genefail   = {}
@@ -383,52 +490,44 @@ def main():
   print '\t'.join(['Project','Population','Region','Chr','Start','Stop',
                    'SNPs', 'Qualifying SNPs', 'Tags', 'Ob. Include', 'Ob. Exclude'])
 
-  for project,ptasks in groupby(tasks,itemgetter(0)):
-    if not project:
+  manager=SubprocessManager()
+
+  polltime   = 1000
+  startdelay = 0.25
+
+  for task in tasks:
+    # Run queue until we have space for the next job
+    while manager and len(manager) >= options.maxqueue:
+      manager.run(timeout=polltime)
+
+    project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude,snps = task
+
+    if options.dryrun:
+      print '\t'.join(map(str,[project,population,gene,chromosome,start,stop,strand]))
       continue
 
-    ptasks = list(ptasks)
+    proc=run_tagzilla(outdir,project,gene,dprime,r2,population,chromosome,snps,
+                      maf,include,exclude,options.designscores,options.include,
+                      options.cmdprefix)
+
+    manager.add(proc)
+
+    if len(manager) > 1:
+      time.sleep(startdelay)
+
+  if options.dryrun:
+    return
+
+  # Drain queue
+  while manager:
+    manager.run()
+
+  # Reap results
+  for project,ptasks in groupby(tasks,itemgetter(0)):
     ptags = set()
-    for project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude in ptasks:
-      if chromosome or start or stop:
-        start = int(start)
-        stop  = int(stop)
-      else:
-        try:
-          row = query_gene_by_name(con, gene)
-        except KeyError,e:
-          print >> sys.stderr, 'Invalid gene: %s' % e.args[0]
-          continue
-
-        if chromosome.strip() and chromosome.strip() != row[2]:
-          print >> sys.stderr, 'Warning: Chromosome does not match for %s (%s != %s)' % \
-                                       (gene,chromosome,row[2])
-
-        chromosome = row[2]
-        start      = row[3]
-        stop       = row[4]
-        strand     = row[5]
-
-        start,stop = gene_margin(start,stop,strand,upstream=options.upstream,
-                                                   downstream=options.downstream)
-
-      include = set(i for i in include.split(',') if i)
-      exclude = set(e for e in exclude.split(',') if e)
-
-      if options.dryrun:
-        print '\t'.join(map(str,[project,population,gene,chromosome,start,stop,strand]))
-        continue
-
-      if None in (start,stop):
-        snps = qsnps = tags = obligate = undesignable = set()
-      else:
-        snps = set(snp[0] for snp in get_snps(con, population, chromosome, start, stop))
-
-        qsnps,tags,obligate,excl = get_tags(outdir,project,gene,dprime,r2,population,
-                                            chromosome,snps,maf,include,exclude,options.designscores,options.include)
-
-      #print 'Tags',len(tags)
-      #print 'Obligates',len(obligate)
+    for task in ptasks:
+      project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude,snps = task
+      qsnps,tags,obligate,excl = get_tags(outdir,project,gene,include,exclude)
 
       design = tags|obligate
       ptags.update(tags|obligate)
@@ -444,11 +543,14 @@ def main():
           designfile.write('>%s\n%s\n' % (rs,seq))
 
       genecounts[gene] = len(design)
-      genestuff[gene] = seqs
+      genestuff[gene]  = seqs
 
       d = map(str,[project,population,gene,chromosome,start,stop,
                    len(snps),len(qsnps),len(tags),len(obligate),len(excl)])
       print '\t'.join(d)
+
+    if options.dryrun:
+      continue
 
     designfile = file(project_file(outdir,project,'design.lst'),'w')
     for rs in ptags:
@@ -460,7 +562,8 @@ def main():
         designfile.write('>%s\n%s\n' % (rs,seq))
 
     pdir = project_path(outdir,project)
-    print >> sys.stderr, os.popen('binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)).read()
+    command = 'binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
+    print >> sys.stderr, subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
 
     sumfile = file(project_file(outdir,project,'genesum.out'),'w')
     for gene,n in sorted(genecounts.iteritems()):
