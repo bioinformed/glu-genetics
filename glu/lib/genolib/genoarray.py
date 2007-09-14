@@ -47,7 +47,7 @@ except ImportError:
     possible genotype within a model.
     '''
 
-    __slots__ = ('model','allele1','allele2','index','gclass')
+    __slots__ = ('model','allele1','allele2','allele1_index','allele2_index','index','gclass')
 
     def __init__(self, model, allele1, allele2, index):
       '''
@@ -67,6 +67,9 @@ except ImportError:
       self.allele1 = allele1
       self.allele2 = allele2
       self.index   = index
+
+      self.allele1_index = model.alleles.index(allele1)
+      self.allele2_index = model.alleles.index(allele2)
 
       missing1 = allele1 is None
       missing2 = allele2 is None

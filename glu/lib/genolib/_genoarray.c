@@ -66,8 +66,8 @@ typedef struct {
 	PyObject_HEAD
 	UnphasedMarkerModelObject *model;
 	unsigned int   index;
-	unsigned int   allele1;
-	unsigned int   allele2;
+	unsigned int   allele1_index;
+	unsigned int   allele2_index;
 } GenotypeObject;
 
 /* Forward declaration */
@@ -87,15 +87,15 @@ static int
 genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
 {
 	UnphasedMarkerModelObject *model;
-	Py_ssize_t index, allele1, allele2, allele_len, genotype_len;
+	Py_ssize_t index, allele1_index, allele2_index, allele_len, genotype_len;
 
-	static char *kwlist[] = {"model", "allele1", "allele2", "index", NULL};
+	static char *kwlist[] = {"model", "allele1_index", "allele2_index", "index", NULL};
 
-	self->allele1 = self->allele2 = self->index = 0;
+	self->allele1_index = self->allele2_index = self->index = 0;
 	Py_CLEAR(self->model);
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "Onnn", kwlist,
-		&model, &allele1, &allele2, &index))
+		&model, &allele1_index, &allele2_index, &index))
 		return -1;
 
 	if(!model || !UnphasedMarkerModel_Check(model))
@@ -110,8 +110,8 @@ genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
 	genotype_len = PyList_Size(model->genotypes);
 	if(genotype_len == -1) return -1;
 
-	if(allele1 < 0 || allele1 >= allele_len ||
-	   allele2 < 0 || allele2 >= allele_len)
+	if(allele1_index < 0 || allele1_index >= allele_len ||
+	   allele2_index < 0 || allele2_index >= allele_len)
 	{
 		PyErr_SetString(PyExc_IndexError,"invalid allele index");
 		return -1;
@@ -126,9 +126,9 @@ genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
 
 	Py_INCREF(model);
 	self->model   = model;
-	self->allele1 = allele1;
-	self->allele2 = allele2;
 	self->index   = index;
+	self->allele1_index = allele1_index;
+	self->allele2_index = allele2_index;
 
 	return 0;
 }
@@ -159,7 +159,7 @@ genotype_allele1_get(GenotypeObject *self)
 {
 	PyObject *allele1;
 
-	allele1 = PyList_GetItem(self->model->alleles, self->allele1);
+	allele1 = PyList_GetItem(self->model->alleles, self->allele1_index);
 	if(allele1)
 		Py_INCREF(allele1);
 	return allele1;
@@ -171,7 +171,7 @@ genotype_allele2_get(GenotypeObject *self)
 {
 	PyObject *allele2;
 
-	allele2 = PyList_GetItem(self->model->alleles, self->allele2);
+	allele2 = PyList_GetItem(self->model->alleles, self->allele2_index);
 	if(allele2)
 		Py_INCREF(allele2);
 	return allele2;
@@ -180,6 +180,8 @@ genotype_allele2_get(GenotypeObject *self)
 static PyMemberDef genotype_members[] = {
 	{"model",   T_OBJECT_EX, offsetof(GenotypeObject, model),   RO, "UnphasedMarkerModel"},
 	{"index",   T_UINT,      offsetof(GenotypeObject, index),   RO, "index"},
+	{"allele1_index",	T_UINT, offsetof(GenotypeObject, allele1_index), RO, "allele1_index"},
+	{"allele2_index",	T_UINT, offsetof(GenotypeObject, allele2_index), RO, "allele2_index"},
 	{NULL}  /* Sentinel */
 };
 
@@ -214,7 +216,8 @@ genotype_repr(GenotypeObject *self)
 static PyObject *
 genotype_heterozygote(GenotypeObject *self)
 {
-	if( self->allele1 && self->allele2 && self->allele1 != self->allele2 )
+	if( self->allele1_index && self->allele2_index
+	 && self->allele1_index != self->allele2_index )
 		Py_RETURN_TRUE;
 	else
 		Py_RETURN_FALSE;
@@ -223,7 +226,7 @@ genotype_heterozygote(GenotypeObject *self)
 static PyObject *
 genotype_homozygote(GenotypeObject *self)
 {
-	if( self->allele1 && self->allele1 == self->allele2 )
+	if( self->allele1_index && self->allele1_index == self->allele2_index )
 		Py_RETURN_TRUE;
 	else
 		Py_RETURN_FALSE;
@@ -232,7 +235,7 @@ genotype_homozygote(GenotypeObject *self)
 static PyObject *
 genotype_hemizygote(GenotypeObject *self)
 {
-	if( !!self->allele1 ^ !!self->allele2 )
+	if( !!self->allele1_index ^ !!self->allele2_index )
 		Py_RETURN_TRUE;
 	else
 		Py_RETURN_FALSE;
@@ -241,7 +244,7 @@ genotype_hemizygote(GenotypeObject *self)
 static PyObject *
 genotype_missing(GenotypeObject *self)
 {
-	if( !self->allele1 && !self->allele2 )
+	if( !self->allele1_index && !self->allele2_index )
 		Py_RETURN_TRUE;
 	else
 		Py_RETURN_FALSE;
@@ -251,8 +254,8 @@ static Py_ssize_t
 genotype_length(GenotypeObject *self)
 {
 	Py_ssize_t n = 0;
-	if(self->allele1) n++;
-	if(self->allele2) n++;
+	if(self->allele1_index) n++;
+	if(self->allele2_index) n++;
 	return n;
 }
 
@@ -261,9 +264,9 @@ genotype_item(GenotypeObject *self, Py_ssize_t item)
 {
 	PyObject *allele;
 	if(item == 0)
-		allele = PyList_GetItem(self->model->alleles, self->allele1);
+		allele = PyList_GetItem(self->model->alleles, self->allele1_index);
 	else if(item == 1)
-		allele = PyList_GetItem(self->model->alleles, self->allele2);
+		allele = PyList_GetItem(self->model->alleles, self->allele2_index);
 	else
 	{
 		PyErr_SetString(PyExc_IndexError,"genotype index out of range");
@@ -280,11 +283,11 @@ genotype_contains(GenotypeObject *self, PyObject *allele)
 	int cmp;
 	PyObject *allele1, *allele2;
 
-	allele1 = PyList_GetItem(self->model->alleles, self->allele1);
+	allele1 = PyList_GetItem(self->model->alleles, self->allele1_index);
 	cmp = PyObject_RichCompareBool(allele, allele1, Py_EQ);
 	if(cmp == 0)
 	{
-		allele2 = PyList_GetItem(self->model->alleles, self->allele2);
+		allele2 = PyList_GetItem(self->model->alleles, self->allele2_index);
 		cmp = PyObject_RichCompareBool(allele, allele2, Py_EQ);
 	}
 	return cmp;
