@@ -35,6 +35,18 @@ csv.register_dialect('tsv', csv.get_dialect('excel-tab'))
 
 
 def OSGzipFile_popen(filename, mode):
+  '''
+  Spawn gzip process and connect to input/output pipes
+
+  @param  filename: file name or file object
+  @type   filename: str or file object
+  @param      mode: determine whether the file objects should be opened for input or output,
+                    either 'w' or 'r'
+  @type       mode: str
+  @return         : file object to read from or write to
+  @rtype          : file object
+
+  '''
   if os.environ.get('GLU_NOSPAWN'):
     raise OSError('Spawning external processes disabled by GLU_NOSPAWN')
 
@@ -58,6 +70,18 @@ def OSGzipFile_popen(filename, mode):
 
 
 def OSGzipFile_subprocess(filename, mode):
+  '''
+  Spawn a subprocess to run gzip and connect to input/output pipes
+
+  @param  filename: file name or file object
+  @type   filename: str or file object
+  @param      mode: determine whether the file objects should be opened for input or output,
+                    either 'w' or 'r'
+  @type       mode: str
+  @return         : file object to read from or write to
+  @rtype          : file object
+  '''
+
   from subprocess import Popen,PIPE
 
   if os.environ.get('GLU_NOSPAWN'):
@@ -81,6 +105,16 @@ def OSGzipFile_subprocess(filename, mode):
 
 
 def hyphen(filename,defaultfile):
+  '''
+  Return the default if input is '-', otherwise itself
+
+  @param  defaultfile: default file name or file object
+  @type   defaultfile: str or file object
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @return            : file name or file object to read from or write to
+  @rtype             : str or file object  
+  '''
   if filename == '-':
     return defaultfile
   else:
@@ -88,6 +122,12 @@ def hyphen(filename,defaultfile):
 
 
 def isstr(s):
+  '''
+  Return whether the input is a string
+
+  @return   : indicate if the input is a string
+  @rtype    : bool
+  '''
   return isinstance(s, basestring)
 
 
@@ -123,6 +163,14 @@ _autofile_errors = (ImportError,ValueError,OSError)
 
 def compressed_filename(filename):
   '''
+  Determine if the input file is in or needs to be in compressed format
+
+  @param  filename: file name or file object
+  @type   filename: str or file object
+  @return         : suffix of the filename if the filename indicates a compress format,
+                    otherwise, empty str
+  @rtype          : str
+
   >>> compressed_filename('subjects.sdat')
   ''
   >>> compressed_filename('subjects.sdat.gz')
@@ -143,6 +191,17 @@ def compressed_filename(filename):
 
 
 def autofile(filename, mode='r'):
+  '''
+  Return a file object in the correct compressed format as specified, which is ready to read from or write to 
+
+  @param  filename: file name or file object
+  @type   filename: str or file object
+  @param      mode: determine whether the file objects should be opened for input or output,
+                    either 'w' or 'r'
+  @type       mode: str
+  @return         : file object to read from or write to
+  @rtype          : file object
+  '''
   # Pass non-string filename objects back as file-objects
   if not isstr(filename):
     return filename
@@ -166,6 +225,15 @@ def autofile(filename, mode='r'):
 
 def guess_format(filename, formats):
   '''
+  Return the guessed format indicated by the filename itself
+
+  @param  filename: file name
+  @type   filename: str
+  @param    format: any expected file format
+  @type     format: list of strs
+  @return         : file format guessed from the filename
+  @rtype          : str
+
   >>> f = ['sdat','ldat']
   >>> guess_format('subjects.sdat', f)
   'sdat'
@@ -193,6 +261,13 @@ def guess_format(filename, formats):
 
 def parse_augmented_filename(filename):
   '''
+  Retrieve option-value pairs from the filename delimited by colon
+
+  @param  filename: file name
+  @type   filename: str
+  @return         : filename and tuples of appended additional option and its value
+  @rtype          : list
+
   >>> parse_augmented_filename('file.gz')
   ('file.gz', [])
   >>> parse_augmented_filename('file.gz:')
@@ -245,6 +320,15 @@ def tryint(s):
 
 def get_csv_dialect(args,default_dialect='tsv'):
   '''
+  Retrieve the standardized csv argument list
+
+  @param             args: csv arguments
+  @type              args: dict
+  @param  default_dialect: set the default value for dialect to 'tsv'
+  @type   default_dialect: str
+  @return                : list of tuples of (option,value)
+  @rtype                 : list of tuples
+
   >>> args = dict(dialect='csv',quoting='none',skipinitialspace='y',doublequote='false',unrelated='baz',lineterminator='\\n',
   ...             delimiter='\\t')
   >>> sorted(get_csv_dialect(args).iteritems())
@@ -281,6 +365,18 @@ def _literal_list(filename):
 
 
 def get_arg(args, names, default=None):
+  '''
+  Retrieve argument which exists in the supplied list
+
+  @param     args: supplied argument list or set
+  @type      args: list or set
+  @param    names: list or set of potential argument names
+  @type     names: list or set
+  @param  default: set the default return to None
+  @type   default: str or None
+  @return        : argument which exists in the supplied list
+  @rtype         : str or None
+  '''
   for name in names:
     if name in args:
       return args.pop(name)
@@ -324,19 +420,19 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
        index, i: index of field to select or name of header
         dialect: csv module dialect name (typically 'csv' or 'tsv')
       delimiter: single field delimiter character
-    doublequote: A one-character string used to quote fields containing
+    doublequote: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
-     escapechar: A one-character string that removes any special meaning
+     escapechar: one-character string that removes any special meaning
                  from the following character.
-      quotechar: A one-character string used to quote fields containing
+      quotechar: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
         quoting: Controls when quotes characters are recognised.  It can
                  take on any of the cav QUOTE_ constants (without the QUOTE_
                  prefix).
 
-  @param         filename: a file name, file object, or literal string
+  @param         filename: file name, file object, or literal string
   @type          filename: str or file object
   @param             skip: number of header lines to skip
   @type              skip: int
@@ -489,12 +585,12 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_noth
   default,def,d: default value for keys with no or empty value
         dialect: csv module dialect name ('csv' or 'tsv')
       delimiter: single field delimiter character
-    doublequote: A one-character string used to quote fields containing
+    doublequote: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
-     escapechar: A one-character string that removes any special meaning
+     escapechar: one-character string that removes any special meaning
                  from the following character.
-      quotechar: A one-character string used to quote fields containing
+      quotechar: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
         quoting: Controls when quotes characters are recognised.  It can
@@ -662,6 +758,15 @@ def get_arg_columns(args,columns):
 
 
 def headers_needed(columns):
+  '''
+  Return whether headers are needed
+
+  @param      columns: indices, names, or ranges of columns to select, comma
+                       delimited
+  @type       columns: list of strings, integers, or 2-tuples for ranges
+  @return            : whether headers are needed
+  @rtype             : bool
+  '''
   for col in columns:
     if isinstance(col,tuple):
       if isstr(col[0]) or isstr(col[1]):
@@ -672,6 +777,16 @@ def headers_needed(columns):
 
 
 def resolve_column_headers(header,columns):
+  '''
+  @param      columns: indices, names, or ranges of columns to select, comma
+                       delimited
+  @type       columns: list of strings, integers, or 2-tuples for ranges
+  @param       header: header line of the input file
+  @type        header: sequence of strs
+  @return            : resolved header line
+  @rtype             : sequence of strs
+  '''
+
   for i,col in enumerate(columns):
     if isstr(col):
       try:
@@ -750,15 +865,15 @@ def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv'):
      columns, c: indices, names, or ranges of columns to select, comma delimited
         dialect: csv module dialect name ('csv' or 'tsv')
       delimiter: single field delimiter character
-    doublequote: A one-character string used to quote fields containing
+    doublequote: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
-    doublequote: A one-character string used to quote fields containing
+    doublequote: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
-     escapechar: A one-character string that removes any special meaning
+     escapechar: one-character string that removes any special meaning
                  from the following character.
-      quotechar: A one-character string used to quote fields containing
+      quotechar: one-character string used to quote fields containing
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
         quoting: Controls when quotes characters are recognised.  It can

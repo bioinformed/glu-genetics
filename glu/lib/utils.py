@@ -32,6 +32,16 @@ def tally(seq):
 
   Returns a dictionary of values mapped to the number of times each
   item appears in the input sequence.
+
+  @param  seq: input sequence
+  @type   seq: sequence
+  @return    : dictionary indicating the count for each key item
+  @rtype     : dict
+
+  >>> tally(['A','B','A','C','A','C','D'])
+  defaultdict(<type 'int'>, {'A': 3, 'C': 2, 'B': 1, 'D': 1})
+  >>> tally(('A','B','A','C','A','C','D'))
+  defaultdict(<type 'int'>, {'A': 3, 'C': 2, 'B': 1, 'D': 1})
   '''
   d = collections.defaultdict(int)
   for item in seq:
@@ -42,6 +52,11 @@ def tally(seq):
 def ilen(seq):
   '''
   ilen(seq) -> length of iterable seq
+
+  @param  seq: input sequence
+  @type   seq: sequence
+  @return    : length of the seq
+  @rtype     : int
 
   >>> ilen(xrange(10))
   10
@@ -54,7 +69,21 @@ def ilen(seq):
 
 
 def pair_generator(items):
-  '''Generator for distinct pairs of items'''
+  '''
+  Generator for distinct pairs of items
+
+  @param items: sequence of items 
+  @type  items: sequence
+  @return     : generator of dictinct pairs of items
+  @rtype      : generator of tuples
+
+  >>> pairs = pair_generator(['A','B','C'])
+  >>> for item1,item2 in pairs:
+  ...   print item1,item2
+  B A
+  C A
+  C B
+  '''
   if not isinstance(items, (list,tuple)):
     items = list(items)
   n = len(items)
@@ -64,13 +93,19 @@ def pair_generator(items):
 
 
 def percent(a,b):
+  '''
+  Return the percentage of two numbers
+  '''
   if not b:
     return 0.
   return float(a)/b*100
 
 
 def xenumerate(a, b=None):
-  "enumerate([start,] iterable)"
+  '''
+  Return an enumerate object with a start position
+  enumerate([start,] iterable)
+  '''
   if b is None:
     start,iterable = 0,a
   else:
@@ -84,6 +119,14 @@ def pick(sequence, indices):
 
   Supports strings, arrays, and sequences with contructors that take a single
   iterable argument.
+
+  @param  sequence: input sequence
+  @type   sequence: sequence
+  @param   indices: sequence of picked indices
+  @type    indices: sequence
+  @return         : sequence with elements from the specified indices
+  @rtype          : sequence
+
 
   >>> pick([1,2,3], [0,2])
   [1, 3]
@@ -105,6 +148,11 @@ def peekfirst(sequence):
   peekfirst(sequence) -> first, sequence
 
   Returns the first element of the sequence and new iterator of the original sequence
+
+  @param  sequence: input sequence
+  @type   sequence: sequence
+  @return         : sequence with first element and the original sequence
+  @rtype          : sequence
 
   >>> peekfirst( [1,2,3] )
   (1, [1, 2, 3])
@@ -139,6 +187,13 @@ def groups(sequence, keyfunc=None):
 
   list(groups(seq,keyfunc)) == [ key for key,subiter in groupby(sequence,keyfunc) ]
 
+  @param  sequence: input sequence
+  @type   sequence: sequence
+  @param   keyfunc: converting function for grouping
+  @type    keyfunc: function
+  @return         : new sequence
+  @rtype          : sequence
+
   >>> list(groups( [1,1,2,2,3,3,1] ))
   [1, 2, 3, 1]
   '''
@@ -162,6 +217,13 @@ def unique(sequence, keyfunc=None):
   Returns an iterator to the first occurance of each item in a sequence.  If
   keyfunc is specified, then the first occurance of each keyfunc(item) is
   returned.
+
+  @param  sequence: input sequence
+  @type   sequence: sequence
+  @param   keyfunc: converting function
+  @type    keyfunc: function
+  @return         : new sequence
+  @rtype          : sequence
 
   >>> list(unique( [1,1,2,2,3,3,1] ))
   [1, 2, 3]
