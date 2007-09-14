@@ -22,6 +22,9 @@ __license__   = 'See GLU license for terms by running: glu license'
 __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeError','GenotypeArrayDescriptor']
 
 
+from  itertools import izip
+
+
 class GenotypeError(ValueError): pass
 
 
@@ -33,7 +36,6 @@ try:
 except ImportError:
   from   array     import array
   from   math      import log, ceil
-  from   itertools import izip
 
   from   bitarray  import getbits,setbits
 
@@ -388,7 +390,7 @@ except ImportError:
     and internal representation are the same.
     '''
 
-    __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_allles')
+    __slots__ = ('alleles','genotypes','genomap','bit_size','allow_hemizygote','max_alleles')
 
     def __init__(self, allow_hemizygote=False, max_alleles=None):
       '''
@@ -522,6 +524,70 @@ except ImportError:
         comparisons += 1
 
     return concordant,comparisons
+
+
+def count_genotypes(model,genos):
+  '''
+  Count the number of occurances of each genotypes belonging to the
+  specified model given a sequence of genotypes.  Counts are returned as a
+  list of integers corresponding to the number of each genotype in
+  model.genotype oberved.
+
+  @param model: model for all genotypes
+  @type  model: UnphasedMarkerModel
+  @param genos: sequence of genotype objects belonging to model
+  @type  genos: sequence of Genotype instances
+  @return     : count of each genotype
+  @rtype      : list of integers
+
+  >>> import random
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*1400)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes*200+model.genotypes[1:]*200
+  >>> random.shuffle(genos)
+
+  >>> count_genotypes(model,genos)
+  [200, 400, 400, 400]
+  >>> count_genotypes(model,GenotypeArray(descr,genos))
+  [200, 400, 400, 400]
+  '''
+  counts = [0]*len(model.genotypes)
+  for geno in genos:
+    counts[geno.index] += 1
+  return counts
+
+
+def count_alleles(model,genocounts):
+  '''
+  Count the number of occurances of each allele belonging to the specified
+  model given a set of genotype counts.  Counts are returned as a list of
+  integers corresponding to the number of each allele in model.alleles
+  oberved.
+
+  @param model: model for all genotypes
+  @type  model: UnphasedMarkerModel
+  @param genos: sequence of genotype objects belonging to model
+  @type  genos: sequence of Genotype instances
+  @return     : count of each genotype
+  @rtype      : list of integers
+
+  >>> import random
+  >>> model = model_from_alleles('AB')
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes*200+model.genotypes[2:]*200
+  >>> random.shuffle(genos)
+
+  >>> count_alleles(model,count_genotypes(model,genos))
+  [400, 800, 1200]
+  '''
+  counts = [0]*len(model.alleles)
+  for geno,n in izip(model.genotypes,genocounts):
+    counts[geno.allele1_index] += n
+    counts[geno.allele2_index] += n
+  return counts
 
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
