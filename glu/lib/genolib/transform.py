@@ -19,11 +19,57 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from   types             import NoneType
 from   collections       import defaultdict
+from   itertools         import izip
 
-from   glu.lib.fileutils import load_list,load_map
+from   glu.lib.fileutils import load_list,load_map,load_table
+
 
 list_type = (NoneType,set,dict,list,tuple)
 map_type  = (NoneType,dict)
+
+
+def load_rename_alleles_file(filename):
+  '''
+  Load an allele renameing file
+
+  @param filename: a file name or file object
+  @type  filename: str or file object
+
+  >>> from StringIO import StringIO
+  >>> data = StringIO('l1\\tA,C,G,T\\tT,G,C,A\\nl3\\tA\\tC\\nl5\\tA,B\\tC,T')
+  >>> for lname,alleles in sorted(load_rename_alleles_file(data).iteritems()):
+  ...   print lname,sorted(alleles.iteritems())
+  l1 [(None, None), ('A', 'T'), ('C', 'G'), ('G', 'C'), ('T', 'A')]
+  l3 [(None, None), ('A', 'C')]
+  l5 [(None, None), ('A', 'C'), ('B', 'T')]
+  '''
+  rows = load_table(filename)
+
+  rename = {}
+  for i,row in enumerate(rows):
+    if not row:
+      continue
+    if len(row) != 3:
+      raise ValueError('Invalid allele rename record %d in %s' % (i+1,namefile(filename)))
+
+    lname,old_alleles,new_alleles = row
+
+    lname       = intern(lname.strip())
+    old_alleles = [ intern(a.strip()) for a in old_alleles.split(',') ]
+    new_alleles = [ intern(a.strip()) for a in new_alleles.split(',') ]
+
+    if len(old_alleles) != len(new_alleles):
+      raise ValueError('Invalid allele rename record %d in %s' % (i+1,namefile(filename)))
+
+    locus_rename = dict( izip(old_alleles,new_alleles) )
+    locus_rename[None] = None
+
+    if lname in rename and rename[lname] != locus_rename:
+      raise ValueError('Inconsistent rename record %d in %s' % (i+1,namefile(filename)))
+
+    rename[lname] = locus_rename
+
+  return rename
 
 
 class GenoTransform(object):
