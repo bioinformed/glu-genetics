@@ -5,8 +5,6 @@
 .. module:: split
    :synopsis: Split genotype data files
 
-.. index:: module: transform
-
 The split module, predictably, is a utility to split a genotype file into
 subsets based on a mapping from sample and/or locus to a partition name.  In
 addition, large data sets can be split into smaller files, based on a
