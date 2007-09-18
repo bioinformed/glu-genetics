@@ -124,7 +124,7 @@ def main():
   out = csv.writer(autofile(out,'w'),dialect='excel-tab')
 
   rows = csv.reader(autofile(hyphen(args[1],sys.stdin)),dialect='excel-tab')
-  header = rows.next()
+  header = rows.next() or ['']
   out.writerow(header + HEADER)
   out.writerows( process(con,header,rows,options) )
 
