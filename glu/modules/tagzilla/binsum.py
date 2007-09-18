@@ -94,6 +94,18 @@ def binsum(options,args):
 
   locusmap = {}
   results = [ locus_result_sequence(filename, locusmap, exclude) for filename in args ]
+
+  # FIXME: Make generic and use a better high-water mark
+  # Unix-specific method to determine if we'll overflow the maximum number
+  # of files desciptors allowed
+  try:
+    import resource
+    slimit,hlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    if len(args) > slimit*3/4:
+      results = [ list(r) for r in results ]
+  except ImportError:
+    pass
+
   results = imerge(*results)
 
   popdtags = {}
