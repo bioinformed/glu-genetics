@@ -24,11 +24,12 @@ from utils import tally
 
 def count_genos(genos):
   '''
-  Count non-hemizygous genotypes
+  Count non-hemizygous non-missing genotypes
 
   @param   genos: genotypes
   @type    genos: sequence
-  @return       : Count of observed homogygote 1, 2 and heterogygote
+  @return       : Count of observed genotypes for homozygote 1,
+                  heterozygotes, and homozygote 2
   @rtype        : tuple
   '''
 
@@ -129,8 +130,8 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
 
   >>> hom1_count, het_count, hom2_count = 15,36,20
   >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
+  0.87188388159827424
   '''
-
   n = hom1_count + het_count + hom2_count
 
   if not n:
@@ -146,7 +147,7 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
      +  score( het_count, 2*n*p*q)
      +  score(hom2_count,   n*q*q))
 
-  return stats.distributions.chi2.sf(xx,1)
+  return float(stats.distributions.chi2.sf(xx,1))
 
 
 def hwp_biallelic(genos):
@@ -177,9 +178,8 @@ def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=8000):
 
   >>> hom1_count, het_count, hom2_count = 15,36,20
   >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
+  0.87188388159827424
   '''
-
-
   # Only use the exact test when there are less than 8000 rare alleles
   # otherwise, use the asymptotic test
   if 2*min(hom1_count,hom2_count)+het_count < exact_threshold:
@@ -197,4 +197,3 @@ def _test():
 
 if __name__=='__main__':
   _test()
-

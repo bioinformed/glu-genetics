@@ -22,8 +22,8 @@ import csv
 import os
 import traceback
 
-from sequence import *
-#from clust import align
+from   sequence import *
+from   clust    import align
 
 
 def norm_seq(seq,n):
@@ -215,6 +215,7 @@ def main():
     print
 
 if __name__ == '__main__':
+  _test()
   if 0:
     import profile, pstats
     profile.run('main()', 'snpselect.prof')
@@ -223,5 +224,4 @@ if __name__ == '__main__':
     stats.sort_stats('time', 'calls')
     stats.print_stats(25)
   else:
-    _test()
-   # main()
+    main()

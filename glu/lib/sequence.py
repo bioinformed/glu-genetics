@@ -274,7 +274,7 @@ def norm_snp_seq(seq):
   @type   seq: str
   @return    : strand and snp alleles
   @rtype     : tuple of three strs
- 
+
   >>> norm_snp_seq('TACTC[G/A]GATCGT')
   ('Top', 'A', 'G')
   >>> norm_snp_seq('TACTC[A/G]GATCGT')
