@@ -25,7 +25,13 @@ from utils import tally
 def count_genos(genos):
   '''
   Count non-hemizygous genotypes
+
+  @param   genos: genotypes
+  @type    genos: sequence
+  @return       : Count of observed homogygote 1, 2 and heterogygote
+  @rtype        : tuple
   '''
+
   f = tally(genos)
 
   hom1 = hom2 = het = 0
@@ -51,17 +57,18 @@ def count_genos(genos):
 
 def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
   '''
-  hwp_exact_biallelic(count, het_count, hom2_count):
-
   Exact SNP test for deviations from Hardy-Weinberg proportions.  Based on
   'A Note on Exact Tests of Hardy-Weinberg Equilibrium', Wigginton JE,
   Cutler DJ and Abecasis GR; Am J Hum Genet (2005) 76: 887-93
 
-  Input: Count of observed homogygote 1, count of observed heterozygotes,
-         count of observed homogyhote 2.
-  Output: Exact p-value for deviation (2-sided) from Hardy-Weinberg
-          Proportions (HWP)
-  Complexity: time and space O(min(hom1_count,hom2_count)+het_count)
+  @param  hom1_count: Count of observed homogygote 1
+  @type   hom1_count: int
+  @param   het_count: Count of observed heterogygote
+  @type    het_count: int
+  @param  hom1_count: Count of observed homogygote 2
+  @type   hom2_count: int
+  @return           : Exact p-value for deviation (2-sided) from Hardy-Weinberg Proportions (HWP)
+  @rtype            : float
   '''
 
   # Computer the number of rare and common alleles
@@ -108,7 +115,21 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
 
 
 def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
-  '''Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes'''
+  '''
+  Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
+
+  @param  hom1_count: Count of observed homogygote 1
+  @type   hom1_count: int
+  @param   het_count: Count of observed heterogygote
+  @type    het_count: int
+  @param  hom1_count: Count of observed homogygote 2
+  @type   hom2_count: int
+  @return           : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
+  @rtype            : float
+
+  >>> hom1_count, het_count, hom2_count = 15,36,20
+  >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
+  '''
 
   n = hom1_count + het_count + hom2_count
 
@@ -129,10 +150,35 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
 
 
 def hwp_biallelic(genos):
+  '''
+  @param   genos: genotypes
+  @type    genos: sequence
+  @return       : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
+  @rtype        : float
+
+  '''
   return hwp_biallelic_counts(*count_genos(genos))
 
 
 def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=8000):
+  '''
+  Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
+
+  @param       hom1_count: Count of observed homogygote 1
+  @type        hom1_count: int
+  @param        het_count: Count of observed heterogygote
+  @type         het_count: int
+  @param       hom1_count: Count of observed homogygote 2
+  @type        hom2_count: int
+  @param  exact_threshold: threshold for the exact test
+  @type   exact_threshold: int
+  @return                : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
+  @rtype                 : float
+
+  >>> hom1_count, het_count, hom2_count = 15,36,20
+  >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
+  '''
+
 
   # Only use the exact test when there are less than 8000 rare alleles
   # otherwise, use the asymptotic test
@@ -142,3 +188,13 @@ def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=8000):
     p = hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
 
   return p
+
+
+def _test():
+  import doctest
+  return doctest.testmod()
+
+
+if __name__=='__main__':
+  _test()
+

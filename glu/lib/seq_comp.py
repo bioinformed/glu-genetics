@@ -23,7 +23,7 @@ import os
 import traceback
 
 from sequence import *
-from clust import align
+#from clust import align
 
 
 def norm_seq(seq,n):
@@ -56,6 +56,25 @@ def seq_align(seq1,seq2):
 
 
 def seq_match(seq1,seq2):
+  '''
+  Return the count of mismatches between two IUPAC sequences
+
+  @param  seq1: first sequence in iupac representation
+  @type   seq1: str
+  @param  seq2: second sequence in iupac representation
+  @type   seq2: str
+  @return     : count of mismatched bases
+  @rtype      : int
+
+  >>> s1='hm'
+  >>> s2='vb'
+  >>> seq_match(s1,s2)
+  0
+  >>> s1='gc'
+  >>> s2='at'
+  >>> seq_match(s1,s2)
+  2
+  '''
   return sequence_match(seq1,seq2).count('')
 
 
@@ -91,6 +110,16 @@ def conform_left(s1,s2):
 
 
 def find_snp(seq,x):
+  '''
+  Retrieve a snp at the specified location in the sequence
+
+  @param  seq: nucleotide sequence
+  @type   seq: sequence
+  @param  seq: location in the sequence
+  @type   seq: int
+  @return    : snp at the specified location
+  @rtype     : str
+  '''
   c = 0
   for i,b in enumerate(seq):
     if b != '-':
@@ -99,6 +128,11 @@ def find_snp(seq,x):
       c+=1
 
   raise "Cannot find SNP at location %d in sequence %s" % (seq,x)
+
+
+def _test():
+  import doctest
+  return doctest.testmod()
 
 
 def main():
@@ -189,4 +223,5 @@ if __name__ == '__main__':
     stats.sort_stats('time', 'calls')
     stats.print_stats(25)
   else:
-    main()
+    _test()
+   # main()

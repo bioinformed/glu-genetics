@@ -6,7 +6,7 @@ Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
 Created:
 
-Abstract:
+Abstract:      Multiple sequence alignment using ClustalW
 
 Requires:      Python 2.5, glu
 
@@ -22,6 +22,14 @@ from Bio.Clustalw import MultipleAlignCL, do_alignment
 
 
 def align(seqs):
+  '''
+  Multiple seqeuence alignment using ClustalW
+
+  @param seqs: list of biological sequences
+  @type  seqs: list of strs
+  @return    : aligned sequences
+  @rtype     : list of strs
+  '''
   name = 'tmpFoo%d' % time.time()
   tfile = open(name+'.fasta','w')
   try:

@@ -33,6 +33,22 @@ iupac_back.update( (a,a) for a,b in iupac.items() )
 iupac = dict( (a,set(b)) for a,b in iupac.items() )
 
 def to_iupac(b):
+  '''
+  Convert the allele that was passed in from IUPC representation to traditional representation
+
+  @param  b: allele
+  @type   b: str
+  @return  : allele in traditional representation
+  @rtype   : str
+
+  >>> b = 'CGT'
+  >>> to_iupac(b)
+  'B'
+  >>> b = 'ACGT'
+  >>> to_iupac(b)
+  'N'
+
+  '''
   b = ''.join(''.join(iupac[c.upper()]) for c in b)
   b = set(b)
   b.discard('-')
@@ -44,33 +60,129 @@ def to_iupac(b):
 
 
 def complement_base(b):
+  '''
+  Complement the base that was passed in
+
+  @param  b: allele
+  @type   b: str
+  @return  : complemented allele
+  @rtype   : str
+
+  >>> b='h'
+  >>> complement_base(b)
+  'D'
+  >>> b='a'
+  >>> complement_base(b)
+  'T'
+  '''
   b = iupac[to_iupac(b.upper())]
   return to_iupac([ comp[c] for c in b ])
 
 
 def complement(s):
+  '''
+  Complement the sequence that was passed in
+
+  @param  s: nucleotide sequence
+  @type   s: sequence
+  @return  : complemented seqeuence
+  @rtype   : sequence
+
+  >>> s='ambhg'
+  >>> complement(s)
+  'TKVDC'
+  '''
   return ''.join([ complement_base(b) for b in s ])
 
 
 def base_match(b1,b2):
+  '''
+  Return the matched set between two iupac alleles
+
+  @param  b1: first allele in iupac representation
+  @type   b1: str
+  @param  b2: second allele in iupac representation
+  @type   b2: str
+  @return   : matched base set
+  @rtype    : str
+
+  >>> b1='h'
+  >>> b2='v'
+  >>> base_match(b1,b2)
+  set(['A', 'C'])
+  '''
   return iupac[b1.upper()].intersection(iupac[b2.upper()])
 
 
 def sequence_match_raw(s1, s2):
+  '''
+  Return the matched set between two iupac alleles
+
+  @param  s1: first sequence in iupac representation
+  @type   s1: str
+  @param  s2: second sequence in iupac representation
+  @type   s2: str
+  @return   : list of matched base set
+  @rtype    : list
+
+  >>> s1='hm'
+  >>> s2='vb'
+  >>> sequence_match_raw(s1,s2)
+  [set(['A', 'C']), set(['C'])]
+  '''
+
   return [ base_match(b1,b2) for b1,b2 in zip(s1,s2) ]
 
 
 def sequence_match(s1, s2):
+  '''
+  Return the matched set between two iupac alleles
+
+  @param  s1: first sequence in iupac representation
+  @type   s1: str
+  @param  s2: second sequence in iupac representation
+  @type   s2: str
+  @return   : list of matched base str
+  @rtype    : list
+
+  >>> s1='hm'
+  >>> s2='vb'
+  >>> sequence_match(s1,s2)
+  ['AC', 'C']
+  '''
   return [ ''.join(b) for b in sequence_match_raw(s1, s2) ]
 
 
 def string_match(s1,s2):
+  '''
+  Return the count of mismatched bases
+
+  @param  s1: first sequence in iupac representation
+  @type   s1: str
+  @param  s2: second sequence in iupac representation
+  @type   s2: str
+  @return   : count of mismatched bases
+  @rtype    : int
+
+  >>> s1='athbc'
+  >>> s2='agvba'
+  >>> string_match(s1,s2)
+  3
+  '''
+
   return sum(1 for c1,c2 in zip(s1,s2) if c1.upper() != c2.upper())
 
 
 def top_or_bottom_comp(a,b):
   '''
   Return top or bottom strand without adjustment for allele order
+
+  @param    a: first allele
+  @type     a: str
+  @param    b: second allele
+  @type     b: str
+  @return    : strand name, 'Top' or 'Bot' or 'Unknown'
+  @rtype     : str
 
   >>> top_or_bottom_comp('A','G')
   'Top'
@@ -112,6 +224,13 @@ def top_or_bottom(a,b):
   '''
   Return top or bottom strand with adjustment for allele order
 
+  @param    a: first allele
+  @type     a: str
+  @param    b: second allele
+  @type     b: str
+  @return    : strand name, 'Top' or 'Bot' or 'Unknown'
+  @rtype     : str
+
   >>> top_or_bottom('A','G')
   'Top'
   >>> top_or_bottom('G','A')
@@ -148,6 +267,14 @@ def top_or_bottom(a,b):
 
 def norm_snp_seq(seq):
   '''
+  Determine the strand, either 'Top' or 'Bot', for the sequence that was passed in
+  Return the alleles of the snp in the alphanumerical order if on 'Top' strand, otherwise the reversed order.
+
+  @param  seq: nucleotide sequence with a snp
+  @type   seq: str
+  @return    : strand and snp alleles
+  @rtype     : tuple of three strs
+ 
   >>> norm_snp_seq('TACTC[G/A]GATCGT')
   ('Top', 'A', 'G')
   >>> norm_snp_seq('TACTC[A/G]GATCGT')

@@ -21,6 +21,15 @@ from numpy import asanyarray,arange
 
 
 def tabletrend(x):
+  '''
+  Calculate  Cochrane-Armitage Trend Test statistics for 2xc tables
+
+  @param  x: data of 2xc tables
+  @type   x: list
+  @return  : Cochrane-Armitage Trend Test statistics
+  @rtype   : float
+  '''
+
   x = asanyarray(x, dtype=int)
 
   if len(x.shape) != 2 or x.shape[0] != 2:

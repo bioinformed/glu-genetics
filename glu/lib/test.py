@@ -31,7 +31,7 @@ def test(report=True):
   if not os.path.samefile(packagefile,localfile):
     raise ImportError('Your PYTHONPATH is not set correctly to find this GLU tree')
 
-  for module in association,fileutils,glm,imerge,sections,sequence,stats,utils:
+  for module in association,fileutils,glm,imerge,sections,sequence,stats,utils,ca,seq_comp,hwp,xtab:
     doctest.testmod(module,report=False)
 
   from glu.lib.genolib.test import test as test_genolib
