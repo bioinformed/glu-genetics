@@ -492,13 +492,12 @@ def main():
 
   manager=SubprocessManager()
 
-  polltime   = 1000
   startdelay = 0.25
 
   for task in tasks:
     # Run queue until we have space for the next job
-    while manager and len(manager) >= options.maxqueue:
-      manager.run(timeout=polltime)
+    while len(manager) >= options.maxqueue:
+      manager.run()
 
     project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude,snps = task
 
@@ -506,14 +505,14 @@ def main():
       print '\t'.join(map(str,[project,population,gene,chromosome,start,stop,strand]))
       continue
 
+    if manager:
+      time.sleep(startdelay)
+
     proc=run_tagzilla(outdir,project,gene,dprime,r2,population,chromosome,snps,
                       maf,include,exclude,options.designscores,options.include,
                       options.cmdprefix)
-
     manager.add(proc)
 
-    if len(manager) > 1:
-      time.sleep(startdelay)
 
   if options.dryrun:
     return
