@@ -72,9 +72,9 @@ def pair_generator(items):
   '''
   Generator for distinct pairs of items
 
-  @param items: sequence of items 
+  @param items: sequence of items
   @type  items: sequence
-  @return     : generator of dictinct pairs of items
+  @return     : distinct pairs of items
   @rtype      : generator of tuples
 
   >>> pairs = pair_generator(['A','B','C'])

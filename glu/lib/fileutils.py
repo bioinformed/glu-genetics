@@ -113,7 +113,7 @@ def hyphen(filename,defaultfile):
   @param     filename: file name or file object
   @type      filename: str or file object
   @return            : file name or file object to read from or write to
-  @rtype             : str or file object  
+  @rtype             : str or file object
   '''
   if filename == '-':
     return defaultfile
@@ -168,7 +168,7 @@ def compressed_filename(filename):
   @param  filename: file name or file object
   @type   filename: str or file object
   @return         : suffix of the filename if the filename indicates a compress format,
-                    otherwise, empty str
+                    otherwise, empty string
   @rtype          : str
 
   >>> compressed_filename('subjects.sdat')
@@ -192,7 +192,7 @@ def compressed_filename(filename):
 
 def autofile(filename, mode='r'):
   '''
-  Return a file object in the correct compressed format as specified, which is ready to read from or write to 
+  Return a file object in the correct compressed format as specified, which is ready to read from or write to
 
   @param  filename: file name or file object
   @type   filename: str or file object
