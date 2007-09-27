@@ -920,19 +920,19 @@ def print_results(out,locus_model,linear_model,verbose=1):
   out.write('\n')
 
   if len(linear_model.categories) <= 2:
-    out.write('Variable                       Coef.   Std.Err.     OR        Z     Pr > |Z| \n')
-    out.write('------------------------ ----------- ---------- ---------- ------- ----------\n')
+    out.write('Variable                       Coef.   Std.Err.     OR        Z      Pr > |Z| \n')
+    out.write('------------------------ ----------- ---------- ---------- ------- -----------\n')
     for k,var in enumerate(vars):
-      pv = format_pvalue(10,p[0,k])
+      pv = format_pvalue(p[0,k],10)
       out.write('%-25s %10.6f %10.6f %10.6f %7.2f %s\n' % (var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],pv))
     out.write('\n')
   else:
-    out.write('TYPE       Variable                  Coef.   Std.Err.     OR        Z     Pr > |Z| \n')
-    out.write('---------- ------------------- ----------- ---------- ---------- ------- ----------\n')
+    out.write('TYPE       Variable                  Coef.   Std.Err.     OR        Z      Pr > |Z| \n')
+    out.write('---------- ------------------- ----------- ---------- ---------- ------- -----------\n')
     for i,cat in enumerate(linear_model.categories[1:]):
       for j,var in enumerate(vars):
         k = i*n+j
-        pv = format_pvalue(10,p[0,k])
+        pv = format_pvalue(p[0,k],10)
         out.write('%-10s %-20s %10.6f %10.6f %10.6f %7.2f %s\n' % (cat,var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],pv))
       out.write('\n')
 
