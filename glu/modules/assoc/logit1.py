@@ -102,7 +102,7 @@ def main():
   if options.nullmodel:
     print_results(out,null_model,null)
     if options.details:
-      details.write('NULL MODEL: %s\n\n')
+      details.write('NULL MODEL:\n\n')
       print_results(details,null_model,null)
 
   headers = ['Locus']
