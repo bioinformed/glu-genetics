@@ -76,11 +76,11 @@ def save_section(swriter, heading, rows):
   Writes a section to file.
 
   @param swriter: A SectionWriter object for checking out a section
-  @type swriter: SectionWriter
+  @type  swriter: SectionWriter
   @param heading: A section heading to checkout from the SectionWriter
-  @type heading: string
-  @param rows: A list of data for the specified section heading
-  @type rows: sequence
+  @type  heading: string
+  @param    rows: A list of data for the specified section heading
+  @type     rows: sequence
 
   >>> import StringIO
   >>> sio = StringIO.StringIO()
@@ -102,9 +102,8 @@ def index_sections(sections):
   Creates a dictionary of materialized sections with the key being the
   heading of each section.
 
-  @param sections: A list of tuples containing the section
-  heading and section
-  @type sections: sequence
+  @param sections: A list of tuples containing the section heading and section
+  @type  sections: sequence
 
   >>> sections = [('head',      [['analysis','completion'], ['version','66.69']]),
   ...             ('samples',  [['sb12345'], ['sb12345']]),
@@ -124,7 +123,7 @@ def materialize_sections(sections):
   Materializes each section within a list sections
 
   @param sections: A list of heading and section tuples
-  @type sections: sequence
+  @type  sections: sequence
 
   >>> sections = [('head',      [['analysis','completion'], ['version','66.69']]),
   ...             ('samples',  [['sb12345'], ['sb12345']]),
@@ -139,12 +138,12 @@ def filter_sections(sections,sectionset,exclude=False):
   '''
   Includes (default) or excludes sections indicated by a list of sections.
 
-  @param sections: A list of tuples, each being a section head and its section
-  @type sections: sequence
+  @param   sections: A list of tuples, each being a section head and its section
+  @type    sections: sequence
   @param sectionset: A list or set of section headings
-  @type sectionset: sequence
-  @param exclude: A flag to exclude the provide sections instead of including
-  @type exclude: boolean
+  @type  sectionset: sequence
+  @param    exclude: A flag to exclude the provide sections instead of including
+  @type     exclude: boolean
 
   >>> sections = [('head',     [['analysis','completion'], ['version','66.69']]),
   ...             ('samples',  [['sb12345'], ['sb12345']]),
@@ -170,8 +169,8 @@ def read_sections(data):
   only until the next section is read.
 
   @param data: a sequence of rows, generally from a file
-  @type data: sequence of sequences
-  @return: An iterable of section heading and section content
+  @type  data: sequence of sequences
+  @return    : An iterable of section heading and section content
 
   >>> data = [['[head]'],    ['analysis','completion'], ['version','66.69'],
   ...         ['[samples]'], ['sb12345'], ['sb12345'],

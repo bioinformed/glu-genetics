@@ -25,6 +25,9 @@ def _remap_comp(a1s,a2s):
 
 
 def remap_category(allelemap):
+  '''
+  Categorize the allelemap into six groups: identity, complement, swap, partial complement, partial swap and other
+  '''
   # FIXME: Use genoarray model once support is available
   complement = {'A':'T','T':'A','G':'C','C':'G'}
   a1s,a2s    = zip(*( (a1,a2) for a1,a2 in allelemap.iteritems() if a1 and a2 ))
@@ -67,6 +70,10 @@ def remap_alleles(genocounts):
   @type:   genocounts: dictionary
   @return: the mapping from the right alleles to the left alleles
   @rtype:  dictionary
+
+  >>> s = [('AA','TT',20),('AG','TC',10),('GG','CC',30),('AG','TT',50)]
+  >>> remap_alleles(dict(encode(s)))
+  (60, {'C': 'G', 'T': 'A'})
   '''
   genos = izip(*genocounts)
   left  = set(a for g in genos.next() for a in g)
@@ -78,6 +85,7 @@ def remap_alleles(genocounts):
     left.update( right - left )
 
   left  = list(left)
+  #print left
   right = list(right)
 
   maps = (dict(izip(right,lperm)) for lperm in permutations(left))
@@ -87,6 +95,24 @@ def remap_alleles(genocounts):
 
 
 def permutations(l):
+  '''
+  Return the permutation of the list of elements that was passed in
+
+  >>> l = ['A', 'G']
+  >>> for perm in permutations(l):
+  ...   print perm
+  ('A', 'G')
+  ('G', 'A')
+  >>> l = ['A', 'G', 'T']
+  >>> for perm in permutations(l):
+  ...   print perm
+  ('A', 'G', 'T')
+  ('G', 'A', 'T')
+  ('G', 'T', 'A')
+  ('A', 'T', 'G')
+  ('T', 'A', 'G')
+  ('T', 'G', 'A')
+  '''
   n = len(l)
   if not n:
     yield []
@@ -100,6 +126,15 @@ def permutations(l):
 
 
 def encode(s):
+  '''
+  >>> s = [('AA','TT',20),('AG','TC',10),('GG','CC',30),('AG','TT',50)]
+  >>> for code in encode(s):
+  ...   print code
+  ((('A', 'A'), ('T', 'T')), 20)
+  ((('A', 'G'), ('T', 'C')), 10)
+  ((('G', 'G'), ('C', 'C')), 30)
+  ((('A', 'G'), ('T', 'T')), 50)
+  '''
   for left,right,count in s:
     yield (tuple(left),tuple(right)),count
 
@@ -143,5 +178,11 @@ class TestRemap(unittest.TestCase):
       self.assertEquals(remap_category(data), result)
 
 
+def _test():
+  import doctest
+  return doctest.testmod()
+
+
 if __name__=='__main__':
+  _test()
   unittest.main()

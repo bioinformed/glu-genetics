@@ -33,17 +33,42 @@ from fileutils            import autofile
 
 class Regions(object):
   '''
-  Store the name and a set of samples or loci for each region.
+  Python implementation of a region representation object
+  which stores the name and a set of samples or loci for each region.
   '''
   def __init__(self,regions=[]):
+    '''
+    Regions object constructor
+
+    @param  regions: region that was passed in
+    @type   regions: regions object
+    '''
     self.regions = {}
     for name,samples,loci in regions:
       self.add_region(name,samples,loci)
 
   def add_region(self,name,samples,loci):
+    '''
+    Add new region into the current regions object with the supplied information
+
+    @param     name: region name
+    @type      name: str
+    @param  samples: list of sample ids
+    @type   samples: list
+    @param     loci: list of locus ids
+    @type      loci: list
+    '''
     self.regions[name] = samples,loci
 
   def __contains__(self,key):
+    '''
+    Return whether or not the sample-locus pair that was passed in exists in the current regions object
+
+    @param    key: sampel id and locus id
+    @type     key: tuple
+    @return      : flag indicating if the sample-locus exists in the current regions object
+    @rtype       : bool
+    '''
     sample,locus = key
     for samples,loci in self.regions.itervalues():
       if sample in samples and locus in loci:
@@ -51,18 +76,37 @@ class Regions(object):
     return False
 
   def __len__(self):
+    '''
+    Return the count of regions in the current regions object
+    '''
     return len(self.regions)
 
   def __iter__(self):
+    '''
+    Iterate through the current regions object for each ssample and locus in each region
+    '''
     return ((name,samples,loci) for name,(samples,loci) in self.regions.iteritems())
 
   def __getitem__(self,name):
+    '''
+    Return all samples and loci in the specified region
+
+    @param   name: region name
+    @type    name: str
+    @return      : sample and locus sets for the specified region
+    @rtype       : list of set
+    '''
     return self.regions[name]
 
 
 def save_regions(file_or_name,regions):
   '''
   Save the regions into a file using SectionWriter.
+
+  @param file_or_name: file name or file object
+  @type  file_or_name: str or file object
+  @param      regions: regions object that was passed in
+  @type       regions: Regions object
   '''
   sw = SectionWriter(file_or_name)
   for name,samples,loci in regions:
@@ -129,6 +173,28 @@ def build_error_msg(dfa,state,heading):
 
 
 def new_state(dfa,state,heading):
+  '''
+  Return a valid state, otherwise raise the error
+
+  @param      dfa: FSA look up table
+  @type       dfa: dict
+  @param    state: current FSA state
+  @type     state: str
+  @param  heading: section name
+  @type   heading: str
+  @return        : next FSA state
+  @rtype         : str
+
+  >>> dfa = build_transition_table()
+  >>> state = 'start'
+  >>> heading = 'samples'
+  >>> new_state(dfa,state,heading)
+  'samples'
+  >>> state = 'locisample'
+  >>> heading = 'region'
+  >>> new_state(dfa,state,heading)
+  'region'
+  '''
   if heading=='data':
     raise RegionParserError, 'Parsing Error: The section file has no header'
 
@@ -234,5 +300,11 @@ class testRegion(unittest.TestCase):
       self.assertRaisesMsg(RegionParserError, load_regions, StringIO(case), **{'exc_msg':exception})
 
 
+def _test():
+  import doctest
+  return doctest.testmod()
+
+
 if __name__ == '__main__':
+  _test()
   unittest.main()
