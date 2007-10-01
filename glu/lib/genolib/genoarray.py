@@ -526,6 +526,81 @@ except ImportError:
     return concordant,comparisons
 
 
+def count_genotypes2(model1,genos1,model2,genos2):
+  '''
+  Count the two-locus genotypes belonging to the two specified models and
+  genotype sequences.  Counts are returned as a list of integers m*n
+  integers corresponding to i*n+j, where i,n and j,m are the genotype index
+  and total number of genotypes in model1 and model2, respectively.
+
+  @param model1: model for genos1 genotypes
+  @type  model1: UnphasedMarkerModel
+  @param genos1: genotypes at first locus
+  @type  genos1: sequence of Genotype instances
+  @param model2: model for genos2 genotypes
+  @type  model2: UnphasedMarkerModel
+  @param genos2: genotypes at second locus
+  @type  genos2: sequence of Genotype instances
+  @return      : count of each genotype
+  @rtype       : sequence of two-locus genotype and integer count
+
+  >>> import random
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*1400)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos1 = model.genotypes*350
+  >>> genos2 = model.genotypes*200+model.genotypes[1:]*200
+
+  >>> for (g1,g2),n in count_genotypes2(model,genos1,model,genos2):
+  ...   print g1,g2,n
+  (None, None) (None, None) 200
+  (None, None) ('A', 'A') 50
+  (None, None) ('A', 'B') 50
+  (None, None) ('B', 'B') 50
+  ('A', 'A') (None, None) 0
+  ('A', 'A') ('A', 'A') 250
+  ('A', 'A') ('A', 'B') 50
+  ('A', 'A') ('B', 'B') 50
+  ('A', 'B') (None, None) 0
+  ('A', 'B') ('A', 'A') 50
+  ('A', 'B') ('A', 'B') 250
+  ('A', 'B') ('B', 'B') 50
+  ('B', 'B') (None, None) 0
+  ('B', 'B') ('A', 'A') 50
+  ('B', 'B') ('A', 'B') 50
+  ('B', 'B') ('B', 'B') 250
+
+  >>> genos1 = GenotypeArray(descr,genos1)
+  >>> genos2 = GenotypeArray(descr,genos2)
+  >>> for (g1,g2),n in count_genotypes2(model,genos1,model,genos2):
+  ...   print g1,g2,n
+  (None, None) (None, None) 200
+  (None, None) ('A', 'A') 50
+  (None, None) ('A', 'B') 50
+  (None, None) ('B', 'B') 50
+  ('A', 'A') (None, None) 0
+  ('A', 'A') ('A', 'A') 250
+  ('A', 'A') ('A', 'B') 50
+  ('A', 'A') ('B', 'B') 50
+  ('A', 'B') (None, None) 0
+  ('A', 'B') ('A', 'A') 50
+  ('A', 'B') ('A', 'B') 250
+  ('A', 'B') ('B', 'B') 50
+  ('B', 'B') (None, None) 0
+  ('B', 'B') ('A', 'A') 50
+  ('B', 'B') ('A', 'B') 50
+  ('B', 'B') ('B', 'B') 250
+  '''
+  n,m = len(model1.genotypes),len(model2.genotypes)
+  counts = [0]*n*m
+  for geno1,geno2 in izip(genos1,genos2):
+    counts[geno1.index*n+geno2.index] += 1
+  genos = ( (g1,g2) for g1 in model1.genotypes
+                    for g2 in model2.genotypes )
+  return zip(genos,counts)
+
+
 def count_genotypes(model,genos):
   '''
   Count the number of occurances of each genotypes belonging to the
@@ -559,11 +634,39 @@ def count_genotypes(model,genos):
   return counts
 
 
+def locus_genotype_completion_rate(genocounts):
+  '''
+  Estimate the genotype completion rate, the proportion of non-missing
+  genotypes among all genotypes observed, for a given set of genotype counts
+  derived from a single locus model.
+
+  # FIXME: Add parameters and doctests
+  '''
+  n = sum(genocounts)
+  if not n:
+    return 0.0
+  return 1-genocounts[0]/n
+
+
+def locus_genotype_missing_rate(genocounts):
+  '''
+  Estimate the genotype completion rate, the proportion of missing genotypes
+  among all genotypes observed, for a given set of genotype counts derived
+  from a single locus model.
+
+  # FIXME: Add parameters and doctests
+  '''
+  n = sum(genocounts)
+  if not n:
+    return 1.0
+  return genocounts[0]/n
+
+
 def count_alleles(model,genocounts):
   '''
   Count the number of occurances of each allele belonging to the specified
-  model given a set of genotype counts.  Counts are returned as a list of
-  integers corresponding to the number of each allele in model.alleles
+  locus model given a set of genotype counts.  Counts are returned as a list
+  of integers corresponding to the number of each allele in model.alleles
   oberved.
 
   @param model: model for all genotypes
@@ -588,6 +691,49 @@ def count_alleles(model,genocounts):
     counts[geno.allele1_index] += n
     counts[geno.allele2_index] += n
   return counts
+
+
+def minor_allele(model,allelecounts):
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def alleles_from_genos(nn,aa,ab,bb):
+  ...   return count_alleles(model,count_genotypes(model,[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
+  >>> minor_allele(model, alleles_from_genos(0,1,2,1))
+  ('A', 0.5)
+  >>> minor_allele(model, alleles_from_genos(0,1000,2000,1000))
+  ('A', 0.5)
+  >>> minor_allele(model, alleles_from_genos(10000,1000,2000,1000))
+  ('A', 0.5)
+  >>> minor_allele(model, alleles_from_genos(10000,0,2000,2000))
+  ('A', 0.25)
+  >>> minor_allele(model, alleles_from_genos(10000,2000,2000,0))
+  ('B', 0.25)
+  >>> minor_allele(model, alleles_from_genos(0,1000,0,0))
+  ('B', 0.0)
+  >>> minor_allele(model, alleles_from_genos(1000,0,0,0))
+  ('A', 0.0)
+  '''
+  n = len(allelecounts)
+  if len(model.alleles) != n:
+    raise ValueError,'allele counts to not match model alleles'
+  elif n > 3:
+    raise ValueError,'minor allele frequency is defined only for biallelic loci'
+  elif not n:
+    raise ValueError,'minor allele not defined for empty model'
+  elif n < 3:
+    return model.alleles[1],0.0
+
+  informative = allelecounts[1:]
+
+  m = sum(informative)
+
+  if not m:
+    return model.alleles[1],0.0
+
+  f = min(informative)
+  i = informative.index(f)+1
+  return model.alleles[i],f/m
 
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
