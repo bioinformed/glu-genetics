@@ -31,17 +31,18 @@ from   glu.lib.fileutils import autofile,namefile,guess_format
 from   streams           import GenotripleStream, GenomatrixStream
 from   genoarray         import model_from_alleles
 from   reprs             import snp,hapmap,marker
-from   text              import TextGenomatrixWriter,    TextGenotripleWriter,    \
-                                save_genotriples_text,   load_genotriples_text,   \
-                                save_genomatrix_text,    load_genomatrix_text,    \
-                                load_genomatrix_hapmap
-from   binary            import BinaryGenomatrixWriter,  BinaryGenotripleWriter,  \
-                                save_genotriples_binary, load_genotriples_binary, \
-                                save_genomatrix_binary,  load_genomatrix_binary
+from   text              import (TextGenomatrixWriter,        TextGenotripleWriter,
+                                 save_genotriples_text,       load_genotriples_text,
+                                 save_genomatrix_text,        load_genomatrix_text,
+                                 load_genomatrix_hapmap,      PrettybaseGenotripleWriter,
+                                 save_genotriples_prettybase, load_genotriples_prettybase)
+from   binary            import (BinaryGenomatrixWriter,  BinaryGenotripleWriter,
+                                 save_genotriples_binary, load_genotriples_binary,
+                                 save_genomatrix_binary,  load_genomatrix_binary)
 
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple','lbat','sbat','tbat')
-OUTPUT_FORMATS = ('ldat','sdat','trip','genotriple','lbat','sbat','tbat')
+INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
+OUTPUT_FORMATS = ('ldat','sdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
 
 
 def guess_informat(filename):
@@ -81,8 +82,8 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
   @param filename: a file name or file object
   @type  filename: str or file object
-  @param   format: format of input file , 'hapmap', 'ldat', 'sdat', 'trip', 'genotriple'
-                   'lbat', 'sbat', or 'tbat'. Default is None
+  @param   format: format of input file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
+                   lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type    format: str
   @param genorepr: internal representation of genotypes for the input/output. Default is None
   @type  genorepr: UnphasedMarkerRepresentation or similar object
@@ -135,6 +136,8 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
     genos = load_genomatrix_binary(filename,'sdat',limit=limit,unique=unique,modelmap=modelmap)
   elif format in ('trip','genotriple'):
     genos = load_genotriples_text(filename,genorepr,limit=limit,unique=unique,modelmap=modelmap)
+  elif format in ('pb','prettybase'):
+    genos = load_genotriples_prettybase(filename,limit=limit,unique=unique,modelmap=modelmap)
   elif format=='tbat':
     genos = load_genotriples_binary(filename,limit=limit,unique=unique,modelmap=modelmap)
   elif not format:
@@ -147,14 +150,14 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
 def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None, compress=True):
   '''
-  Write genotype data to file in one of the specified formats (ldat, sdat, trip, genotriple).
+  Write genotype data to file
 
   @param  filename: a file name or file object
   @type   filename: str or file object
   @param     genos: genomatrix/genotriple stream
   @type      genos: sequence
-  @param    format: format of input file , 'ldat', 'sdat', 'trip', 'genotriple'
-                    'lbat', 'sbat', or 'tbat'. Default is None
+  @param    format: format of input file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
+                    lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type     format: str
   @param  genorepr: internal representation of genotypes for the input/output. Default is None
   @type   genorepr: UnphasedMarkerRepresentation or similar object
@@ -175,6 +178,8 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
     save_genomatrix_text(filename, genos.as_sdat(mergefunc), genorepr)
   elif format in ('trip','genotriple'):
     save_genotriples_text(filename, genos.as_genotriples(), genorepr)
+  elif format in ('pb','prettybase'):
+    genos = save_genotriples_prettybase(filename, genos.as_genotriples())
   elif format == 'lbat':
     save_genomatrix_binary(filename, genos.as_ldat(mergefunc), compress=compress)
   elif format == 'sbat':
@@ -199,15 +204,15 @@ def transform_files(infiles,informat,ingenorepr,
 
   @param     infiles: list of input file names or file objects
   @type      infiles: str or file objects
-  @param    informat: format of input file, 'hapmap', 'ldat', 'sdat', 'trip', 'genotriple'
-                      'lbat', 'sbat', or 'tbat'
+  @param    informat: format of input file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
+                      lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type     informat: str
   @param  ingenorepr: internal genotype representation for the input
   @type   ingenorepr: UnphasedMarkerRepresentation or similar object
   @param    outfiles: output file name or file object
   @type     outfiles: str or file object
-  @param   outformat: format of output file , 'ldat', 'sdat', 'trip', 'genotriple'
-                      'lbat', 'sbat', or 'tbat'
+  @param   outformat: format of output file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
+                      lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type    outformat: str
   @param outgenorepr: internal genotype representation for the output
   @type  outgenorepr: UnphasedMarkerRepresentation or similar object
@@ -249,7 +254,7 @@ def transform_files(infiles,informat,ingenorepr,
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
   elif outformat in ('sdat','sbat'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
-  elif outformat in ('trip','genotriple','tbat'):
+  elif outformat in ('trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
   elif not outformat:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(outfile)
