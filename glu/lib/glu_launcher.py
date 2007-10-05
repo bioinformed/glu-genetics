@@ -15,7 +15,7 @@ Revision:      $Id$
 
 from __future__ import absolute_import
 
-__version__   = '0.5'
+__version__   = '0.63'
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
