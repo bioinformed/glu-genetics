@@ -3193,7 +3193,7 @@ def tagzilla_multi(options,args):
       tags,resultset = zip(*resultset)
     except ValueError:
       tags,resultset = [],[]
-      
+
     # Refine tags -- once enabled, also add stags to subset_tags below
     if 0:
       results = zip(*resultset)
