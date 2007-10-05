@@ -84,14 +84,13 @@ def unique_check_genomatrixstream(genos):
 
 def load_genomatrix_hapmap(filename,limit=None):
   '''
-  Load the hampmap genotype data from file.
+  Load a HapMap genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
   @param        limit: limit the number of samples loaded. Default is None
   @type         limit: int or None
-  @return            : rows of genotypes with the first row being the sample names
-  @rtype             : generator
+  @rtype             : GenomatrixStream
   '''
   gfile = autofile(filename)
   gfile = dropwhile(lambda s: s.startswith('#'), gfile)
@@ -135,6 +134,43 @@ def load_genomatrix_hapmap(filename,limit=None):
   return GenomatrixStream.from_strings(_load(),'ldat',hapmap,samples=columns,modelmap=modelmap)
 
 
+def load_genomatrix_linkage(filename,limit=None,modelmap=None):
+  '''
+  Load a Linkage format genotype data file.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param        limit: limit the number of samples loaded. Default is None
+  @type         limit: int or None
+  @rtype             : GenomatrixStream
+  '''
+  gfile = autofile(filename)
+
+  line,gfile = peekfirst(gfile)
+
+  n    = len(split(line))
+  loci = [ '%s' % i for i in range(n-6) ]
+
+  def _load():
+    split = re_spaces.split
+    amap  = {'0':None}
+
+    for line_num,line in enumerate(gfile):
+      fields = split(line)
+
+      if len(fields) != n:
+        raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
+
+      sample = '%s_%s' % (field[0],field[1])
+      a1s    = islice(fields,6,None,2)
+      a2s    = islice(fields,7,None,2)
+      genos  = [ (amap.get(a1,a1),amap.get(a2,a2)) for a1,a2 in izip(a1s,a2s) ]
+
+      yield sample,genos
+
+  return GenomatrixStream.from_tuples(_load(),'sdat',loci=loci,modelmap=modelmap)
+
+
 def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelmap=None):
   '''
   Load the genotype matrix data from file.
@@ -156,9 +192,7 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelma
   @type        unique: bool
   @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
   @type      modelmap: dict
-  @return            : format and sequence of column names followed by
-                       tuples of row label and row data
-  @rtype             : tuple of string and generator
+  @rtype             : GenomatrixStream
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
@@ -402,8 +436,7 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,modelmap=None
   @type         limit: int or None
   @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
   @type      modelmap: dict
-  @return            : sequence of tuples of sample name, locus name, and genotype representation
-  @rtype             : generator
+  @rtype             : GenotripleStream
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
@@ -593,8 +626,7 @@ def load_genotriples_prettybase(filename,unique=True,limit=None,modelmap=None):
   @type         limit: int or None
   @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
   @type      modelmap: dict
-  @return            : sequence of tuples of sample name, locus name, and genotype representation
-  @rtype             : generator
+  @rtype             : GenotripleStream
 
   >>> from StringIO import StringIO
   >>> data = StringIO('l1 s1 A A\\nl2 s1 G G\\nl1 s2 N N\\nl2 s2 C C\\n')
