@@ -16,6 +16,7 @@ Additional CGEMS contributors:
 * Thomas Giles <thomasgi at mail.nih.gov>
 * Zhaoming Wang <wangzha at mail.nih.gov>
 * Xiang Deng <dengx at mail.nih.gov>
+* Nick Orr <orrn at mail.nih.gov>
 
 GLU is also used by the NCI `Core Genotyping Facility (CGF)`_
 
@@ -26,3 +27,7 @@ CGF contributors:
 * Meredith Yeager <yeagerm at mail.nih.gov>
 * Bernice Packer <packerb at mail.nih.gov>
 * Jun Lu <lujun at mail.nih.gov>
+
+Other contributors:
+
+* Sturat Yeager <sturat at gmail.com>
