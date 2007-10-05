@@ -3189,8 +3189,11 @@ def tagzilla_multi(options,args):
   popdtags = {}
 
   for resultset,lddata,locusmap in results:
-    tags,resultset = zip(*resultset)
-
+    try:
+      tags,resultset = zip(*resultset)
+    except ValueError:
+      tags,resultset = [],[]
+      
     # Refine tags -- once enabled, also add stags to subset_tags below
     if 0:
       results = zip(*resultset)
