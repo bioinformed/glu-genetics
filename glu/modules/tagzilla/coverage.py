@@ -39,6 +39,9 @@ def option_parser():
 
   inputgroup.add_option('-f', '--format', dest='format', metavar='NAME', default='',
                           help='Format for genotype/pedigree or ld input data.  Values: hapmap (default), linkage, festa, prettybase, raw.')
+  inputgroup.add_option(      '--pedformat', dest='pedformat', metavar='NAME', default='',
+                          help='Format for pedigree data.  Values: hapmap or linkage.  Defaults to hapmap when '
+                               'reading HapMap files and linkage format otherwise.')
   inputgroup.add_option('-l', '--loci', dest='loci', metavar='FILE',
                           help='Locus description file for input in Linkage format')
   inputgroup.add_option('-p', '--pedfile', dest='pedfile', metavar='FILE', action='append',
