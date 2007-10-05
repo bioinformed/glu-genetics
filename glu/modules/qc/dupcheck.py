@@ -193,7 +193,7 @@ def option_parser():
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')
   parser.add_option('-T', '--threshold', dest='threshold', metavar='N%', type='int', default=85,
-                    help='Threshold for the percentage of identity chasred between two individuals (default=85)')
+                    help='Threshold for the percentage of identity shared between two individuals (default=85)')
   parser.add_option('-m', '--mincount', dest='mincount', metavar='N', type='int', default=20,
                     help='Minimum concordant genotypes to be considered informative for duplicate checking')
   parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
