@@ -26,9 +26,10 @@ import sys
 
 from   operator          import itemgetter
 from   itertools         import islice, chain
+from   collections       import defaultdict
 
 from   glu.lib.fileutils import autofile, load_map
-from   glu.lib.genolib   import load_genostream, snp
+from   glu.lib.genolib   import GenotripleStream, load_genostream, snp
 from   glu.lib.remap     import remap_alleles, remap_category
 from   glu.lib.hwp       import hwp_exact_biallelic
 from   glu.lib.sections  import save_section, SectionWriter, save_metadata_section
@@ -46,11 +47,10 @@ def geno_pair_mode(g1,g2):
 
 class SampleConcordStat(object):
   def __init__(self):
-    self.stats = {}
+    self.stats = defaultdict(lambda: [0,0,0,0,0])
 
   def update(self, refgeno, refsample, compgeno, compsample):
-    sample = refsample,compsample
-    values = self.stats.setdefault(sample, [0,0,0,0,0])
+    values = self.stats[refsample,compsample]
     if refgeno.alleles()==compgeno.alleles():
       values[4]    += 1
     else:
@@ -60,13 +60,10 @@ class SampleConcordStat(object):
 
 class LocusConcordStat(object):
   def __init__(self):
-    self.stats = {}
+    self.stats = defaultdict(lambda: defaultdict(int))
 
   def update(self, refgeno, reflocus, compgeno, complocus):
-    locus        = reflocus,complocus
-    geno         = refgeno,compgeno
-    values       = self.stats.setdefault(locus, {})
-    values[geno] = values.get(geno,0) + 1
+    self.stats[reflocus,complocus][refgeno,compgeno] += 1
 
 
 def generate_sample_output(sampleconcord):
@@ -101,6 +98,7 @@ def output_sample_concordstat(filename, sampleconcord):
   samplestat = ['*','*'] + totals
   samplestats.append(samplestat)
   f.writerows(samplestats)
+
 
 # FIXME: consolidate with the one in glu.lib.hwp
 def count_genos(genos):
@@ -181,6 +179,7 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
     totals.append( '%.6f' % (float(totals[0])/sum(totals)) )
   else:
     totals.append('')
+
   locusstat = ['*','*'] + totals + ['']
   locusstats.append(locusstat)
 
@@ -192,12 +191,7 @@ def load_reference_genotypes(filename, format, locusset, sampleset, limit):
   data = data.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
 
   samples = dict( (s,i) for i,s in enumerate(data.samples) )
-  loci = []
-  genos = []
-  for locus,row in data:
-    loci.append(locus)
-    genos.append(row)
-
+  loci,genos = zip(*data)
   loci = dict( (l,i) for i,l in enumerate(loci))
 
   return genos,samples,loci
@@ -208,14 +202,14 @@ def load_comparison_genotypes(filename, format, locusset, sampleset, lmapfile, s
   genos = genos.transformed(rename_samples=smapfile, include_samples=smapfile,
                             rename_loci=lmapfile,    include_loci=lmapfile)
   genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
-  return genos.as_genotriples().transformed(filter_missing=True)
+  return genos
 
 
 def invert_dict(d):
-  r = {}
+  r = defaultdict(list)
   for key,value in d.iteritems():
-    r.setdefault(value, []).append(key)
-  return r
+    r[value].append(key)
+  return dict(r)
 
 
 def concordance(refgenos,samples,loci,compgenos,sampleeq,locuseq,sampleconcord,locusconcord):
@@ -250,50 +244,6 @@ def concordance(refgenos,samples,loci,compgenos,sampleeq,locuseq,sampleconcord,l
            locusconcord.update(refgeno, reflocus,  compgeno, locus)
 
 
-# FIXME: Move to global sequence representation module
-def make_remap(amap):
-  return dict( ((b1,b2),(c1,c2))  for b1,c1 in amap
-                                  for b2,c2 in amap )
-
-complement_map = 'AT','TA','CG','GC',(None,None)
-
-
-def load_remap_file(allelemapfile):
-  # FIXME: Use glu.lib.load_map()?
-  mapfile = csv.reader(autofile(allelemapfile), dialect='excel-tab')
-
-  allelemap ={}
-  for line in mapfile:
-    # Skip blank lines or ones with no locus name
-    if not line or not line[0]:
-      continue
-
-    # Apply implicit complement to lines that do not specify a remapping
-    elif len(line) == 1:
-      amap = complement_map
-
-    # Otherwise, parse the list of comma separated items into a geno remap
-    # dictionary.
-    else:
-      amap = [ tuple(reversed(m.split(','))) for m in islice(line,1,None) ] + [(None,None)]
-
-    allelemap[line[0]] = amap
-
-  return allelemap
-
-
-def build_geno_remap(allelemaps):
-  return dict( (locus,make_remap(amap)) for locus,amap in allelemaps.iteritems() )
-
-
-def remap_genotypes(genos, genomap):
-  for sample,locus,geno in genos:
-    if locus in genomap:
-      geno = genomap[locus].get(geno)
-    if geno:
-      yield sample,locus,geno
-
-
 def compute_allele_maps(locusconcord):
   for (reflocus,complocus),stats in locusconcord.stats.iteritems():
     concord,bestmap = remap_alleles(stats)
@@ -304,7 +254,8 @@ def output_allele_maps(amap,mapfile):
   w = csv.writer(autofile(mapfile,'w'), dialect='excel-tab')
   for locus,map in amap:
     if any(1 for a,b in map.iteritems() if a!=b):
-      w.writerow(list(chain([locus],('%s,%s' % (b,a) for a,b in map.iteritems() ))))
+      old,new = zip(*map.iteritems())
+      w.writerow([locus, ','.join(old), ','.join(new)])
 
 
 def save_results(sw,locusconcord,sampleconcord,allelemaps):
@@ -323,10 +274,10 @@ def option_parser():
 
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('--refformat',  dest='refformat', metavar='FILE', default='ldat',
-                     help='The file format for reference genotype data. Values=ldat(default)')
-  parser.add_option('--compformat', dest='compformat',metavar='FILE', default='hapmap',
-                     help='The file format for other(comparison) genotype data. Values=hapmap(default)')
+  parser.add_option('-f', '--refformat',  dest='refformat', metavar='FILE', default=None,
+                     help='The file format for reference genotype data')
+  parser.add_option('-F', '--compformat', dest='compformat',metavar='FILE', default=None,
+                     help='The file format for other(comparison) genotype data')
   parser.add_option('-r', '--remap',     dest='remap',     metavar='FILE',
                      help='Determine and output the optimal allele mapping based on greatest concordance')
   parser.add_option('-a', '--allelemap', dest='allelemap', metavar='FILE',
@@ -380,16 +331,11 @@ def main():
   compgenos = [ load_comparison_genotypes(arg, options.compformat, eqlocus, eqsample,
                 options.locusmap, options.samplemap) for arg in args[1:] ]
 
-  if len(compgenos)>1:
-    compgenos = chain(*compgenos)
-  else:
-    compgenos = compgenos[0]
+  compgenos = GenotripleStream.from_streams(compgenos).transformed(filter_missing=True)
 
   allelemaps = None
   if options.allelemap:
-    allelemaps   = load_remap_file(options.allelemap)
-    genomappings = build_geno_remap(allelemaps)
-    compgenos    = remap_genotypes(compgenos, genomappings)
+    compgenos = compgenos.transformed(rename_alleles=options.allelemap)
 
   sampleconcord = SampleConcordStat()
   locusconcord  = LocusConcordStat()
@@ -414,6 +360,7 @@ def main():
     sw = SectionWriter(options.tabularoutput)
     save_metadata_section(sw, analysis='concordance', analysis_version='0.1')
     save_results(sw,locusconcord,sampleconcord,allelemaps)
+
 
 if __name__=='__main__':
   main()
