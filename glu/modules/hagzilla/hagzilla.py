@@ -227,8 +227,10 @@ def get_genotypes(populations,chromosome):
   command = []
 
   populations = populations.split(',')
+  command.append(' -M %s' % escape(','.join(populations)))
+
   if len(populations) > 1:
-    command.append(' -M %s --multimethod global' % escape(','.join(populations)))
+    command.append('--multimethod global')
 
   for population in populations:
     data = POPS[population]
@@ -272,7 +274,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
     if cmdprefix:
       command.append(cmdprefix)
 
-    command.append('python /usr/local/bin/tagzilla')
+    command.append('python /usr/local/bin/glu tagzilla')
 
     command.append('-s subset')
     file('subset','w').write('\n'.join(snps))
@@ -428,8 +430,9 @@ class SubprocessManager(object):
     for fd,event in self.poll.poll(timeout):
       proc = self.taskmap[fd]
       if event&select.POLLIN:
-        proc.stdout.read(8196)
+        proc.pid,proc.stdout.read(8196)
       if event&select.POLLHUP:
+        proc.wait()
         done.append(proc)
         del self.taskmap[fd]
         self.poll.unregister(fd)
@@ -561,7 +564,7 @@ def main():
         designfile.write('>%s\n%s\n' % (rs,seq))
 
     pdir = project_path(outdir,project)
-    command = 'binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
+    command = 'glu tagzilla.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
     print >> sys.stderr, subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
 
     sumfile = file(project_file(outdir,project,'genesum.out'),'w')
