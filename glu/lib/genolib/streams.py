@@ -145,6 +145,11 @@ class GenotripleStream(GenotypeStream):
     self.unique       = bool(unique)
     self.materialized = materialized or isinstance(triples, (list,tuple))
 
+  def _model_pairs(self):
+    return self.models.iteritems()
+
+  model_pairs = property(_model_pairs)
+
   @staticmethod
   def from_streams(genos, mergefunc=None, order=None):
     '''
@@ -384,7 +389,11 @@ class GenotripleStream(GenotypeStream):
     if self.materialized:
       return self
 
-    return self.clone(list(self.use_stream()), materialized=True)
+    genos   = list(self.use_stream())
+    loci    = set(imap(itemgetter(0),genos))
+    samples = set(imap(itemgetter(1),genos))
+
+    return self.clone(genos, loci=loci, samples=samples, materialized=True)
 
   def transformed(self, transform=None, mergefunc=None, **kwargs):
     '''
@@ -1033,6 +1042,11 @@ class GenomatrixStream(GenotypeStream):
   rows    = property(_get_rows,   _set_rows)
   columns = property(_get_columns,_set_columns)
 
+  def _model_pairs(self):
+    return izip(self.loci,self.models)
+
+  model_pairs = property(_model_pairs)
+
   def materialize(self):
     '''
     Returns a materialized genomatrix stream.
@@ -1443,9 +1457,9 @@ def recode_genomatrixstream(genos, modelmap):
 
   >>> sorted(modelmap)
   ['l1', 'l2', 'l3']
-  >>> for locus,model in izip(genos1.loci,genos1.models):
+  >>> for locus,model in genos1.model_pairs:
   ...   assert modelmap[locus] is model
-  >>> for locus,model in izip(genos2.loci,genos2.models):
+  >>> for locus,model in genos2.model_pairs:
   ...   assert modelmap[locus] is model
   '''
   models = []
@@ -3546,9 +3560,9 @@ def filter_genotriples(triples,sampleset,locusset,exclude=False):
   samples = triples.samples
   if samples is not None and sampleset is not None:
     if exclude:
-      samples = set(s for s in samples if l not in sampleset)
+      samples = set(s for s in samples if s not in sampleset)
     else:
-      samples = set(s for s in samples if l in sampleset)
+      samples = set(s for s in samples if s in sampleset)
   elif samples is None and sampleset is not None and not exclude:
     samples = sampleset
 
