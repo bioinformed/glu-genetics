@@ -46,6 +46,9 @@ def option_parser():
   parser.add_option('-D', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='List of loci to exclude')
   parser.add_option('--nullmodel', dest='nullmodel', action='store_true', default=False, help='Show null model')
+  parser.add_option('--allowdups', dest='allowdups', action='store_true', default=False,
+                    help='Allow duplicate individuals in the data (e.g., to accommodate weighting '
+                         'or incidence density sampling)')
   parser.add_option('--minmaf', dest='minmaf', metavar='N', default=0.01, type='float',
                     help='Minimum minor allele frequency filter')
   parser.add_option('--mingenos', dest='mingenos', metavar='N', default=10, type='int',

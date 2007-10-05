@@ -67,6 +67,9 @@ def option_parser():
   parser.add_option('--mingenos', dest='mingenos', metavar='N', default=10, type='int',
                     help='Minimum number of observed genotype filter')
   parser.add_option('--nullmodel', dest='nullmodel', action='store_true', default=False, help='Show null model')
+  parser.add_option('--allowdups', dest='allowdups', action='store_true', default=False,
+                    help='Allow duplicate individuals in the data (e.g., to accommodate weighting '
+                         'or incidence density sampling)')
   parser.add_option('--genomodel', dest='genomodel', default='geno,trend', metavar='M1,M2,..',
                     help='Comma separated list of genetic models.  The first that can be fit will be used.  '
                          'Values: genotype/geno, adddom/adom, trend/multiplicative/mult, additive/add, '

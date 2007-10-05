@@ -359,7 +359,7 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
 
 
 def build_models(phenofile, genofile, options,deptype=int):
-  header,phenos = load_phenos(phenofile,deptype=deptype)
+  header,phenos = load_phenos(phenofile,deptype=deptype,allowdups=options.allowdups)
   phenos        = list(phenos)
   phenocount1   = len(phenos)
   genorepr      = get_genorepr(options.genorepr)
