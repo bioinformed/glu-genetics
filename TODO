@@ -1,0 +1,6 @@
+File format support:
+  PLINK text (http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml)
+  PLINK binary (http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtmlhttp://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
+  MERLIN (http://www.sph.umich.edu/csg/abecasis/MACH/tour/)
+  WTCC (http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html)
+  GenABEL (http://rss.acs.unt.edu/Rdoc/library/GenABEL/html/GenABEL-package.html)
