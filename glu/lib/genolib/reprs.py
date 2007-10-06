@@ -16,10 +16,10 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
-from   operator   import getitem
-from   itertools  import imap, repeat
+from   operator                   import getitem
+from   itertools                  import imap, repeat
 
-from   genoarray  import model_from_alleles
+from   glu.lib.genolib.genoarray  import model_from_alleles
 
 
 class Nothing(object): pass

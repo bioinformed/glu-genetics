@@ -14,7 +14,7 @@ Revision:      $Id$
 '''
 
 import pkg_resources
-
+pkg_resources.require('glu')
 
 def test(report=True):
   import os

@@ -22,8 +22,8 @@ import csv
 import os
 import traceback
 
-from   sequence import *
-from   clust    import align
+from   glu.lib.sequence import *
+from   glu.lib.clust    import align
 
 
 def norm_seq(seq,n):

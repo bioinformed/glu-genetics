@@ -27,14 +27,15 @@ from   glu.lib.fileutils import load_list,load_map
 from   glu.lib.imerge    import imerge
 from   glu.lib.xtab      import xtab,rowsby
 
-from   reprs             import snp
-from   transform         import GenoTransform, prove_unique_transform
-from   merge             import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
-from   genoarray         import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
-                                model_from_alleles
+from   glu.lib.genolib.reprs     import snp
+from   glu.lib.genolib.transform import GenoTransform, prove_unique_transform
+from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
+from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray,Genotype, \
+                                        model_from_alleles
 
 # Debugging flag
 DEBUG=False
+
 
 class GenotypeStream(object):
   __slots__ = []

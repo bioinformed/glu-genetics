@@ -30,8 +30,8 @@ class GenotypeError(ValueError): pass
 
 try:
   #raise ImportError    # Uncomment to test pure-Python implementation
-  from   _genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor, UnphasedMarkerModel,
-                            genoarray_concordance)
+  from   glu.lib.genolib._genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor,
+                                            UnphasedMarkerModel, genoarray_concordance)
 
 except ImportError:
   from   array     import array

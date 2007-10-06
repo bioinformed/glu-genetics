@@ -19,18 +19,18 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   math           import ceil,log
-from   itertools      import izip
-from   collections    import defaultdict
-from   operator       import itemgetter
+from   math              import ceil,log
+from   itertools         import izip
+from   collections       import defaultdict
+from   operator          import itemgetter
 
-from   numpy          import array,matrix,asarray,asanyarray,zeros,zeros_like, \
-                             exp,nan,abs,arange,median,sqrt,inf
-from   scipy          import stats
+from   numpy             import array,matrix,asarray,asanyarray,zeros,zeros_like, \
+                                exp,nan,abs,arange,median,sqrt,inf
+from   scipy             import stats
 
-from   utils          import tally,pick
-from   fileutils      import autofile,namefile,load_list,load_map,load_table
-from   genolib        import load_genostream, get_genorepr
+from   glu.lib.utils     import tally,pick
+from   glu.lib.fileutils import autofile,namefile,load_list,load_map,load_table
+from   glu.lib.genolib   import load_genostream, get_genorepr
 
 
 LOGE_10 = log(10)

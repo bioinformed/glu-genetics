@@ -17,9 +17,9 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from scipy import stats
+from scipy         import stats
 
-from utils import tally
+from glu.lib.utils import tally
 
 
 def count_genos(genos):

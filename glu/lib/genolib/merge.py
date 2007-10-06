@@ -19,14 +19,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   operator          import itemgetter
-from   itertools         import izip,starmap,dropwhile,repeat
-from   collections       import defaultdict
+from   operator                  import itemgetter
+from   itertools                 import izip,starmap,dropwhile,repeat
+from   collections               import defaultdict
 
-from   glu.lib.utils     import tally
-from   glu.lib.fileutils import autofile,hyphen
+from   glu.lib.utils             import tally
+from   glu.lib.fileutils         import autofile,hyphen
 
-from   genoarray         import model_from_alleles
+from   glu.lib.genolib.genoarray import model_from_alleles
 
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)

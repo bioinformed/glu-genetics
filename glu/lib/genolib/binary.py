@@ -24,16 +24,16 @@ __all__ = ['BinaryGenomatrixWriter','BinaryGenotripleWriter',
 
 import time
 
-from   operator          import itemgetter
-from   itertools         import izip,groupby,imap
+from   operator                  import itemgetter
+from   itertools                 import izip,groupby,imap
 
 import tables
 
-from   glu.lib.utils     import ilen
-from   glu.lib.fileutils import compressed_filename
+from   glu.lib.utils             import ilen
+from   glu.lib.fileutils         import compressed_filename
 
-from   streams           import GenomatrixStream, GenotripleStream
-from   genoarray         import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
+from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
+from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
 
 class TripleDesc(tables.IsDescription):

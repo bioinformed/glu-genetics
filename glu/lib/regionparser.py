@@ -24,11 +24,11 @@ import sys
 import csv
 import unittest
 
-from StringIO             import StringIO
-from itertools            import chain,izip
+from   StringIO             import StringIO
+from   itertools            import chain,izip
 
-from sections             import SectionWriter,read_sections,save_section
-from fileutils            import autofile
+from   glu.lib.sections     import SectionWriter,read_sections,save_section
+from   glu.lib.fileutils    import autofile
 
 
 class Regions(object):

@@ -23,8 +23,6 @@ import collections
 from   functools import update_wrapper
 from   itertools import izip, count, chain
 
-from   fileutils import hyphen,namefile,autofile
-
 
 def tally(seq):
   '''

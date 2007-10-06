@@ -22,14 +22,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 import re
 import csv
 
-from   itertools         import islice,dropwhile
+from   itertools                 import islice,dropwhile
 
-from   glu.lib.utils     import tally
-from   glu.lib.fileutils import autofile,namefile
+from   glu.lib.utils             import tally
+from   glu.lib.fileutils         import autofile,namefile
 
-from   streams           import GenotripleStream, GenomatrixStream
-from   genoarray         import model_from_alleles
-from   reprs             import snp,hapmap
+from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
+from   glu.lib.genolib.genoarray import model_from_alleles
+from   glu.lib.genolib.reprs     import snp,hapmap
 
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',

@@ -21,24 +21,24 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import csv
 
-from   operator          import getitem, itemgetter
-from   collections       import defaultdict
-from   itertools         import izip,islice,dropwhile,imap,repeat
+from   collections               import defaultdict
+from   operator                  import getitem, itemgetter
+from   itertools                 import izip,islice,dropwhile,imap,repeat
 
-from   glu.lib.utils     import tally
-from   glu.lib.fileutils import autofile,namefile,guess_format
+from   glu.lib.utils             import tally
+from   glu.lib.fileutils         import autofile,namefile,guess_format
 
-from   streams           import GenotripleStream, GenomatrixStream
-from   genoarray         import model_from_alleles
-from   reprs             import snp,hapmap,marker
-from   text              import (TextGenomatrixWriter,        TextGenotripleWriter,
-                                 save_genotriples_text,       load_genotriples_text,
-                                 save_genomatrix_text,        load_genomatrix_text,
-                                 load_genomatrix_hapmap,      PrettybaseGenotripleWriter,
-                                 save_genotriples_prettybase, load_genotriples_prettybase)
-from   binary            import (BinaryGenomatrixWriter,  BinaryGenotripleWriter,
-                                 save_genotriples_binary, load_genotriples_binary,
-                                 save_genomatrix_binary,  load_genomatrix_binary)
+from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
+from   glu.lib.genolib.genoarray import model_from_alleles
+from   glu.lib.genolib.reprs     import snp,hapmap,marker
+from   glu.lib.genolib.text      import (TextGenomatrixWriter,        TextGenotripleWriter,
+                                         save_genotriples_text,       load_genotriples_text,
+                                         save_genomatrix_text,        load_genomatrix_text,
+                                         load_genomatrix_hapmap,      PrettybaseGenotripleWriter,
+                                         save_genotriples_prettybase, load_genotriples_prettybase)
+from   glu.lib.genolib.binary    import (BinaryGenomatrixWriter,      BinaryGenotripleWriter,
+                                         save_genotriples_binary,     load_genotriples_binary,
+                                         save_genomatrix_binary,      load_genomatrix_binary)
 
 
 INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')

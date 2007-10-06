@@ -13,6 +13,10 @@ Requires:      Python 2.5, glu
 Revision:      $Id$
 '''
 
+import pkg_resources
+pkg_resources.require('glu')
+
+
 def test(report=True):
   import os
   import doctest
@@ -25,7 +29,7 @@ def test(report=True):
   localfile   =  local_streams.__file__.replace('.pyc','.py')
 
   if not os.path.samefile(packagefile,localfile):
-    raise ImportError('Your PYTHONPATH is not set correctly to find this GLU tree')
+    raise ImportError('Your PYTHONPATH/pkg_resources are not set correctly to find this GLU tree')
 
   for module in bitarray,binary,text,genoarray,io,merge,reprs,streams:
     doctest.testmod(module,report=False)

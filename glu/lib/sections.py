@@ -22,7 +22,8 @@ import  time
 import  os
 
 from    itertools           import groupby
-from    fileutils           import autofile
+
+from    glu.lib.fileutils   import autofile
 
 
 class SectionInUseError(RuntimeError): pass
