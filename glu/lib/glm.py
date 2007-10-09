@@ -20,13 +20,48 @@ from math         import pi
 from itertools    import izip
 
 # Import Python numerical libraries (from http://scipy.org/)
-from numpy        import array,matrix,asmatrix,asarray,asarray_chkfinite,asanyarray,zeros,zeros_like,ones,\
+from numpy        import array,matrix,asmatrix,asarray,asanyarray,atleast_2d,zeros,zeros_like,ones,\
                          where,exp,log,vsplit,unique,bmat,inf,sum,dot,transpose,diag,sqrt,conjugate,eye
 from scipy        import linalg
 from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 
 CONV = 1e-8
 COND = 1e-6
+
+
+def bmat2d(data):
+  '''
+  Construct a block matrix from a 2d list of equal sized components
+
+  >>> x = array([[4.,1.,1.],
+  ...            [2.,4.,1.],
+  ...            [0.,1.,4.]])
+  >>> y = array([[1.,0.,0.],
+  ...            [0.,1.,0.],
+  ...            [0.,0.,1.]])
+  >>> bmat2d([[x,y],[y,x]])
+  matrix([[ 4.,  1.,  1.,  1.,  0.,  0.],
+          [ 2.,  4.,  1.,  0.,  1.,  0.],
+          [ 0.,  1.,  4.,  0.,  0.,  1.],
+          [ 1.,  0.,  0.,  4.,  1.,  1.],
+          [ 0.,  1.,  0.,  2.,  4.,  1.],
+          [ 0.,  0.,  1.,  0.,  1.,  4.]])
+  '''
+  #n = [ d.shape[0]    for d in data[0] ]
+  #m = [ d[0].shape[1] for d in data    ]
+
+  n,m = atleast_2d(data[0][0]).shape
+  if any( d.shape != (n,m) for row in data for d in row ):
+    raise ValueError('blocks must all be of same size')
+
+  b = zeros( (n*len(data[0]),m*len(data)), dtype=data[0][0].dtype )
+
+  for i in xrange(len(data[0])):
+    for j in xrange(len(data)):
+      b[i*n:(i+1)*n,:][:,j*m:(j+1)*m] = data[i][j]
+
+  return asmatrix(b)
+
 
 # Derived from SciPy's linalg.lstsq routine, though heavily modified and
 # extended.
@@ -205,7 +240,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
          [-0.98717469,  0.15197524, -0.04888411],
          [ 0.0881574 ,  0.77423153,  0.62673265]])
   '''
-  a1,b1 = map(asarray_chkfinite,(a,b))
+  a1,b1 = map(asarray,(a,b))
 
   if len(a1.shape) != 2:
     raise ValueError('incompatible design matrix dimensions')
@@ -530,7 +565,7 @@ def bdiag_to_mat(x):
   for i in xrange(n):
     for j in xrange(n):
       m[i][j] = diag(asarray(x[i][j],dtype=float).reshape(-1))
-  return bmat(m)
+  return bmat2d(m)
 
 
 def bdiag_copy(x):
@@ -1282,7 +1317,7 @@ class GLogit(object):
     for i in xrange(k):
       for j in xrange(i,k):
         XX[i][j] = (uw[i][j]*X.T.A).T
-    return bmat(XX)
+    return bmat2d(XX)
 
 
   def update_estimates(self,w,W,mu,eta):
