@@ -24,7 +24,7 @@ import sys
 from   itertools         import izip,chain
 from   operator          import itemgetter
 
-from   glu.lib.utils     import autofile,hyphen
+from   glu.lib.fileutils import autofile,hyphen
 from   glu.lib.genolib   import load_genostream,snp
 
 

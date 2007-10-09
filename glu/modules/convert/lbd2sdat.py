@@ -24,7 +24,7 @@ import csv
 from   itertools            import islice,chain,izip,imap,groupby
 from   operator             import itemgetter
 
-from   glu.lib.utils        import autofile,hyphen
+from   glu.lib.fileutils    import autofile,hyphen
 from   glu.lib.sections     import read_sections
 from   glu.lib.sequence     import norm_snp_seq, complement_base
 

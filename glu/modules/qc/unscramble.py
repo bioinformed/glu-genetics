@@ -26,7 +26,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import csv
 import sys
 from   operator          import itemgetter
-from   glu.lib.utils     import autofile, peekfirst
+from   glu.lib.fileutils import autofile
 from   glu.lib.remap     import remap_alleles, remap_category
 from   glu.lib.genolib   import load_genostream,snp
 

@@ -19,10 +19,11 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   operator        import itemgetter
+from   operator           import itemgetter
 
-from   glu.lib.utils   import autofile,hyphen,tally
-from   glu.lib.genolib import load_genostream, get_genorepr
+from   glu.lib.utils     import tally
+from   glu.lib.fileutils import autofile,hyphen
+from   glu.lib.genolib   import load_genostream, get_genorepr
 
 
 def option_parser():

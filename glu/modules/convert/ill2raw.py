@@ -26,9 +26,8 @@ import csv
 
 from   operator          import itemgetter
 
-from   glu.lib.utils     import autofile, hyphen
 from   glu.lib.xtab      import rowsby
-from   glu.lib.fileutils import load_list,load_map
+from   glu.lib.fileutils import autofile, hyphen, load_list,load_map
 from   glu.lib.genolib   import save_genostream
 
 

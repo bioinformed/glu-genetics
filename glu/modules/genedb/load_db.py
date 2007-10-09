@@ -22,7 +22,7 @@ import sqlite3
 
 from   itertools         import islice,chain
 
-from   glu.lib.utils     import autofile
+from   glu.lib.fileutils import autofile
 from   glu.lib.sections  import read_sections
 
 

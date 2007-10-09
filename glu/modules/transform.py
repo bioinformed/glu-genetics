@@ -22,7 +22,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   glu.lib.utils           import autofile,hyphen
+from   glu.lib.fileutils       import autofile,hyphen
 from   glu.lib.genolib.reprs   import get_genorepr
 from   glu.lib.genolib.merge   import get_genomerger, output_merge_statistics
 from   glu.lib.genolib.streams import GenoTransform

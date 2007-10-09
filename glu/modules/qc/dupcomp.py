@@ -22,7 +22,8 @@ import csv
 
 from   textwrap              import fill
 
-from   glu.lib.utils         import autofile, percent
+from   glu.lib.utils         import autofile
+from   glu.lib.fileutils     import percent
 from   glu.lib.union_find    import union_find
 
 from   dupcheck              import generate_pairs

@@ -24,10 +24,10 @@ import sys
 import csv
 import sqlite3
 
-from   itertools     import islice
+from   itertools         import islice
 
-from   glu.lib.utils import autofile,hyphen
-from   preprocess    import load_features
+from   glu.lib.fileutils import autofile,hyphen
+from   preprocess        import load_features
 
 
 HEADER = ['SNP_NAME','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
