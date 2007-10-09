@@ -84,22 +84,24 @@ def eval_model(lname,k,model,details,detailsmaxp):
     if k:
       st,df = g.score_test(indices=range(1,k+1)).test()
       wt,df = g.wald_test(indices=range(1,k+1)).test()
-      sf = stats.distributions.chi2.sf
-      ps = format_pvalue(sf(st,df))
-      pw = format_pvalue(sf(wt,df))
+      sf    = stats.distributions.chi2.sf
+      ps   = sf(st,df)
+      pw   = sf(wt,df)
+      pss   = format_pvalue(ps)
+      pws   = format_pvalue(pw)
   except LinAlgError:
     return res
 
   if k == 2:
     res = ['%.6f'  % L,
-           '%8.5f' % st, '%d' % df, ps,
-           '%8.5f' % wt, '%d' % df, pw,
+           '%8.5f' % st, '%d' % df, pss,
+           '%8.5f' % wt, '%d' % df, pws,
            '%7.4f' % exp(b[1,0]), '%7.4f' % exp(b[2,0]),
             '%.6f' % W[1,1], '%.6f' % W[2,2], '%.6f' % W[1,2]]
   elif k == 1:
     res = ['%.6f'  % L,
-           '%8.5f' % st, '%d' % df, ps,
-           '%8.5f' % wt, '%d' % df, pw,
+           '%8.5f' % st, '%d' % df, pss,
+           '%8.5f' % wt, '%d' % df, pws,
            '%7.4f' % exp(b[1,0]), '%.6f' % W[1,1]]
   elif k == 0:
     res = ['%.6f' % L]
@@ -107,8 +109,8 @@ def eval_model(lname,k,model,details,detailsmaxp):
   if k and details and min(ps,pw) <= detailsmaxp:
     details.write('\nRESULTS: %s\n\n' % lname)
     print_results(details,model,g)
-    details.write('Score Test: X2=%6.3f, df=%d, p=%12.10f\n' % (st,df,ps))
-    details.write('Wald  Test: X2=%6.3f, df=%d, p=%12.10f\n' % (wt,df,pw))
+    details.write('Score Test: X2=%6.3f, df=%d, p=%s\n' % (st,df,pss))
+    details.write('Wald  Test: X2=%6.3f, df=%d, p=%s\n' % (wt,df,pws))
     details.write('-'*79)
     details.write('\n')
 
