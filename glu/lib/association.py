@@ -311,7 +311,7 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
     errs.write('[ERROR] Duplicate headers detected (n=%d)' % len(dups))
     if verbose > 1:
       for h,n in sorted(dups, key=itemgetter(1,0), reverse=True):
-        errs.write('         %-12s : %02d\n' % (h,n))
+        errs.write('         %-12s : %2d\n' % (h,n))
     raise ValueError('Invalid repeated heading in phenotype header')
 
   def _phenos():
@@ -350,7 +350,7 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
 
       if verbose > 1:
           for pid,n in sorted(dups, key=itemgetter(1,0), reverse=True):
-            errs.write('         %-12s : %02d\n' % (pid,n))
+            errs.write('         %-12s : %2d\n' % (pid,n))
 
       if not allowdups:
         raise ValueError('Duplicate subjects detected')
@@ -803,7 +803,6 @@ class LocusModelBuilder(object):
     model_names = []
     model_terms = []
     model_loci  = {}
-    subterms    = {}
 
     for lname in set(term.loci()):
       ref    = self.reference_alleles.get(lname)
@@ -813,9 +812,10 @@ class LocusModelBuilder(object):
       model_loci[lname] = lmodel
 
     model_names = term.names(model_loci)
+    k = len(model_names)
 
     # Reject models without all terms
-    if len(model_names) != len(term):
+    if k != len(term):
       return None
 
     X = []
@@ -835,9 +835,8 @@ class LocusModelBuilder(object):
     y = matrix(y, dtype=float)
     X = matrix(X, dtype=float)
 
-    k = len(model_names)
     colcounts = (X.A[:,1:k+1]!=0).sum(axis=0)
-    if k and (colcounts < self.mingenos).any():
+    if k and colcounts.min() < self.mingenos:
       return None
 
     vars = ['_mean'] + model_names + self.pheno_header[2:]
