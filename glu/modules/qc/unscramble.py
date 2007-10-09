@@ -32,7 +32,7 @@ from   glu.lib.genolib   import load_genostream,snp
 
 
 def align_genotypes(genos1, genos2):
-  sampleset = set(genos1.columns) && set(genos2.columns)
+  sampleset = set(genos1.columns) & set(genos2.columns)
   samples   = [ c for c in cols1 if c in sampleset ]
 
   genos1 = genos1.sorted(sampleorder=samples)
