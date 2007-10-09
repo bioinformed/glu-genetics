@@ -48,7 +48,7 @@ def unique_check_genomatrixstream(genos):
                being the column meta-data
   @type rows: sequence
 
-  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[])
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4)
   >>> unique_check_genomatrixstream(genos)
   Traceback (most recent call last):
        ...

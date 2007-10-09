@@ -720,6 +720,7 @@ class GenomatrixStream(GenotypeStream):
     @type        packed: bool
     '''
     assert models is not None
+    assert format=='ldat' or len(models) == len(loci)
 
     if format not in ('sdat','ldat'):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
@@ -2466,16 +2467,14 @@ def merge_genomatrixstream_columns(genos, mergefunc):
 
   else:
     new_models = []
+    for c in new_columns:
+      mset = set(genos.models[i] for i in merge_indices[c])
+      if len(mset) != 1:
+        raise ValueError('Incompatible genotype models in merge')
+      new_models.append(mset.pop())
 
     def _merger():
       rows_seen = set()
-
-      for c in new_columns:
-        mset = set(genos.models[i] for i in merge_indices[c])
-        if len(mset) != 1:
-          raise ValueError('Incompatible genotype models in merge')
-        new_models.append(mset.pop())
-
       for i,(sample,row) in enumerate(genos):
         if sample in rows_seen:
           raise ValueError('row labels required to be unique')
@@ -3687,9 +3686,6 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   ('l1', [('A', 'A'), ('G', 'G')])
   ('l2', [('A', 'A'), ('T', 'T')])
 
-  >>> samples =     ('s1','s2','s3')
-  >>> rows = [('l1',['AA','AG','GG']),
-  ...         ('l2',['AA','AT','TT'])]
   >>> genos = GenomatrixStream.from_strings(rows,'ldat',snp,samples=samples)
   >>> genos = filter_genomatrixstream_by_column(genos,colset,exclude=True)
   >>> genos.samples
@@ -3698,6 +3694,31 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   ...   print row
   ('l1', [('A', 'G')])
   ('l2', [('A', 'T')])
+
+  >>> loci =  ('l1','l2')
+  >>> rows = [('s1',['AA','AA']),
+  ...         ('s2',['AG','AT']),
+  ...         ('s3',['GG','TT'])]
+  >>> colset = set(['l1','l3'])
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = filter_genomatrixstream_by_column(genos,colset)
+  >>> genos.loci
+  ('l1',)
+  >>> for row in genos:
+  ...   print row
+  ('s1', [('A', 'A')])
+  ('s2', [('A', 'G')])
+  ('s3', [('G', 'G')])
+
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = filter_genomatrixstream_by_column(genos,colset,exclude=True)
+  >>> genos.loci
+  ('l2',)
+  >>> for row in genos:
+  ...   print row
+  ('s1', [('A', 'A')])
+  ('s2', [('A', 'T')])
+  ('s3', [('T', 'T')])
   '''
   columns = genos.columns
   if exclude:
@@ -3720,9 +3741,8 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   if genos.format=='ldat':
     new_genos=genos.clone(_filter(),samples=columns,packed=False,materialized=False)
   else:
-    models = genos.models
-    if models is not None:
-      models = pick(models,indices)
+    assert len(genos.columns) == len(genos.models)
+    models = pick(genos.models,indices)
     new_genos=genos.clone(_filter(),loci=columns,models=models,packed=False,materialized=False)
 
   return new_genos
@@ -3973,38 +3993,6 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
   ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
   '''
   # FIXME: Implement fast path when rows are known
-  if genos.format=='sdat':
-    if exclude:
-      models = [ model for label,model in izip(genos.columns,genos.models)
-                                       if label not in rowset ]
-      def _filter():
-        for label,row in genos:
-          if label not in rowset:
-            yield label,row
-    else:
-      models = [ model for label,model in izip(genos.columns,genos.models)
-                                       if label in rowset ]
-
-      def _filter():
-        for label,row in genos:
-          if label in rowset:
-            yield label,row
-
-  else:
-    models = []
-    if exclude:
-      def _filter():
-        for (label,row),model in izip(genos,genos.models):
-          if label not in rowset:
-            models.append(model)
-            yield label,row
-    else:
-      def _filter():
-        for (label,row),model in izip(genos,genos.models):
-          if label in rowset:
-            models.append(model)
-            yield label,row
-
   rows = genos.rows
   if rows is not None:
     if exclude:
@@ -4012,12 +4000,36 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
     else:
       rows = tuple(label for label in rows if label     in rowset)
 
-  if genos.format=='ldat':
-    new_genos=genos.clone(_filter(),loci=rows,models=models,materialized=False)
-  else:
-    new_genos=genos.clone(_filter(),samples=rows,models=models,materialized=False)
+  if genos.format=='sdat':
+    if exclude:
+      def _filter():
+        for subject,row in genos:
+          if subject not in rowset:
+            yield subject,row
+    else:
+      def _filter():
+        for subject,row in genos:
+          if subject in rowset:
+            yield subject,row
 
-  return new_genos
+    return genos.clone(_filter(),samples=rows,materialized=False)
+
+  else:
+    models = []
+    if exclude:
+      def _filter():
+        for (locus,row),model in izip(genos,genos.models):
+          if locus not in rowset:
+            models.append(model)
+            yield locus,row
+    else:
+      def _filter():
+        for (locus,row),model in izip(genos,genos.models):
+          if locus in rowset:
+            models.append(model)
+            yield locus,row
+
+    return genos.clone(_filter(),loci=rows,models=models,materialized=False)
 
 
 def remap_genomatrixstream_row(genos,rowmap):
