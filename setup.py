@@ -29,7 +29,7 @@ from   setuptools     import setup, find_packages, Extension
 import numpy
 
 def get_version():
-  vfile = os.path.join(os.path.dirname(__file__), 'VERSION')
+  vfile = os.path.join(os.path.dirname(__file__), 'glu', 'VERSION')
   version = file(vfile).readline().strip()
   return version
 

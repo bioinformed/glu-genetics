@@ -15,7 +15,6 @@ Revision:      $Id$
 
 from __future__ import absolute_import
 
-__version__   = '0.63'
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
@@ -25,7 +24,16 @@ import time
 import optparse
 import traceback
 
+from   pkg_resources import resource_string
+
 import glu
+
+
+try:
+  __version__ = resource_string('glu','VERSION').strip()
+except (IOError,ValueError):
+  __version__ = '(unknown)'
+
 
 class GLUError(RuntimeError): pass
 
@@ -100,7 +108,7 @@ def module_info(name,module,out=sys.stderr):
   copyright = getattr(module,'__copyright__', None)
 
   if version:
-    sys.stderr.write('%s version %s\n' % (program,__version__))
+    sys.stderr.write('%s version %s\n' % (program,version))
   else:
     sys.stderr.write(program + '\n')
 
