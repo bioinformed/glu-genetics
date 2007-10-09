@@ -1,1 +1,1 @@
-include README LICENSE docs
+include MANIFEST.in README LICENSE docs glu/VERSION
