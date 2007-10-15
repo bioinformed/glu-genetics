@@ -28,7 +28,10 @@ def test(report=True):
   packagefile =  streams.__file__.replace('.pyc','.py')
   localfile   =  local_streams.__file__.replace('.pyc','.py')
 
-  if not os.path.samefile(packagefile,localfile):
+  try:
+    if not os.path.samefile(packagefile,localfile):
+      raise OSError
+  except OSError:
     raise ImportError('Your PYTHONPATH/pkg_resources are not set correctly to find this GLU tree')
 
   for module in bitarray,binary,text,genoarray,io,merge,reprs,streams:

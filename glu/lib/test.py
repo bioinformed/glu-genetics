@@ -29,8 +29,11 @@ def test(report=True):
   packagefile =  utils.__file__.replace('.pyc','.py')
   localfile   =  local_utils.__file__.replace('.pyc','.py')
 
-  if not os.path.samefile(packagefile,localfile):
-    raise ImportError('Your PYTHONPATH is not set correctly to find this GLU tree')
+  try:
+    if not os.path.samefile(packagefile,localfile):
+      raise OSError
+  except OSError:
+    raise ImportError('Your PYTHONPATH/pkg_resources are not set correctly to find this GLU tree')
 
   for module in association,fileutils,glm,imerge,sections,sequence,stats,utils,ca,hwp,xtab,union_find,regionparser:
     doctest.testmod(module,report=False)
