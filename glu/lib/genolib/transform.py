@@ -49,23 +49,31 @@ def load_rename_alleles_file(filename):
   for i,row in enumerate(rows):
     if not row:
       continue
-    if len(row) != 3:
-      raise ValueError('Invalid allele rename record %d in %s' % (i+1,namefile(filename)))
 
-    lname,old_alleles,new_alleles = row
+    if len(row) < 3:
+      raise ValueError('Incomplete allele rename record %d in %s' % (i+1,namefile(filename)))
 
-    lname       = intern(lname.strip())
+    lname,old_alleles,new_alleles = row[:3]
+
+    lname = intern(lname.strip())
+
     old_alleles = [ intern(a.strip()) for a in old_alleles.split(',') ]
     new_alleles = [ intern(a.strip()) for a in new_alleles.split(',') ]
 
-    if len(old_alleles) != len(new_alleles):
-      raise ValueError('Invalid allele rename record %d in %s' % (i+1,namefile(filename)))
+    if not lname and not old_alleles and not new_alleles:
+      continue
+
+    if not lname:
+      raise ValueError('Missing locus name in allele rename record %d in %s' % (i+1,namefile(filename)))
+
+    if len(old_alleles) != len(new_alleles) or '' in old_alleles or '' in new_alleles:
+      raise ValueError('Invalid allele rename record %d for %s in %s' % (i+1,lname,namefile(filename)))
 
     locus_rename = dict( izip(old_alleles,new_alleles) )
     locus_rename[None] = None
 
     if lname in rename and rename[lname] != locus_rename:
-      raise ValueError('Inconsistent rename record %d in %s' % (i+1,namefile(filename)))
+      raise ValueError('Inconsistent rename record %d for %s in %s' % (i+1,lname,namefile(filename)))
 
     rename[lname] = locus_rename
 
