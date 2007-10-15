@@ -817,7 +817,8 @@ def resolve_column_headers(header,columns):
       yield col
 
 
-def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv'):
+def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv',
+                        extra_args=None):
   '''
   Return a table of data read from a delimited file as a list of rows, based
   on several parameters.
@@ -891,6 +892,9 @@ def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv'):
   @type       columns: list of strings, integers, or 2-tuples for ranges
   @param      dialect: csv module dialect name or dialect object
   @type       dialect: str or csv.Dialect
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
   @return            : sequence of rows containing the columns requested
   @rtype             : generator
 
@@ -934,7 +938,9 @@ def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv'):
   skip      = int(get_arg(args, ['s','skip'], skip))
   columns   = get_arg_columns(args,columns)
 
-  if args:
+  if args and extra_args is not None:
+    extra_args.update(args)
+  elif args:
     raise ValueError, 'Unexpected filename arguments: %s' % ','.join(sorted(args))
 
   lfile = autofile(name)
