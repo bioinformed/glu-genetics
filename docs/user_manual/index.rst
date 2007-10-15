@@ -257,10 +257,6 @@ Genotype quality control
 
 * **hwp:** test for deviations from Hardy-Weinberg proportions
 
-  The **hwp** module measures deviation from Hardy-Weinberg proportion
-  based on data from the following input formats: ldat, sdat, triple, or
-  counts. Parameters allow the user to select subsets of samples or loci
-  for analysis.
 
 Genotype-phenotype association testing
 --------------------------------------
