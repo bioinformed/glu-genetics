@@ -21,7 +21,7 @@ def test(report=True):
   import os
   import doctest
 
-  from   glu.lib.genolib import bitarray,binary,text,genoarray,io,merge,reprs,streams
+  from   glu.lib.genolib import bitarray,binary,text,genoarray,io,merge,reprs,streams,locus
   import streams as local_streams
 
   # Standardize on the .py source, since one can load the .py and the other the .pyc
@@ -34,7 +34,7 @@ def test(report=True):
   except OSError:
     raise ImportError('Your PYTHONPATH/pkg_resources are not set correctly to find this GLU tree')
 
-  for module in bitarray,binary,text,genoarray,io,merge,reprs,streams:
+  for module in bitarray,binary,text,genoarray,io,merge,reprs,streams,locus:
     doctest.testmod(module,report=False)
   doctest.master.summarize()
 
