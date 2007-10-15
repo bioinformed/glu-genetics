@@ -32,6 +32,7 @@ from   glu.lib.fileutils         import autofile, hyphen, load_map
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream
+from   glu.lib.genolib.locus     import load_modelmap
 from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.reprs     import get_genorepr, snp, hapmap
 from   glu.lib.genolib.genoarray import genoarray_concordance, model_from_alleles
@@ -197,7 +198,7 @@ def write_unexpected_sets(out,leftover,sample_phenos=None):
   e = 11
   indent2 = ' ' * e
 
-  out.write('    *****  [UNEXPECTED DUPLICATE SETS\n')
+  out.write('    *****  UNEXPECTED DUPLICATE SETS\n')
   for (alist,i) in leftover:
     indent1 = '  ' + '%7d'% (len(alist)) + '  '
     write_sample_rows(out,alist,indent1,indent2,[i]*len(alist),sample_phenos)
@@ -314,6 +315,8 @@ def option_parser():
                     help='The file input format for genotype data. Values=hapmap, ldat, sdat (preferred), trip or genotriple')
   parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-l', '--locusmodels', dest='locusmodels', metavar='FILE',
+                    help='Locus description options and/or file')
   parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',
                     help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
                          'Values=vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=vote:1')
@@ -346,20 +349,9 @@ def main():
   genorepr = get_genorepr(options.genorepr)
   merger   = get_genomerger(options.merge)
 
-  # FIXME: Ensure an 8-bit genotype representation to allow
-  #        genoarray_concordance to use accelerated version.  This may not
-  #        be sufficient for binary input formats, which will require
-  #        recoding.
-  #        Optimization currently disabled until support for default models
-  #        or alphabets has been added.
-  if 0 and genorepr in (snp,hapmap):
-    defmodel = model_from_alleles('ACGTAB', max_alleles=22)
-    modelmap = defaultdict(lambda: defmodel)
-  elif 0:
-    defmodel = model_from_alleles('',max_alleles=45)
-    modelmap = defaultdict(lambda: defmodel)
-  else:
-    modelmap = None
+  modelmap = None
+  if options.locusmodels:
+    modelmap = load_modelmap(options.locusmodels)
 
   genos = load_genostream(args[0], options.format, genorepr, modelmap=modelmap).as_sdat().materialize()
 
