@@ -44,6 +44,8 @@ POPS = {'CEU'    : 'hapmap',
         'NHS'    : 'NHS',
        }
 
+GENOMEDB='/usr/local/share/genedb/genome36.db'
+
 if 1:
   HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build22/rs_strand/non-redundant/genotypes_chr%s_%s_r22_nr.b36.txt.gz'
@@ -254,7 +256,7 @@ def escape(s):
 
 
 def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,include,exclude,
-                         designfiles,includefile,cmdprefix):
+                         designfiles,designdefault,includefile,cmdprefix):
 
   prefix = '%s_%s_%s' % (project,gene,populations)
 
@@ -304,6 +306,8 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
 
     for d in designfiles or []:
       command.append('-D %s' % escape(d))
+
+    command.append('--designdefault=%f' % designdefault)
 
     command.append(get_genotypes(populations,chromosome))
 
@@ -430,7 +434,7 @@ class SubprocessManager(object):
     for fd,event in self.poll.poll(timeout):
       proc = self.taskmap[fd]
       if event&select.POLLIN:
-        proc.pid,proc.stdout.read(8196)
+        proc.stdout.read(8196)
       if event&select.POLLHUP:
         proc.wait()
         done.append(proc)
@@ -449,8 +453,10 @@ def option_parser():
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-D', '--designscores', dest='designscores', metavar='FILE', action='append',
-                      help='Design scores (optional)')
-  parser.add_option('-g', '--genomedb',   dest='genomedb', metavar='FILE', default='genome.db',
+                    help='Design scores (optional)')
+  parser.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
+                    help='Default design score for any locus not found in a design file')
+  parser.add_option('-g', '--genomedb',   dest='genomedb', metavar='FILE', default=GENOMEDB,
                       help='Genome database file')
   parser.add_option('-i', '--include',   dest='include', metavar='FILE',
                       help='Obligate tags (optional)')
@@ -465,7 +471,7 @@ def option_parser():
   parser.add_option('--maxqueue', dest='maxqueue', default=1, type='int',
                           help='Maximum number of jobs to queue in parallel')
   parser.add_option('--cmdprefix', dest='cmdprefix', metavar='VALUE',
-                      help='Command prefix for running tagzilla (useful for scheduling jobs)')
+                    help='Command prefix for running tagzilla (useful for scheduling jobs)')
 
   return parser
 
@@ -490,7 +496,7 @@ def main():
   genestuff  = {}
   genefail   = {}
 
-  print '\t'.join(['Project','Population','Region','Chr','Start','Stop',
+  print '\t'.join(['Project','Population','Region','Chr','Start','Stop', 'Strand',
                    'SNPs', 'Qualifying SNPs', 'Tags', 'Ob. Include', 'Ob. Exclude'])
 
   manager=SubprocessManager()
@@ -512,8 +518,8 @@ def main():
       time.sleep(startdelay)
 
     proc=run_tagzilla(outdir,project,gene,dprime,r2,population,chromosome,snps,
-                      maf,include,exclude,options.designscores,options.include,
-                      options.cmdprefix)
+                      maf,include,exclude,options.designscores,options.designdefault,
+                      options.include,options.cmdprefix)
     manager.add(proc)
 
 
@@ -547,7 +553,7 @@ def main():
       genecounts[gene] = len(design)
       genestuff[gene]  = seqs
 
-      d = map(str,[project,population,gene,chromosome,start,stop,
+      d = map(str,[project,population,gene,chromosome,start,stop,strand,
                    len(snps),len(qsnps),len(tags),len(obligate),len(excl)])
       print '\t'.join(d)
 
