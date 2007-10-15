@@ -47,9 +47,10 @@ import time
 import optparse
 import collections
 
-from   itertools import islice, chain, repeat, groupby, izip, dropwhile
-from   operator  import attrgetter, itemgetter
-from   math      import log, ceil, sqrt, fabs, exp, pi
+from   collections import defaultdict
+from   itertools   import islice, chain, repeat, groupby, izip, dropwhile
+from   operator    import attrgetter, itemgetter
+from   math        import log, ceil, sqrt, fabs, exp, pi
 
 epsilon = 10e-10
 
@@ -1641,7 +1642,7 @@ def build_binsets(loci, ldpairs, includes, exclude, designscores):
   # are provided
   if designscores:
     for lname,bin in binsets.iteritems():
-      if designscores.get(lname,0) < epsilon:
+      if designscores[lname] < epsilon:
         bin.disposition = bin.EXCLUDE
         exclude.add(lname)
 
@@ -2396,9 +2397,9 @@ def read_snp_list(name, sset):
   return sset
 
 
-def build_design_score(designscores):
+def build_design_score(designscores,designdefault=0):
   designscores = designscores or []
-  aggscores = {}
+  aggscores = defaultdict(lambda: designdefault)
   for design in designscores:
     design = design.split(':')
     dfile = design[0]
@@ -2889,6 +2890,8 @@ def option_parser():
                                'to be open.  The end coordinate is exclusive and not included in the range.')
   inputgroup.add_option('-D', '--designscores', dest='designscores', metavar='FILE', type='str', action='append',
                           help='Read in design scores or other weights to use as criteria to choose the optimal tag for each bin')
+  inputgroup.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
+                          help='Default design score for any locus not found in a design file')
   inputgroup.add_option('-L', '--limit', dest='limit', metavar='N', type='int', default=0,
                           help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
 
@@ -3067,7 +3070,7 @@ def tagzilla_single(options,args):
     read_snp_list(options.exclude, exclude)
 
   includes     = Includes(include_typed, include_untyped)
-  designscores = build_design_score(options.designscores)
+  designscores = build_design_score(options.designscores,options.designdefault)
   tagcriteria  = build_tag_criteria(options.tagcriteria)
   tagselector  = TagSelector(designscores, tagcriteria)
 
@@ -3172,7 +3175,7 @@ def tagzilla_multi(options,args):
     read_snp_list(options.exclude, exclude)
 
   includes     = Includes(include_typed, include_untyped)
-  designscores = build_design_score(options.designscores)
+  designscores = build_design_score(options.designscores,options.designdefault)
   tagcriteria  = build_tag_criteria(options.tagcriteria)
   tagselector  = TagSelector(designscores, tagcriteria)
 
