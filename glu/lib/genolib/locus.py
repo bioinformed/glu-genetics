@@ -33,9 +33,21 @@ def _get_header(filename,hmap,header,required=False):
   return index[0]
 
 
-def load_locus_file(filename,max_alleles=2,alleles=None):
+def load_locus_file(filename,extra_args=None,**kwargs):
   '''
   Load a locus file
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param      alleles: alleles
+  @param      alleles: sequence of objects
+  @param  max_alleles: maximum number of alleles allowed. Default is 2
+  @type   max_alleles: int or None
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
+  @return            : default_max_alleles, default_alleles, sequence of
+                       locus models of the form: locus name, max_alleles, alleles
 
   >>> from StringIO import StringIO
   >>> l = """LOCUS\\tMAX_ALLELES\\tALLELES
@@ -93,23 +105,23 @@ def load_locus_file(filename,max_alleles=2,alleles=None):
   ...   print lname,max_alleles,alleles
   '''
   if isinstance(filename,basestring) and filename.startswith(':'):
-    filename,args = parse_augmented_filename(filename)
-    args = dict(args)
+    filename = parse_augmented_filename(filename,kwargs)
     assert not filename
   else:
-    args = {}
-    rows = load_table(filename,want_header=True,extra_args=args)
+    rows = load_table(filename,want_header=True,extra_args=kwargs,**kwargs)
     header = rows.next()
 
-  default_max_alleles = int(get_arg(args, ['max_alleles'], max_alleles or 0)) or None
-  default_alleles     = get_arg(args, ['alleles'], None)
+  default_alleles     = get_arg(kwargs, ['alleles'], None)
+  default_max_alleles = int(get_arg(kwargs, ['max_alleles'], 2)) or None
 
-  if args:
+  if kwargs and extra_args is not None:
+    extra_args.update(kwargs)
+  elif kwargs:
     raise ValueError('Unexpected filename arguments: %s' % str(args))
 
   if default_alleles is None:
-    default_alleles = alleles or []
-  else:
+    default_alleles = []
+  elif isinstance(default_alleles,basestring):
     default_alleles = [ a.strip() for a in default_alleles.split(',') ]
 
   if not filename:
@@ -160,13 +172,13 @@ def load_locus_file(filename,max_alleles=2,alleles=None):
   return default_max_alleles,default_alleles,_loci()
 
 
-def load_modelmap(filename,max_alleles=None,alleles=None):
+def load_modelmap(filename,extra_args=None,**kwargs):
   '''
   Create a modelmap dictionary from an augmented locus description file
 
   FIXME: Add docstring and doctests
   '''
-  default_max_alleles,default_alleles,loci = load_locus_file(filename)
+  default_max_alleles,default_alleles,loci = load_locus_file(filename,extra_args,**kwargs)
   defmodel = model_from_alleles(default_alleles,max_alleles=default_max_alleles)
   modelmap = defaultdict(lambda: defmodel)
   modelmap.update( (lname,model_from_alleles(alleles,max_alleles=max_alleles))

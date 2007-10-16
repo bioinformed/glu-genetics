@@ -53,13 +53,13 @@ def OSGzipFile_popen(filename, mode):
   # Shell escaping is out of the scope of this function, so ensure that no
   # illegal characters appear
   if set('\'"\\') & set(filename):
-    raise OSError, 'Invalid characters in filename for this method'
+    raise OSError('Invalid characters in filename for this method')
 
   gzipexe = os.environ.get('GLU_GZIP','gzip')
 
   #FIXME: Add additional sanity checks to the executable name
   if set('\'"\\;') & set(gzipexe):
-    raise OSError, 'Invalid characters in gzip executable'
+    raise OSError('Invalid characters in gzip executable')
 
   if 'w' in mode:
     f = os.popen("%s -c > '%s'" % (gzipexe,filename), 'w', 10240)
@@ -91,7 +91,7 @@ def OSGzipFile_subprocess(filename, mode):
 
   #FIXME: Add additional sanity checks to the executable name
   if set('\'"\\;') & set(gzipexe):
-    raise OSError, 'Invalid characters in gzip executable'
+    raise OSError('Invalid characters in gzip executable')
 
   if 'w' in mode:
     out = file(filename,mode)
@@ -259,7 +259,7 @@ def guess_format(filename, formats):
   return None
 
 
-def parse_augmented_filename(filename):
+def parse_augmented_filename(filename,args):
   '''
   Retrieve option-value pairs from the filename delimited by colon
 
@@ -268,35 +268,47 @@ def parse_augmented_filename(filename):
   @return         : filename and tuples of appended additional option and its value
   @rtype          : list
 
-  >>> parse_augmented_filename('file.gz')
-  ('file.gz', [])
-  >>> parse_augmented_filename('file.gz:')
-  ('file.gz', [])
-  >>> parse_augmented_filename('file.gz:foo=bar')
-  ('file.gz', [('foo', 'bar')])
-  >>> parse_augmented_filename('file.gz:foo=bar:baz:=spoo')
-  ('file.gz', [('foo', 'bar'), ('baz', ''), ('', 'spoo')])
+  >>> args = {}
+  >>> parse_augmented_filename('file.gz',args)
+  'file.gz'
+  >>> sorted(args.iteritems())
+  []
+
+  >>> args = {}
+  >>> parse_augmented_filename('file.gz:',args)
+  'file.gz'
+  >>> sorted(args.iteritems())
+  []
+
+  >>> args = {}
+  >>> parse_augmented_filename('file.gz:foo=bar',args)
+  'file.gz'
+  >>> sorted(args.iteritems())
+  [('foo', 'bar')]
+
+  >>> args = {}
+  >>> parse_augmented_filename('file.gz:foo=bar:baz:=spoo',args)
+  'file.gz'
+  >>> sorted(args.iteritems())
+  [('', 'spoo'), ('baz', ''), ('foo', 'bar')]
   '''
   if not isstr(filename):
-    return filename,[]
+    return filename
 
   filename_save = filename
-  args = []
   while not os.path.exists(filename) and ':' in filename:
     filename,arg = filename.rsplit(':',1)
     kv = arg.split('=')
 
     if len(kv) > 2:
-      raise ValueError, "Invalid extended filename argument in '%s'" % filename_save
+      raise ValueError("Invalid extended filename argument in '%s'" % filename_save)
     elif len(kv) == 1:
       kv.append('')
 
     if kv != ['','']:
-      args.append( (kv[0],kv[1]) )
+      args[kv[0]] = kv[1]
 
-  args.reverse()
-
-  return filename,args
+  return filename
 
 
 DIALECT_KWARGS = ['dialect','delimiter','doublequote','escapechar','lineterminator',
@@ -383,7 +395,7 @@ def get_arg(args, names, default=None):
   return default
 
 
-def load_list(filename,skip=0,index=0,dialect='tsv'):
+def load_list(filename, extra_args=None, **kwargs):
   '''
   Load list of values from a file or literal list. By default, the specified
   file is interpreted as a tab-delimited file with only the first field
@@ -440,6 +452,9 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
   @type             index: int or str
   @param          dialect: csv module dialect name or dialect object
   @type           dialect: str or csv.Dialect
+  @param       extra_args: optional dictionary to store extraneous arguments, instead of
+                           raising an error.
+  @type        extra_args: dict
   @return:                 list of values selected
   @rtype:                  list or str
 
@@ -485,16 +500,17 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
     return [ intern(l.strip()) for l in filename[1:].split(',') if l ]
 
   # Otherwise, handle file name or file object cases
-  name,args = parse_augmented_filename(filename)
-  args      = dict(args)
-  dialect   = get_csv_dialect(args,dialect)
-  skip      = int(get_arg(args,     ['skip', 's'], skip))
-  index     = tryint(get_arg(args, ['index','i'], index))
+  name      = parse_augmented_filename(filename,kwargs)
+  dialect   = get_csv_dialect(kwargs, 'tsv')
+  skip      = int(get_arg(kwargs,     ['skip', 's'], 0))
+  index     = tryint(get_arg(kwargs,  ['index','i'], 0))
 
-  if args:
-    raise ValueError, 'Unexpected filename arguments: %s' % ','.join(sorted(args))
+  if kwargs and extra_args is not None:
+    extra_args.update(kwargs)
+  elif kwargs:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(kwargs)))
 
-  lines   = csv.reader(autofile(name),**dialect)
+  lines = csv.reader(autofile(name),**dialect)
 
   if skip:
     lines = islice(lines,skip,None)
@@ -509,7 +525,7 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
     try:
       index = header.index(index)
     except ValueError:
-      raise ValueError, "Cannot find header '%s'" % index
+      raise ValueError("Cannot find header '%s'" % index)
 
   values = (intern(l[index].strip()) for l in lines if len(l)>index)
   return [ v for v in values if v ]
@@ -518,7 +534,7 @@ def load_list(filename,skip=0,index=0,dialect='tsv'):
 # Anonymous object
 _nothing = object()
 
-def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_nothing,dialect='tsv'):
+def load_map(filename,unique=True,extra_args=None,**kwargs):
   '''
   Creates a dictionary representing a list or mapping from a text file.
   Valid files should be composed of standard ASCII lines of text with tab
@@ -608,6 +624,9 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_noth
   @type       default: object
   @param      dialect: csv module dialect name or dialect object
   @type       dialect: str or csv.Dialect
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
   @return            : mapping from key string to value string, if
                        unique=True.  Otherwise, mapping from key string to
                        list of value strings.
@@ -656,18 +675,20 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_noth
   if _literal_list(filename):
     key_index,value_index = 0,1
     lines = (kv.split('=') for kv in filename[1:].split(',') if kv)
+    default = kwargs.get('default',_nothing)
 
   else:
-    name,args   = parse_augmented_filename(filename)
-    args        = dict(args)
-    dialect     = get_csv_dialect(args,dialect)
-    skip        = int(get_arg(args, ['s','skip'], skip))
-    default     = get_arg(args, ['d','def','default'], default)
-    key_index   = tryint(get_arg(args, ['k','key',  'key_index'  ], key_index))
-    value_index = tryint(get_arg(args, ['v','value','value_index'], value_index))
+    name        = parse_augmented_filename(filename,kwargs)
+    dialect     = get_csv_dialect(kwargs,'tsv')
+    skip        = int(get_arg(kwargs, ['s','skip'], 0))
+    default     = get_arg(kwargs, ['d','def','default'], _nothing)
+    key_index   = tryint(get_arg(kwargs, ['k','key',  'key_index'  ], 0))
+    value_index = tryint(get_arg(kwargs, ['v','value','value_index'], 1))
 
-    if args:
-      raise ValueError, 'Unexpected filename arguments: %s' % ','.join(sorted(args))
+    if kwargs and extra_args is not None:
+      extra_args.update(kwargs)
+    elif kwargs:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(kwargs)))
 
     lfile = autofile(name)
     lines = csv.reader(lfile, **dialect)
@@ -686,13 +707,13 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_noth
       try:
         key_index = header.index(key_index)
       except ValueError:
-        raise ValueError, "Cannot find key header '%s'" % key_index
+        raise ValueError("Cannot find key header '%s'" % key_index)
 
     if isstr(value_index):
       try:
         value_index = header.index(value_index)
       except ValueError:
-        raise ValueError, "Cannot find value header '%s'" % value_index
+        raise ValueError("Cannot find value header '%s'" % value_index)
 
   # Parse the data file
   def _load_map_generator():
@@ -731,16 +752,17 @@ def load_map(filename,unique=True,skip=0,key_index=0,value_index=1,default=_noth
   if unique_fails:
     n = len(unique_fails)
     key,value = unique_fails[0]
-    raise ValueError, 'Found %d non-unique mapping in %s. The first is "%s" -> "%s" and "%s"' % (n,namefile(filename),key,m[key],value)
+    raise ValueError('Found %d non-unique mapping in %s. The first is "%s" -> "%s" and "%s"'
+                       % (n,namefile(filename),key,m[key],value))
 
   return m
 
 
-def get_arg_columns(args,columns):
+def get_arg_columns(args):
   cols = get_arg(args, ['c','cols','columns'])
 
-  if not cols:
-    return columns
+  if not cols or isinstance(cols,list):
+    return cols
 
   cols = cols.split(',')
   columns = []
@@ -817,8 +839,7 @@ def resolve_column_headers(header,columns):
       yield col
 
 
-def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv',
-                        extra_args=None):
+def load_table(filename,want_header=False,extra_args=None,**kwargs):
   '''
   Return a table of data read from a delimited file as a list of rows, based
   on several parameters.
@@ -932,16 +953,15 @@ def load_table(filename,want_header=False,skip=0,columns=None,dialect='tsv',
   [['v11', 'v12', 'v12', 'v11', 'v11', 'v12'], ['v21', '', '', 'v21', 'v21', ''], ['', 'v32', 'v32', '', '', 'v32']]
   >>> del f
   '''
-  name,args = parse_augmented_filename(filename)
-  args      = dict(args)
-  dialect   = get_csv_dialect(args,dialect)
-  skip      = int(get_arg(args, ['s','skip'], skip))
-  columns   = get_arg_columns(args,columns)
+  name    = parse_augmented_filename(filename,kwargs)
+  dialect = get_csv_dialect(kwargs,'tsv')
+  skip    = int(get_arg(kwargs, ['s','skip'], 0))
+  columns = get_arg_columns(kwargs)
 
-  if args and extra_args is not None:
-    extra_args.update(args)
-  elif args:
-    raise ValueError, 'Unexpected filename arguments: %s' % ','.join(sorted(args))
+  if kwargs and extra_args is not None:
+    extra_args.update(kwargs)
+  elif kwargs:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   lfile = autofile(name)
   lines = csv.reader(lfile, **dialect)
