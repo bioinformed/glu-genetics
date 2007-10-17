@@ -19,23 +19,13 @@ __license__   = 'See GLU license for terms by running: glu license'
 import csv
 import sys
 
-from   numpy               import empty,exp,nan,abs,isfinite,vstack,vsplit
+from   numpy               import isfinite
 from   scipy               import stats
 
 from   glu.lib.fileutils   import autofile,hyphen
 from   glu.lib.glm         import GLogit
 
 from   glu.lib.association import build_models,print_results,get_term,format_pvalue,NULL
-
-
-#####
-##### FIXME: This only works for GENO models.  Other models need to have custom OR columns
-def get_ors(g,cats,k,indices):
-  ors = exp(g.beta).take(indices).A.flatten()
-  orsl = empty( (2*(cats-1),), dtype=float )
-  orsl[:] = nan
-  orsl[::3-k] = ors
-  return orsl
 
 
 def option_parser():
@@ -108,28 +98,22 @@ def main():
       details.write('NULL MODEL:\n\n')
       print_results(details,null_model,null)
 
-  headers = ['Locus']
+  headers = ['Locus', 'Alleles', 'MAF', 'Subjects']
 
   or_headers = []
   if len(null.categories) > 2:
     for i in range(1,len(null.categories)):
-      or_headers += ['HetOR%d' % i, 'HomOR%d' % i]
+      or_headers += ['HetOR%d' % i, 'HetOR%d 95%% CI_l' % i, 'HetOR%d 95%% CI_u' % i,
+                     'HomOR%d' % i, 'HomOR%d 95%% CI_l' % i, 'HomOR%d 95%% CI_u' % i ]
   else:
-    or_headers += ['HetOR', 'HomOR']
+    or_headers += ['HetOR', 'HomOR 95% CI_l', 'HomOR 95% CI_u',
+                   'HomOR', 'HomOR 95% CI_l', 'HomOR 95% CI_u']
 
   headers += ['Score X2', 'p-value', 'Wald X2', 'p-value', 'LR X2', 'p-value', 'df']
   headers += or_headers
 
   out.write('\t'.join(headers))
   out.write('\n')
-
-  initial_beta = [None]
-  bs = vsplit(null.beta,cats-1)
-  for i in range(1,3):
-    bi = []
-    for b in bs:
-      bi.extend( [b[:1],[[0]]*i,b[1:]] )
-    initial_beta.append(vstack(bi))
 
   terms = [ get_term(m) for m in options.genomodel.split(',') ]
 
@@ -164,7 +148,8 @@ def main():
     elif k>2:
       raise ValueError,'Unexpected number of parameters in model (n=%d,k=%d)' % (n,k)
 
-    out.write(lname)
+    m = model.model_loci[lname]
+    out.write('\t'.join([lname, ','.join(m.alleles), '%.3f' % m.maf ]))
 
     ### SCORE TEST ###
     g = GLogit(model.y,model.X)
@@ -173,11 +158,11 @@ def main():
     indices = [ j*n+i for i in range(1,k+1)
                       for j in range(len(g.categories)-1) ]
 
-    # FIXME: Can use initial_betas to possibly speed things up
-    #g.fit(initial_beta=initial_beta[k])
-    #scoretest = g.score_test(indices=indices,initial_beta=null.beta)
-
     g.fit()
+
+    counts = [ str((g.y_ord==c).sum()) for c in g.categories]
+    out.write('\t')
+    out.write(','.join(counts))
 
     st,df_s = g.score_test(indices=indices).test()
     wt,df_w = g.wald_test(indices=indices).test()
@@ -198,9 +183,14 @@ def main():
     assert df_s == df_w == df_l
     out.write('\t%d' % df_s)
 
-    ors = exp(g.beta).take(indices).A.flatten()
+    ors = []
+    for cat in range(len(g.categories)-1):
+      beta = g.beta[cat*n:(cat+1)*n,0]
+      W    = g.W[cat*n:(cat+1)*n,:][:,cat*n:(cat+1)*n]
+      for orr,(ci_l,ci_u) in zip(model_term.odds_ratios(beta).tolist(),
+                                 model_term.odds_ratio_ci(beta,W)):
+        ors.extend( [orr,ci_l,ci_u] )
 
-    ors = get_ors(g,cats,k,indices)
     orsstr = '\t'.join('%.4f' % orr if isfinite(orr) else '' for orr in ors)
     out.write('\t%s' % orsstr)
 

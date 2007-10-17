@@ -449,6 +449,7 @@ def estimate_maf(genocounts):
 class TERM(object):
   def __init__(self, lname):
     self.lname = lname
+    self.index = None
 
   def loci(self):
     if self.lname is None:
@@ -511,6 +512,26 @@ class GENO(TERM):
       return []
     return [ '%s:%s' % (self.lname,''.join(g)) for g in lmodel.tests[1:] ]
 
+  def estimates(self,p):
+    return p[self.index:self.index+2,0].A.flatten()
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [c[i,i],c[i+1,i+1]]
+
+  def se(self,c):
+    return sqrt(self.var(c))
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1,p2 = self.estimates(p)
+    e1,e2 = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1)),
+            (exp(p2-a*e2),exp(p2+a*e2))]
+
   def __len__(self):
     return 2
 
@@ -531,6 +552,26 @@ class ADOM(TERM):
     return [ '%s:trend:-%s+%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]),
              '%s:domdev:%s%s'  % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
 
+  def estimates(self,p):
+    return p[self.index:self.index+2,0].A.flatten()
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [c[i,i],c[i+1,i+1]]
+
+  def se(self,c):
+    return sqrt(self.var(c))
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1,p2 = self.estimates(p)
+    e1,e2 = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1)),
+            (exp(p2-a*e2),exp(p2+a*e2))]
+
   def __len__(self):
     return 2
 
@@ -545,6 +586,26 @@ class TREND(TERM):
     if lmodel.genocount < 2:
       return []
     return ['%s:trend:-%s+%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1])]
+
+  def estimates(self,p):
+    return [p[self.index,0],p[self.index,0]*2]
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [c[i,i],4*c[i,i]]
+
+  def se(self,c):
+    return sqrt(self.var(c))
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1,p2 = self.estimates(p)
+    e1,e2 = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1)),
+            (exp(p2-a*e2),exp(p2+a*e2))]
 
   def __len__(self):
     return 1
@@ -565,6 +626,26 @@ class DOM(TERM):
       return []
     return ['%s:dom:%s<%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
 
+  def estimates(self,p):
+    return [p[self.index,0],p[self.index,0]]
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [c[i,i],c[i,i]]
+
+  def se(self,c):
+    return sqrt(self.var(c))
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1,p2 = self.estimates(p)
+    e1,e2 = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1)),
+            (exp(p2-a*e2),exp(p2+a*e2))]
+
   def __len__(self):
     return 1
 
@@ -584,6 +665,26 @@ class REC(TERM):
       return []
     return ['%s:rec:%s>%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
 
+  def estimates(self,p):
+    return [0,p[self.index,0]]
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [0,c[i,i]]
+
+  def se(self,c):
+    return sqrt(self.var(c))
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1,p2 = self.estimates(p)
+    e1,e2 = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1)),
+            (exp(p2-a*e2),exp(p2+a*e2))]
+
   def __len__(self):
     return 1
 
@@ -600,6 +701,25 @@ class MISSING(TERM):
       return []
     return ['%s:missing' % self.lname]
 
+  def estimates(self,p):
+    return [p[self.index,0]]
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [c[i,i]]
+
+  def se(self,c):
+    return [sqrt(self.var(c))]
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1, = self.estimates(p)
+    e1, = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1))]
+
   def __len__(self):
     return 1
 
@@ -615,6 +735,25 @@ class NOT_MISSING(TERM):
     if not loci[self.lname].genocount:
       return []
     return ['%s:not_missing' % self.lname]
+
+  def estimates(self,p):
+    return [p[self.index,0]]
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    i = self.index
+    return [c[i,i]]
+
+  def se(self,c):
+    return [sqrt(self.var(c))]
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    p1, = self.estimates(p)
+    e1, = self.se(c)
+    return [(exp(p1-a*e1),exp(p1+a*e1))]
 
   def __len__(self):
     return 1
@@ -702,10 +841,7 @@ class COMBINATION(TERM):
     return results
 
   def __len__(self):
-    l = 0
-    for term in self.terms:
-      l += len(term)
-    return l
+    return sum(len(term) for term in self.terms)
 
 
 def geno_terms(model_term):
@@ -760,7 +896,7 @@ class BiallelicLocusModel(object):
         raise ValueError(msg % (reference_allele,lname,', '.join(self.alleles)))
 
       if a1 != reference_allele:
-        a1,a2 = a2,a1
+        self.alleles = a1,a2 = a2,a1
 
     model        = genos[0].model
     self.tests   = [ model.add_genotype( (a1,a1) ),
@@ -770,13 +906,13 @@ class BiallelicLocusModel(object):
 
 
 class LocusModel(object):
-  def __init__(self, y, X, pheno, vars, loci):
-    self.y     = y
-    self.X     = X
-    self.pheno = pheno
-    self.vars  = vars
-    self.loci  = loci
-
+  def __init__(self, y, X, pheno, vars, loci, model_loci):
+    self.y          = y
+    self.X          = X
+    self.pheno      = pheno
+    self.vars       = vars
+    self.loci      = loci
+    self.model_loci = model_loci
 
 # FIXME: Needs docs+tests
 class LocusModelBuilder(object):
@@ -818,6 +954,11 @@ class LocusModelBuilder(object):
     if k != len(term):
       return None
 
+    index = 1
+    for t in term.terms():
+      t.index = index
+      index += len(t)
+
     X = []
     y = []
     for row in self.phenos:
@@ -841,7 +982,7 @@ class LocusModelBuilder(object):
 
     vars = ['_mean'] + model_names + self.pheno_header[2:]
 
-    return LocusModel(y,X,self.pheno_header[1],vars,loci)
+    return LocusModel(y,X,self.pheno_header[1],vars,loci,model_loci)
 
 
 def variable_summary(out, x, categorical_limit=5, verbose=1):
