@@ -26,7 +26,7 @@ from scipy        import linalg
 from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 
 CONV = 1e-8
-COND = 1e-6
+COND = 1e-8
 
 
 def bmat2d(data):
