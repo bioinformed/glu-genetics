@@ -46,13 +46,18 @@ POPS = {'CEU'    : 'hapmap',
 
 GENOMEDB='/usr/local/share/genedb/genome36.db'
 
+#FIXME: Make configurable
 if 1:
   HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build22/rs_strand/non-redundant/genotypes_chr%s_%s_r22_nr.b36.txt.gz'
   HAP_FORMAT    = 'hapmap'
-else:
+elif 0:
   HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build21a/rs_strand/non-redundant/genotypes_chr%s_%s_r21a_nr.txt.gz'
+  HAP_FORMAT    = 'hapmap'
+else:
+  HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
+  HAP_GENOTYPES = '/usr/local/share/hapmap/build19/non-redundant/genotypes_chr%s_%s.txt.gz'
   HAP_FORMAT    = 'hapmap'
 
 NHS_PEDIGREES = None
