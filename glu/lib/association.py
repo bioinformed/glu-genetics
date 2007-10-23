@@ -512,6 +512,9 @@ class GENO(TERM):
       return []
     return [ '%s:%s' % (self.lname,''.join(g)) for g in lmodel.tests[1:] ]
 
+  def indices(self):
+    return [self.index,self.index+1]
+
   def estimates(self,p):
     return p[self.index:self.index+2,0].A.flatten()
 
@@ -552,6 +555,9 @@ class ADOM(TERM):
     return [ '%s:trend:-%s+%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]),
              '%s:domdev:%s%s'  % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
 
+  def indices(self):
+    return [self.index,self.index+1]
+
   def estimates(self,p):
     return p[self.index:self.index+2,0].A.flatten()
 
@@ -586,6 +592,9 @@ class TREND(TERM):
     if lmodel.genocount < 2:
       return []
     return ['%s:trend:-%s+%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1])]
+
+  def indices(self):
+    return [self.index]
 
   def estimates(self,p):
     return [p[self.index,0],p[self.index,0]*2]
@@ -626,6 +635,9 @@ class DOM(TERM):
       return []
     return ['%s:dom:%s<%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
 
+  def indices(self):
+    return [self.index]
+
   def estimates(self,p):
     return [p[self.index,0],p[self.index,0]]
 
@@ -665,6 +677,9 @@ class REC(TERM):
       return []
     return ['%s:rec:%s>%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
 
+  def indices(self):
+    return [self.index]
+
   def estimates(self,p):
     return [0,p[self.index,0]]
 
@@ -701,6 +716,9 @@ class MISSING(TERM):
       return []
     return ['%s:missing' % self.lname]
 
+  def indices(self):
+    return [self.index]
+
   def estimates(self,p):
     return [p[self.index,0]]
 
@@ -735,6 +753,9 @@ class NOT_MISSING(TERM):
     if not loci[self.lname].genocount:
       return []
     return ['%s:not_missing' % self.lname]
+
+  def indices(self):
+    return [self.index]
 
   def estimates(self,p):
     return [p[self.index,0]]
