@@ -64,6 +64,9 @@ def option_parser():
                     help='Comma separated list of genetic models.  The first that can be fit will be used.  '
                          'Values: genotype/geno, adddom/adom, trend/multiplicative/mult, additive/add, '
                          'dominant/dom, recessive/rec, missing/miss, not_missing/not_miss, null.  Default=geno,trend')
+  parser.add_option('--tests', dest='tests', default='score', metavar='T1,T2,..',
+                    help='Comma separated list of tests to apply to each model.  Supported tests '
+                         'include score, Wald, and likelihood ratio tests.  Values: score, wald, lrt.')
   parser.add_option('--refalleles', dest='refalleles', metavar='FILE',
                     help='Mapping of locus name to the corresponding reference allele')
   return parser
@@ -98,6 +101,17 @@ def main():
       details.write('NULL MODEL:\n\n')
       print_results(details,null_model,null)
 
+  terms = [ get_term(m) for m in options.genomodel.split(',') ]
+
+  if not terms:
+    raise ValueError('Must specify a genetic model to test')
+
+  tests = set(t.strip().lower() for t in options.tests.split(','))
+  tests.discard('')
+  extra = tests - set(['score','wald','lrt'])
+  if extra:
+    raise ValueError('Unknown test(s) specified: %s' % ','.join(sorted(extra)))
+
   headers = ['Locus', 'Alleles', 'MAF', 'Subjects']
 
   or_headers = []
@@ -109,16 +123,19 @@ def main():
     or_headers += ['HetOR', 'HomOR 95% CI_l', 'HomOR 95% CI_u',
                    'HomOR', 'HomOR 95% CI_l', 'HomOR 95% CI_u']
 
-  headers += ['Score X2', 'p-value', 'Wald X2', 'p-value', 'LR X2', 'p-value', 'df']
+  if 'score' in tests:
+    headers += ['score X2', 'score p-value']
+  if 'wald' in tests:
+    headers += ['Wald X2',  'Wald p-value' ]
+  if 'lrt' in tests:
+    headers += ['LR X2',    'LR p-value'   ]
+  if tests:
+    headers += ['df']
+
   headers += or_headers
 
   out.write('\t'.join(headers))
   out.write('\n')
-
-  terms = [ get_term(m) for m in options.genomodel.split(',') ]
-
-  if not terms:
-    raise ValueError('Must specify a genetic model to test')
 
   # For each locus
   for locus in loci:
@@ -164,24 +181,28 @@ def main():
     out.write('\t')
     out.write(','.join(counts))
 
-    st,df_s = g.score_test(indices=indices).test()
-    wt,df_w = g.wald_test(indices=indices).test()
-    lt,df_l = g.lr_test(indices=indices).test()
+    sp = wp = lp = 1
 
-    sp = stats.distributions.chi2.sf(st,df_s)
-    wp = stats.distributions.chi2.sf(wt,df_w)
-    lp = stats.distributions.chi2.sf(lt,df_l)
+    if 'score' in tests:
+      st,df = g.score_test(indices=indices).test()
+      sp    = stats.distributions.chi2.sf(st,df)
+      sps   = format_pvalue(sp)
+      out.write('\t%.5f\t%s' % (st,sps))
 
-    sps = format_pvalue(sp)
-    wps = format_pvalue(wp)
-    lps = format_pvalue(lp)
+    if 'wald' in tests:
+      wt,df = g.wald_test(indices=indices).test()
+      wp    = stats.distributions.chi2.sf(wt,df)
+      wps   = format_pvalue(wp)
+      out.write('\t%.5f\t%s' % (wt,wps))
 
-    out.write('\t%.5f\t%s' % (st,sps))
-    out.write('\t%.5f\t%s' % (wt,wps))
-    out.write('\t%.5f\t%s' % (lt,lps))
+    if 'lrt' in tests:
+      lt,df = g.lr_test(indices=indices).test()
+      lp    = stats.distributions.chi2.sf(lt,df)
+      lps   = format_pvalue(lp)
+      out.write('\t%.5f\t%s' % (lt,lps))
 
-    assert df_s == df_w == df_l
-    out.write('\t%d' % df_s)
+    if tests:
+      out.write('\t%d' % df)
 
     ors = []
     for cat in range(len(g.categories)-1):
@@ -199,9 +220,14 @@ def main():
     if options.details and min(sp,wp,lp) <= options.detailsmaxp:
       details.write('\nRESULTS: %s\n\n' % lname)
       print_results(details,model,g)
-      details.write('Score test           : X2=%9.5f, df=%d, p=%s\n' % (st,df_s,sps))
-      details.write('Wald test            : X2=%9.5f, df=%d, p=%s\n' % (wt,df_w,wps))
-      details.write('Likelihood ratio test: X2=%9.5f, df=%d, p=%s\n' % (lt,df_l,lps))
+
+      if 'score' in tests:
+        details.write('Score test           : X2=%9.5f, df=%d, p=%s\n' % (st,df,sps))
+      if 'wald' in tests:
+        details.write('Wald test            : X2=%9.5f, df=%d, p=%s\n' % (wt,df,wps))
+      if 'lrt' in tests:
+        details.write('Likelihood ratio test: X2=%9.5f, df=%d, p=%s\n' % (lt,df,lps))
+
       details.write('\n')
       details.write('-'*79)
       details.write('\n')
