@@ -120,7 +120,7 @@ def main():
       or_headers += ['HetOR%d' % i, 'HetOR%d 95%% CI_l' % i, 'HetOR%d 95%% CI_u' % i,
                      'HomOR%d' % i, 'HomOR%d 95%% CI_l' % i, 'HomOR%d 95%% CI_u' % i ]
   else:
-    or_headers += ['HetOR', 'HomOR 95% CI_l', 'HomOR 95% CI_u',
+    or_headers += ['HetOR', 'HetOR 95% CI_l', 'HetOR 95% CI_u',
                    'HomOR', 'HomOR 95% CI_l', 'HomOR 95% CI_u']
 
   if 'score' in tests:
