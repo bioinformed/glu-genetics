@@ -271,7 +271,7 @@ def strip_trailing_empty(row):
 
 
 # FIXME: Needs docs+tests
-def load_phenos(filename,deptype=int,allowdups=False,verbose=2,errs=sys.stderr):
+def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
   '''
   Load phenotypes from a tab-delimited file
 
