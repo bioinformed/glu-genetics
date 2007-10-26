@@ -39,43 +39,57 @@ def clean_alias(a):
   return a
 
 
-def get_aliases(genes, filename):
-  geneids = set()
-  for gene in genes:
-    geneid=gene[0]
-    symbol=gene[1]
-    geneids.add(geneid)
+def get_aliases(con,filename):
+  sql = 'SELECT geneid,featureName FROM GENE;'
+  cur = con.cursor()
+  cur.execute(sql)
+  geneids = dict( (int(geneid),symbol) for geneid,symbol in cur.fetchall() )
+
+  aliasfile = csv.reader(autofile(filename), dialect='excel-tab')
+  aliasfile.next()
+
+  updates = []
+  for record in aliasfile:
+    symbol = record[2]
+    geneid  = int(record[1])
+
+    if record[0] != '9606' or record[-1] == '-' or geneid not in geneids:
+      continue
+
+    if symbol != geneids[geneid]:
+      geneids[geneid] = symbol
+      updates.append( (symbol,geneid) )
+
+  print 'Updating map with %d new official feature names...' % len(updates),
+  sql = 'UPDATE GENE SET featureName=? WHERE geneid=?;'
+  cur.executemany(sql,updates)
+  con.commit()
+  print 'Done.'
+
+  for geneid,symbol in geneids.iteritems():
     yield symbol,geneid,symbol
+    if symbol != symbol.upper():
+      yield symbol.upper(),geneid,symbol.upper()
 
   aliasfile = csv.reader(autofile(filename), dialect='excel-tab')
   aliasfile.next()
 
   for record in aliasfile:
-    symbol = record[2].upper()
+    symbol = record[2]
     geneid  = int(record[1])
 
-    if record[0] != '9606' or record[-1] == '-' or record[2] != symbol or geneid not in geneids:
+    if record[0] != '9606' or record[-1] == '-' or geneid not in geneids:
       continue
 
-    yield symbol,geneid,symbol
-
-  aliasfile = csv.reader(autofile(filename), dialect='excel-tab')
-  aliasfile.next()
-
-  for record in aliasfile:
-    symbol = record[2].upper()
-    geneid  = int(record[1])
-
-    if record[0] != '9606' or record[-1] == '-' or record[2] != symbol or geneid not in geneids:
-      continue
-
-    aliases = record[4].upper()
+    aliases = record[4]
 
     aliases = [ clean_alias(a) for a in aliases.split('|') ]
 
     for alias in aliases:
-      if alias and alias != symbol and alias == alias.upper():
+      if alias and alias != symbol:
         yield alias,geneid,symbol
+        if alias != alias.upper():
+          yield alias.upper(),geneid,symbol
 
 
 def filter_aliases(aliases):
@@ -189,38 +203,6 @@ def load_aliases(con, aliases):
   con.commit()
 
 
-def fix_aliases(con):
-  sql = '''
-  SELECT   s.featureName, s.geneID
-  FROM     gene s
-  WHERE    NOT EXISTS (SELECT * FROM alias a WHERE a.Alias == s.featureName)
-    AND    s.featureType='GENE'
-    AND    s.submitGroup='reference';
-  '''
-
-  cur = con.cursor()
-  cur.execute(sql)
-  unmapped = cur.fetchall()
-
-  counts = {}
-  for symbol,geneid in unmapped:
-    counts[symbol] = counts.get(symbol,0) + 1
-
-  unmapped = [ (s,gid) for s,gid in unmapped if counts[s] == 1 ]
-
-  print 'UNMAPPED LEN: %d' % len(unmapped)
-
-  cur = con.cursor()
-  sql = "INSERT INTO ALIAS VALUES (?,?);"
-  cur.executemany(sql, unmapped)
-
-  sql = 'SELECT COUNT(*) FROM ALIAS;'
-  cur.execute(sql)
-  print cur.fetchall()[0][0]
-
-  con.commit()
-
-
 def get_snps(filename):
   filenames = glob.glob(filename)
   for filename in filenames:
@@ -323,20 +305,18 @@ def extract_illumina_snps(manifest):
 
 
 def main():
-  con = sqlite3.connect('genome36.db')
+  con = sqlite3.connect('genome36-1.db')
 
-  if 1:
-    genes = list(get_genes('data/seq_gene.md.b36.2.gz'))
+  if 0:
+    genes = list(get_genes('data/seq_gene.md.b35.1.gz'))
     load_genes(con,genes)
 
   if 1:
-    aliases = get_aliases(genes,'data/gene_info.gz')
-    aliases = filter_aliases(aliases)
+    aliases = get_aliases(con,'data/gene_info.gz')
+    aliases = list(filter_aliases(aliases))
     load_aliases(con,aliases)
 
-    fix_aliases(con)
-
-  if 1:
+  if 0:
     hapmap_snps   = get_snps(HAPMAP)
     #illumina_snps = extract_illumina_snps(load_illumina_manifest(MANIFEST))
     illumina_snps = []
