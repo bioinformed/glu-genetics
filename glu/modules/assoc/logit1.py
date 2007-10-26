@@ -179,7 +179,7 @@ def main():
 
     counts = [ str((g.y_ord==c).sum()) for c in g.categories]
     out.write('\t')
-    out.write(','.join(counts))
+    out.write('|'.join(counts))
 
     sp = wp = lp = 1
 
