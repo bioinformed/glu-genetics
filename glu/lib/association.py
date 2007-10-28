@@ -318,7 +318,7 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
   def _phenos():
     warn_msg = '[WARNING] Subject "%s" dropped on line #%04d due to missing data in column "%s"\n'
     note_msg = '[NOTICE] Read phenotypes from %s: ' \
-               '%d covariates, %d valid records, %d records dropped, %d distinct subjects\n'
+               '%d covariates, %d valid records, %d records dropped due to missing data, %d distinct subjects\n'
 
     dropped  = 0
     subjects = defaultdict(int)
