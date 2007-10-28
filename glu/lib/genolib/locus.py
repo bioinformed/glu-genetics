@@ -15,7 +15,7 @@ Revision:      $Id$
 
 from collections               import defaultdict
 
-from glu.lib.fileutils         import namefile,load_table,get_arg,parse_augmented_filename
+from glu.lib.fileutils         import namefile,load_table,get_arg,tryint,parse_augmented_filename
 from glu.lib.genolib.genoarray import model_from_alleles
 
 
@@ -33,7 +33,17 @@ def _get_header(filename,hmap,header,required=False):
   return index[0]
 
 
-def load_locus_file(filename,extra_args=None,**kwargs):
+class Locus(object):
+  __slots__ = ('name','chromosome','location','model')
+
+  def __init__(self, name, model, chromosome=None, location=None):
+    self.name       = name
+    self.model      = model
+    self.chromosome = chromosome
+    self.location   = location
+
+
+def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   '''
   Load a locus file
 
@@ -50,59 +60,59 @@ def load_locus_file(filename,extra_args=None,**kwargs):
                        locus models of the form: locus name, max_alleles, alleles
 
   >>> from StringIO import StringIO
-  >>> l = """LOCUS\\tMAX_ALLELES\\tALLELES
-  ... l1\\t2\\tA,C
+  >>> l = """LOCUS\\tMAX_ALLELES\\tALLELES\\tCHROMOSOME\\tLOCATION
+  ... l1\\t2\\tA,C\\t1\\t0
   ... l2
-  ... l3\\t\\tA,G
-  ... l4\\t45
-  ... l5\\t45\\tA,B,C,D,E,F,G,H,I,J,K
+  ... l3\\t\\tA,G\\t1
+  ... l4\\t45\\t\\tX\\t1234
+  ... l5\\t45\\tA,B,C,D,E,F,G,H,I,J,K\\tM\\t5541
   ... """
-  >>> max_alleles,alleles,loci = load_locus_file(StringIO(l))
+  >>> max_alleles,alleles,loci = load_locus_records(StringIO(l))
   >>> max_alleles
   2
   >>> alleles
   []
-  >>> for lname,max_alleles,alleles in loci:
-  ...   print lname,max_alleles,alleles
-  l1 2 ['A', 'C']
-  l2 2 []
-  l3 2 ['A', 'G']
-  l4 45 []
-  l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  ...   print lname,max_alleles,alleles,chromosome,location
+  l1 2 ['A', 'C'] 1 0
+  l2 2 [] None None
+  l3 2 ['A', 'G'] 1 None
+  l4 45 [] X 1234
+  l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] M 5541
 
-  >>> max_alleles,alleles,loci = load_locus_file(StringIO(l),max_alleles=4,alleles=['A','C','G','T'])
+  >>> max_alleles,alleles,loci = load_locus_records(StringIO(l),max_alleles=4,alleles=['A','C','G','T'])
   >>> max_alleles
   4
   >>> alleles
   ['A', 'C', 'G', 'T']
-  >>> for lname,max_alleles,alleles in loci:
-  ...   print lname,max_alleles,alleles
-  l1 2 ['A', 'C']
-  l2 4 ['A', 'C', 'G', 'T']
-  l3 2 ['A', 'G']
-  l4 45 []
-  l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  ...   print lname,max_alleles,alleles,chromosome,location
+  l1 2 ['A', 'C'] 1 0
+  l2 4 ['A', 'C', 'G', 'T'] None None
+  l3 2 ['A', 'G'] 1 None
+  l4 45 [] X 1234
+  l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] M 5541
 
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
   >>> f.write(l)
   >>> f.flush()
-  >>> max_alleles,alleles,loci = load_locus_file(f.name + ':max_alleles=4:alleles=A,C,G,T')
-  >>> for lname,max_alleles,alleles in loci:
-  ...   print lname,max_alleles,alleles
-  l1 2 ['A', 'C']
-  l2 4 ['A', 'C', 'G', 'T']
-  l3 2 ['A', 'G']
-  l4 45 []
-  l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+  >>> max_alleles,alleles,loci = load_locus_records(f.name + ':max_alleles=4:alleles=A,C,G,T')
+  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  ...   print lname,max_alleles,alleles,chromosome,location
+  l1 2 ['A', 'C'] 1 0
+  l2 4 ['A', 'C', 'G', 'T'] None None
+  l3 2 ['A', 'G'] 1 None
+  l4 45 [] X 1234
+  l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] M 5541
 
-  >>> max_alleles,alleles,loci = load_locus_file(':max_alleles=4:alleles=A,C,G,T')
+  >>> max_alleles,alleles,loci = load_locus_records(':max_alleles=4:alleles=A,C,G,T')
   >>> max_alleles
   4
   >>> alleles
   ['A', 'C', 'G', 'T']
-  >>> for lname,max_alleles,alleles in loci:
-  ...   print lname,max_alleles,alleles
+  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  ...   print lname,max_alleles,alleles,chromosome,location
   '''
   if isinstance(filename,basestring) and filename.startswith(':'):
     filename = parse_augmented_filename(filename,kwargs)
@@ -134,6 +144,8 @@ def load_locus_file(filename,extra_args=None,**kwargs):
   lname_index       = _get_header(filename,hmap,'LOCUS',required=True)
   max_alleles_index = _get_header(filename,hmap,'MAX_ALLELES')
   alleles_index     = _get_header(filename,hmap,'ALLELES')
+  chromosome_index  = _get_header(filename,hmap,'CHROMOSOME')
+  location_index    = _get_header(filename,hmap,'LOCATION')
 
   def _loci():
     for i,row in enumerate(rows):
@@ -159,7 +171,8 @@ def load_locus_file(filename,extra_args=None,**kwargs):
         max_alleles = default_max_alleles
 
       if alleles_index is not None and alleles_index<n:
-        alleles = [ intern(a.strip()) for a in row[alleles_index].split(',') ]
+        alleles = ( a.strip() for a in row[alleles_index].split(',') )
+        alleles = [ intern(a) for a in alleles if a ]
       elif informative:
         alleles = []
       else:
@@ -167,22 +180,56 @@ def load_locus_file(filename,extra_args=None,**kwargs):
 
       max_alleles = max(max_alleles or 0,len(alleles)) or None
 
-      yield lname,max_alleles,alleles
+      if chromosome_index is not None and chromosome_index<n:
+        chromosome = intern(row[chromosome_index].strip())
+      else:
+        chromosome = None
+
+      if location_index is not None and location_index<n:
+        location = int(row[location_index].strip())
+      else:
+        location = None
+
+      yield lname,max_alleles,alleles,chromosome,location
 
   return default_max_alleles,default_alleles,_loci()
 
 
-def load_modelmap(filename,extra_args=None,**kwargs):
+def load_models(filename,modelcache=None,**kwargs):
+  '''
+  Return the default model and a sequence of Locus objects from an augmented
+  locus description file
+
+  FIXME: Add docstring and doctests
+  '''
+  if modelcache is None:
+    modelcache = {}
+
+  default_max_alleles,default_alleles,loci = load_locus_records(filename,**kwargs)
+
+  defmodel = model_from_alleles(default_alleles,max_alleles=default_max_alleles)
+
+  def _loci():
+    for lname,max_alleles,alleles,chromosome,location in loci:
+      key   = (max_alleles,alleles)
+      model = modelcache.get(key)
+      if model is None:
+        model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
+
+      yield Locus(lname, chromosome, location, model)
+
+  return defmodel,_loci()
+
+
+def load_modelmap(filename,**kwargs):
   '''
   Create a modelmap dictionary from an augmented locus description file
 
   FIXME: Add docstring and doctests
   '''
-  default_max_alleles,default_alleles,loci = load_locus_file(filename,extra_args,**kwargs)
-  defmodel = model_from_alleles(default_alleles,max_alleles=default_max_alleles)
+  defmodel,loci = load_models(filename,**kwargs)
   modelmap = defaultdict(lambda: defmodel)
-  modelmap.update( (lname,model_from_alleles(alleles,max_alleles=max_alleles))
-                       for lname,max_alleles,alleles in loci )
+  modelmap.update( (locus.name,locus.model) for locus in loci )
   return modelmap
 
 
