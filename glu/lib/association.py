@@ -308,7 +308,8 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
 
   dups = [ (h,n) for h,n in tally(header).iteritems() if n>1 ]
   if dups:
-    errs.write('[ERROR] Duplicate headers detected (n=%d)' % len(dups))
+    if verbose > 0:
+      errs.write('[ERROR] Duplicate headers detected (n=%d)' % len(dups))
     if verbose > 1:
       for h,n in sorted(dups, key=itemgetter(1,0), reverse=True):
         errs.write('         %-12s : %2d\n' % (h,n))
@@ -343,10 +344,11 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
     # Check for duplicate subjects
     dups = [ (pid,n) for pid,n in subjects.iteritems() if n>1 ]
     if dups:
-      if allowdups:
-        errs.write('[NOTICE] Duplicate subjects (n=%d)\n' % len(dups))
-      else:
-        errs.write('[ERROR] Duplicate subjects (n=%d)\n' % len(dups))
+      if verbose > 0:
+        if allowdups:
+          errs.write('[NOTICE] Duplicate subjects (n=%d)\n' % len(dups))
+        else:
+          errs.write('[ERROR] Duplicate subjects (n=%d)\n' % len(dups))
 
       if verbose > 1:
           for pid,n in sorted(dups, key=itemgetter(1,0), reverse=True):
@@ -358,9 +360,14 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
   return header,_phenos()
 
 
-def build_models(phenofile, genofile, options,deptype=int):
-  header,phenos = load_phenos(phenofile,deptype=deptype,allowdups=options.allowdups)
+def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
+  warn_msg = '[WARNING] Subject "%s" excluded from analysis\n'
+
+  verbose       = options.verbose
+  header,phenos = load_phenos(phenofile,deptype=deptype,allowdups=options.allowdups,verbose=verbose,errs=errs)
   phenos        = list(phenos)
+  subjects      = set(p[0] for p in phenos)
+  keep          = subjects.copy()
   phenocount1   = len(phenos)
   genorepr      = get_genorepr(options.genorepr)
   loci          = load_genostream(genofile,format=options.format,genorepr=genorepr).as_ldat()
@@ -370,22 +377,22 @@ def build_models(phenofile, genofile, options,deptype=int):
                             exclude_loci=options.excludeloci)
 
   if options.includesamples:
-    keep   = set(load_list(options.includesamples))
-    phenos = (p for p in phenos if p[0] in keep)
+    keep &= set(load_list(options.includesamples))
 
   if options.excludesamples:
-    drop   = set(load_list(options.excludesamples))
-    phenos = (p for p in phenos if p[0] not in drop)
+    keep -= set(load_list(options.excludesamples))
 
   if loci.samples:
-    samples = set(loci.samples)
-    phenos  = (p for p in phenos if p[0] in samples)
+    keep &= set(loci.samples)
 
-  phenos      = list(phenos)
-  phenocount2 = len(phenos)
+  if subjects != keep:
+    phenos = [ p for p in phenos if p[0] in keep ]
 
-  if phenocount1 != phenocount2:
-    print >> sys.stderr, '[NOTICE] After exclusions, %d subjects remain, %d subjects excluded' % (phenocount2,phenocount1-phenocount2)
+    if verbose > 0:
+      errs.write('[NOTICE] After exclusions, %d subjects remain, %d subjects excluded\n' % (len(phenos),len(subjects)-len(keep)))
+    if verbose > 1:
+      for pid in sorted(subjects-keep):
+        errs.write(warn_msg % pid)
 
   reference_alleles = load_map(options.refalleles) if options.refalleles else None
 
@@ -459,14 +466,17 @@ class TERM(object):
   def terms(self):
     return [self]
 
+  def expand_terms(self):
+    return [self]
+
   def __mul__(self, other):
-    t1 =  self.terms if isinstance(self,  INTERACTION) else [self]
-    t2 = other.terms if isinstance(other, INTERACTION) else [other]
+    t1 =  self.terms() if isinstance(self,  INTERACTION) else [self]
+    t2 = other.terms() if isinstance(other, INTERACTION) else [other]
     return INTERACTION(t1 + t2)
 
   def __add__(self, other):
-    t1 =  self.terms if isinstance(self,  COMBINATION) else [self]
-    t2 = other.terms if isinstance(other, COMBINATION) else [other]
+    t1 =  self.terms() if isinstance(self,  COMBINATION) else [self]
+    t2 = other.terms() if isinstance(other, COMBINATION) else [other]
     return COMBINATION(t1 + t2)
 
 
@@ -782,23 +792,46 @@ class NOT_MISSING(TERM):
 
 class INTERACTION(TERM):
   def __init__(self, terms):
-    self.terms = terms
+    self.subterms = terms
 
   def loci(self):
     results = set()
-    for term in self.terms:
+    for term in self.terms():
       results.update(term.loci())
     return sorted(results)
 
   def terms(self):
+    return self.subterms
+
+  def expand_terms(self):
     results = []
-    for term in self.terms:
-      results.extend(term.terms())
+    for term in self.terms():
+      results.extend(term.expand_terms())
     return results
+
+  def indices(self):
+    return range(self.index,self.index+len(self))
+
+  def estimates(self,p):
+    return p[self.index:self.index+len(self),0].A.flatten()
+
+  def odds_ratios(self,p):
+    return exp(self.estimates(p))
+
+  def var(self,c):
+    return [c[i,i] for i in self.indices()]
+
+  def se(self,c):
+    return sqrt(self.var(c))
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    a = stats.distributions.norm.ppf( (1+alpha)/2 )
+    return [(exp(p-a*e),exp(p+a*e)) for p,e in zip(self.estimates(p),
+                                                   self.se(c)) ]
 
   def effects(self, loci, i):
     results = []
-    for term in self.terms:
+    for term in self.terms():
       effects = term.effects(loci,i)
       if None in effects:
         return [None]
@@ -810,7 +843,7 @@ class INTERACTION(TERM):
 
   def names(self, loci):
     results = []
-    for term in self.terms:
+    for term in self.terms():
       names = term.names(loci)
 
       if not results:
@@ -821,34 +854,43 @@ class INTERACTION(TERM):
     return results
 
   def __len__(self):
-    if not self.terms:
+    if not self.terms():
       return 0
 
     l = 1
-    for term in self.terms:
+    for term in self.terms():
       l *= len(term)
     return l
 
 
 class COMBINATION(TERM):
   def __init__(self, terms):
-    self.terms = terms
+    self.subterms = terms
 
   def loci(self):
     results = set()
-    for term in self.terms:
+    for term in self.terms():
       results.update(term.loci())
     return sorted(results)
 
   def terms(self):
+    return self.subterms
+
+  def expand_terms(self):
     results = []
-    for term in self.terms:
-      results.extend(term.terms())
+    for term in self.terms():
+      results.extend(term.expand_terms())
+    return results
+
+  def indices(self):
+    results = []
+    for term in self.terms():
+      results.extend(term.indices())
     return results
 
   def effects(self, loci, i):
     results = []
-    for term in self.terms:
+    for term in self.terms():
       effects = term.effects(loci,i)
       if None in effects:
         return [None]
@@ -857,16 +899,42 @@ class COMBINATION(TERM):
 
   def names(self, loci):
     results = []
-    for term in self.terms:
+    for term in self.terms():
       results.extend(term.names(loci))
     return results
 
+  def estimates(self,p):
+    results = []
+    for term in self.terms():
+      results.extend(term.estimates(p))
+    return results
+
+  def odds_ratios(self,p):
+    results = []
+    for term in self.terms():
+      results.extend(term.odds_ratios(p))
+    return results
+
+  def var(self,c):
+    results = []
+    for term in self.terms():
+      results.extend(term.var(c))
+    return results
+
+  def se(self,c):
+    results = []
+    for term in self.terms():
+      results.extend(term.se(c))
+    return results
+
+  def odds_ratio_ci(self,p,c,alpha=0.95):
+    results = []
+    for term in self.terms():
+      results.extend(term.odds_ratio_ci(p,c,alpha))
+    return results
+
   def __len__(self):
-    return sum(len(term) for term in self.terms)
-
-
-def geno_terms(model_term):
-  return [ t for t in model_term.terms() if not isinstance(t, (NULL,MISSING,NOT_MISSING,NULL)) ]
+    return sum(len(term) for term in self.terms())
 
 
 termmap = { 'GENO'           : GENO,
@@ -952,9 +1020,9 @@ class LocusModelBuilder(object):
     except TypeError:
       phenos = list(phenos)
 
-    pidset                 = set(p[0] for p in phenos)
-    self.geno_indices      = dict( (pid,i) for i,pid in enumerate(locus_header) if pid in pidset )
-    self.phenos            = [ p for p in phenos if p[0] in self.geno_indices ]
+    pidset            = set(p[0] for p in phenos)
+    self.geno_indices = dict( (pid,i) for i,pid in enumerate(locus_header) if pid in pidset )
+    self.phenos       = [ p for p in phenos if p[0] in self.geno_indices ]
 
   def build_model(self,term,loci):
     model_names = []
