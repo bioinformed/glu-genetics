@@ -37,6 +37,8 @@ def option_parser():
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output of duplicate check report')
+  parser.add_option('-v', '--verbose', dest='verbose', metavar='LEVEL', type='int', default=1,
+                    help='Verbosity level of diagnostic output.  O for none, 1 for some (default), 2 for exhaustive.')
   parser.add_option('-i', '--includesamples', dest='includesamples', metavar='FILE',
                     help='List of samples to include')
   parser.add_option('-d', '--excludesamples', dest='excludesamples', metavar='FILE',
