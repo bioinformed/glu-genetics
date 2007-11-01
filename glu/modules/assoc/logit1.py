@@ -92,8 +92,12 @@ def main():
 
   null_model = models.build_model(NULL(),{})
 
+  if not null_model:
+    raise ValueError('Cannot construct null model')
+
   # Obtain estimates of covariate effects under the null
   null = GLogit(null_model.y,null_model.X,vars=null_model.vars)
+
   cats = len(null.categories)
   null.fit()
 
