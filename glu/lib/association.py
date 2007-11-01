@@ -1065,6 +1065,10 @@ class LocusModelBuilder(object):
     y = matrix(y, dtype=float)
     X = matrix(X, dtype=float)
 
+    # Do not fit models with no contrast
+    if len(set(y.A.ravel())) < 2:
+      return None
+
     colcounts = (X.A[:,1:k+1]!=0).sum(axis=0)
     if k and colcounts.min() < self.mingenos:
       return None

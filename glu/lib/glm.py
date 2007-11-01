@@ -1144,9 +1144,13 @@ class GLogit(object):
         raise ValueError('reference class for dependent variable not observed in data')
       categories = [ref] + [ r for r in categories if r!=ref ]
 
+    if len(categories) < 2:
+      raise ValueError('less than two dependent variable categories observed')
+
     # Recode y with ordinal categories from 0..k-1, where 0 is reference
     # FIXME: This should be a scalar loop
     y_ord = zeros_like(y)
+
     for i,v in enumerate(categories):
       y_ord += where(y==v, i, 0)
 
@@ -1190,7 +1194,7 @@ class GLogit(object):
       eta = [ X*bi for bi in b ]
 
       # Compute expected values and linear predictors
-      mu0  = 1/(1+sum(exp(etai) for etai in eta)).A
+      mu0  = 1/(1+exp(eta).sum(axis=0))
       eta0 = log(mu0)
       mu   = [ exp(eta[i]).A*mu0 for i in xrange(k) ]
 
