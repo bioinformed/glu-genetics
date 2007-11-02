@@ -24,9 +24,9 @@ import sys
 import csv
 import sqlite3
 
-from   itertools        import chain,islice
+from   itertools         import chain,islice
 
-from   glu.lib.fileutils    import autofile,hyphen,load_list
+from   glu.lib.fileutils import autofile,hyphen,load_table
 
 
 HEADER = ['CHROMOSOME','LOCATION','GENE NEIGHBORHOOD']
@@ -47,11 +47,7 @@ def option_parser():
   return parser
 
 
-def load_features(filename,limit=None):
-  return
-
-
-def process(con,header,rows,options):
+def annotate(con,header,rows,options):
   up = options.upstream
   dn = options.downstream
 
@@ -123,10 +119,10 @@ def main():
   out = hyphen(options.outfile,sys.stdout)
   out = csv.writer(autofile(out,'w'),dialect='excel-tab')
 
-  rows = csv.reader(autofile(hyphen(args[1],sys.stdin)),dialect='excel-tab')
+  rows = load_table(hyphen(args[1],sys.stdin),want_header=True)
   header = rows.next() or ['']
   out.writerow(header + HEADER)
-  out.writerows( process(con,header,rows,options) )
+  out.writerows( annotate(con,header,rows,options) )
 
 
 if __name__=='__main__':
