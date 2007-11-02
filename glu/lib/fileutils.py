@@ -922,9 +922,9 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   >>> def test(f,**kw): return list(load_table(f,**kw))
   >>> from StringIO import StringIO
   >>> test(StringIO("loc1\\tlocA \\nloc2\\n\\n\\t\\n loc3 \\tlocC\\n\\tfoo\\nloc4\\t\\n"))
-  [['loc1', 'locA'], ['loc2'], [], ['', ''], ['loc3', 'locC'], ['', 'foo'], ['loc4', '']]
+  [['loc1', 'locA'], ['loc2', ''], ['', ''], ['', ''], ['loc3', 'locC'], ['', 'foo'], ['loc4', '']]
   >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),skip=2)
-  [['loc1', 'loc1'], ['loc2']]
+  [['loc1', 'loc1'], ['loc2', '']]
   >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[0,1])
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
   >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[1,0])
@@ -940,7 +940,7 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   >>> f.write('H1\\tH2\\nv11\\tv12\\nv21\\n\\tv32')
   >>> f.flush()
   >>> test(f.name + ':skip=1')
-  [['v11', 'v12'], ['v21'], ['', 'v32']]
+  [['v11', 'v12'], ['v21', ''], ['', 'v32']]
   >>> test(f.name + ':skip=1:columns=0,1')
   [['v11', 'v12'], ['v21', ''], ['', 'v32']]
   >>> test(f.name + ':skip=1:columns=0-1')
@@ -961,7 +961,7 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   if kwargs and extra_args is not None:
     extra_args.update(kwargs)
   elif kwargs:
-    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(kwargs)))
 
   lfile = autofile(name)
   lines = csv.reader(lfile, **dialect)
@@ -971,9 +971,20 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
 
   # All columns are to be returned
   if not columns:
+    try:
+      row = lines.next()
+    except StopIteration:
+      return
+
+    row = map(str.strip,row)
+    yield row
+
+    n = len(row)
     for row in lines:
-      row = map(str.strip,row)
-      yield row
+      result  = map(str.strip,row)
+      result += ['']*(n-len(result))
+      yield result
+
     return
 
   # Otherwise, resolve column heading names into indices
@@ -997,10 +1008,14 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   if want_header and header is not None:
     yield [ header[j] for j in indices ]
 
+  n = len(indices)
+
   # Build result rows
   for row in lines:
     m = len(row)
-    result = [ (row[j] if j<m else '') for j in indices ]
+    result = [ (row[j].strip() if j<m else '') for j in indices ]
+    if header is not None:
+      result += ['']*(n-len(result))
     yield result
 
 
