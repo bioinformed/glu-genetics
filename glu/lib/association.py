@@ -385,6 +385,8 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   if loci.samples:
     keep &= set(loci.samples)
 
+  loci = loci.transformed(include_samples=keep)
+
   if subjects != keep:
     phenos = [ p for p in phenos if p[0] in keep ]
 
