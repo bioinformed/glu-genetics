@@ -21,7 +21,7 @@ from itertools    import izip
 
 # Import Python numerical libraries (from http://scipy.org/)
 from numpy        import array,matrix,asmatrix,asarray,asanyarray,atleast_2d,zeros,zeros_like,ones,\
-                         where,exp,log,vsplit,unique,bmat,inf,sum,dot,transpose,diag,sqrt,conjugate,eye
+                         where,exp,log,vsplit,unique,bmat,inf,sum,dot,diag,sqrt,conjugate,eye
 from scipy        import linalg
 from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 
@@ -270,8 +270,8 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
       if not sqrtweights:
         weights = sqrt(weights)
 
-      a1 = transpose(weights*transpose(a1))
-      b1 = transpose(weights*transpose(b1))
+      a1 = (weights*a1.T).T
+      b1 = (weights*b1.T).T
 
     # Generalized covariance
     elif len(weights.shape) == 2:
@@ -334,8 +334,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   #  X'X    = V*S**2*V'                V is unitary, so V'*V=V*V'=I;
   #   I     = V*S**2*V'*(V*S**-2*V')   S is diagonal positive semi-definite
   # (X'X).I = V*S**-2*V'
-  v   = transpose(vt)
-  cov = dot(v,transpose(s2*v))
+  cov = dot(vt.T,(s2*vt.T).T)
 
   return beta,ss,cov,resids,rank,s,vt
 
@@ -395,7 +394,7 @@ def sqrtm(x):
       k = slice(i+1,j)
       R[i,j] = (T[i,j] - dot(R[i,k],R[k,j]))/(R[i,i] + R[j,j])
 
-  X = dot(dot(Z,R),conjugate(transpose(Z))).astype(A.dtype.char)
+  X = dot(dot(Z,R),conjugate(Z.T)).astype(A.dtype.char)
 
   # XXX: Should be a warning
   if 0:
@@ -445,7 +444,7 @@ def sqrtm_svd(x):
   False
   '''
   u,s,vt = svd(x)
-  return dot(u,transpose((s**0.5)*transpose(vt)))
+  return dot(u,((s**0.5)*vt.T).T)
 
 
 def sqrtm_eig(x):
@@ -488,7 +487,7 @@ def sqrtm_eig(x):
   '''
   d,e = eig(x)
   d = (d**0.5).astype(float)
-  return dot(e,transpose(d*e)).astype(float)
+  return dot(e,(d*e).T).astype(float)
 
 
 def sqrtm_symmetric(x,cond=1e-7):
@@ -515,7 +514,7 @@ def sqrtm_symmetric(x,cond=1e-7):
   '''
   d,e = eigh(x)
   d[d<cond] = 0
-  return dot(e,transpose((d**0.5)*e)).astype(float)
+  return dot(e,((d**0.5)*e).T).astype(float)
 
 
 def sqrtm_symmetric2(x):
@@ -543,7 +542,7 @@ def sqrtm_symmetric2(x):
   '''
   l=cholesky(x,lower=1)
   u,s,vt = svd(l)
-  return dot(u,transpose(s*u))
+  return dot(u,(s*u).T)
 
 
 def bdiag_to_mat(x):
@@ -635,7 +634,7 @@ def block_cholesky(w,lower=True):
 
   Verify x=l*l':
 
-  >>> norm(dot(l,transpose(l))-x) < 1e-14
+  >>> norm(dot(l,l.T)-x) < 1e-14
   True
 
   Now do the same thing using our algorithm, still using the packed format:
@@ -651,7 +650,7 @@ def block_cholesky(w,lower=True):
 
   >>> norm(l2-l) < 1e-14
   True
-  >>> norm(dot(l2,transpose(l2))-x) < 1e-14
+  >>> norm(dot(l2,l2.T)-x) < 1e-14
   True
 
   Derivation:
@@ -1049,7 +1048,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
     b,ss,W,resids,rank,s,vt = linear_least_squares(X,z,weights=w)
 
   else:
-    raise RuntimeError('logit estimator failed to converge')
+    raise LinAlgError('logit estimator failed to converge')
 
   b = asmatrix(b,dtype=float)
   W = asmatrix(W,dtype=float)
@@ -1191,12 +1190,12 @@ class GLogit(object):
 
     # Iterate until convergence
     for iteration in xrange(max_iterations):
-      eta = [ X*bi for bi in b ]
+      eta = [ asarray(dot(X,bi)) for bi in b ]
 
       # Compute expected values and linear predictors
       mu0  = 1/(1+exp(eta).sum(axis=0))
       eta0 = log(mu0)
-      mu   = [ exp(eta[i]).A*mu0 for i in xrange(k) ]
+      mu   = [ exp(eta[i])*mu0 for i in xrange(k) ]
 
       # Compute likelihood
       newL = eta0.sum() + y.choose( [0]+eta ).sum()
@@ -1226,7 +1225,7 @@ class GLogit(object):
       b    = vsplit(beta,k)
 
     else:
-      raise RuntimeError('glogit estimator failed to converge')
+      raise LinAlgError('glogit estimator failed to converge')
 
     # Return log-likelihood, regression estimates, and covariance matrix
     self.L       = L
@@ -1271,8 +1270,7 @@ class GLogit(object):
       else:
         s[i] = s[i]**2
 
-    v   = transpose(vt)
-    inf = dot(v,transpose(s*v))
+    inf = dot(vt.T,(s*vt.T).T)
 
     return inf
 
@@ -1305,7 +1303,7 @@ class GLogit(object):
     y  = self.y_ord
     yy = [ ((y==i+1) - mu[i]).reshape(-1) for i in xrange(k) ]
     zz = [ [eta[i]+sum((iw[i][j]*yy[j]) for j in xrange(k)).reshape(-1,1)] for i in xrange(k) ]
-    return bmat([ [sum(uw[i][j]*zz[j][0].T.A for j in xrange(i,k)).T] for i in xrange(k) ])
+    return bmat([ [sum(uw[i][j]*zz[j][0].T for j in xrange(i,k)).T] for i in xrange(k) ])
 
 
   def design_matrix(self,uw):
@@ -1704,7 +1702,7 @@ class Linear(object):
     self.resids = resids.sum()
     self.rank   = rank
     self.singular_values = s
-    self.right_singlular_matrix = transpose(vt)
+    self.right_singlular_matrix = vt.T
 
     return L,beta,W,ss
 
