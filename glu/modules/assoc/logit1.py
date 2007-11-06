@@ -16,14 +16,14 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
 import sys
+import csv
 
 from   numpy               import isfinite
 from   scipy               import stats
 
 from   glu.lib.fileutils   import autofile,hyphen
-from   glu.lib.glm         import GLogit
+from   glu.lib.glm         import GLogit,LinAlgError
 
 from   glu.lib.association import build_models,print_results,get_term,format_pvalue,NULL
 
@@ -98,7 +98,6 @@ def main():
   # Obtain estimates of covariate effects under the null
   null = GLogit(null_model.y,null_model.X,vars=null_model.vars)
 
-  cats = len(null.categories)
   null.fit()
 
   if options.nullmodel:
@@ -152,7 +151,17 @@ def main():
     for term in terms:
       model_term = term(lname)
       model = models.build_model(model_term,lmap)
-      if model:
+
+      if not model:
+        continue
+
+      g = GLogit(model.y,model.X,vars=model.vars)
+
+      try:
+        g.fit()
+      except LinAlgError:
+        continue
+      else:
         break
     else:
       # Otherwise, skip the locus
@@ -163,28 +172,21 @@ def main():
       f.writerow(model.vars)
       f.writerows(model.X.tolist())
 
+    assert len(null.categories) >= len(g.categories)
+
     n = model.X.shape[1]
     k = len(model_term)
+    c = len(g.categories)-1
 
-    if not k or not model.X.shape[0]:
-      continue
-    elif k>2:
-      raise ValueError,'Unexpected number of parameters in model (n=%d,k=%d)' % (n,k)
+    # Construct genotype parameter indices
+    indices = [ j*n+i for j in range(c)
+                      for i in model_term.indices() ]
 
     m = model.model_loci[lname]
     out.write('\t'.join([lname, ','.join(m.alleles), '%.3f' % m.maf ]))
-
-    ### SCORE TEST ###
-    g = GLogit(model.y,model.X)
-
-    # Construct genotype parameter indices
-    indices = [ j*n+i for i in range(1,k+1)
-                      for j in range(len(g.categories)-1) ]
-
-    g.fit()
-
-    counts = [ str((g.y_ord==c).sum()) for c in g.categories]
     out.write('\t')
+
+    counts = [ str((g.y_ord==cat).sum()) for cat in g.categories]
     out.write('|'.join(counts))
 
     sp = wp = lp = 1
@@ -211,15 +213,20 @@ def main():
       out.write('\t%d' % df)
 
     ors = []
-    for cat in range(len(g.categories)-1):
+    for cat in range(c):
       beta = g.beta[cat*n:(cat+1)*n,0]
       W    = g.W[cat*n:(cat+1)*n,:][:,cat*n:(cat+1)*n]
-      for orr,(ci_l,ci_u) in zip(model_term.odds_ratios(beta).tolist(),
+      for orr,(ci_l,ci_u) in zip(model_term.odds_ratios(beta),
                                  model_term.odds_ratio_ci(beta,W)):
         ors.extend( [orr,ci_l,ci_u] )
 
     orsstr = '\t'.join('%.4f' % orr if isfinite(orr) else '' for orr in ors)
     out.write('\t%s' % orsstr)
+
+    # FIXME: This does not align the categories -- just the blank headers
+    if len(null.categories) < len(g.categories):
+      short = len(g.categories)-len(null.categories)
+      out.write( '\t'*(short*6) )
 
     out.write('\n')
 
