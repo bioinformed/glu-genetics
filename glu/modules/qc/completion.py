@@ -19,93 +19,82 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools        import izip
-from   textwrap         import fill
+from   itertools         import izip
+from   textwrap          import fill
+from   collections       import defaultdict
 
-from   glu.lib.utils    import percent
-from   glu.lib.genolib  import load_genostream, snp
-from   glu.lib.sections import save_section, SectionWriter, save_metadata_section
+from   glu.lib.utils     import percent
+from   glu.lib.fileutils import autofile,hyphen
+from   glu.lib.genolib   import load_genostream
+from   glu.lib.sections  import save_section, SectionWriter, save_metadata_section
 
 
-# FIXME: Use an output stream (-o)
-def completion_summary(rowlabel,collabel,results,rowresults,colresults):
-  # FIXME: This is beginning to look like a closure
-  inf,genos_all,genos_inf = results
-  rowcomp,emptyrows,droppedrows,totalrows = rowresults
-  colcomp,emptycols,droppedcols,totalcols = colresults
+class MatrixResults(object):
+  def __init__(self,rowresults,colresults,completed,total_all,total_inf):
+    self.rowresults = rowresults
+    self.colresults = colresults
+    self.completed  = completed
+    self.total_all  = total_all
+    self.total_inf  = total_inf
 
-  print '%s     Total: %7d, Empty: %7d, Dropped: %7d, Informative: %7d' % \
-             (rowlabel,totalrows,len(emptyrows),droppedrows,len(rowcomp)-len(emptyrows))
-  print '%s  Total: %7d, Empty: %7d, Dropped: %7d, Informative: %7d' % \
-             (collabel,totalcols,len(emptycols),droppedcols,len(colcomp)-len(emptycols))
-  print
-  print 'GLOBAL GENOTYPE COMPLETION RATE FOR ALL DATA:         %10d / %10d = %5.3f%%' % (inf,genos_all,percent(inf,genos_all))
-  print 'GLOBAL GENOTYPE COMPLETION RATE FOR INFORMATIVE DATA: %10d / %10d = %5.3f%%' % (inf,genos_inf,percent(inf,genos_inf))
+
+class SliceResults(object):
+  def __init__(self,label,completion,empty,dropped,total):
+    self.label      = label
+    self.completion = completion
+    self.empty      = empty
+    self.dropped    = dropped
+    self.total      = total
+
+
+def completion_summary(outfile,results):
+  for x in (results.rowresults,results.colresults):
+    outfile.write('%-7s Total: %7d, Empty: %7d, Dropped: %7d, Informative: %7d\n' % \
+               (x.label,x.total,len(x.empty),x.dropped,len(x.completion)-len(x.empty)))
+  outfile.write('\n')
+  outfile.write('GLOBAL GENOTYPE COMPLETION RATE FOR ALL DATA:         %10d / %10d = %5.3f%%\n' %
+                 (results.completed,results.total_all,percent(results.completed,results.total_all)))
+  outfile.write('GLOBAL GENOTYPE COMPLETION RATE FOR INFORMATIVE DATA: %10d / %10d = %5.3f%%\n' %
+                 (results.completed,results.total_inf,percent(results.completed,results.total_inf)))
+
   e = ' '*5
   empty = e+'(empty)'
-  print
-  print '%s with no data:' % rowlabel
-  print fill(', '.join(emptyrows), initial_indent=e,subsequent_indent=e) or empty
-  print
-  print '%s with no data:' % collabel
-  print fill(', '.join(emptycols), initial_indent=e,subsequent_indent=e) or empty
-  print
+  outfile.write('\n')
+  for x in (results.rowresults,results.colresults):
+    outfile.write('%s with no data:\n' % x.label)
+    outfile.write(fill(', '.join(x.empty), initial_indent=e,subsequent_indent=e) or empty)
+    outfile.write('\n\n')
 
 
-# FIXME: Use an output stream (-o)
-def completion_output(name, data, total_inf, total_uninf):
-  data = sorted( (n,k) for k,(n,m) in data.iteritems() )
-  print 'MISSING GENOTYPES BY %s' % name.upper()
-  print
-  print '                                        Informative                  All'
-  print '  Rank  %-25s        N / Total      %%           N / Total      %%  ' % name
-  print '  ----  -------------------------  -----------------  ------  -----------------  ------'
+def completion_output(outfile, results1, results2):
+  data = sorted( (n,k) for k,(n,m) in results1.completion.iteritems() )
+  outfile.write('MISSING GENOTYPES BY %s\n' % results1.label.upper())
+  outfile.write('\n')
+  outfile.write('                                        Informative                  All\n')
+  outfile.write('  Rank  %-25s        N / Total      %%           N / Total      %%  \n' % results1.label)
+  outfile.write('  ----  -------------------------  -----------------  ------  -----------------  ------\n')
 
-  total_all = total_inf+total_uninf
+  total_inf = len(results2.completion)-len(results2.empty)
+  total_all = total_inf+len(results2.empty)+results2.dropped
+
   for r,(n,l) in enumerate(data):
-    data = (r+1,l,n,total_inf,percent(n,total_inf),n,total_all,percent(n,total_all))
-    print '  %4d  %-25s  %7d / %7d  %6.2f  %7d / %7d  %6.2f' % data
-  print
+    data = (r+1,l,n,total_inf,percent(n,total_inf),
+                  n,total_all,percent(n,total_all))
+    outfile.write('  %4d  %-25s  %7d / %7d  %6.2f  %7d / %7d  %6.2f\n' % data)
+  outfile.write('\n')
 
 
-# FIXME: Use an output stream (-o)
-def completion_output2(name, data, m):
-  data = sorted( (v,k) for k,v in data.iteritems() )
-  e = ' '*43
-  rank = 1
-
-  print 'MISSING GENOTYPES BY %s' % name.upper()
-  print
-  print '  Ranks              # Missing        %%    Missing %s names' % name
-  print '  -------------  -----------------  -----  -------------------------------------------------'
-  for items in data:
-    k = len(items)
-    if k > 9:
-      it = items[:9] + ['...']
-    else:
-      it = items
-    text = fill(', '.join(it), initial_indent=e,subsequent_indent=e,width=99).lstrip(' ')
-    p = percent(n,m)
-    print '  %6d-%6d  %7d / %7d  %4.1f%%  %s' % (rank,rank+k-1,n,m,p,text)
-    rank += k
-
-  print
-
-
-def completion(genos, droppedrows=0, droppedcols=0):
+def completion(genos, rowlabel, collabel, droppedrows=0, droppedcols=0):
   print >> sys.stderr, 'Computing completion rates...',
 
-  rowcomp = {}
-  colcomp = {}
+  rowcomp  = defaultdict(lambda: [0,0])
+  colcomp  = defaultdict(lambda: [0,0])
+  colcomps = [ colcomp[colkey] for colkey in genos.columns ]
 
-  colcomps = [ colcomp.setdefault(colkey,[0,0]) for colkey in genos.columns ]
+  for rowkey,rgenos in genos:
+    rcomp = rowcomp[rowkey]
 
-  for row in genos:
-    rowkey,rgenos = row
-    items = izip(colcomps,rgenos)
-
-    rcomp = rowcomp.setdefault(rowkey,[0,0])
-    for ccomp,geno in items:
+    for ccomp,geno in izip(colcomps,rgenos):
       # Dirty python trick where not missing == 0, missing == 1
       missing = not geno
       rcomp[missing] += 1
@@ -153,28 +142,26 @@ def completion(genos, droppedrows=0, droppedcols=0):
   genos_inf = inf + noninf - empty
   genos_all = inf + noninf + missing
 
-  # FIXME: This is beginning to look like a closure
-  return (inf,genos_all,genos_inf),                 \
-         (rowcomp,emptyrows,droppedrows,totalrows), \
-         (colcomp,emptycols,droppedcols,totalcols)
+  rowresults = SliceResults(rowlabel,rowcomp,emptyrows,droppedrows,totalrows)
+  colresults = SliceResults(collabel,colcomp,emptycols,droppedcols,totalcols)
 
-def save_completion_summary(sw, results, section_type):
- section='summary'
- comp,empty,dropped,total = results
- data = [['slice',        section_type],
-         ['total',       total],
-         ['empty',       ','.join(empty)],
-         ['dropped',     dropped],
-         ['informative', len(comp)-len(empty)]]
-
- save_section(sw, section, data)
+  return MatrixResults(rowresults,colresults,inf,genos_all,genos_inf)
 
 
-def save_completion_results(sw, results, section_type):
- section='data'
- data = [[name,complete] for name,(complete,total) in results.iteritems()]
- data = [['slice', section_type], ['id', 'complete']] + data
- save_section(sw, section, data)
+def save_completion_summary(sw, results):
+ data = [['slice',       results.label],
+         ['total',       results.total],
+         ['empty',       ','.join(results.empty)],
+         ['dropped',     results.dropped],
+         ['informative', len(results.completion)-len(results.empty)]]
+
+ save_section(sw, 'summary', data)
+
+
+def save_completion_results(sw, results):
+ data  = [['slice', results.label], ['id', 'complete']]
+ data += [[name,complete] for name,(complete,total) in results.completion.iteritems()]
+ save_section(sw, 'data', data)
 
 
 def option_parser():
@@ -183,14 +170,16 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE',
+  parser.add_option('-f', '--format', dest='format', metavar='NAME',
+                    help='Format of the input data. Values=sdat,ldat')
+  parser.add_option('-R', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of completion report')
   parser.add_option('-r', '--droppedrows', dest='droppedrows', metavar='N', type='int', default=0,
                     help='Number of rows that where dropped from the dataset previously.  Used to compute overall completion.')
   parser.add_option('-c', '--droppedcols', dest='droppedcols', metavar='N', type='int', default=0,
                     help='Number of columns that where dropped from the dataset previously.  Used to compute overall completion.')
-  parser.add_option('-f', '--format', dest='format', metavar='NAME',
-                    help='Format of the input data. Values=sdat,ldat')
   parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
 
@@ -205,38 +194,35 @@ def main():
     parser.print_help()
     return
 
-  genos = load_genostream(args[0],options.format,snp)
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr)
 
   if genos.format not in ('sdat','ldat'):
     genos = genos.as_ldat()
 
   if genos.format=='sdat':
     rowlabel='Sample'
-    collabel='Loci'
+    collabel='Locus'
   elif genos.format=='ldat':
-    rowlabel='Loci'
-    collabel='Samples'
+    rowlabel='Locus'
+    collabel='Sample'
 
-  results,rowresults,colresults = completion(genos, options.droppedrows, options.droppedcols)
+  outfile = autofile(hyphen(options.output, sys.stdout),'w')
+
+  results = completion(genos,rowlabel,collabel,options.droppedrows,options.droppedcols)
 
   print >> sys.stderr, 'Writing completion output...',
 
-  completion_summary(rowlabel,collabel,results,rowresults,colresults)
-
-  # FIXME: This is beginning to look like a closure
-  rowcomp,emptyrows,droppedrows,totalrows = rowresults
-  colcomp,emptycols,droppedcols,totalcols = colresults
-
-  completion_output(rowlabel, rowcomp, len(colcomp)-len(emptycols), len(emptycols)+droppedcols)
-  completion_output(collabel, colcomp, len(rowcomp)-len(emptyrows), len(emptyrows)+droppedrows)
+  completion_summary(outfile,results)
+  completion_output(outfile, results.rowresults, results.colresults)
+  completion_output(outfile, results.colresults, results.rowresults)
 
   if options.tabularoutput:
     sw = SectionWriter(options.tabularoutput)
     save_metadata_section(sw, analysis='completion', analysis_version='0.1')
-    save_completion_summary(sw,rowresults,rowlabel)
-    save_completion_summary(sw,colresults,collabel)
-    save_completion_results(sw,rowcomp,rowlabel)
-    save_completion_results(sw,colcomp,collabel)
+    save_completion_summary(sw,results.rowresults)
+    save_completion_summary(sw,results.colresults)
+    save_completion_results(sw,results.rowresults)
+    save_completion_results(sw,results.colresults)
 
   print >> sys.stderr, 'Done.'
 
