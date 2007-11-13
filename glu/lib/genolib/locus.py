@@ -117,7 +117,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   if isinstance(filename,basestring) and filename.startswith(':'):
     filename = parse_augmented_filename(filename,kwargs)
     assert not filename
-  else:
+  elif filename:
     rows = load_table(filename,want_header=True,extra_args=kwargs,**kwargs)
     header = rows.next()
 
