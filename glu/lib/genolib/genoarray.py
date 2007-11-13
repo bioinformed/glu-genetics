@@ -662,7 +662,7 @@ def locus_genotype_missing_rate(genocounts):
   return genocounts[0]/n
 
 
-def count_alleles(model,genocounts):
+def count_alleles_from_genocounts(model,genocounts):
   '''
   Count the number of occurances of each allele belonging to the specified
   locus model given a set of genotype counts.  Counts are returned as a list
@@ -683,7 +683,7 @@ def count_alleles(model,genocounts):
   >>> genos = model.genotypes*200+model.genotypes[2:]*200
   >>> random.shuffle(genos)
 
-  >>> count_alleles(model,count_genotypes(model,genos))
+  >>> count_alleles_from_genocounts(model,count_genotypes(model,genos))
   [400, 800, 1200]
   '''
   counts = [0]*len(model.alleles)
@@ -693,25 +693,52 @@ def count_alleles(model,genocounts):
   return counts
 
 
-def minor_allele(model,allelecounts):
+def count_alleles_from_genos(model,genos):
+  '''
+  Count the number of occurances of each allele belonging to the specified
+  locus model given a set of genotype counts.  Counts are returned as a list
+  of integers corresponding to the number of each allele in model.alleles
+  oberved.
+
+  @param model: model for all genotypes
+  @type  model: UnphasedMarkerModel
+  @param genos: sequence of genotype objects belonging to model
+  @type  genos: sequence of Genotype instances
+  @return     : count of each genotype
+  @rtype      : list of integers
+
+  >>> import random
+  >>> model = model_from_alleles('AB')
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes*200+model.genotypes[2:]*200
+  >>> random.shuffle(genos)
+
+  >>> count_alleles_from_genos(model,genos)
+  [400, 800, 1200]
+  '''
+  return count_alleles_from_genocounts(model,count_genotypes(model,genos))
+
+
+def minor_allele_from_allelecounts(model,allelecounts):
   '''
   >>> model = model_from_alleles('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def alleles_from_genos(nn,aa,ab,bb):
-  ...   return count_alleles(model,count_genotypes(model,[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
-  >>> minor_allele(model, alleles_from_genos(0,1,2,1))
+  ...   return count_alleles_from_genocounts(model,count_genotypes(model,[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(0,1,2,1))
   ('A', 0.5)
-  >>> minor_allele(model, alleles_from_genos(0,1000,2000,1000))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(0,1000,2000,1000))
   ('A', 0.5)
-  >>> minor_allele(model, alleles_from_genos(10000,1000,2000,1000))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(10000,1000,2000,1000))
   ('A', 0.5)
-  >>> minor_allele(model, alleles_from_genos(10000,0,2000,2000))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(10000,0,2000,2000))
   ('A', 0.25)
-  >>> minor_allele(model, alleles_from_genos(10000,2000,2000,0))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(10000,2000,2000,0))
   ('B', 0.25)
-  >>> minor_allele(model, alleles_from_genos(0,1000,0,0))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(0,1000,0,0))
   ('B', 0.0)
-  >>> minor_allele(model, alleles_from_genos(1000,0,0,0))
+  >>> minor_allele_from_allelecounts(model, alleles_from_genos(1000,0,0,0))
   ('A', 0.0)
   '''
   n = len(allelecounts)
@@ -735,6 +762,32 @@ def minor_allele(model,allelecounts):
   i = informative.index(f)+1
   return model.alleles[i],f/m
 
+
+def minor_allele_from_genos(model,genos):
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def mkgenos(nn,aa,ab,bb):
+  ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
+  >>> minor_allele_from_genos(model,mkgenos(0,1,2,1))
+  ('A', 0.5)
+  >>> minor_allele_from_genos(model,mkgenos(0,1000,2000,1000))
+  ('A', 0.5)
+  >>> minor_allele_from_genos(model,mkgenos(10000,1000,2000,1000))
+  ('A', 0.5)
+  >>> minor_allele_from_genos(model,mkgenos(10000,0,2000,2000))
+  ('A', 0.25)
+  >>> minor_allele_from_genos(model,mkgenos(10000,2000,2000,0))
+  ('B', 0.25)
+  >>> minor_allele_from_genos(model,mkgenos(0,1000,0,0))
+  ('B', 0.0)
+  >>> minor_allele_from_genos(model,mkgenos(1000,0,0,0))
+  ('A', 0.0)
+  '''
+  counts = count_alleles_from_genocounts(model,count_genotypes(model,genos))
+  return minor_allele_from_allelecounts(model, counts)
+
+##################################################################################
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
   '''
