@@ -29,8 +29,10 @@ from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import autofile,namefile,guess_format
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
+from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.genoarray import model_from_alleles
-from   glu.lib.genolib.reprs     import snp,hapmap,marker
+from   glu.lib.genolib.locus     import load_modelmap
+from   glu.lib.genolib.reprs     import snp, hapmap, marker, get_genorepr
 from   glu.lib.genolib.text      import (TextGenomatrixWriter,        TextGenotripleWriter,
                                          save_genotriples_text,       load_genotriples_text,
                                          save_genomatrix_text,        load_genomatrix_text,
@@ -50,7 +52,6 @@ def guess_informat(filename):
   @param filename: a file name or file object
   @type  filename: str or file object
   '''
-
   return guess_format(filename, INPUT_FORMATS)
 
 
@@ -59,7 +60,6 @@ def guess_informat_list(filenames):
   @param filename: a file name or file object
   @type  filename: str or file object
   '''
-
   formats = set( guess_informat(f) for f in filenames )
   formats.discard(None)
   if len(formats) == 1:
@@ -72,7 +72,6 @@ def guess_outformat(filename):
   @param filename: a file name or file object
   @type  filename: str or file object
   '''
-
   return guess_format(filename, OUTPUT_FORMATS)
 
 
@@ -85,14 +84,16 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   @param   format: format of input file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
                    lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type    format: str
-  @param genorepr: internal representation of genotypes for the input/output. Default is None
-  @type  genorepr: UnphasedMarkerRepresentation or similar object
+  @param  genorepr: string or representation object for text genotypes. Default is None
+  @type   genorepr: str, UnphasedMarkerRepresentation or similar object
   @param    limit: limit the number of samples loaded. Default is None
   @type     limit: int or None
   @param   unique: flag indicating if repeated row or column elements do not exist. Default is None
   @type    unique: bool
-  @para  modelmap: map between a locus and an new internal representation of genotypes. Default is None
-  @type  modelmap: dict
+  @para  modelmap: map between a locus and an new internal genotype
+                   representation. If a string is specified, it is passwd to load_modelmap().
+                   Default is None.
+  @type  modelmap: str or dict
   @return        : loaded genomatrix stream
   @rtype         : GenomatrixStream
 
@@ -111,7 +112,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genostream(data,'trip',genorepr=snp)
+  >>> triples = load_genostream(data,'trip',genorepr='snp')
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -122,10 +123,16 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   if format is None:
     format = guess_informat(filename)
 
+  if isinstance(genorepr,basestring):
+    genorepr = get_genorepr(genorepr)
+
+  if isinstance(modelmap,basestring):
+    modelmap = load_modelmap(options.modelmap)
+
   samples = loci = None
 
   if format == 'hapmap':
-    genos = load_genomatrix_hapmap(filename,limit=limit)
+    genos = load_genomatrix_hapmap(filename,limit=limit,modelmap=modelmap)
   elif format == 'ldat':
     genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,modelmap=modelmap)
   elif format == 'sdat':
@@ -159,8 +166,8 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
   @param    format: format of input file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
                     lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type     format: str
-  @param  genorepr: internal representation of genotypes for the input/output. Default is None
-  @type   genorepr: UnphasedMarkerRepresentation or similar object
+  @param  genorepr: string or representation object for text genotypes. Default is None
+  @type   genorepr: str, UnphasedMarkerRepresentation or similar object
   @param mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
   @type  mergefunc: callable
   @param  compress: flag indicating if a compressed format is desired. Default is True
@@ -168,6 +175,9 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
   '''
   if format is None:
     format = guess_outformat(filename)
+
+  if isinstance(genorepr,basestring):
+    genorepr = get_genorepr(genorepr)
 
   if mergefunc is not None:
     genos = genos.merged(mergefunc)
@@ -194,13 +204,15 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
 
 def transform_files(infiles,informat,ingenorepr,
                     outfile,outformat,outgenorepr,
-                    transform=None,
+                    transform=None, modelmap=None,
                     mergefunc=None,limit=None):
   '''
+
   The driver for transforming multiple genodata files into different formats
   (ldat, sdat, trip, or genotriples), representations (...) and, depending
   on the presence and attributes of the transform object, performing
-  operations on samples and loci such as exclude, include, and rename.
+  operations on samples and loci such as exclude, include, and rename.  The
+  results are then saved to the specified output file.
 
   @param     infiles: list of input file names or file objects
   @type      infiles: str or file objects
@@ -222,13 +234,11 @@ def transform_files(infiles,informat,ingenorepr,
   @type    mergefunc: callable
   @param       limit: limit the number of samples loaded
   @type        limit: int or None
-  @return           : transformed genodata
-  @rtype            : GenomatrixStream or GenotripleStream
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\t\\tCT\\tTT\\n")
   >>> out  = StringIO()
-  >>> transform_files([data],'ldat',snp,out,'trip',marker)
+  >>> transform_files([data],'ldat','snp',out,'trip','marker')
   >>> print out.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1  l1      A/A
   s2  l1      A/G
@@ -240,7 +250,24 @@ def transform_files(infiles,informat,ingenorepr,
   if informat is None:
     informat = guess_informat_list(infiles)
 
-  genos = [ load_genostream(f,informat,ingenorepr,limit=limit).transformed(transform) for f in infiles ]
+  if isinstance(ingenorepr,basestring):
+    ingenorepr = get_genorepr(ingenorepr)
+
+  if isinstance(outgenorepr,basestring):
+    outgenorepr = get_genorepr(outgenorepr)
+
+  if not outgenorepr:
+    outgenorepr = ingenorepr
+
+  if modelmap is None:
+    modelmap = {}
+  elif isinstance(modelmap,basestring):
+    modelmap = load_modelmap(options.modelmap)
+
+  if isinstance(mergefunc,basestring):
+    mergefunc = get_genomerger(mergefunc)
+
+  genos = [ load_genostream(f,informat,ingenorepr,limit=limit,modelmap=modelmap).transformed(transform) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
