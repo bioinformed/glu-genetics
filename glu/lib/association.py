@@ -30,7 +30,7 @@ from   scipy             import stats
 
 from   glu.lib.utils     import tally,pick
 from   glu.lib.fileutils import autofile,namefile,load_list,load_map,load_table
-from   glu.lib.genolib   import load_genostream, get_genorepr
+from   glu.lib.genolib   import load_genostream
 
 
 LOGE_10 = log(10)
@@ -369,8 +369,7 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   subjects      = set(p[0] for p in phenos)
   keep          = subjects.copy()
   phenocount1   = len(phenos)
-  genorepr      = get_genorepr(options.genorepr)
-  loci          = load_genostream(genofile,format=options.format,genorepr=genorepr).as_ldat()
+  loci          = load_genostream(genofile,format=options.format,genorepr=options.genorepr).as_ldat()
 
   if options.includeloci or options.excludeloci:
     loci = loci.transformed(include_loci=options.includeloci,

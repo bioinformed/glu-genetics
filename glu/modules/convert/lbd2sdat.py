@@ -28,7 +28,6 @@ from   glu.lib.fileutils    import autofile,hyphen
 from   glu.lib.sections     import read_sections
 from   glu.lib.sequence     import norm_snp_seq, complement_base
 
-from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.io        import save_genostream
 from   glu.lib.genolib.genoarray import model_from_alleles
@@ -276,8 +275,7 @@ def main():
   samples  = convert_ab_genos(loci, samples, abmap)
   genos    = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci, modelmap=modelmap)
 
-  genorepr = get_genorepr(options.genorepr)
-  save_genostream(hyphen(options.output,sys.stdout),genos,genorepr=genorepr)
+  save_genostream(hyphen(options.output,sys.stdout),genos,genorepr=options.genorepr)
 
 
 if __name__ == '__main__':

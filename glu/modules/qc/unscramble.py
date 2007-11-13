@@ -75,8 +75,14 @@ def option_parser():
 
   parser.add_option('--testformat', dest='testformat',metavar='FILE', default='ldat',
                      help='File format for test genotype data. Values=ldat (default) or hapmap')
+  parser.add_option('-g', '--testgenorepr', dest='testgenorepr', metavar='REP', default='snp',
+                    help='Test data genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('--refformat',  dest='refformat', metavar='FILE', default='ldat',
                      help='File format for reference genotype data. Values=ldat (default) or hapmap')
+  parser.add_option('-G', '--refgenorepr', dest='refgenorepr', metavar='REP', default='snp',
+                    help='Reference data genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   return parser
 
 
@@ -88,8 +94,10 @@ def main():
     parser.print_help()
     return
 
-  test           = load_genostream(args[0], options.testformat).as_ldat()
-  reference      = load_genostream(args[1], options.refformat).as_ldat()
+  test           = load_genostream(args[0], format=options.testformat, genorepr=options.testgenorepr,
+                                            modelmap=options.loci).as_ldat()
+  reference      = load_genostream(args[1], format=options.refformat,  genorepr=options.refgenorepr,
+                                            modelmap=options.loci).as_ldat()
   test,reference = align_genotypes(test,reference)
   concordance(test,reference)
 

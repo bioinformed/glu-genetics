@@ -172,8 +172,10 @@ def option_parser():
 
   parser.add_option('-f', '--format', dest='format', metavar='NAME',
                     help='Format of the input data. Values=sdat,ldat')
-  parser.add_option('-R', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
                     help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of completion report')
   parser.add_option('-r', '--droppedrows', dest='droppedrows', metavar='N', type='int', default=0,
@@ -194,7 +196,8 @@ def main():
     parser.print_help()
     return
 
-  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr)
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                  modelmap=options.loci)
 
   if genos.format not in ('sdat','ldat'):
     genos = genos.as_ldat()

@@ -28,7 +28,7 @@ from   operator          import itemgetter
 
 from   glu.lib.xtab      import rowsby
 from   glu.lib.fileutils import autofile, hyphen, load_list,load_map
-from   glu.lib.genolib   import save_genostream
+from   glu.lib.genolib   import GenomatrixStream, save_genostream, snp
 
 
 DATA_HEADER = ['SNP Name','Sample ID','Allele1 - Forward','Allele2 - Forward','GC Score','X','Y','X Raw','Y Raw']
@@ -42,6 +42,10 @@ def option_parser():
 
   #parser.add_option('--gcthreshold', dest='gcthreshold', type='float', metavar='N', default=0)
   parser.add_option('-o','--output', dest='output',                    metavar='FILE')
+  parser.add_option('-f','--format',  dest='format',
+                    help='Output format for genotype data. Default is informat, cannot be hapmap.')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
+                    help='Output genotype representation.  Values=snp (default), hapmap, marker')
   parser.add_option('--samplemap',   dest='samplemap',                 metavar='FILE')
   parser.add_option('--locusmap',    dest='locusmap',                  metavar='FILE')
   parser.add_option('--gcthreshold', dest='gcthreshold', type='float', metavar='N')
@@ -142,7 +146,7 @@ def main():
   genos = GenomatrixStream.from_strings(rows,'ldat',samples=columns,genorepr=snp)
 
   out = hyphen(options.output,sys.stdout)
-  save_genostream(out,genos,snp)
+  save_genostream(out,genos,format=options.format,genorepr=options.genorepr)
 
 
 if __name__ == '__main__':

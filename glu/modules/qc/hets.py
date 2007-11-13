@@ -60,8 +60,10 @@ def option_parser():
   parser = optparse.OptionParser(usage=usage)
   parser.add_option('-f', '--format', dest='format',
                     help='Input data format, either hapmap,ldat,sdat or counts')
-  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
                     help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
                     help='Include list for those samples to only use')
   parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
@@ -132,7 +134,8 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr).as_sdat()
+    loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                   modelmap=options.loci).as_sdat()
 
     loci = loci.transformed(include_loci=options.includeloci,
                             exclude_loci=options.excludeloci,

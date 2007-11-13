@@ -370,7 +370,8 @@ def option_parser():
                     help='Input format for genotype data. Values=hapmap, ldat, sdat, trip, or genotriple')
   parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='genotype representation.  Values=snp (default), hapmap, marker')
-
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('-d', '--destdir', dest='destdir', default='',
                     help='Destination directory for output files.  Write to input file directory by default.')
   parser.add_option('--maxrows', dest='maxrows', metavar='N', type='int',
@@ -406,7 +407,8 @@ def main():
   options.genorepr = get_genorepr(options.genorepr)
 
   infile   = hyphen(args[0],sys.stdin)
-  genos    = load_genostream(infile,format=options.format,genorepr=options.genorepr)
+  genos    = load_genostream(infile,format=options.format,genorepr=options.genorepr,
+                                    modelmap=options.loci)
 
   outformat = guess_outformat(infile) or options.format or genos.format
   split(genos, outformat, prefix, suffix, options)

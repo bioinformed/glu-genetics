@@ -71,7 +71,7 @@ from   collections          import defaultdict
 
 from   glu.lib.utils        import percent
 from   glu.lib.fileutils    import load_map,autofile,hyphen
-from   glu.lib.genolib      import load_genostream,get_genorepr
+from   glu.lib.genolib      import load_genostream
 from   glu.lib.regionparser import load_regions,Regions
 from   glu.lib.sections     import save_section, SectionWriter, save_metadata_section
 
@@ -359,17 +359,19 @@ def option_parser():
 
   parser.add_option('-f', '--format',          dest='format',          metavar='NAME',
                     help='Format of the input data. Values=sdat,ldat,hapmap,genotriple')
-  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
                     help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('-o', '--output',          dest='output',          metavar='FILE', default='-',
                     help='Output of completion report')
-  parser.add_option('-l', '--limit',           dest='limit',           metavar='N',    default=0 , type='int',
+  parser.add_option(      '--limit',           dest='limit',           metavar='N',    default=0 , type='int',
                     help='Limit the number of genotypes considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('-e', '--regions', dest='regions', metavar='FILE',
                     help='Regions of genotypes expected to be genotyped. Used to compute overall completion.')
-  parser.add_option('-g', '--samplegroup',     dest='samplegroup',     metavar='FILE',
+  parser.add_option(     '--samplegroup',     dest='samplegroup',     metavar='FILE',
                     help='Map the sample ids to the grouping variable')
-  parser.add_option('-G', '--locusgroup',      dest='locusgroup',      metavar='FILE',
+  parser.add_option(     '--locusgroup',      dest='locusgroup',      metavar='FILE',
                     help='Map the locus ids to the grouping variable')
   parser.add_option(      '--tabularoutput',   dest='tabularoutput',   metavar='FILE',
                     help='Generate machine readable tabular output of results')
@@ -425,8 +427,8 @@ def main():
 
   infile      = hyphen(args[0], sys.stdin)
   outfile     = autofile(hyphen(options.output, sys.stdout),'w')
-  genorepr    = get_genorepr(options.genorepr)
-  genostream  = load_genostream(infile,options.format,genorepr,limit=options.limit)
+  genostream  = load_genostream(infile,format=options.format,genorepr=options.genorepr,
+                                       modelmap=options.loci,limit=options.limit)
   genotriples = genostream.as_genotriples()
 
   samcomp,samempty,loccomp,locempty,nonmissing,genos_inf,genos_all = completion(genotriples,regions)

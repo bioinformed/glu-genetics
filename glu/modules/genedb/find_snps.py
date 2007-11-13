@@ -57,7 +57,7 @@ def option_parser():
                     help="the name of the output file, '-' for standard out")
   parser.add_option('-i', '--infile',   dest='infile',  default='-', metavar='FILE',
                     help="the name of the feature file containing list of features, '-' for standard in")
-  parser.add_option('-l', '--limit',     dest='limit',   type='int',
+  parser.add_option(      '--limit',     dest='limit',   type='int',
                     help='limit the number of features being explored for testing purpose.')
   return parser
 

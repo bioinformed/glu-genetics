@@ -34,9 +34,7 @@ from   glu.lib.union_find        import union_find
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
 from   glu.lib.genolib.io        import load_genostream
-from   glu.lib.genolib.locus     import load_modelmap
 from   glu.lib.genolib.merge     import get_genomerger
-from   glu.lib.genolib.reprs     import get_genorepr, snp, hapmap
 from   glu.lib.genolib.genoarray import genoarray_concordance, model_from_alleles
 
 
@@ -184,8 +182,8 @@ def option_parser():
                     help='Input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
   parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
-  parser.add_option('-l', '--locusmodels', dest='locusmodels', metavar='FILE',
-                    help='Locus description options and/or file')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',
                     help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
                          'Values=vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=vote:1')
@@ -230,14 +228,9 @@ def main():
     print >> sys.stderr, 'Done.'
 
   print >> sys.stderr, 'Loading data...',
-  genorepr = get_genorepr(options.genorepr)
   merger   = get_genomerger(options.merge)
 
-  modelmap = None
-  if options.locusmodels:
-    modelmap = load_modelmap(options.locusmodels)
-
-  genos = load_genostream(args[0], options.format, genorepr, modelmap=modelmap)
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,modelmap=options.loci)
   genos = genos.as_sdat(merger).materialize()
 
   print >> sys.stderr, 'Done.'

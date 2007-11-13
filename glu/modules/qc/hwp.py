@@ -86,8 +86,10 @@ def option_parser():
                     help='Output of tests for deviation from Hardy-Weinberg proportions')
   parser.add_option('-f', '--format', dest='format', metavar='F',
                     help='Input data format, ldat, sdat, trip, or counts')
-  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
                     help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
                     help='Include list for those samples to only use')
   parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
@@ -96,7 +98,7 @@ def option_parser():
                     help='Exclude a list of samples')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='Exclude a list of loci')
-  parser.add_option('-L', '--limit', dest='limit', metavar='N', type='int',
+  parser.add_option(      '--limit', dest='limit', metavar='N', type='int',
                     help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
@@ -133,7 +135,7 @@ def main():
 
   if options.format != 'counts':
     loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                   limit=options.limit).as_ldat()
+                                   modelmap=options.loci,limit=options.limit).as_ldat()
 
     loci = loci.transformed(include_loci=options.includeloci,
                             exclude_loci=options.excludeloci,

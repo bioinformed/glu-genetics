@@ -25,7 +25,6 @@ from   itertools import izip
 
 from   glu.lib.fileutils     import autofile, namefile, hyphen
 from   glu.lib.genolib.io    import load_genostream
-from   glu.lib.genolib.reprs import get_genorepr
 
 
 def emit(filename,rows):
@@ -39,19 +38,21 @@ def option_parser():
 
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('--format',  dest='format', type='str',
+  parser.add_option('-f', '--format',  dest='format', type='str',
                      help='The input genotype file format, possible values=hapmap,ldat,sdat,lbat,sbat,tbat,trip,genotriple')
   parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
-  parser.add_option('-l', '--lazy', dest='lazy', action='store_true', default=False,
+  parser.add_option('-z', '--lazy', dest='lazy', action='store_true', default=False,
                     help='Be lazy and never materialize the genotypes.  Some results may come back unknown')
-  parser.add_option('--loci',   dest='loci',    metavar='FILE',
+  parser.add_option('--outputloci',   dest='outputloci',    metavar='FILE',
                      help='Output the list of loci to FILE')
-  parser.add_option('--samples',dest='samples', metavar='FILE',
+  parser.add_option('--outputsamples',dest='outputsamples', metavar='FILE',
                      help='Output the list of samples to FILE')
-  parser.add_option('--models',  dest='models', metavar='FILE',
+  parser.add_option('--outputmodels',  dest='outputmodels', metavar='FILE',
                      help='Output the genotype models (alleles for each locus) to FILE')
   return parser
 
@@ -64,9 +65,9 @@ def main():
     parser.print_help()
     return
 
-  infile   = hyphen(args[0],sys.stdin)
-  genorepr = get_genorepr(options.genorepr)
-  genos    = load_genostream(infile,options.format,genorepr=genorepr)
+  infile = hyphen(args[0],sys.stdin)
+  genos  = load_genostream(infile,format=options.format,genorepr=options.genorepr,
+                                  modelmap=options.loci)
 
   out = autofile(hyphen(options.output,sys.stdout),'w')
 
@@ -79,22 +80,22 @@ def main():
 
   if genos.samples is not None:
     out.write('sample count: %d\n' % len(genos.samples))
-    if options.samples:
-      emit(options.samples,([s] for s in genos.samples) )
+    if options.outputsamples:
+      emit(options.outputsamples,([s] for s in genos.samples) )
 
   if genos.loci is not None:
     out.write('locus  count: %d\n' % len(genos.loci))
-    if options.loci:
-      emit(options.loci, ([l] for l in genos.loci))
+    if options.outputloci:
+      emit(options.outputloci, ([l] for l in genos.loci))
 
   if genos.samples is not None and genos.loci is not None:
     out.write('model  count: %d\n' % len(set(genos.models)))
-    if options.models:
+    if options.outputmodels:
       def _models():
         for locus,model in genos.model_pairs:
           yield [locus, ','.join(sorted(model.alleles[1:]))]
 
-      emit(options.models,_models())
+      emit(options.outputmodels,_models())
 
 
 if __name__=='__main__':

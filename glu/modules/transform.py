@@ -23,7 +23,6 @@ import sys
 import csv
 
 from   glu.lib.fileutils       import autofile,hyphen
-from   glu.lib.genolib.reprs   import get_genorepr
 from   glu.lib.genolib.merge   import get_genomerger, output_merge_statistics
 from   glu.lib.genolib.streams import GenoTransform
 from   glu.lib.genolib.io      import transform_files, save_genostream
@@ -48,7 +47,9 @@ def option_parser():
                     help='Input genotype representation.  Values=snp (default), hapmap, marker')
   ioopts.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP', default=None,
                     help='Output genotype representation (see -g/--ingenorepr).  Default is ingenorepr')
-  ioopts.add_option('-l', '--limit', dest='limit', metavar='N', type='int', default=None,
+  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                    help='Locus description file and options')
+  ioopts.add_option(      '--limit', dest='limit', metavar='N', type='int', default=None,
                     help='Limit the number of rows of data to N for testing purposes')
 
   mopts = optparse.OptionGroup(parser, 'Genotype Merging and Reporting')
@@ -113,9 +114,6 @@ def main():
     print >> sys.stderr, 'Error: Must specify output file'
     return
 
-  ingenorepr  = get_genorepr(options.ingenorepr)
-  outgenorepr = get_genorepr(options.outgenorepr) if options.outgenorepr else ingenorepr
-
   infiles = sorted(set(hyphen(arg,sys.stdin) for arg in args))
   outfile = hyphen(options.output,sys.stdout)
 
@@ -123,10 +121,10 @@ def main():
 
   transform = GenoTransform.from_options(options)
 
-  genos = transform_files(infiles, options.informat,  ingenorepr,
-                          outfile, options.outformat, outgenorepr,
-                                   transform, mergefunc=merger,
-                                   limit=options.limit)
+  transform_files(infiles, options.informat,  options.ingenorepr,
+                  outfile, options.outformat, options.outgenorepr,
+                  transform, mergefunc=merger, modelmap=options.loci,
+                  limit=options.limit)
 
   output_merge_statistics(merger, options.samplemerge, options.locusmerge)
 
