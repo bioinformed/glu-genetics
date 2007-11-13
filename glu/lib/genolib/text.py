@@ -82,7 +82,7 @@ def unique_check_genomatrixstream(genos):
   return genos.clone(_check(),unique=True)
 
 
-def load_genomatrix_hapmap(filename,limit=None):
+def load_genomatrix_hapmap(filename,limit=None,modelmap=None):
   '''
   Load a HapMap genotype data file.
 
@@ -108,7 +108,9 @@ def load_genomatrix_hapmap(filename,limit=None):
 
   columns = [ intern(h.strip()) for h in islice(header.split(),11,limit) ]
   modelcache = {}
-  modelmap   = {}
+
+  if modelmap is None:
+    modelmap   = {}
 
   def _load():
     n = len(columns)
@@ -124,10 +126,13 @@ def load_genomatrix_hapmap(filename,limit=None):
       assert len(alleles)<=2
       assert len(genos) == n
 
-      model = modelcache.get(alleles)
-      if model is None:
-        model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
-      modelmap[locus] = model
+      try:
+        model = modelmap[locus]
+      except KeyError:
+        model = modelcache.get(alleles)
+        if model is None:
+          model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
+        modelmap[locus] = model
 
       yield locus,genos
 
