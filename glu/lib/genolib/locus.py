@@ -89,7 +89,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   ...   print lname,max_alleles,alleles,chromosome,location
   l1 2 ['A', 'C'] 1 0
   l2 4 ['A', 'C', 'G', 'T'] None None
-  l3 2 ['A', 'G'] 1 None
+  l3 4 ['A', 'G'] 1 None
   l4 45 [] X 1234
   l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] M 5541
 
@@ -102,7 +102,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   ...   print lname,max_alleles,alleles,chromosome,location
   l1 2 ['A', 'C'] 1 0
   l2 4 ['A', 'C', 'G', 'T'] None None
-  l3 2 ['A', 'G'] 1 None
+  l3 4 ['A', 'G'] 1 None
   l4 45 [] X 1234
   l5 45 ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'] M 5541
 
@@ -124,15 +124,18 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   default_alleles     = get_arg(kwargs, ['alleles'], None)
   default_max_alleles = int(get_arg(kwargs, ['max_alleles'], 2)) or None
 
-  if kwargs and extra_args is not None:
-    extra_args.update(kwargs)
-  elif kwargs:
-    raise ValueError('Unexpected filename arguments: %s' % str(args))
-
   if default_alleles is None:
     default_alleles = []
   elif isinstance(default_alleles,basestring):
     default_alleles = [ a.strip() for a in default_alleles.split(',') ]
+
+  if default_max_alleles is not None and default_alleles is not None:
+    default_max_alleles = max(default_max_alleles,len(default_alleles))
+
+  if kwargs and extra_args is not None:
+    extra_args.update(kwargs)
+  elif kwargs:
+    raise ValueError('Unexpected filename arguments: %s' % str(args))
 
   if not filename:
     return default_max_alleles,default_alleles,[]
@@ -164,31 +167,34 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
 
       informative = False
 
+      max_alleles = default_max_alleles
       if max_alleles_index is not None and max_alleles_index<n:
-        max_alleles = int(row[max_alleles_index] or 0)
-        informative = max_alleles > 0
-      else:
-        max_alleles = default_max_alleles
+        m = row[max_alleles_index].strip()
+        if m:
+          max_alleles = int(m)
+          informative = max_alleles>0
 
+      alleles = None
       if alleles_index is not None and alleles_index<n:
         alleles = ( a.strip() for a in row[alleles_index].split(',') )
         alleles = [ intern(a) for a in alleles if a ]
-      elif informative:
+
+      if not alleles and informative:
         alleles = []
-      else:
+      elif not alleles:
         alleles = default_alleles
 
       max_alleles = max(max_alleles or 0,len(alleles)) or None
 
+      chromosome = None
       if chromosome_index is not None and chromosome_index<n:
-        chromosome = intern(row[chromosome_index].strip())
-      else:
-        chromosome = None
+        chromosome = intern(row[chromosome_index].strip()) or None
 
+      location = None
       if location_index is not None and location_index<n:
-        location = int(row[location_index].strip())
-      else:
-        location = None
+        loc = row[location_index].strip()
+        if loc:
+          location = int(loc)
 
       yield lname,max_alleles,alleles,chromosome,location
 
