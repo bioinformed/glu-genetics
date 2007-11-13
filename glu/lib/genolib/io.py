@@ -127,7 +127,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
     genorepr = get_genorepr(genorepr)
 
   if isinstance(modelmap,basestring):
-    modelmap = load_modelmap(options.modelmap)
+    modelmap = load_modelmap(modelmap)
 
   samples = loci = None
 
@@ -207,8 +207,7 @@ def transform_files(infiles,informat,ingenorepr,
                     transform=None, modelmap=None,
                     mergefunc=None,limit=None):
   '''
-
-  The driver for transforming multiple genodata files into different formats
+  A driver for transforming multiple genodata files into different formats
   (ldat, sdat, trip, or genotriples), representations (...) and, depending
   on the presence and attributes of the transform object, performing
   operations on samples and loci such as exclude, include, and rename.  The
@@ -262,7 +261,7 @@ def transform_files(infiles,informat,ingenorepr,
   if modelmap is None:
     modelmap = {}
   elif isinstance(modelmap,basestring):
-    modelmap = load_modelmap(options.modelmap)
+    modelmap = load_modelmap(modelmap)
 
   if isinstance(mergefunc,basestring):
     mergefunc = get_genomerger(mergefunc)
