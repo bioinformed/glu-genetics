@@ -23,7 +23,7 @@ from   textwrap              import fill
 
 from   glu.lib.utils         import percent
 from   glu.lib.fileutils     import autofile, hyphen, load_list
-from   glu.lib.genolib       import load_genostream,snp
+from   glu.lib.genolib       import load_genostream
 from   glu.lib.hwp           import hwp_exact_biallelic, hwp_chisq_biallelic, count_genos
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
@@ -82,14 +82,20 @@ def option_parser():
 
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
-  parser.add_option('-s', '--samplesubset',   dest='samplesubset', metavar='FILE',
-                    help='List of samples to include in the analysis')
-  parser.add_option('-l', '--locussubset',    dest='locussubset',  metavar='FILE',
-                    help='List of loci to include in the analysis')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of tests for deviation from Hardy-Weinberg proportions')
   parser.add_option('-f', '--format', dest='format', metavar='F',
                     help='Input data format, ldat, sdat, trip, or counts')
+  parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
+                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
+                    help='Include list for those samples to only use')
+  parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
+                    help='Include list for those loci to only use')
+  parser.add_option('-x', '--excludesamples', dest='excludesamples', metavar='FILE',
+                    help='Exclude a list of samples')
+  parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
+                    help='Exclude a list of loci')
   parser.add_option('-L', '--limit', dest='limit', metavar='N', type='int',
                     help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
@@ -126,22 +132,29 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genostream(args[0],options.format,snp,limit=options.limit).as_ldat()
+    loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                   limit=options.limit).as_ldat()
 
-    if options.samplesubset:
-      loci = loci.transformed(include_samples=options.samplesubset)
+    loci = loci.transformed(include_loci=options.includeloci,
+                            exclude_loci=options.excludeloci,
+                            include_samples=options.includesamples,
+                            exclude_samples=options.excludesamples)
 
     counts = geno_counts(loci)
 
   else:
-    if options.samplesubset:
+    if options.options.includesamples or options.excludesamples:
       raise ValueError,'Cannot specify a sample filter for count input'
 
     counts = read_counts(args[0])
 
-  if options.locussubset:
-    locussubset = set(load_list(options.locussubset))
-    counts = [ c for c in counts if c[0] in locussubset ]
+    if options.includeloci:
+      includeloci = set(load_list(options.includeloci))
+      counts = [ c for c in counts if c[0] in includeloci ]
+
+    if options.excludeloci:
+      excludeloci = set(load_list(options.excludeloci))
+      counts = [ c for c in counts if c[0] not in excludeloci ]
 
   print >> sys.stderr, 'Checking HWP...',
 

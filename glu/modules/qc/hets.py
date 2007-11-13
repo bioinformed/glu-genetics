@@ -24,7 +24,7 @@ from   operator              import itemgetter
 
 from   glu.lib.utils         import percent, tally
 from   glu.lib.fileutils     import autofile, hyphen, load_list
-from   glu.lib.genolib       import load_genostream, snp
+from   glu.lib.genolib       import load_genostream
 from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
 
 
@@ -62,10 +62,14 @@ def option_parser():
                     help='Input data format, either hapmap,ldat,sdat or counts')
   parser.add_option('-r', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
                     help='Input genotype representations. Values=snp (default), hapmap, or marker')
-  parser.add_option('-s', '--samplesubset',   dest='samplesubset', metavar='FILE',
-                    help='List of samples to include in the analysis')
-  parser.add_option('-l', '--locussubset',    dest='locussubset',  metavar='FILE',
-                    help='List of loci to include in the analysis')
+  parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
+                    help='Include list for those samples to only use')
+  parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
+                    help='Include list for those loci to only use')
+  parser.add_option('-x', '--excludesamples', dest='excludesamples', metavar='FILE',
+                    help='Exclude a list of samples')
+  parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
+                    help='Exclude a list of loci')
   parser.add_option('-m','--mincount', dest='mincount', metavar='N',default=None, type='int',
                     help='Minimum number of non-missing genotypes')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -128,23 +132,28 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    genorepr = get_genorepr(options.genorepr)
-    loci = load_genostream(args[0],format=options.format,genorepr=genorepr).as_sdat()
+    loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr).as_sdat()
 
-    if options.locussubset:
-      loci = loci.transformed(exclude_loci=options.locussubset)
+    loci = loci.transformed(include_loci=options.includeloci,
+                            exclude_loci=options.excludeloci,
+                            include_samples=options.includesamples,
+                            exclude_samples=options.excludesamples)
 
     counts = geno_counts(loci)
 
   else:
-    if options.locussubset:
+    if options.includeloci or options.excludeloci:
       raise ValueError,'Cannot specift a locus filter for count input'
 
     counts = read_counts(args[0])
 
-  if options.samplesubset:
-    samplesubset = set(load_list(options.samplesubset))
-    counts = [ c for c in counts if c[0] in samplesubset ]
+    if options.includesamples:
+      includesamples = set(load_list(options.includesamples))
+      counts = [ c for c in counts if c[0] in includesamples ]
+
+    if options.excludesamples:
+      excludesamples = set(load_list(options.excludesamples))
+      counts = [ c for c in counts if c[0] not in excludesamples ]
 
   if options.mincount:
     counts = filter_counts(counts,options.mincount)
