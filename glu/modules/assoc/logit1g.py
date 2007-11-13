@@ -24,7 +24,6 @@ from   scipy               import stats
 from   scipy.linalg        import LinAlgError
 
 from   glu.lib.fileutils   import autofile,hyphen,load_list
-from   glu.lib.genolib     import load_genostream
 from   glu.lib.glm         import GLogit
 
 from   glu.lib.association import print_results,build_models,format_pvalue, \
