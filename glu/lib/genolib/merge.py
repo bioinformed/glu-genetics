@@ -292,7 +292,7 @@ class Ordered(object):
     genocounts = tally(g for g in genos if g)
 
     if not genocounts:
-      return MISSING,(None, None)
+      return MISSING,model[None,None]
     elif len(genocounts) == 1:
       return CONCORDANT,iter(genocounts).next()
 
