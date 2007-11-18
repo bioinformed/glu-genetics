@@ -77,6 +77,7 @@ def run_profile(options,progmain):
       stats.strip_dirs()
       stats.sort_stats('time', 'calls')
       stats.print_stats(25)
+      stats.print_callers(25)
 
   elif options.profiler == 'hotshot':
     import hotshot, hotshot.stats
@@ -96,6 +97,7 @@ def run_profile(options,progmain):
       stats.strip_dirs()
       stats.sort_stats('time', 'calls')
       stats.print_stats(25)
+      stats.print_callers(25)
 
   else:
     raise GLUError('ERROR: Unknown profiling option provided "%s"' % options.profiler)
