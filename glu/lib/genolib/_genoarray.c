@@ -646,6 +646,7 @@ genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 static Py_ssize_t
 genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 {
+	PyObject *index;
 	Py_ssize_t result;
 
 	assert(!PyErr_Occurred());
@@ -656,7 +657,7 @@ genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 		return -1;
 	}
 
-	PyObject *index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
+	index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
 
 	if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
 	{
@@ -706,7 +707,10 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self,  PyObject *geno)
 		GenotypeObject *genoobj = (GenotypeObject *)geno;
 		/* If it belongs to this model, just return it */
 		if(genoobj->model == self)
+		{
+			Py_INCREF(geno);
 			return geno;
+		}
 		else
 		{
 			/* Handle foreign genotypes by looking them up by their alleles */
@@ -830,6 +834,7 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 
 	/* Add to the genotype map */
 	res = PyDict_SetItem(self->genomap, args, g);
+	Py_DECREF(args);
 	if(res == -1) goto error;
 
 	/* Create the reversed tuple (since we are an unphased representation) */
