@@ -1,14 +1,44 @@
+=================
+GLU 1.0 TODO LIST
+=================
+
+-------------
+documentation
+-------------
+
+  * Update installation documentation
+  * Complete user reference guide
+  * Complete user tutorial
+  * Complete developer reference guide
+
+------------
+distribution
+------------
+
+  * Prepare win32 binary distribution (AMD and Intel)
+  * Prepare Linux binary distribution (AMD and Intel)
 
 -------
 genolib
 -------
 
+  * Improve genoarray exceptions so they can be better distinguished and
+    handled
+
+  * File auto detection based on headers (HapMap, primarily)
+
   * File format support:
     * PLINK text (http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml)
-    * PLINK binary (http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtmlhttp://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
+    * PLINK binary (http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml)
     * MERLIN (http://www.sph.umich.edu/csg/abecasis/MACH/tour/)
     * WTCC (http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html)
     * GenABEL (http://rss.acs.unt.edu/Rdoc/library/GenABEL/html/GenABEL-package.html)
+
+----------------------
+modules.qc.concordance
+----------------------
+
+  * Add support for genoreprs
 
 -------------
 modules.assoc
@@ -17,4 +47,6 @@ modules.assoc
   * Optimize unadjusted models
   * Add ordinal logistic regression
   * Add support for MACH dosage and posterior genotype probability models
-
+  * Add GLM for correlated data (Pete wants to look at Framingham)
+  * Add user-level support for regression weights
+  * Add robust variance estimator(s)
