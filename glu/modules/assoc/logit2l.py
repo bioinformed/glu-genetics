@@ -232,7 +232,7 @@ def main():
     out.write('\n')
 
     if options.details and min(sp,wp,lp) <= options.detailsmaxp:
-      details.write('\nRESULTS: %s\n\n' % lname)
+      details.write('\nRESULTS: %s, %s\n\n' % (lname1,lname2))
       print_results(details,model,g)
 
       if 'score' in tests:
