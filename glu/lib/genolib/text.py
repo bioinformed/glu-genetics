@@ -119,10 +119,16 @@ def load_genomatrix_hapmap(filename,limit=None,genome=None):
       fields     = line.split()
       locus      = intern(fields[0].strip())
       alleles    = tuple(sorted(fields[1].split('/')))
-      chromosome = intern(fields[2].strip())
+      chromosome = fields[2].strip()
       position   = tryint(fields[3].strip())
       strand     = intern(fields[4].strip())
       genos      = fields[11:limit]
+
+      # Normalize 'chrXX' names to just 'XX'
+      if chromosome.startswith('chr'):
+        chromosome = chromosome[3:].strip()
+
+      chromosome = intern(chromosome)
 
       if len(alleles) != 2 or any(a not in 'ACGT' for a in alleles):
         alleles = tuple(set(a for g in genos for a in g if a!='N'))
