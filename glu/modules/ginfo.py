@@ -89,11 +89,20 @@ def main():
       emit(options.outputloci, ([l] for l in genos.loci))
 
   if genos.samples is not None and genos.loci is not None:
-    out.write('model  count: %d\n' % len(set(genos.models)))
+    if genos.format == 'genotriple':
+      models = [ genos.genome.get_model(locus) for locus in genos.loci ]
+    else:
+      models = genos.models
+
+    out.write('model  count: %d\n' % len(set(models)))
     if options.outputmodels:
       def _models():
         for locus,model in genos.model_pairs:
-          yield [locus, ','.join(sorted(model.alleles[1:]))]
+          loc = genos.genome.get_locus(locus)
+          assert loc.model is model
+
+          yield [locus, str(model.max_alleles), ','.join(sorted(model.alleles[1:])),
+                        loc.chromosome or '', loc.location or '', loc.strand or '']
 
       emit(options.outputmodels,_models())
 
