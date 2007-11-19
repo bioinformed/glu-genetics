@@ -80,7 +80,7 @@ class Genome(object):
       self.add_locus(lname, locus.model, locus.fixed, locus.chromosome, locus.location)
 
   def add_locus(self, name, model=Nothing, fixed=Nothing, chromosome=Nothing,
-                            location=Nothing, strand=None):
+                            location=Nothing, strand=Nothing):
 
     '''
     FIXME: docstring
