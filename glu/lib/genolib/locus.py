@@ -331,7 +331,7 @@ def load_genome(filename,modelcache=None,**kwargs):
     modelcache = {}
 
   for lname,max_alleles,alleles,chromosome,location in loci:
-    key   = (max_alleles,alleles)
+    key   = (max_alleles,)+tuple(sorted(alleles))
     model = modelcache.get(key)
     if model is None:
       model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
