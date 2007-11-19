@@ -36,6 +36,8 @@ from   glu.lib.genolib.locus     import Genome, Locus
 from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
+GENOMATRIXVERSION=2
+GENOTRIPLEVERSION=2
 
 class TripleDesc(tables.IsDescription):
   sample = tables.Int32Col(pos=0)
@@ -44,6 +46,8 @@ class TripleDesc(tables.IsDescription):
 
 
 CLOSED,NOTOPEN,OPEN = range(3)
+STRANDS   = [None,'+','-']
+STRANDMAP = dict( (s,i) for i,s in enumerate(STRANDS) )
 
 
 class BinaryGenomatrixWriter(object):
@@ -51,7 +55,7 @@ class BinaryGenomatrixWriter(object):
   Object to write the genotype matrix data to a compressed binary file
 
   '''
-  def __init__(self,filename,format,header,compress=True,scratch=16*1024*1024):
+  def __init__(self,filename,format,header,genome,compress=True,scratch=16*1024*1024):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
@@ -73,7 +77,7 @@ class BinaryGenomatrixWriter(object):
     >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
     >>> import tempfile
     >>> f = tempfile.NamedTemporaryFile()
-    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.loci) as writer:
+    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.loci,genos.genome) as writer:
     ...   writer.writerows(genos)
     >>> genos = load_genomatrix_binary(f.name,'sdat')
     >>> genos.format
@@ -93,7 +97,7 @@ class BinaryGenomatrixWriter(object):
     ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
     ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
     >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
-    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.samples) as writer:
+    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.samples,genos.genome) as writer:
     ...   writer.writerows(genos)
     >>> genos = load_genomatrix_binary(f.name,'ldat')
     >>> genos.format
@@ -115,6 +119,8 @@ class BinaryGenomatrixWriter(object):
     self.filename = filename
     self.format   = format
     self.header   = header
+    self.genome   = genome
+
     self.scratch  = scratch
     self.state    = NOTOPEN
 
@@ -125,7 +131,9 @@ class BinaryGenomatrixWriter(object):
 
   def _open(self,row1):
     self.gfile  = tables.openFile(self.filename,mode='w')
+
     self.gfile.root._v_attrs.format = self.format
+    self.gfile.root._v_attrs.version = GENOMATRIXVERSION
 
     n = len(row1.data)
 
@@ -252,9 +260,15 @@ class BinaryGenomatrixWriter(object):
 
     save_strings(gfile, 'rows', self.rowkeys, filters=self.filters)
     save_strings(gfile, 'cols', self.header,  filters=self.filters)
-    save_models(gfile, self.models,           filters=self.filters)
 
-    self.rowkeys = self.header = self.models = None
+    if self.format == 'ldat':
+      loci = self.rowkeys
+    else:
+      loci = self.header
+
+    save_models(gfile, loci, self.genome, self.models, filters=self.filters)
+
+    self.rowkeys = self.header = self.genome = self.models = None
 
     gfile.close()
 
@@ -297,11 +311,12 @@ class BinaryGenotripleWriter(object):
   ...            ('s1', 'l2',    (None,None)  ),
   ...            ('s1', 'l3', ('A','A')),
   ...            ('s2', 'l2', ('C','C'))]
-  >>> triples = iter(GenotripleStream.from_tuples(triples))
-  >>> with BinaryGenotripleWriter(f.name) as w:
-  ...   w.writerow(*triples.next())
-  ...   w.writerow(*triples.next())
-  ...   w.writerows(triples)
+  >>> triples = GenotripleStream.from_tuples(triples)
+  >>> trips = iter(triples)
+  >>> with BinaryGenotripleWriter(f.name,triples.genome) as w:
+  ...   w.writerow(*trips.next())
+  ...   w.writerow(*trips.next())
+  ...   w.writerows(trips)
   >>> for row in load_genotriples_binary(f.name):
   ...   print row
   ('s1', 'l1', ('C', 'T'))
@@ -309,7 +324,7 @@ class BinaryGenotripleWriter(object):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  def __init__(self,filename,compress=True,chunksize=232960):
+  def __init__(self,filename,genome,compress=True,chunksize=232960):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
@@ -322,11 +337,14 @@ class BinaryGenotripleWriter(object):
     if compressed_filename(filename):
       raise IOError('Binary genotype files must not have a compressed extension')
 
+    self.genome = genome
+
     # Initialize self.gfile in case the next statement fails for __del__
     self.gfile = None
 
     self.gfile = tables.openFile(filename,mode='w')
     self.gfile.root._v_attrs.format = 'genotriple'
+    self.gfile.root._v_attrs.version = GENOTRIPLEVERSION
 
     if compress:
       self.filters = tables.Filters(complevel=5,complib='zlib',shuffle=True,fletcher32=True)
@@ -431,7 +449,7 @@ class BinaryGenotripleWriter(object):
     save_strings(gfile,'samples',samples,filters=self.filters)
     save_strings(gfile,'loci',   loci,   filters=self.filters)
 
-    save_models(gfile,models,filters=self.filters)
+    save_models(gfile,loci,self.genome,models,filters=self.filters)
 
     gfile.close()
 
@@ -484,7 +502,8 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  with BinaryGenotripleWriter(filename,compress=compress,chunksize=chunksize) as writer:
+  with BinaryGenotripleWriter(filename,triples.genome,compress=compress,
+                                       chunksize=chunksize) as writer:
     writer.writerows(triples)
 
 
@@ -522,15 +541,20 @@ def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
   if compressed_filename(filename):
     raise IOError('Binary genotype files must not have a compressed extension')
 
-  gfile = tables.openFile(filename,mode='r')
-  format = gfile.root._v_attrs.format
+  gfile   = tables.openFile(filename,mode='r')
+  format  = gfile.root._v_attrs.format
+  version = getattr(gfile.root._v_attrs,'version',1)
 
   if format != 'genotriple':
-    raise ValieError, 'Unknown format: %s' % format
+    raise ValueError('Unknown format: %s' % format)
+
+  if version > GENOTRIPLEVERSION:
+    raise ValueError('Unknown Genotriple file version: %s' % version)
 
   samples = map(str,gfile.root.samples[:])
   loci    = map(str,gfile.root.loci[:])
-  models  = list(load_models(gfile))
+
+  file_genome,models = load_models(gfile,loci,version)
 
   def _load():
     for row in gfile.root.genotypes:
@@ -538,10 +562,6 @@ def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
       yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
     gfile.close()
 
-  locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
-                    for locus,model in izip(loci,models) ]
-
-  file_genome = Genome(loci=locs)
 
   # FIXME: Order must be restored
   genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique,genome=file_genome)
@@ -550,7 +570,6 @@ def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
     genos = genos.transformed(recode_models=genome)
 
   return genos
-
 
 
 def save_strings(gfile,name,data,filters=None,maxlen=None):
@@ -572,13 +591,15 @@ def save_strings(gfile,name,data,filters=None,maxlen=None):
     except ValueError:
       maxlen = 0
 
+  maxlen = max(maxlen,1)
+
   a = gfile.createCArray(gfile.root, name, tables.StringAtom(itemsize=maxlen),
                          (len(data),), filters=filters)
   a[:] = data
   a.flush()
 
 
-def save_models(gfile, models, filters=None):
+def save_models(gfile, loci, genome, models, filters=None):
   '''
   Save the supplied list of models that correspond to specific genetic loci
   to an open HDF5 file instance
@@ -592,6 +613,7 @@ def save_models(gfile, models, filters=None):
     /models         : model parameters for each distinct model
     /model_genotypes: 1->n ordered mapping from model to model genotype index
     /model_alleles  : 1->n mapping from genotype index to genotype string
+    /chromosomes    : lookup table of chromosome strings
 
   @param   gfile: output file
   @type    gfile: PyTables HDF5 file instance
@@ -604,6 +626,7 @@ def save_models(gfile, models, filters=None):
   ad = allelemap.setdefault
   al = allelemap.__len__
 
+  chrmap   = {}
   modelmap = {}
 
   #####
@@ -612,13 +635,19 @@ def save_models(gfile, models, filters=None):
   # Collect and collapse redundant models and write index array
   # also, collect an index array of alleles to write later
   class LocusModelDesc(tables.IsDescription):
-    model = tables.Int32Col(pos=0)
+    model      = tables.Int32Col(pos=0)
+    chromosome = tables.Int32Col(pos=1)
+    location   = tables.Int32Col(pos=2)
+    strand     = tables.Int32Col(pos=3)
 
   locus_models = gfile.createTable(gfile.root, 'locus_models', LocusModelDesc, 'locus models',
                                        filters=filters, expectedrows=len(models))
 
   locus_row = locus_models.row
-  for model in models:
+  for locus,model in izip(loci,models):
+    loc = genome.get_locus(locus)
+    assert loc.model in (None,model)
+
     key = (model.max_alleles,model.allow_hemizygote)+tuple(g.alleles() for g in model.genotypes[1:])
     index = modelmap.get(key)
     if index is None:
@@ -626,13 +655,24 @@ def save_models(gfile, models, filters=None):
       for allele in model.alleles:
         ad(allele,al())
 
-    locus_row['model'] = index
+    chr = chrmap.get(loc.chromosome)
+    if chr is None:
+      chr = chrmap[loc.chromosome] = len(chrmap)
+
+    locus_row['model']      = index
+    locus_row['chromosome'] = chr
+    locus_row['location']   = loc.location if loc.location is not None else -1
+    locus_row['strand']     = STRANDMAP[loc.strand]
+
     locus_row.append()
 
   locus_models.flush()
 
-  # Smash modelmap down to an ordered list of tuples
+  # Smash modelmap and chrmap down to an ordered list of tuples
   models = map(itemgetter(0), sorted(modelmap.iteritems(),  key=itemgetter(1)))
+  chrs   = [ p[0] or '' for p in sorted(chrmap.iteritems(), key=itemgetter(1)) ]
+
+  save_strings(gfile,'chromosomes',chrs,filters=filters)
 
   #####
   # WRITE MODELS: sequence of model max_alleles and allow_hemizygote parameters
@@ -657,7 +697,6 @@ def save_models(gfile, models, filters=None):
   # WRITE MODEL_GENOTYPES: model -> allele1/allele2
   #
   # Used to re-construct model objects.  Ordered list of genotypes per model
-
   class GenotypeDesc(tables.IsDescription):
     model   = tables.Int32Col(pos=0)
     allele1 = tables.Int32Col(pos=1)
@@ -685,7 +724,7 @@ def save_models(gfile, models, filters=None):
   save_strings(gfile,'model_alleles',alleles,filters=filters)
 
 
-def load_models(gfile):
+def load_models(gfile,loci,version):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -694,6 +733,25 @@ def load_models(gfile):
   @param   gfile: output file
   @type    gfile: PyTables HDF5 file instance
   '''
+  if version == 1:
+    return load_models_v1(gfile,loci)
+  elif version == 2:
+    return load_models_v2(gfile,loci)
+  else:
+    raise ValueError('Unknown Genotriple file version: %s' % version)
+
+
+def load_models_v1(gfile,loci):
+  '''
+  Load models from an HDF5 binary genotype file
+
+  Implements model compression upon input.
+
+  @param   gfile: output file
+  @type    gfile: PyTables HDF5 file instance
+  '''
+  assert len(gfile.root.locus_models) == len(loci)
+
   alleles         = map(str,gfile.root.model_alleles[:])
   alleles[0]      = None
   mods            = list(gfile.root.models[:])
@@ -713,7 +771,58 @@ def load_models(gfile):
     models.append(model)
 
   locus_models = [ m[0] for m in gfile.root.locus_models[:] ]
-  return [ models[i] for i in locus_models ]
+  models = [ models[i] for i in locus_models ]
+
+  locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
+                    for locus,model in izip(loci,models) ]
+
+  return Genome(loci=locs),models
+
+
+def load_models_v2(gfile,loci):
+  '''
+  Load models from an HDF5 binary genotype file
+
+  Implements model compression upon input.
+
+  @param   gfile: output file
+  @type    gfile: PyTables HDF5 file instance
+  '''
+  assert len(gfile.root.locus_models) == len(loci)
+
+  alleles         = map(str,gfile.root.model_alleles[:])
+  alleles[0]      = None
+  mods            = list(gfile.root.models[:])
+  chrs            = map(str,gfile.root.chromosomes[:])
+  model_genotypes = list(gfile.root.model_genotypes[:])
+  model_genotypes = groupby(model_genotypes, itemgetter(0))
+
+  modelcache = {}
+  models = []
+  for mod,(i,mgenos) in izip(mods,model_genotypes):
+    genotypes = tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos)
+    key = (mod[1],mod[0])+genotypes
+    model = modelcache.get(key)
+    if model is None:
+      model = modelcache[key] = UnphasedMarkerModel(mod[1],mod[0])
+      for g in genotypes:
+        model.add_genotype(g)
+    models.append(model)
+
+  genome = Genome()
+  locs = []
+  for locus,lmod in izip(loci,gfile.root.locus_models[:]):
+    location = lmod[2]
+    if location == -1:
+      location = None
+
+    locs.append( Locus(locus, model=models[lmod[0]], fixed=True,
+                              chromosome=chrs[lmod[1]], location=location,
+                              strand=STRANDS[lmod[3]] ) )
+
+  models = [ locus.model for locus in locs ]
+
+  return Genome(loci=locs),models
 
 
 def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
@@ -771,7 +880,8 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
   ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
   ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
   '''
-  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,compress=compress,scratch=scratch) as writer:
+  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,genos.genome,
+                                       compress=compress,scratch=scratch) as writer:
     writer.writerows(genos.transformed(repack=True))
 
 
@@ -836,13 +946,13 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,genome=None,ch
 
   gfile = tables.openFile(filename,mode='r')
   format_found = gfile.root._v_attrs.format
-
-  # 'key' and blank are always allowed for backward compatibility
-  if format_found == 'key':
-    format_found = ''
+  version = getattr(gfile.root._v_attrs,'version',1)
 
   if format not in ('ldat','sdat'):
-    raise ValieError, 'Unknown format: %s' % format
+    raise ValueError, 'Unknown format: %s' % format
+
+  if version > GENOMATRIXVERSION:
+    raise ValueError('Unknown Genomatrix file version: %s' % version)
 
   columns = tuple(imap(intern,map(str,gfile.root.cols[:])))
   rows    = tuple(imap(intern,map(str,gfile.root.rows[:])))
@@ -860,14 +970,7 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,genome=None,ch
     if len(set(rows)) != len(rows):
       raise ValueError('Non-unique column identifiers')
 
-  models = list(load_models(gfile))
-  assert len(models) == len(loci)
-
-  locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
-                    for locus,model in izip(loci,models) ]
-
-  start = time.time()
-  file_genome = Genome(loci=locs)
+  file_genome,models = load_models(gfile,loci,version)
 
   if format == format_found == 'sdat':
     def _load():
