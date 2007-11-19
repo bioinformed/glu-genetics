@@ -147,7 +147,8 @@ class GenotripleStream(GenotypeStream):
     self.materialized = materialized or isinstance(triples, (list,tuple))
 
   def _model_pairs(self):
-    return self.genome.iteritems()
+    get_model = self.genome.get_model
+    return ( (locus,get_model(locus)) for locus in self.genome.loci or [] )
 
   model_pairs = property(_model_pairs)
 
