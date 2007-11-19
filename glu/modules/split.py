@@ -408,7 +408,7 @@ def main():
 
   infile   = hyphen(args[0],sys.stdin)
   genos    = load_genostream(infile,format=options.format,genorepr=options.genorepr,
-                                    modelmap=options.loci)
+                                    genome=options.loci)
 
   outformat = guess_outformat(infile) or options.format or genos.format
   split(genos, outformat, prefix, suffix, options)

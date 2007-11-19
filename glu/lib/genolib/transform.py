@@ -112,8 +112,8 @@ class GenoTransform(object):
     @type    order_samples: list
     @param      order_loci: reorder loci such based on the order of the supplied list (optional)
     @type       order_loci: list
-    @param   recode_models: recode using a new genotype modelmap (a new internal representation). Default is 'None'
-    @type    recode_models: dict or None
+    @param   recode_models: recode using a new genome descriptor.  Default is None
+    @type    recode_models: Genome instance or None
     @param  rename_alleles: rename alleles for any loci in the supplied dictionary from old allele name to new allele name
     @type   rename_alleles: dict from old_allele str -> new_allele str
     @param  filter_missing: filter missing genotypes from the stream

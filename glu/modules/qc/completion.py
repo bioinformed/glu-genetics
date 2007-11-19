@@ -197,7 +197,7 @@ def main():
     return
 
   genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                  modelmap=options.loci)
+                                  genome=options.loci)
 
   if genos.format not in ('sdat','ldat'):
     genos = genos.as_ldat()

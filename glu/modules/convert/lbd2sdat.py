@@ -21,13 +21,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools            import islice,chain,izip,imap,groupby
-from   operator             import itemgetter
+from   itertools                 import islice,chain,izip,imap,groupby
+from   operator                  import itemgetter
 
-from   glu.lib.fileutils    import autofile,hyphen
-from   glu.lib.sections     import read_sections
-from   glu.lib.sequence     import norm_snp_seq, complement_base
+from   glu.lib.fileutils         import autofile,hyphen
+from   glu.lib.sections          import read_sections
+from   glu.lib.sequence          import norm_snp_seq, complement_base
 
+from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.io        import save_genostream
 from   glu.lib.genolib.genoarray import model_from_alleles
@@ -198,15 +199,26 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
     yield locus,(a,b)
 
 
-def build_abmap(loci,usermap,modelmap):
+def build_abmap(loci,usermap,genome):
   abmap={}
+  modelcache = {}
+
   for locus in loci:
     a,b = usermap.get(locus, ('A','B') )
-    modelmap[locus]  = model_from_alleles([a,b])
+
+    key = tuple(sorted([a,b]))
+    model = modelcache.get(key)
+
+    if not model:
+      model = modelcache[key] = model_from_alleles(key,max_alleles=2)
+
+    genome.add_locus(locus, model, fixed=True)
+
     abmap[locus,'A'] = a,a
     abmap[locus,'B'] = b,b
     abmap[locus,'H'] = a,b
     abmap[locus,'U'] = None,None
+
   return abmap
 
 
@@ -248,6 +260,7 @@ def main():
   if options.output == '-' and not options.outformat:
     options.outformat = 'sdat'
 
+  # FIXME: Parse locus metadata from manifest, if available
   user_abmap = {}
   if options.manifest:
     print >> sys.stderr, 'Processing Illumina manifest file...',
@@ -270,10 +283,10 @@ def main():
 
     samples = chain(samples,more_samples)
 
-  modelmap = {}
-  abmap    = build_abmap(loci,user_abmap,modelmap)
+  genome   = Genome()
+  abmap    = build_abmap(loci,user_abmap,genome)
   samples  = convert_ab_genos(loci, samples, abmap)
-  genos    = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci, modelmap=modelmap)
+  genos    = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci, genome=genome)
 
   save_genostream(hyphen(options.output,sys.stdout),genos,genorepr=options.genorepr)
 

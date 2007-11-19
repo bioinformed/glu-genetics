@@ -67,7 +67,7 @@ def main():
 
   infile = hyphen(args[0],sys.stdin)
   genos  = load_genostream(infile,format=options.format,genorepr=options.genorepr,
-                                  modelmap=options.loci)
+                                  genome=options.loci)
 
   out = autofile(hyphen(options.output,sys.stdout),'w')
 

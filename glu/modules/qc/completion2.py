@@ -428,7 +428,7 @@ def main():
   infile      = hyphen(args[0], sys.stdin)
   outfile     = autofile(hyphen(options.output, sys.stdout),'w')
   genostream  = load_genostream(infile,format=options.format,genorepr=options.genorepr,
-                                       modelmap=options.loci,limit=options.limit)
+                                       genome=options.loci,limit=options.limit)
   genotriples = genostream.as_genotriples()
 
   samcomp,samempty,loccomp,locempty,nonmissing,genos_inf,genos_all = completion(genotriples,regions)

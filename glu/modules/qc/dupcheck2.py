@@ -347,7 +347,7 @@ def main():
   merger   = get_genomerger(options.merge)
 
   genos = load_genostream(args[0], format=options.format, genorepr=options.genorepr,
-                                   modelmap=options.loci).as_sdat().materialize()
+                                   genome=options.loci).as_sdat().materialize()
 
   expected_dupsets = None
   if options.duplicates:

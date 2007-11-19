@@ -32,6 +32,7 @@ import tables
 from   glu.lib.utils             import ilen
 from   glu.lib.fileutils         import compressed_filename
 
+from   glu.lib.genolib.locus     import Genome, Locus
 from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
@@ -487,7 +488,7 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
     writer.writerows(triples)
 
 
-def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
+def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
   '''
   Load genotype triples from file
 
@@ -498,8 +499,8 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
   @type        unique: bool
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None
-  @param     modelmap: map between a locus and an new internal representation of genotypes
-  @type      modelmap: dict
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
   @return:             sequence of tuples of sample name, locus name, and genotype representation
   @rtype:              generator
 
@@ -537,9 +538,19 @@ def load_genotriples_binary(filename,unique=True,limit=None,modelmap=None):
       yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
     gfile.close()
 
+  locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
+                    for locus,model in izip(loci,models) ]
+
+  file_genome = Genome(loci=locs)
+
   # FIXME: Order must be restored
-  modelmap = dict( izip(loci,models) )
-  return GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique,models=modelmap)
+  genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique,genome=file_genome)
+
+  if genome:
+    genos = genos.transformed(recode_models=genome)
+
+  return genos
+
 
 
 def save_strings(gfile,name,data,filters=None,maxlen=None):
@@ -764,7 +775,7 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
     writer.writerows(genos.transformed(repack=True))
 
 
-def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,chunksize=4096,scratch=32*1024*1024):
+def load_genomatrix_binary(filename,format,limit=None,unique=True,genome=None,chunksize=4096,scratch=32*1024*1024):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -780,8 +791,8 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
   @param       unique: flag indicating if repeated row or column elements do not exist
                        (default is True)
   @type        unique: bool
-  @param     modelmap: map between a locus and an new internal representation of genotypes
-  @type      modelmap: dict
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
   @param    chunksize: size of chunks to write/compress in bytes
   @type     chunksize: int
   @param      scratch: the buffer space available to use while reading or writing a binary file.
@@ -852,7 +863,11 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
   models = list(load_models(gfile))
   assert len(models) == len(loci)
 
-  modelmap = dict( izip(loci,models) )
+  locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
+                    for locus,model in izip(loci,models) ]
+
+  start = time.time()
+  file_genome = Genome(loci=locs)
 
   if format == format_found == 'sdat':
     def _load():
@@ -977,8 +992,13 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,modelmap=None,
 
       gfile.close()
 
-  return GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,
+  genos = GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,genome=file_genome,
                                          unique=unique,packed=True)
+
+  if genome:
+    genos = genos.transformed(recode_models=genome)
+
+  return genos
 
 
 def test(descr,filename,command,genotypes):

@@ -19,6 +19,9 @@ from glu.lib.fileutils         import namefile,load_table,get_arg,tryint,parse_a
 from glu.lib.genolib.genoarray import model_from_alleles
 
 
+class Nothing(object): pass
+
+
 def _get_header(filename,hmap,header,required=False):
   index = hmap.get(header,[])
 
@@ -34,13 +37,119 @@ def _get_header(filename,hmap,header,required=False):
 
 
 class Locus(object):
-  __slots__ = ('name','chromosome','location','model')
+  '''
+  Locus metadata
+  '''
+  __slots__ = ('name','chromosome','fixed','location','strand','model')
 
-  def __init__(self, name, model, chromosome=None, location=None):
+  def __init__(self, name, model=None, fixed=None, chromosome=None, location=None, strand=None):
     self.name       = name
     self.model      = model
+    self.fixed      = fixed
     self.chromosome = chromosome
     self.location   = location
+    self.strand     = strand
+
+
+class Genome(object):
+  '''
+  Genome metadata storage, default genotype model factory and collection of
+  locus descriptors
+
+  FIXME: docstring
+  '''
+
+  def __init__(self, default_model=None, default_fixed=False, max_alleles=0, alleles=None, loci=None):
+    '''
+    FIXME: docstring
+    '''
+    self.loci          = dict( (locus.name,locus) for locus in loci or [])
+    self.max_alleles   = max_alleles or 0
+    self.alleles       = alleles or []
+    self.default_model = default_model
+    self.default_fixed = default_fixed
+
+  def __copy(self, copy_loci=True):
+    new_genome = Genome(default_model=self.default_model, default_fixed=self.default_fixed,
+                        max_alleles=self.max_alleles, alleles=self.alleles)
+
+    if not copy_loci:
+      return
+
+    for lname,locus in self.loci.iteritems():
+      self.add_locus(lname, locus.model, locus.fixed, locus.chromosome, locus.location)
+
+  def add_locus(self, name, model=Nothing, fixed=Nothing, chromosome=Nothing,
+                            location=Nothing, strand=None):
+
+    '''
+    FIXME: docstring
+    '''
+    locus = self.loci.get(name)
+    if locus is None:
+      locus = self.loci[name] = Locus(name)
+
+    if model is not Nothing:
+      if locus.model is None:
+        locus.model = model
+      elif locus.model is not model:
+        raise ValueError('Incompatible models')
+
+    if fixed is not Nothing:
+      if locus.fixed is None:
+        locus.fixed = fixed
+      elif locus.fixed != fixed:
+        raise ValueError('Incompatible models')
+
+    if chromosome is not Nothing:
+      if locus.chromosome is None:
+        locus.chromosome = chromosome
+      elif locus.chromosome != chromosome:
+        raise ValueError('Incompatible chromsomes')
+
+    if location is not Nothing:
+      if locus.location is None:
+        locus.location = location
+      elif locus.location != location:
+        raise ValueError('Incompatible locations')
+
+    if strand is not Nothing:
+      if locus.strand is None:
+        locus.strand = strand
+      elif locus.strand != strand:
+        raise ValueError('Incompatible strands')
+
+  def get_locus(self, name):
+    '''
+    FIXME: docstring
+    '''
+    locus = self.loci.get(name)
+
+    if locus is None:
+      locus = self.loci[name] = Locus(name)
+
+    return locus
+
+  def get_locus_model(self, name):
+    '''
+    FIXME: docstring
+    '''
+    locus = self.get_locus(name)
+
+    if locus.model is None:
+      locus.fixed = self.default_fixed
+      if self.default_model is not None:
+        locus.model = self.default_model
+      else:
+        locus.model = model_from_alleles(self.alleles, max_alleles=self.max_alleles)
+
+    return locus
+
+  def get_model(self, name):
+    '''
+    FIXME: docstring
+    '''
+    return self.get_locus_model(name).model
 
 
 def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
@@ -201,42 +310,34 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   return default_max_alleles,default_alleles,_loci()
 
 
-def load_models(filename,modelcache=None,**kwargs):
+def load_genome(filename,modelcache=None,**kwargs):
   '''
   Return the default model and a sequence of Locus objects from an augmented
   locus description file
 
   FIXME: Add docstring and doctests
   '''
+  default_max_alleles,default_alleles,loci = load_locus_records(filename,**kwargs)
+
+  if default_alleles:
+    default_model = model_from_alleles(alleles,max_alleles=default_max_alleles)
+  else:
+    default_model = None
+
+  genome = Genome(default_model=default_model, default_fixed=bool(default_alleles),
+                  max_alleles=default_max_alleles, alleles=default_alleles)
+
   if modelcache is None:
     modelcache = {}
 
-  default_max_alleles,default_alleles,loci = load_locus_records(filename,**kwargs)
+  for lname,max_alleles,alleles,chromosome,location in loci:
+    key   = (max_alleles,alleles)
+    model = modelcache.get(key)
+    if model is None:
+      model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
+    genome.add_locus(lname, model, bool(alleles), chromosome, location)
 
-  defmodel = model_from_alleles(default_alleles,max_alleles=default_max_alleles)
-
-  def _loci():
-    for lname,max_alleles,alleles,chromosome,location in loci:
-      key   = (max_alleles,alleles)
-      model = modelcache.get(key)
-      if model is None:
-        model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
-
-      yield Locus(lname, chromosome, location, model)
-
-  return defmodel,_loci()
-
-
-def load_modelmap(filename,**kwargs):
-  '''
-  Create a modelmap dictionary from an augmented locus description file
-
-  FIXME: Add docstring and doctests
-  '''
-  defmodel,loci = load_models(filename,**kwargs)
-  modelmap = defaultdict(lambda: defmodel)
-  modelmap.update( (locus.name,locus.model) for locus in loci )
-  return modelmap
+  return genome
 
 
 def _test():

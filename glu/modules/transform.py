@@ -123,7 +123,7 @@ def main():
 
   transform_files(infiles, options.informat,  options.ingenorepr,
                   outfile, options.outformat, options.outgenorepr,
-                  transform, mergefunc=merger, modelmap=options.loci,
+                  transform, mergefunc=merger, genome=options.loci,
                   limit=options.limit)
 
   output_merge_statistics(merger, options.samplemerge, options.locusmerge)

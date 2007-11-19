@@ -230,7 +230,7 @@ def main():
   print >> sys.stderr, 'Loading data...',
   merger   = get_genomerger(options.merge)
 
-  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,modelmap=options.loci)
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,genome=options.loci)
   genos = genos.as_sdat(merger).materialize()
 
   print >> sys.stderr, 'Done.'

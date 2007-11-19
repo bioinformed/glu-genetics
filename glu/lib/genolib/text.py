@@ -25,11 +25,12 @@ import csv
 from   itertools                 import islice,dropwhile
 
 from   glu.lib.utils             import tally
-from   glu.lib.fileutils         import autofile,namefile
+from   glu.lib.fileutils         import autofile,namefile,tryint
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.reprs     import snp,hapmap
+from   glu.lib.genolib.locus     import Genome
 
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
@@ -48,7 +49,7 @@ def unique_check_genomatrixstream(genos):
                being the column meta-data
   @type rows: sequence
 
-  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4)
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
   >>> unique_check_genomatrixstream(genos)
   Traceback (most recent call last):
        ...
@@ -82,7 +83,7 @@ def unique_check_genomatrixstream(genos):
   return genos.clone(_check(),unique=True)
 
 
-def load_genomatrix_hapmap(filename,limit=None,modelmap=None):
+def load_genomatrix_hapmap(filename,limit=None,genome=None):
   '''
   Load a HapMap genotype data file.
 
@@ -109,16 +110,20 @@ def load_genomatrix_hapmap(filename,limit=None,modelmap=None):
   columns = [ intern(h.strip()) for h in islice(header.split(),11,limit) ]
   modelcache = {}
 
-  if modelmap is None:
-    modelmap   = {}
+  if genome is None:
+    genome = Genome()
 
   def _load():
     n = len(columns)
     for line in gfile:
-      fields  = line.split()
-      locus   = intern(fields[0].strip())
-      alleles = tuple(sorted(fields[1].split('/')))
-      genos   = fields[11:limit]
+      fields     = line.split()
+      locus      = intern(fields[0].strip())
+      alleles    = tuple(sorted(fields[1].split('/')))
+      chromosome = intern(fields[2].strip())
+      position   = tryint(fields[3].strip())
+      strand     = intern(fields[4].strip())
+      genos      = fields[11:limit]
+
       if len(alleles) != 2 or any(a not in 'ACGT' for a in alleles):
         alleles = tuple(set(a for g in genos for a in g if a!='N'))
 
@@ -126,20 +131,22 @@ def load_genomatrix_hapmap(filename,limit=None,modelmap=None):
       assert len(alleles)<=2
       assert len(genos) == n
 
-      try:
-        model = modelmap[locus]
-      except KeyError:
+      model = genome.get_locus(locus).model
+
+      if not model:
         model = modelcache.get(alleles)
-        if model is None:
-          model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
-        modelmap[locus] = model
+
+      if not model:
+        model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
+
+      loc = genome.add_locus(locus, model, True, chromosome, position, strand)
 
       yield locus,genos
 
-  return GenomatrixStream.from_strings(_load(),'ldat',hapmap,samples=columns,modelmap=modelmap)
+  return GenomatrixStream.from_strings(_load(),'ldat',hapmap,samples=columns,genome=genome)
 
 
-def load_genomatrix_linkage(filename,limit=None,modelmap=None):
+def load_genomatrix_linkage(filename,limit=None,genome=None):
   '''
   Load a Linkage format genotype data file.
 
@@ -173,10 +180,10 @@ def load_genomatrix_linkage(filename,limit=None,modelmap=None):
 
       yield sample,genos
 
-  return GenomatrixStream.from_tuples(_load(),'sdat',loci=loci,modelmap=modelmap)
+  return GenomatrixStream.from_tuples(_load(),'sdat',loci=loci,genome=genome)
 
 
-def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelmap=None):
+def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,genome=None):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -195,8 +202,8 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelma
   @param       unique: verify that rows and columns are uniquely labeled
                        (default is True)
   @type        unique: bool
-  @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
-  @type      modelmap: dict
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
   @rtype             : GenomatrixStream
 
   >>> from StringIO import StringIO
@@ -255,9 +262,9 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,modelma
       yield label,genos
 
   if format=='ldat':
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,modelmap=modelmap)
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,genome=genome)
   else:
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,modelmap=modelmap)
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,genome=genome)
 
   if unique:
     genos = unique_check_genomatrixstream(genos)
@@ -425,7 +432,7 @@ def save_genomatrix_text(filename,genos,genorepr):
     writer.writerows(genos)
 
 
-def load_genotriples_text(filename,genorepr,unique=True,limit=None,modelmap=None):
+def load_genotriples_text(filename,genorepr,unique=True,limit=None,genome=None):
   '''
   Load genotype triples from file
 
@@ -439,8 +446,8 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,modelmap=None
   @type        unique: bool
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None
-  @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
-  @type      modelmap: dict
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
   @rtype             : GenotripleStream
 
   >>> from StringIO import StringIO
@@ -479,7 +486,7 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,modelmap=None
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),unique=unique,modelmap=modelmap)
+  return GenotripleStream.from_tuples(_load(),unique=unique,genome=genome)
 
 
 class TextGenotripleWriter(object):
@@ -615,7 +622,7 @@ def save_genotriples_text(filename,triples,genorepr):
     w.writerows(triples)
 
 
-def load_genotriples_prettybase(filename,unique=True,limit=None,modelmap=None):
+def load_genotriples_prettybase(filename,unique=True,limit=None,genome=None):
   '''
   Load genotype triples from file
 
@@ -629,8 +636,8 @@ def load_genotriples_prettybase(filename,unique=True,limit=None,modelmap=None):
   @type        unique: bool
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None
-  @param     modelmap: map between a locus and an new internal representation of genotypes. Default is None
-  @type      modelmap: dict
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
   @rtype             : GenotripleStream
 
   >>> from StringIO import StringIO
@@ -670,7 +677,7 @@ def load_genotriples_prettybase(filename,unique=True,limit=None,modelmap=None):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),unique=unique,modelmap=modelmap)
+  return GenotripleStream.from_tuples(_load(),unique=unique,genome=genome)
 
 
 class PrettybaseGenotripleWriter(object):

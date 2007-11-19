@@ -135,7 +135,7 @@ def main():
 
   if options.format != 'counts':
     loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                   modelmap=options.loci).as_sdat()
+                                   genome=options.loci).as_sdat()
 
     loci = loci.transformed(include_loci=options.includeloci,
                             exclude_loci=options.excludeloci,

@@ -73,7 +73,7 @@ def main():
     return
 
   loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                 modelmap=options.loci).as_ldat()
+                                 genome=options.loci).as_ldat()
 
   loci = loci.transformed(include_loci=options.includeloci,
                           exclude_loci=options.excludeloci,

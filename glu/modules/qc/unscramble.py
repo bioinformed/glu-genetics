@@ -95,9 +95,9 @@ def main():
     return
 
   test           = load_genostream(args[0], format=options.testformat, genorepr=options.testgenorepr,
-                                            modelmap=options.loci).as_ldat()
+                                            genome=options.loci).as_ldat()
   reference      = load_genostream(args[1], format=options.refformat,  genorepr=options.refgenorepr,
-                                            modelmap=options.loci).as_ldat()
+                                            genome=options.loci).as_ldat()
   test,reference = align_genotypes(test,reference)
   concordance(test,reference)
 

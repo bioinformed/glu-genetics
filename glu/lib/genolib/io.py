@@ -31,7 +31,7 @@ from   glu.lib.fileutils         import autofile,namefile,guess_format
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
 from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.genoarray import model_from_alleles
-from   glu.lib.genolib.locus     import load_modelmap
+from   glu.lib.genolib.locus     import load_genome, Genome
 from   glu.lib.genolib.reprs     import snp, hapmap, marker, get_genorepr
 from   glu.lib.genolib.text      import (TextGenomatrixWriter,        TextGenotripleWriter,
                                          save_genotriples_text,       load_genotriples_text,
@@ -75,7 +75,7 @@ def guess_outformat(filename):
   return guess_format(filename, OUTPUT_FORMATS)
 
 
-def load_genostream(filename, format=None, genorepr=None, limit=None, unique=True, modelmap=None):
+def load_genostream(filename, format=None, genorepr=None, limit=None, unique=True, genome=None):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -90,10 +90,10 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   @type     limit: int or None
   @param   unique: flag indicating if repeated row or column elements do not exist. Default is None
   @type    unique: bool
-  @para  modelmap: map between a locus and an new internal genotype
-                   representation. If a string is specified, it is passwd to load_modelmap().
+  @para    genome: map between a locus and an new internal genotype
+                   representation. If a string is specified, it is passed to load_genome().
                    Default is None.
-  @type  modelmap: str or dict
+  @type    genome: str or Genome instance
   @return        : loaded genomatrix stream
   @rtype         : GenomatrixStream
 
@@ -126,27 +126,27 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   if isinstance(genorepr,basestring):
     genorepr = get_genorepr(genorepr)
 
-  if isinstance(modelmap,basestring):
-    modelmap = load_modelmap(modelmap)
+  if isinstance(genome,basestring):
+    genome = load_genome(genome)
 
   samples = loci = None
 
   if format == 'hapmap':
-    genos = load_genomatrix_hapmap(filename,limit=limit,modelmap=modelmap)
+    genos = load_genomatrix_hapmap(filename,limit=limit,genome=genome)
   elif format == 'ldat':
-    genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,genome=genome)
   elif format == 'sdat':
-    genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,genome=genome)
   elif format == 'lbat':
-    genos = load_genomatrix_binary(filename,'ldat',limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genomatrix_binary(filename,'ldat',limit=limit,unique=unique,genome=genome)
   elif format == 'sbat':
-    genos = load_genomatrix_binary(filename,'sdat',limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genomatrix_binary(filename,'sdat',limit=limit,unique=unique,genome=genome)
   elif format in ('trip','genotriple'):
-    genos = load_genotriples_text(filename,genorepr,limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genotriples_text(filename,genorepr,limit=limit,unique=unique,genome=genome)
   elif format in ('pb','prettybase'):
-    genos = load_genotriples_prettybase(filename,limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genotriples_prettybase(filename,limit=limit,unique=unique,genome=genome)
   elif format=='tbat':
-    genos = load_genotriples_binary(filename,limit=limit,unique=unique,modelmap=modelmap)
+    genos = load_genotriples_binary(filename,limit=limit,unique=unique,genome=genome)
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
   else:
@@ -204,7 +204,7 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
 
 def transform_files(infiles,informat,ingenorepr,
                     outfile,outformat,outgenorepr,
-                    transform=None, modelmap=None,
+                    transform=None,genome=None,
                     mergefunc=None,limit=None):
   '''
   A driver for transforming multiple genodata files into different formats
@@ -258,15 +258,15 @@ def transform_files(infiles,informat,ingenorepr,
   if not outgenorepr:
     outgenorepr = ingenorepr
 
-  if modelmap is None:
-    modelmap = {}
-  elif isinstance(modelmap,basestring):
-    modelmap = load_modelmap(modelmap)
+  if genome is None:
+    genome = Genome()
+  elif isinstance(genome,basestring):
+    genome = load_genome(genome)
 
   if isinstance(mergefunc,basestring):
     mergefunc = get_genomerger(mergefunc)
 
-  genos = [ load_genostream(f,informat,ingenorepr,limit=limit,modelmap=modelmap).transformed(transform) for f in infiles ]
+  genos = [ load_genostream(f,informat,ingenorepr,limit=limit,genome=genome).transformed(transform) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
