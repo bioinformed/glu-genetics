@@ -28,7 +28,7 @@ from   glu.lib.fileutils         import autofile,hyphen
 from   glu.lib.sections          import read_sections
 from   glu.lib.sequence          import norm_snp_seq, complement_base
 
-from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.locus     import Genome, Nothing
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.io        import save_genostream
 from   glu.lib.genolib.genoarray import model_from_alleles
@@ -129,7 +129,7 @@ def find_index(header,headings):
   raise ValueError,'Cannot find heading index'
 
 
-def extract_ab_from_manifest(manifest,targetstrand='customer'):
+def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
   targetstrand = targetstrand.lower()
   assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
 
@@ -138,6 +138,8 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
   assayid_idx = find_index(header,['IlmnID','Ilmn ID'])
   name_idx    = find_index(header,['Name'])
   snp_idx     = find_index(header,['SNP'])
+  chr_idx     = find_index(header,['Chr'])
+  loc_idx     = find_index(header,['MapInfo'])
   cstrand_idx = find_index(header,['CustomerStrand'])
   dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
   topseq_idx  = find_index(header,['TopGenomicSeq'])
@@ -147,6 +149,8 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
     assay  += ['']*(max_idx-len(assay)+1)
     locus   = assay[name_idx]
     snp     = assay[snp_idx]
+    chr     = assay[chr_idx] or None
+    loc     = assay[loc_idx]
     cstrand = assay[cstrand_idx].lower()
     dstrand = assay[dstrand_idx].lower()
     topseq  = assay[topseq_idx]
@@ -154,6 +158,9 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
     assert cstrand in ('top','bot')
     assert dstrand in ('top','bot')
     assert (snp[0],snp[2],snp[4]) == ('[','/',']')
+
+    if loc:
+      loc = int(loc)
 
     # Alleles on the design strand
     aa,bb = snp[1],snp[3]
@@ -172,17 +179,20 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
     if (a,b) != (aa,bb):
       raise ValueError('Sequence alleles do not match assay alleles')
 
-    if targetstrand in ('forward','reverse'):
-      # Get the strand orientation of the design sequence
-      gstrand = assay[assayid_idx].split('_')[2]
-      assert gstrand in 'FRU'
-      if gstrand == 'U':
-        raise ValueError("Unknown strand for assay '%s'" % locus)
+    gstrand = assay[assayid_idx].split('_')[2]
+    assert gstrand in 'FRU'
 
+    if gstrand != 'U':
+      # Get the strand orientation of the design sequence
       # Alleles are forward strand if the tstrand matches the design strand
       # and the design is on the forward strand or the converse of both
       # conditions is true.
       forward = (tstrand != dstrand) ^ (gstrand == 'F')
+      strand  = '+' if forward else '-'
+    else:
+      if targetstrand in ('forward','reverse') and gstrand == 'U':
+        raise ValueError("Unknown strand for assay '%s'" % locus)
+      strand = Nothing
 
     flip =    ((targetstrand == 'customer'     and tstrand != cstrand)
            or  (targetstrand == 'anticustomer' and tstrand == cstrand)
@@ -195,8 +205,10 @@ def extract_ab_from_manifest(manifest,targetstrand='customer'):
 
     if flip:
       a,b = complement_base(a),complement_base(b)
+      strand = {Nothing:Nothing,'+':'-','-':'+'}[strand]
 
-    yield locus,(a,b)
+    genome.add_locus(locus, chromosome=chr, location=loc, strand=strand)
+    abmap[locus] = (a,b)
 
 
 def build_abmap(loci,usermap,genome):
@@ -260,12 +272,13 @@ def main():
   if options.output == '-' and not options.outformat:
     options.outformat = 'sdat'
 
-  # FIXME: Parse locus metadata from manifest, if available
+  genome = Genome()
   user_abmap = {}
+
   if options.manifest:
     print >> sys.stderr, 'Processing Illumina manifest file...',
     manifest = load_illumina_manifest(options.manifest)
-    user_abmap.update(extract_ab_from_manifest(manifest,targetstrand=options.targetstrand))
+    parse_manifest(manifest,genome,user_abmap,targetstrand=options.targetstrand)
     print >> sys.stderr, 'done.'
 
   if options.abmap:
@@ -283,7 +296,6 @@ def main():
 
     samples = chain(samples,more_samples)
 
-  genome   = Genome()
   abmap    = build_abmap(loci,user_abmap,genome)
   samples  = convert_ab_genos(loci, samples, abmap)
   genos    = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci, genome=genome)
