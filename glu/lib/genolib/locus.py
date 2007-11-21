@@ -22,6 +22,7 @@ from glu.lib.genolib.genoarray import model_from_alleles
 class Nothing(object): pass
 
 
+# FIXME: Try various cases
 def _get_header(filename,hmap,header,required=False):
   index = hmap.get(header,[])
 
@@ -69,19 +70,8 @@ class Genome(object):
     self.default_model = default_model
     self.default_fixed = default_fixed
 
-  def __copy(self, copy_loci=True):
-    new_genome = Genome(default_model=self.default_model, default_fixed=self.default_fixed,
-                        max_alleles=self.max_alleles, alleles=self.alleles)
-
-    if not copy_loci:
-      return
-
-    for lname,locus in self.loci.iteritems():
-      self.add_locus(lname, locus.model, locus.fixed, locus.chromosome, locus.location)
-
-  def add_locus(self, name, model=Nothing, fixed=Nothing, chromosome=Nothing,
+  def set_locus(self, name, model=Nothing, fixed=Nothing, chromosome=Nothing,
                             location=Nothing, strand=Nothing):
-
     '''
     FIXME: docstring
     '''
@@ -90,30 +80,50 @@ class Genome(object):
       locus = self.loci[name] = Locus(name)
 
     if model is not Nothing:
+      locus.model = model
+    if fixed is not Nothing:
+      locus.fixed = fixed
+    if chromosome is not Nothing:
+      locus.chromosome = chromosome
+    if location is not Nothing:
+      locus.location = location
+    if strand is not Nothing:
+      locus.strand = strand
+
+  def merge_locus(self, name, model=None, fixed=None, chromosome=None,
+                              location=None, strand=None):
+    '''
+    FIXME: docstring
+    '''
+    locus = self.loci.get(name)
+    if locus is None:
+      locus = self.loci[name] = Locus(name)
+
+    if model is not None:
       if locus.model is None:
         locus.model = model
       elif locus.model is not model:
         raise ValueError('Incompatible models')
 
-    if fixed is not Nothing:
+    if fixed is not None:
       if locus.fixed is None:
         locus.fixed = fixed
       elif locus.fixed != fixed:
         raise ValueError('Incompatible models')
 
-    if chromosome is not Nothing:
+    if chromosome is not None:
       if locus.chromosome is None:
         locus.chromosome = chromosome
       elif locus.chromosome != chromosome:
         raise ValueError('Incompatible chromsomes')
 
-    if location is not Nothing:
+    if location is not None:
       if locus.location is None:
         locus.location = location
       elif locus.location != location:
         raise ValueError('Incompatible locations')
 
-    if strand is not Nothing:
+    if strand is not None:
       if locus.strand is None:
         locus.strand = strand
       elif locus.strand != strand:
@@ -253,6 +263,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   for i,h in enumerate(header):
     hmap[h].append(i)
 
+  # FIXME: Add aliases -- POSITION,MARKERNAME,NAME,CHR
   lname_index       = _get_header(filename,hmap,'LOCUS',required=True)
   max_alleles_index = _get_header(filename,hmap,'MAX_ALLELES')
   alleles_index     = _get_header(filename,hmap,'ALLELES')
@@ -301,7 +312,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
 
       location = None
       if location_index is not None and location_index<n:
-        loc = row[location_index].strip()
+        loc = row[location_index].strip() or None
         if loc:
           location = int(loc)
 
@@ -335,7 +346,7 @@ def load_genome(filename,modelcache=None,**kwargs):
     model = modelcache.get(key)
     if model is None:
       model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
-    genome.add_locus(lname, model, bool(alleles), chromosome, location)
+    genome.merge_locus(lname, model, bool(alleles), chromosome, location)
 
   return genome
 

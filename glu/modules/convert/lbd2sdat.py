@@ -76,7 +76,7 @@ def load_lbd_file(filename, gcthreshold=None):
   return loci,samples
 
 
-def load_user_abmap(file_or_name,skip=0):
+def load_abmap(file_or_name,skip=0):
   '''
   Creates a dictionary representing a mapping from A and B probes for each locus to allele names.
   '''
@@ -207,13 +207,14 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
       a,b = complement_base(a),complement_base(b)
       strand = {Nothing:Nothing,'+':'-','-':'+'}[strand]
 
-    genome.add_locus(locus, chromosome=chr, location=loc, strand=strand)
+    genome.merge_locus(locus, chromosome=chr, location=loc, strand=strand)
     abmap[locus] = (a,b)
 
 
-def build_abmap(loci,usermap,genome):
+def build_models(loci,usermap,genome):
   abmap={}
   modelcache = {}
+  models = []
 
   for locus in loci:
     a,b = usermap.get(locus, ('A','B') )
@@ -224,17 +225,18 @@ def build_abmap(loci,usermap,genome):
     if not model:
       model = modelcache[key] = model_from_alleles(key,max_alleles=2)
 
-    genome.add_locus(locus, model, fixed=True)
+    genome.merge_locus(locus, model, fixed=True)
+    models.append(model)
 
-    abmap[locus,'A'] = a,a
-    abmap[locus,'B'] = b,b
-    abmap[locus,'H'] = a,b
-    abmap[locus,'U'] = None,None
+    abmap[locus,'A'] = model[a,a]
+    abmap[locus,'B'] = model[b,b]
+    abmap[locus,'H'] = model[a,b]
+    abmap[locus,'U'] = model[None,None]
 
-  return abmap
+  return abmap,models
 
 
-def convert_ab_genos(loci, samples, abmap):
+def encode_genotypes(loci, samples, abmap):
   for sampleid,genos in samples:
     genos = [abmap[locus,geno] for locus,geno in izip(loci,genos)]
     yield sampleid,genos
@@ -273,32 +275,32 @@ def main():
     options.outformat = 'sdat'
 
   genome = Genome()
-  user_abmap = {}
+  abmap = {}
 
   if options.manifest:
     print >> sys.stderr, 'Processing Illumina manifest file...',
     manifest = load_illumina_manifest(options.manifest)
-    parse_manifest(manifest,genome,user_abmap,targetstrand=options.targetstrand)
+    parse_manifest(manifest,genome,abmap,targetstrand=options.targetstrand)
     print >> sys.stderr, 'done.'
 
   if options.abmap:
-    user_abmap.update(load_user_abmap(options.abmap))
+    abmap.update(load_abmap(options.abmap))
 
   args = iter(args)
-  loci,samples = load_lbd_file(args.next(),gcthreshold=options.gcthreshold)
+  loci,rows = load_lbd_file(args.next(),gcthreshold=options.gcthreshold)
 
   loci = list(loci)
   for arg in args:
-    more_loci,more_samples = load_lbd_file(arg,gcthreshold=options.gcthreshold)
+    more_loci,more_rows = load_lbd_file(arg,gcthreshold=options.gcthreshold)
 
     if list(more_loci) != loci:
       raise RuntimeError,'Genotype headers do not match'
 
-    samples = chain(samples,more_samples)
+    rows = chain(rows,more_rows)
 
-  abmap    = build_abmap(loci,user_abmap,genome)
-  samples  = convert_ab_genos(loci, samples, abmap)
-  genos    = GenomatrixStream.from_tuples(samples, 'sdat', loci=loci, genome=genome)
+  genomap,models = build_models(loci,abmap,genome)
+  rows  = encode_genotypes(loci, rows, genomap)
+  genos = GenomatrixStream(rows, 'sdat', loci=loci, models=models, genome=genome)
 
   save_genostream(hyphen(options.output,sys.stdout),genos,genorepr=options.genorepr)
 

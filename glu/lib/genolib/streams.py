@@ -1415,10 +1415,10 @@ def recode_genomatrixstream(genos, genome):
 
   >>> defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
   >>> genome = Genome()
-  >>> genome.add_locus('l1',model=defmodel)
-  >>> genome.add_locus('l2',model=defmodel)
-  >>> genome.add_locus('l3',model=defmodel)
-  >>> genome.add_locus('l4',model=defmodel)
+  >>> genome.set_locus('l1',model=defmodel)
+  >>> genome.set_locus('l2',model=defmodel)
+  >>> genome.set_locus('l3',model=defmodel)
+  >>> genome.set_locus('l4',model=defmodel)
 
   >>> samples = ('s1', 's2', 's3')
   >>> genos = [('l1', [ ('A', 'A'),  (None, None),   ('G', 'G') ]),
@@ -1500,7 +1500,7 @@ def recode_genomatrixstream(genos, genome):
         assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
         # Get the new model or fix the old model
-        genome.add_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
+        genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
                                 location=old_locus.location, strand=old_locus.strand)
 
         loc = genome.get_locus(locus)
@@ -1554,7 +1554,7 @@ def recode_genomatrixstream(genos, genome):
       assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
       # Get the new model or fix the old model
-      genome.add_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
+      genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
                               location=old_locus.location, strand=old_locus.strand)
 
       loc = genome.get_locus(locus)
@@ -1736,7 +1736,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
             model = None
 
           # FIXME: Awkward
-          genome.add_locus(locus, model, unique)
+          genome.merge_locus(locus, model, unique)
           genome.get_locus_model(locus)
 
           if unique:
@@ -1934,7 +1934,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
             model = None
 
           # FIXME: Awkward
-          genome.add_locus(locus, model, unique)
+          genome.merge_locus(locus, model, unique)
           genome.get_locus_model(locus)
 
           if unique:
@@ -2075,7 +2075,7 @@ def recode_genotriples(triples,genome):
           assert old_model is triples.genome.loci[locus].model
           assert old_locus.model is old_model
 
-          genome.add_locus(old_locus.name, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
+          genome.merge_locus(old_locus.name, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
                                            location=old_locus.location)
           loc = genome.get_locus(locus)
           if loc.model is None:
@@ -2994,55 +2994,44 @@ def merge_genomatrixstream_list(genos, mergefunc):
   new_rows    = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(),   key=itemgetter(1))))
   n = len(new_columns)
 
+  # FIXME: Refactor to clarify the following cases
+  #        1) Identical columns
+  #        2) Disjoint rows, overlapping columns
+  #        3) Disjoint columns, overlapping rows
+  #        4) Fully general merge
+
   if format=='ldat':
     models = []
-    def _merger():
-      # Fully general merge over duplicate rows and columns
-      for i,locus in enumerate(new_rows):
-        model = genome.get_model(locus)
-        models.append(model)
-
-        # Form lists of all genotypes at each new column for all rows with locus
-        new_row = [ [] for i in xrange(n) ]
-
-        # Iterate over input rows and schema, find the cooresponding column
-        # mappings, and append the relevant genotypes
-        for i,rows in merge_rows.pop(locus).iteritems():
-          for j,k in merge_columns[i]:
-             new_row[k] += (row[j] for row in rows)
-
-        # Merge genotypes
-        new_row = list(imap(mergefunc,new_columns,repeat(locus),repeat(model),new_row))
-
-        # Yield new row
-        yield locus,new_row
-
-    new_genos = genos[0].clone(_merger(),samples=new_columns,loci=new_rows,models=models,genome=genome,
-                                         packed=False,materialized=False,unique=True)
+    samples,loci = new_columns,new_rows
   else:
     models = [ genome.get_model(column) for column in new_columns ]
-    def _merger():
-      # Fully general merge over duplicate rows and columns
-      for sample in new_rows:
-        # Form lists of all genotypes at each new column for all rows with sample
-        new_row = [ [] for i in xrange(n) ]
+    samples,loci = new_rows,new_columns
 
-        # Iterate over input rows and schema, find the cooresponding column
-        # mappings, and append the relevant genotypes
-        for i,rows in merge_rows.pop(sample).iteritems():
-          for j,k in merge_columns[i]:
-             new_row[k] += (row[j] for row in rows)
+  def _merger():
+    # Fully general merge over duplicate rows and columns
+    for locus in new_rows:
+      model = genome.get_model(locus)
 
-        # Merge genotypes
-        new_row = list(imap(mergefunc,repeat(sample),new_columns,models,new_row))
+      if format=='ldat':
+        models.append(model)
 
-        # Yield new row
-        yield sample,new_row
+      # Form lists of all genotypes at each new column for all rows with locus
+      new_row = [ [] for i in xrange(n) ]
 
-    new_genos = genos[0].clone(_merger(),loci=new_columns,samples=new_rows,models=models,genome=genome,
-                                         packed=False,materialized=False,unique=True)
+      # Iterate over input rows and schema, find the cooresponding column
+      # mappings, and append the relevant genotypes
+      for i,rows in merge_rows.pop(locus).iteritems():
+        for j,k in merge_columns[i]:
+          new_row[k] += (row[j] for row in rows)
 
-  return new_genos
+      # Merge genotypes
+      new_row = list(imap(mergefunc,new_columns,repeat(locus),repeat(model),new_row))
+
+      # Yield new row
+      yield locus,new_row
+
+  return genos[0].clone(_merger(),samples=samples,loci=loci,models=models,genome=genome,
+                                  packed=False,materialized=False,unique=True)
 
 
 #######################################################################################
@@ -3304,8 +3293,8 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
     if genos.format=='ldat':
       for locus,row in genos:
         old_loc = genos.genome.get_locus(locus)
-        genome.add_locus(locus, chromosome=old_loc.chromosome,
-                                location=old_loc.chromosome, strand=old_loc.strand)
+        genome.merge_locus(locus, chromosome=old_loc.chromosome,
+                                  location=old_loc.chromosome, strand=old_loc.strand)
 
         if locus in rename_alleles:
           r = rename_alleles[locus]
@@ -3316,8 +3305,8 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
     elif genos.format=='sdat':
       for locus in genos.loci:
         old_loc = genos.genome.get_locus(locus)
-        genome.add_locus(locus, chromosome=old_loc.chromosome,
-                                location=old_loc.chromosome, strand=old_loc.strand)
+        genome.merge_locus(locus, chromosome=old_loc.chromosome,
+                                  location=old_loc.chromosome, strand=old_loc.strand)
 
       remaps = [ rename_alleles.get(h) for h in genos.loci ]
       for sample,row in genos:
@@ -3560,10 +3549,10 @@ def _genome_merge_loci(old_genome, old_name, new_genome, new_name):
   old_locus = old_genome.loci[old_name]
   old_model = old_locus.model
 
-  new_genome.add_locus(new_name, fixed=old_locus.fixed,
-                                 chromosome=old_locus.chromosome,
-                                 location=old_locus.location,
-                                 strand=old_locus.strand)
+  new_genome.merge_locus(new_name, fixed=old_locus.fixed,
+                                   chromosome=old_locus.chromosome,
+                                   location=old_locus.location,
+                                   strand=old_locus.strand)
 
   new_locus = new_genome.loci[new_name]
   new_model = new_locus.model

@@ -36,8 +36,10 @@ from   glu.lib.genolib.locus     import Genome, Locus
 from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
-GENOMATRIXVERSION=2
-GENOTRIPLEVERSION=2
+
+GENOMATRIX_COMPAT_VERSION,GENOMATRIX_VERSION=1,2
+GENOTRIPLE_COMPAT_VERSION,GENOTRIPLE_VERSION=1,2
+
 
 class TripleDesc(tables.IsDescription):
   sample = tables.Int32Col(pos=0)
@@ -48,6 +50,13 @@ class TripleDesc(tables.IsDescription):
 CLOSED,NOTOPEN,OPEN = range(3)
 STRANDS   = [None,'+','-']
 STRANDMAP = dict( (s,i) for i,s in enumerate(STRANDS) )
+
+
+def _get_v_attr(gfile,names,default=None):
+  for name in names:
+    if hasattr(gfile.root._v_attrs,name):
+      return getattr(gfile.root._v_attrs,name)
+  return default
 
 
 class BinaryGenomatrixWriter(object):
@@ -132,8 +141,13 @@ class BinaryGenomatrixWriter(object):
   def _open(self,row1):
     self.gfile  = tables.openFile(self.filename,mode='w')
 
-    self.gfile.root._v_attrs.format = self.format
-    self.gfile.root._v_attrs.version = GENOMATRIXVERSION
+    # V1 attributes
+    self.gfile.root._v_attrs.format      = self.format
+
+    # V2 attributes
+    self.gfile.root._v_attrs.GLU_FORMAT         = self.format
+    self.gfile.root._v_attrs.GLU_VERSION        = GENOMATRIX_VERSION
+    self.gfile.root._v_attrs.GLU_COMPAT_VERSION = GENOMATRIX_COMPAT_VERSION
 
     n = len(row1.data)
 
@@ -343,8 +357,14 @@ class BinaryGenotripleWriter(object):
     self.gfile = None
 
     self.gfile = tables.openFile(filename,mode='w')
-    self.gfile.root._v_attrs.format = 'genotriple'
-    self.gfile.root._v_attrs.version = GENOTRIPLEVERSION
+
+    # V1 attributes
+    self.gfile.root._v_attrs.format     = 'genotriple'
+
+    # V2 attributes
+    self.gfile.root._v_attrs.GLU_FORMAT         = 'genotriple'
+    self.gfile.root._v_attrs.GLU_VERSION        = GENOTRIPLE_VERSION
+    self.gfile.root._v_attrs.GLU_COMPAT_VERSION = GENOTRIPLE_COMPAT_VERSION
 
     if compress:
       self.filters = tables.Filters(complevel=5,complib='zlib',shuffle=True,fletcher32=True)
@@ -542,14 +562,19 @@ def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
     raise IOError('Binary genotype files must not have a compressed extension')
 
   gfile   = tables.openFile(filename,mode='r')
-  format  = gfile.root._v_attrs.format
-  version = getattr(gfile.root._v_attrs,'version',1)
+
+  format         = _get_v_attr(gfile,['GLU_FORMAT', 'format'])
+  version        = _get_v_attr(gfile,['GLU_VERSION','version'],1)
+  compat_version = _get_v_attr(gfile,['GLU_COMPAT_VERSION'],version)
 
   if format != 'genotriple':
     raise ValueError('Unknown format: %s' % format)
 
-  if version > GENOTRIPLEVERSION:
+  if compat_version > GENOTRIPLE_VERSION:
     raise ValueError('Unknown Genotriple file version: %s' % version)
+
+  if version > GENOMATRIX_VERSION:
+    version = compat_version
 
   samples = map(str,gfile.root.samples[:])
   loci    = map(str,gfile.root.loci[:])
@@ -945,14 +970,19 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,genome=None,ch
     raise ValueError('Binary genotype files must not have a compressed extension')
 
   gfile = tables.openFile(filename,mode='r')
-  format_found = gfile.root._v_attrs.format
-  version = getattr(gfile.root._v_attrs,'version',1)
+
+  format_found   = _get_v_attr(gfile,['GLU_FORMAT', 'format'])
+  version        = _get_v_attr(gfile,['GLU_VERSION','version'],1)
+  compat_version = _get_v_attr(gfile,['GLU_COMPAT_VERSION'],version)
 
   if format not in ('ldat','sdat'):
     raise ValueError, 'Unknown format: %s' % format
 
-  if version > GENOMATRIXVERSION:
+  if compat_version > GENOMATRIX_VERSION:
     raise ValueError('Unknown Genomatrix file version: %s' % version)
+
+  if version > GENOMATRIX_VERSION:
+    version = compat_version
 
   columns = tuple(imap(intern,map(str,gfile.root.cols[:])))
   rows    = tuple(imap(intern,map(str,gfile.root.rows[:])))

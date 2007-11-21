@@ -145,7 +145,7 @@ def load_genomatrix_hapmap(filename,limit=None,genome=None):
       if not model:
         model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
 
-      loc = genome.add_locus(locus, model, True, chromosome, position, strand)
+      loc = genome.merge_locus(locus, model, True, chromosome, position, strand)
 
       yield locus,genos
 
