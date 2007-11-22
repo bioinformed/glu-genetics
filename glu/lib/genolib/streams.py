@@ -22,7 +22,7 @@ from   operator          import itemgetter, getitem
 from   collections       import defaultdict
 from   itertools         import izip,ifilter,imap,chain,groupby,repeat
 
-from   glu.lib.utils     import pick,tally
+from   glu.lib.utils     import pick,tally,izip_exact
 from   glu.lib.imerge    import imerge
 from   glu.lib.xtab      import xtab,rowsby
 
@@ -784,7 +784,7 @@ class GenomatrixStream(GenotypeStream):
       '''
       if self.format=='ldat':
         def _check(rows):
-          for (locus,row),model in izip(rows,self.models):
+          for (locus,row),model in izip_exact(rows,self.models):
             assert not self.packed or isinstance(row,GenotypeArray)
             assert not self.packed or model is row.descriptor.models[0]
             assert all(g.model is model for g in row)
@@ -793,11 +793,12 @@ class GenomatrixStream(GenotypeStream):
             yield locus,row
         return _check(self.use_stream())
       else:
-        assert all(self.genome.loci[locus].model in (model,None) for locus,model in izip(self.loci,self.models))
+        assert all(self.genome.loci[locus].model in (model,None) for locus,model in izip_exact(self.loci,self.models))
         def _check(rows):
           for sample,row in rows:
             assert all(isinstance(g,Genotype) for g in row)
-            assert all(g.model is model for model,g in izip(self.models,row))
+            assert len(self.models) == len(row)
+            assert all(g.model is model for model,g in izip_exact(self.models,row))
             yield sample,row
         return _check(self.use_stream())
 
@@ -1060,7 +1061,7 @@ class GenomatrixStream(GenotypeStream):
   columns = property(_get_columns,_set_columns)
 
   def _model_pairs(self):
-    return izip(self.loci,self.models)
+    return izip_exact(self.loci,self.models)
 
   model_pairs = property(_model_pairs)
 
@@ -1431,7 +1432,7 @@ def recode_genomatrixstream(genos, genome):
   ('s1', 's2', 's3')
   >>> all(model is defmodel for model in genos.models)
   True
-  >>> for (label,row),model in izip(genos,genos.models):
+  >>> for (label,row),model in izip_exact(genos,genos.models):
   ...   print label,row,model is defmodel,all(isinstance(g,Genotype) for g in row)
   l1 [('A', 'A'), (None, None), ('G', 'G')] True True
   l2 [(None, None), (None, None), (None, None)] True True
@@ -1448,7 +1449,7 @@ def recode_genomatrixstream(genos, genome):
   ('l1', 'l2', 'l3', 'l4')
   >>> all(model is defmodel for model in genos.models)
   True
-  >>> for (label,row),model in izip(genos,genos.models):
+  >>> for label,row in genos:
   ...   print label,row,all(isinstance(g,Genotype) for g in row)
   s1 [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')] True
   s2 [(None, None), (None, None), (None, None), (None, None)] True
@@ -2943,6 +2944,10 @@ def merge_genomatrixstream_list(genos, mergefunc):
   if not genos:
     raise ValueError('Invalid empty genotype list')
 
+  # Fastpath for nothing to merge
+  if len(genos) == 1:
+    return genos[0]
+
   # Fastpath for identical schema: Concatenate all genotype rows and merge
   # using the single-matrix merge function.  Also optimizes the single input
   # case.
@@ -2963,7 +2968,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
       models = []
       def _combine(genos):
         for g in genos:
-          for labelrow,model in izip(g,g.models):
+          for labelrow,model in izip_exact(g,g.models):
             models.append(model)
             yield labelrow
 
@@ -3009,26 +3014,26 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
   def _merger():
     # Fully general merge over duplicate rows and columns
-    for locus in new_rows:
-      model = genome.get_model(locus)
-
-      if format=='ldat':
-        models.append(model)
-
+    for label in new_rows:
       # Form lists of all genotypes at each new column for all rows with locus
       new_row = [ [] for i in xrange(n) ]
 
       # Iterate over input rows and schema, find the cooresponding column
       # mappings, and append the relevant genotypes
-      for i,rows in merge_rows.pop(locus).iteritems():
+      for i,rows in merge_rows.pop(label).iteritems():
         for j,k in merge_columns[i]:
           new_row[k] += (row[j] for row in rows)
 
       # Merge genotypes
-      new_row = list(imap(mergefunc,new_columns,repeat(locus),repeat(model),new_row))
+      if format=='ldat':
+        model = genome.get_model(label)
+        models.append(model)
+        new_row = list(imap(mergefunc,samples,repeat(label),repeat(model),new_row))
+      else:
+        new_row = list(imap(mergefunc,repeat(label),loci,models,new_row))
 
       # Yield new row
-      yield locus,new_row
+      yield label,new_row
 
   return genos[0].clone(_merger(),samples=samples,loci=loci,models=models,genome=genome,
                                   packed=False,materialized=False,unique=True)
@@ -3310,7 +3315,7 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
 
       remaps = [ rename_alleles.get(h) for h in genos.loci ]
       for sample,row in genos:
-        row = [ ((r[g[0]],r[g[1]]) if g and r else g.alleles()) for g,r in izip(row,remaps) ]
+        row = [ ((r[g[0]],r[g[1]]) if g and r else g.alleles()) for g,r in izip_exact(row,remaps) ]
         yield sample,row
 
     else:
@@ -3412,7 +3417,7 @@ def filter_genomatrixstream_missing(genos):
   if genos.format=='ldat':
     models = []
     def _filter():
-      for (lname,row),model in izip(genos,genos.models):
+      for (lname,row),model in izip_exact(genos,genos.models):
         if any(row):
           models.append(model)
           yield lname,row
@@ -3521,14 +3526,14 @@ def build_genotriples_from_genomatrix(genos):
     def _build():
       samples = genos.samples
       for i,(locus,row) in enumerate(genos):
-        for sample,geno in izip(samples, row):
+        for sample,geno in izip_exact(samples, row):
           yield sample,locus,geno
   else:
     order = 'sample'
     def _build():
       loci = genos.loci
       for sample,row in genos:
-        for locus,geno in izip(loci, row):
+        for locus,geno in izip_exact(loci, row):
           yield sample,locus,geno
 
   # Unset the result order if any of the required ordering constraints
@@ -4181,13 +4186,13 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
     models = []
     if exclude:
       def _filter():
-        for (locus,row),model in izip(genos,genos.models):
+        for (locus,row),model in izip_exact(genos,genos.models):
           if locus not in rowset:
             models.append(model)
             yield locus,row
     else:
       def _filter():
-        for (locus,row),model in izip(genos,genos.models):
+        for (locus,row),model in izip_exact(genos,genos.models):
           if locus in rowset:
             models.append(model)
             yield locus,row
