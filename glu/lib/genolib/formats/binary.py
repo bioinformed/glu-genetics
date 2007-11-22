@@ -667,6 +667,7 @@ def save_models(gfile, loci, genome, models, filters=None):
   locus_models = gfile.createTable(gfile.root, 'locus_models', LocusModelDesc, 'locus models',
                                        filters=filters, expectedrows=len(models))
 
+
   locus_row = locus_models.row
   for locus,model in izip(loci,models):
     loc = genome.get_locus(locus)
@@ -779,12 +780,12 @@ def load_models_v1(gfile,loci):
   alleles         = map(str,gfile.root.model_alleles[:])
   alleles[0]      = None
   mods            = list(gfile.root.models[:])
-  model_genotypes = list(gfile.root.model_genotypes[:])
-  model_genotypes = groupby(model_genotypes, itemgetter(0))
+  model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
+                           for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
 
   modelcache = {}
   models = []
-  for mod,(i,mgenos) in izip(mods,model_genotypes):
+  for i,mod in enumerate(mods):
     genotypes = tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos)
     key = (mod[1],mod[0])+genotypes
     model = modelcache.get(key)
@@ -818,13 +819,13 @@ def load_models_v2(gfile,loci):
   alleles[0]      = None
   mods            = list(gfile.root.models[:])
   chrs            = map(str,gfile.root.chromosomes[:])
-  model_genotypes = list(gfile.root.model_genotypes[:])
-  model_genotypes = groupby(model_genotypes, itemgetter(0))
+  model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
+                           for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
 
   modelcache = {}
   models = []
-  for mod,(i,mgenos) in izip(mods,model_genotypes):
-    genotypes = tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos)
+  for i,mod in enumerate(mods):
+    genotypes = model_genotypes.get(i) or ()
     key = (mod[1],mod[0])+genotypes
     model = modelcache.get(key)
     if model is None:
