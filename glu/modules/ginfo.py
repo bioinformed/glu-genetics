@@ -21,8 +21,6 @@ Revision:      $Id: $
 import sys
 import csv
 
-from   itertools import izip
-
 from   glu.lib.fileutils     import autofile, namefile, hyphen
 from   glu.lib.genolib.io    import load_genostream
 

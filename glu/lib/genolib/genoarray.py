@@ -22,7 +22,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeError','GenotypeArrayDescriptor']
 
 
-from  itertools import izip
+from  itertools     import izip
+from  glu.lib.utils import izip_exact
 
 
 class GenotypeError(ValueError): pass
@@ -592,6 +593,9 @@ def count_genotypes2(model1,genos1,model2,genos2):
   ('B', 'B') ('A', 'B') 50
   ('B', 'B') ('B', 'B') 250
   '''
+  if len(genos1) != len(genos2):
+    raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
+
   n,m = len(model1.genotypes),len(model2.genotypes)
   counts = [0]*n*m
   for geno1,geno2 in izip(genos1,genos2):
@@ -687,7 +691,7 @@ def count_alleles_from_genocounts(model,genocounts):
   [400, 800, 1200]
   '''
   counts = [0]*len(model.alleles)
-  for geno,n in izip(model.genotypes,genocounts):
+  for geno,n in izip_exact(model.genotypes,genocounts):
     counts[geno.allele1_index] += n
     counts[geno.allele2_index] += n
   return counts

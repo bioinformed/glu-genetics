@@ -24,6 +24,7 @@ import csv
 from   itertools                 import islice,chain,izip,imap,groupby
 from   operator                  import itemgetter
 
+from   glu.lib.utils             import izip_exact
 from   glu.lib.fileutils         import autofile,hyphen
 from   glu.lib.sections          import read_sections
 from   glu.lib.sequence          import norm_snp_seq, complement_base
@@ -64,7 +65,7 @@ def load_lbd_file(filename, gcthreshold=None):
 
       if gcthreshold is not None:
         scores = imap(float,islice(scores,8,None))
-        genos = [ (g if gc>gcthreshold else 'U') for g,gc in izip(genos,scores) ]
+        genos = [ (g if gc>gcthreshold else 'U') for g,gc in izip_exact(genos,scores) ]
 
       yield sampleid,genos
 
@@ -238,7 +239,7 @@ def build_models(loci,usermap,genome):
 
 def encode_genotypes(loci, samples, abmap):
   for sampleid,genos in samples:
-    genos = [abmap[locus,geno] for locus,geno in izip(loci,genos)]
+    genos = [abmap[locus,geno] for locus,geno in izip_exact(loci,genos)]
     yield sampleid,genos
 
 

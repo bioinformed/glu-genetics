@@ -24,7 +24,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools                 import izip, chain
+from   itertools                 import chain
 from   textwrap                  import fill
 from   collections               import defaultdict
 

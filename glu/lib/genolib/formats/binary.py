@@ -28,7 +28,7 @@ from   itertools                 import izip,groupby,imap
 
 import tables
 
-from   glu.lib.utils             import ilen
+from   glu.lib.utils             import izip_exact
 from   glu.lib.fileutils         import compressed_filename
 
 from   glu.lib.genolib.locus     import Genome, Locus
@@ -669,7 +669,7 @@ def save_models(gfile, loci, genome, models, filters=None):
 
 
   locus_row = locus_models.row
-  for locus,model in izip(loci,models):
+  for locus,model in izip_exact(loci,models):
     loc = genome.get_locus(locus)
     assert loc.model in (None,model)
 
@@ -799,7 +799,7 @@ def load_models_v1(gfile,loci):
   models = [ models[i] for i in locus_models ]
 
   locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
-                    for locus,model in izip(loci,models) ]
+                    for locus,model in izip_exact(loci,models) ]
 
   return Genome(loci=locs),models
 
@@ -836,7 +836,7 @@ def load_models_v2(gfile,loci):
 
   genome = Genome()
   locs = []
-  for locus,lmod in izip(loci,gfile.root.locus_models[:]):
+  for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
     location = lmod[2]
     if location == -1:
       location = None
@@ -1148,6 +1148,8 @@ def test(descr,filename,command,genotypes):
 
 def main():
   from   random    import shuffle
+
+  from   glu.lib.utils         import ilen
 
   from   glu.lib.genolib.reprs import snp
   from   glu.lib.genolib.io    import load_genostream, save_genostream

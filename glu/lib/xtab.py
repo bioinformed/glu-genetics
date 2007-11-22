@@ -18,7 +18,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
 from   operator  import itemgetter
-from   itertools import groupby,chain,izip
+from   itertools import groupby,chain
 
 
 def _rowstream(data, rowkeyfunc, colkeyfunc, valuefunc):
