@@ -16,6 +16,10 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
+
+__all__ = ['tally','ilen','pair_generator','percent','xenumerate','pick','peekfirst','groups',
+           'unique','izip_exact','deprecated','deprecated_by']
+
 import array
 import warnings
 import collections
@@ -238,6 +242,110 @@ def unique(sequence, keyfunc=None):
       if key not in seen:
         seen.add(key)
         yield item
+
+
+# Helpers for izip_exact
+
+class LengthMismatch(Exception):
+  pass
+
+def _izip_exact_thow():
+  raise LengthMismatch
+  yield None # unreachable
+
+def _zip_exact_check(rest):
+  for i in rest:
+    try:
+      i.next()
+    except LengthMismatch:
+      pass
+    else:
+      raise LengthMismatch
+  return
+  yield None # unreachable
+
+
+def izip_exact(*iterables):
+  '''
+  izip_exact(iter1 [,iter2 [...]]) --> iterator object
+
+  Return an iterator whose .next() method returns a tuple where the i-th
+  element comes from the i-th iterable argument.  The .next() method
+  continues until the shortest iterable in the argument sequence is
+  exhausted.  If all sequences are exhausted a StopIteration exception is
+  raised, otherwise a LengthMismatch exception is raised.
+
+  Works like itertools.izip(), but throws a LengthMismatch exception if any
+  iterable's length differs.
+
+  Zero length iterable lists return iter(iterables).  Unit length iterables
+  return iter(iterables[0]).  Otherwise an izip object is returned.
+
+  If the len() of all iterables is available and match, then this function
+  returns izip(*iterables).  In the length of any iterable cannot be
+  determined, then sentinel objects are appended to each iterable and an
+  izip object of these augmented iterables is returned.  If the length a
+  proper subset of iterables can be determined, the second strategy is
+  employed, even if known lengths do not match.  This is in anticipation of
+  iterable side-effects that may ultimately balance the lengths.
+
+  Inspired largely by Peter Otten's zip_exc, modified to check lengths.
+  (http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/497006)
+
+  >>> list(izip_exact())
+  []
+  >>> list(izip_exact([]))
+  []
+  >>> list(izip_exact((), (), ()))
+  []
+
+  >>> list(izip_exact("abc", range(3)))
+  [('a', 0), ('b', 1), ('c', 2)]
+
+  >>> list(izip_exact("", range(3)))
+  Traceback (most recent call last):
+       ...
+  LengthMismatch
+
+  >>> list(izip_exact(range(3), ()))
+  Traceback (most recent call last):
+       ...
+  LengthMismatch
+
+  >>> list(izip_exact(range(3), range(2), range(4)))
+  Traceback (most recent call last):
+       ...
+  LengthMismatch
+
+  >>> items = izip_exact(iter(range(3)), range(2), range(4))
+  >>> items.next()
+  (0, 0, 0)
+  >>> items.next()
+  (1, 1, 1)
+  >>> items.next()
+  Traceback (most recent call last):
+       ...
+  LengthMismatch
+  '''
+  if not iterables:
+    return iter(iterables)
+  elif len(iterables) == 1:
+    return iter(iterables[0])
+
+  first = iterables[0]
+  rest  = iterables[1:]
+
+  try:
+    n = len(first)
+    if all( len(i)==n for i in rest ):
+      return izip(*iterables)
+  except TypeError:
+    pass
+
+  # Must use sentinel objects to enforce length equality
+  rest  = [chain(i, _izip_exact_thow()) for i in rest]
+  first = chain(first, _zip_exact_check(rest))
+  return izip(*[first] + rest)
 
 
 def deprecated(func):
