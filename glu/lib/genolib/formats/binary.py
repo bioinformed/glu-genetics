@@ -18,11 +18,10 @@ from __future__ import with_statement
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
-__all__ = ['BinaryGenomatrixWriter','BinaryGenotripleWriter',
+__all__ = ['BinaryGenomatrixWriter', 'BinaryGenotripleWriter',
            'save_genotriples_binary','load_genotriples_binary',
            'save_genomatrix_binary', 'load_genomatrix_binary']
 
-import time
 
 from   operator                  import itemgetter
 from   itertools                 import izip,groupby,imap

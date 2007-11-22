@@ -19,28 +19,16 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-import csv
-
-from   collections               import defaultdict
-from   operator                  import getitem, itemgetter
-from   itertools                 import izip,islice,dropwhile,imap,repeat
-
-from   glu.lib.utils             import tally
-from   glu.lib.fileutils         import autofile,namefile,guess_format
+from   glu.lib.fileutils         import namefile,guess_format
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
 from   glu.lib.genolib.merge     import get_genomerger
-from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.locus     import load_genome, Genome
-from   glu.lib.genolib.reprs     import snp, hapmap, marker, get_genorepr
-from   glu.lib.genolib.text      import (TextGenomatrixWriter,        TextGenotripleWriter,
-                                         save_genotriples_text,       load_genotriples_text,
-                                         save_genomatrix_text,        load_genomatrix_text,
-                                         load_genomatrix_hapmap,      PrettybaseGenotripleWriter,
-                                         save_genotriples_prettybase, load_genotriples_prettybase)
-from   glu.lib.genolib.binary    import (BinaryGenomatrixWriter,      BinaryGenotripleWriter,
-                                         save_genotriples_binary,     load_genotriples_binary,
-                                         save_genomatrix_binary,      load_genomatrix_binary)
+from   glu.lib.genolib.reprs     import get_genorepr
+
+# FIXME: Format support should ultimately be pluggable with a registration protocol
+from   glu.lib.genolib.formats.text   import *
+from   glu.lib.genolib.formats.binary import *
 
 
 INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
@@ -99,7 +87,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> ldat = load_genostream(data,'ldat',snp)
+  >>> ldat = load_genostream(data,'ldat','snp')
   >>> ldat.columns
   ('s1', 's2', 's3')
   >>> for row in ldat:

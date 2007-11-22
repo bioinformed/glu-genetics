@@ -33,6 +33,13 @@ from   glu.lib.genolib.reprs     import snp,hapmap
 from   glu.lib.genolib.locus     import Genome
 
 
+__all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
+           'save_genotriples_text', 'load_genotriples_text',
+           'save_genomatrix_text',  'load_genomatrix_text',
+           'load_genomatrix_hapmap','PrettybaseGenotripleWriter',
+           'save_genotriples_prettybase', 'load_genotriples_prettybase']
+
+
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
