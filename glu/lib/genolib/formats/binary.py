@@ -786,7 +786,7 @@ def load_models_v1(gfile,loci):
   modelcache = {}
   models = []
   for i,mod in enumerate(mods):
-    genotypes = tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos)
+    genotypes = model_genotypes.get(i,())
     key = (mod[1],mod[0])+genotypes
     model = modelcache.get(key)
     if model is None:
@@ -825,7 +825,7 @@ def load_models_v2(gfile,loci):
   modelcache = {}
   models = []
   for i,mod in enumerate(mods):
-    genotypes = model_genotypes.get(i) or ()
+    genotypes = model_genotypes.get(i,())
     key = (mod[1],mod[0])+genotypes
     model = modelcache.get(key)
     if model is None:
