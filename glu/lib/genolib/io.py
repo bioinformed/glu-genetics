@@ -31,8 +31,8 @@ from   glu.lib.genolib.formats.text   import *
 from   glu.lib.genolib.formats.binary import *
 
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
-OUTPUT_FORMATS = ('ldat','sdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
+INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
+OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
 
 
 def guess_informat(filename):
@@ -100,7 +100,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genostream(data,'trip',genorepr='snp')
+  >>> triples = load_genostream(data,'tdat',genorepr='snp')
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -129,7 +129,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
     genos = load_genomatrix_binary(filename,'ldat',limit=limit,unique=unique,genome=genome)
   elif format == 'sbat':
     genos = load_genomatrix_binary(filename,'sdat',limit=limit,unique=unique,genome=genome)
-  elif format in ('trip','genotriple'):
+  elif format in ('tdat','trip','genotriple'):
     genos = load_genotriples_text(filename,genorepr,limit=limit,unique=unique,genome=genome)
   elif format in ('pb','prettybase'):
     genos = load_genotriples_prettybase(filename,limit=limit,unique=unique,genome=genome)
@@ -174,7 +174,7 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
     save_genomatrix_text(filename, genos.as_ldat(mergefunc), genorepr)
   elif format == 'sdat':
     save_genomatrix_text(filename, genos.as_sdat(mergefunc), genorepr)
-  elif format in ('trip','genotriple'):
+  elif format in ('tdat','trip','genotriple'):
     save_genotriples_text(filename, genos.as_genotriples(), genorepr)
   elif format in ('pb','prettybase'):
     genos = save_genotriples_prettybase(filename, genos.as_genotriples())
@@ -225,7 +225,7 @@ def transform_files(infiles,informat,ingenorepr,
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\t\\tCT\\tTT\\n")
   >>> out  = StringIO()
-  >>> transform_files([data],'ldat','snp',out,'trip','marker')
+  >>> transform_files([data],'ldat','snp',out,'tdat','marker')
   >>> print out.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1  l1      A/A
   s2  l1      A/G
@@ -268,7 +268,7 @@ def transform_files(infiles,informat,ingenorepr,
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
   elif outformat in ('sdat','sbat'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
-  elif outformat in ('trip','genotriple','pb','prettybase','tbat'):
+  elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
   elif not outformat:
     raise ValueError, "Output file format for '%s' must be specified" % namefile(outfile)
