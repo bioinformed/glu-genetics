@@ -398,9 +398,13 @@ class GCDisabled(object):
   numbers of potentially cyclic objects.  It is not wise to disable the
   garbage collector for too long.
 
+  >>> gc.isenabled
+  True
   >>> with gcdisabled:
-  ...   print 'foo'
-  foo
+  ...   print gc.isenabled
+  False
+  >>> print gc.isenabled
+  True
   '''
   def __enter__(self):
     gc.disable()
