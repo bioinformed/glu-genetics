@@ -15,8 +15,9 @@ documentation
 distribution
 ------------
 
+  * Prepare Linux binary distribution (AMD64 and Intel64)
+  * Prepare OSX binary distribution
   * Prepare win32 binary distribution (AMD and Intel)
-  * Prepare Linux binary distribution (AMD and Intel)
 
 -------
 genolib
@@ -30,8 +31,8 @@ genolib
   * File format support:
     * PLINK text (http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml)
     * PLINK binary (http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml)
-    * MERLIN (http://www.sph.umich.edu/csg/abecasis/MACH/tour/)
-    * WTCC (http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html)
+    * MERLIN/MACH (http://www.sph.umich.edu/csg/abecasis/MACH/tour/)
+    * WTCCC (http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html)
     * GenABEL (http://rss.acs.unt.edu/Rdoc/library/GenABEL/html/GenABEL-package.html)
 
 ----------------------

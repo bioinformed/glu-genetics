@@ -41,10 +41,10 @@ Prerequistites for using GLU:
 GLU requires the following free and open source packages:
 
 	Python   2.5.1   or newer from http://www.python.org/
-	NumPy    1.0.3.1 or newer from http://numpy.scipy.org/
-	SciPy    0.5.3   or newer from http://www.scipy.org/
-	PyTables 2.0     or newer from http://www.pytables.org/
-        SQLite   2.4.1   or newer from http://www.sqlite.org/
+	NumPy    1.0.4   or newer from http://numpy.scipy.org/
+	SciPy    0.6.0   or newer from http://www.scipy.org/
+	PyTables 2.0.2   or newer from http://www.pytables.org/
+        SQLite   3.5.2   or newer from http://www.sqlite.org/
 
 Prerequistites of the prerequistites:
 
@@ -58,7 +58,7 @@ Prerequistites of the prerequistites:
 
 	In addition, PyTables is based on the HDF5 standard and requires:
 
-	HDF5 1.6.5 or newer from http://hdfgroup.org/HDF5/
+	HDF5 1.6.6 or newer from http://hdfgroup.org/HDF5/
 
 Then to build install GLU, run:
 
