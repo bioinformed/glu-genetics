@@ -28,7 +28,7 @@ from   itertools                 import izip,groupby,imap
 
 import tables
 
-from   glu.lib.utils             import izip_exact
+from   glu.lib.utils             import izip_exact, gcdisabled
 from   glu.lib.fileutils         import compressed_filename
 
 from   glu.lib.genolib.locus     import Genome, Locus
@@ -784,7 +784,7 @@ def load_models_v1(gfile,loci):
                            for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
 
   modelcache = {}
-  models = []
+  allmodels = []
   for i,mod in enumerate(mods):
     genotypes = model_genotypes.get(i,())
     key = (mod[1],mod[0])+genotypes
@@ -793,15 +793,16 @@ def load_models_v1(gfile,loci):
       model = modelcache[key] = UnphasedMarkerModel(mod[1],mod[0])
       for g in genotypes:
         model.add_genotype(g)
-    models.append(model)
+    allmodels.append(model)
 
   locus_models = [ m[0] for m in gfile.root.locus_models[:] ]
-  models = [ models[i] for i in locus_models ]
+  models = [ allmodels[i] for i in locus_models ]
 
-  locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
-                    for locus,model in izip_exact(loci,models) ]
-
-  return Genome(loci=locs),models
+  # Performance hot spot (potentially millions of objects allocated here)
+  with gcdisabled:
+    locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
+                      for locus,model in izip_exact(loci,models) ]
+    return Genome(loci=locs),models
 
 
 def load_models_v2(gfile,loci):
@@ -834,20 +835,21 @@ def load_models_v2(gfile,loci):
         model.add_genotype(g)
     models.append(model)
 
-  genome = Genome()
-  locs = []
-  for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
-    location = lmod[2]
-    if location == -1:
-      location = None
+  # Performance hot spot (potentially millions of objects allocated here)
+  with gcdisabled:
+    locs = []
+    for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
+      location = lmod[2]
+      if location == -1:
+        location = None
 
-    locs.append( Locus(locus, model=models[lmod[0]], fixed=True,
-                              chromosome=chrs[lmod[1]], location=location,
-                              strand=STRANDS[lmod[3]] ) )
+      locs.append( Locus(locus, model=models[lmod[0]], fixed=True,
+                                chromosome=chrs[lmod[1]], location=location,
+                                strand=STRANDS[lmod[3]] ) )
 
-  models = [ locus.model for locus in locs ]
+    models = [ locus.model for locus in locs ]
 
-  return Genome(loci=locs),models
+    return Genome(loci=locs),models
 
 
 def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
