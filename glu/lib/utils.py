@@ -13,13 +13,16 @@ Requires:      Python 2.5
 Revision:      $Id$
 '''
 
+from __future__ import with_statement
+
 __copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
 __license__   = 'See GLU license for terms by running: glu license'
 
 
 __all__ = ['tally','ilen','pair_generator','percent','xenumerate','pick','peekfirst','groups',
-           'unique','izip_exact','deprecated','deprecated_by']
+           'unique','izip_exact','deprecated','deprecated_by', 'gcdisabled']
 
+import gc
 import array
 import warnings
 import collections
@@ -386,6 +389,28 @@ def deprecated_by(msg):
     return update_wrapper(deprecated_wrapper, func)
 
   return deprecated
+
+
+class GCDisabled(object):
+  '''
+  Conext manager to temporarily disable Python's cyclic garbage collector.
+  The primary use is to avoid CPU and cache thrashing while allocating large
+  numbers of potentially cyclic objects.  It is not wise to disable the
+  garbage collector for too long.
+
+  >>> with gcdisabled:
+  ...   print 'foo'
+  foo
+  '''
+  def __enter__(self):
+    gc.disable()
+
+  def __exit__(self, type, value, traceback):
+    gc.enable()
+
+
+gcdisabled = GCDisabled()
+del GCDisabled
 
 
 def _test():
