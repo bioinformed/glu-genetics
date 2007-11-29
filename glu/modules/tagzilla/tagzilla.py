@@ -3316,7 +3316,7 @@ def check_accelerators(accelerators, quiet=False):
     failed = []
     for a in accelerators:
       try:
-        __import__(a)
+        __import__('glu.modules.tagzilla.%s' % a)
       except ImportError:
         failed.append(a)
 
