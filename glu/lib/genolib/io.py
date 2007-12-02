@@ -27,8 +27,7 @@ from   glu.lib.genolib.locus     import load_genome, Genome
 from   glu.lib.genolib.reprs     import get_genorepr
 
 # FIXME: Format support should ultimately be pluggable with a registration protocol
-from   glu.lib.genolib.formats.text   import *
-from   glu.lib.genolib.formats.binary import *
+from   glu.lib.genolib.formats   import *
 
 
 INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
