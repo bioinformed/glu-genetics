@@ -2008,9 +2008,10 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
         try:
           row = GenotypeArray(descr,imap(getitem, cachelist, row) )
         except KeyError:
+          geno_tuples = from_strings(row)
 
           try:
-            for (locus,update,cache),gstr,g in izip(updates,row,from_strings(row)):
+            for (locus,update,cache),gstr,g in izip(updates,row,geno_tuples):
               # Aggressively form homozygote genotypes and cache them.  Thus
               # we only see cache misses when we encounter previously
               # unobserved alleles or when genotype formatting is off.
