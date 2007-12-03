@@ -499,16 +499,20 @@ def load_list(filename, extra_args=None, **kwargs):
   if _literal_list(filename):
     return [ intern(l.strip()) for l in filename[1:].split(',') if l ]
 
-  # Otherwise, handle file name or file object cases
-  name      = parse_augmented_filename(filename,kwargs)
-  dialect   = get_csv_dialect(kwargs, 'tsv')
-  skip      = int(get_arg(kwargs,     ['skip', 's'], 0))
-  index     = tryint(get_arg(kwargs,  ['index','i'], 0))
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
 
-  if kwargs and extra_args is not None:
-    extra_args.update(kwargs)
-  elif kwargs:
-    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(kwargs)))
+  # Otherwise, handle file name or file object cases
+  name      = parse_augmented_filename(filename,args)
+  dialect   = get_csv_dialect(args, 'tsv')
+  skip      = int(get_arg(args,     ['skip', 's'], 0))
+  index     = tryint(get_arg(args,  ['index','i'], 0))
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   lines = csv.reader(autofile(name),**dialect)
 
@@ -671,30 +675,34 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
   >>> test(f.name + ':key=H2:value=H1')
   [('v12', 'v11'), ('v32', 'v32')]
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
   # Handle :literal syntax
   if _literal_list(filename):
     key_index,value_index = 0,1
     lines = (kv.split('=') for kv in filename[1:].split(',') if kv)
-    default = kwargs.get('default',_nothing)
+    default = get_arg(args, ['default'], _nothing)
 
   else:
-    name        = parse_augmented_filename(filename,kwargs)
-    dialect     = get_csv_dialect(kwargs,'tsv')
-    skip        = int(get_arg(kwargs, ['s','skip'], 0))
-    default     = get_arg(kwargs, ['d','def','default'], _nothing)
-    key_index   = tryint(get_arg(kwargs, ['k','key',  'key_index'  ], 0))
-    value_index = tryint(get_arg(kwargs, ['v','value','value_index'], 1))
-
-    if kwargs and extra_args is not None:
-      extra_args.update(kwargs)
-    elif kwargs:
-      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(kwargs)))
+    name        = parse_augmented_filename(filename,args)
+    dialect     = get_csv_dialect(args,'tsv')
+    skip        = int(get_arg(args, ['s','skip'], 0))
+    default     = get_arg(args, ['d','def','default'], _nothing)
+    key_index   = tryint(get_arg(args, ['k','key',  'key_index'  ], 0))
+    value_index = tryint(get_arg(args, ['v','value','value_index'], 1))
 
     lfile = autofile(name)
     lines = csv.reader(lfile, **dialect)
 
     if skip:
       lines = islice(lines,skip,None)
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   # Resolve column heading names into indices
   if isstr(key_index) or isstr(value_index):
@@ -953,15 +961,19 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   [['v11', 'v12', 'v12', 'v11', 'v11', 'v12'], ['v21', '', '', 'v21', 'v21', ''], ['', 'v32', 'v32', '', '', 'v32']]
   >>> del f
   '''
-  name    = parse_augmented_filename(filename,kwargs)
-  dialect = get_csv_dialect(kwargs,'tsv')
-  skip    = int(get_arg(kwargs, ['s','skip'], 0))
-  columns = get_arg_columns(kwargs)
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
 
-  if kwargs and extra_args is not None:
-    extra_args.update(kwargs)
-  elif kwargs:
-    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(kwargs)))
+  name    = parse_augmented_filename(filename,args)
+  dialect = get_csv_dialect(args,'tsv')
+  skip    = int(get_arg(args, ['s','skip'], 0))
+  columns = get_arg_columns(args)
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   lfile = autofile(name)
   lines = csv.reader(lfile, **dialect)

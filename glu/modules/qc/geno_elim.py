@@ -646,7 +646,7 @@ def main():
     parser.print_help()
     return
 
-  genos = iter(load_genostream(options.genofile,snp).as_ldat())
+  genos = iter(load_genostream(options.genofile,genorepr=snp).as_ldat())
   individuals = genos.next()
 
   if options.errdetails:

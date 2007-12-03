@@ -1159,11 +1159,11 @@ def main():
   if 0:
     f      = '/usr/local/share/hapmap/build21/fwd_strand/non-redundant/genotypes_chr22_CEU_r21a_nr_fwd.txt.gz'
     #f     = '/usr/local/share/hapmap/build21/fwd_strand/non-redundant/genotypes_chr2_YRI_r21a_nr_fwd.txt.gz'
-    matrix = load_genostream(f,'hapmap').materialize()
+    matrix = load_genostream(f,format='hapmap').materialize()
     format = 'hapmap'
   else:
     f = '/home/jacobske/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_CASE_22.ldat.gz'
-    matrix = load_genostream(f,genorepr=snp).materialize()
+    matrix = load_genostream(f).materialize()
     format = matrix.format
 
   matrix   = matrix.materialize()
@@ -1173,33 +1173,33 @@ def main():
   print
 
   test('Load   compressed %s file' % (format or 'source'), f,
-         lambda f: ilen(load_genostream(f,format,snp)), g)
+         lambda f: ilen(load_genostream(f,format=format)), g)
 
   if 1:
     test('Save uncompressed   triple file ldat', 'data/g2.trip',
-           lambda f: save_genostream(f,matrix.as_genotriples(),genorepr=snp), g)
+           lambda f: save_genostream(f,matrix.as_genotriples()), g)
     test('Save   compressed   triple file ldat', 'data/g2.trip.gz',
-           lambda f: save_genostream(f,matrix.as_genotriples(),genorepr=snp), g)
+           lambda f: save_genostream(f,matrix.as_genotriples()), g)
     test('Save       binary   triple file ldat', 'data/g2.tbat',
            lambda f: save_genostream(f,matrix.as_genotriples()), g)
     test('Load uncompressed   triple file ldat', 'data/g2.trip',
-           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+           lambda f: ilen(load_genostream(f)), g)
     test('Load   compressed   triple file ldat', 'data/g2.trip.gz',
-           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+           lambda f: ilen(load_genostream(f)), g)
     test('Load       binary   triple file ldat', 'data/g2.tbat',
            lambda f: ilen(load_genostream(f)), g)
 
   if 1:
     test('Save   compressed   ldat file',        'data/g2.ldat.gz',
-           lambda f: save_genostream(f,matrix,genorepr=snp), g)
+           lambda f: save_genostream(f,matrix), g)
 
   if 1:
     test('Save uncompressed   ldat file',        'data/g2.ldat',
-           lambda f: save_genostream(f,matrix,genorepr=snp), g)
+           lambda f: save_genostream(f,matrix), g)
     test('Load   compressed   ldat file',        'data/g2.ldat.gz',
-           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+           lambda f: ilen(load_genostream(f)), g)
     test('Load uncompressed   ldat file',        'data/g2.ldat',
-           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+           lambda f: ilen(load_genostream(f)), g)
 
   if 1:
     test('Save       binary   ldat file',        'data/g2.lbat',
@@ -1218,7 +1218,7 @@ def main():
          lambda f: ilen(load_genomatrix_binary(f,'sdat')), g)
 
   test('Load   compressed   ldat file as sdat',        'data/g2.ldat.gz',
-         lambda f: ilen(load_genostream(f,genorepr=snp).as_sdat()), g)
+         lambda f: ilen(load_genostream(f).as_sdat()), g)
 
   matrix  = None
 
@@ -1239,28 +1239,28 @@ def main():
          lambda f: ilen(load_genomatrix_binary(f,'ldat')), g)
 
   test('Save   compressed   sdat file',        'data/g2.sdat.gz',
-         lambda f: save_genostream(f,matrix2,genorepr=snp), g)
+         lambda f: save_genostream(f,matrix2), g)
   test('Save uncompressed   sdat file',        'data/g2.sdat',
-         lambda f: save_genostream(f,matrix2,genorepr=snp), g)
+         lambda f: save_genostream(f,matrix2), g)
   test('Load   compressed   sdat file',        'data/g2.sdat.gz',
-         lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+         lambda f: ilen(load_genostream(f)), g)
   test('Load uncompressed   sdat file',        'data/g2.sdat',
-         lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+         lambda f: ilen(load_genostream(f)), g)
 
   test('Load   compressed   sdat file as ldat','data/g2.sdat.gz',
-         lambda f: ilen(load_genostream(f,genorepr=snp).as_ldat()), g)
+         lambda f: ilen(load_genostream(f).as_ldat()), g)
 
   if 1:
     test('Save uncompressed   triple file sdat', 'data/g22.trip',
-           lambda f: save_genostream(f,matrix2.as_genotriples(),genorepr=snp), g)
+           lambda f: save_genostream(f,matrix2.as_genotriples()), g)
     test('Save   compressed   triple file sdat', 'data/g22.trip.gz',
-           lambda f: save_genostream(f,matrix2.as_genotriples(),genorepr=snp), g)
+           lambda f: save_genostream(f,matrix2.as_genotriples()), g)
     test('Save       binary   triple file sdat', 'data/g23.tbat',
-           lambda f: save_genostream(f,matrix2.as_genotriples(),genorepr=snp), g)
+           lambda f: save_genostream(f,matrix2.as_genotriples()), g)
     test('Load uncompressed   triple file sdat', 'data/g22.trip',
-           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+           lambda f: ilen(load_genostream(f)), g)
     test('Load   compressed   triple file sdat', 'data/g22.trip.gz',
-           lambda f: ilen(load_genostream(f,genorepr=snp)), g)
+           lambda f: ilen(load_genostream(f)), g)
     test('Load       binary   triple file sdat', 'data/g23.tbat',
            lambda f: ilen(load_genostream(f)), g)
 

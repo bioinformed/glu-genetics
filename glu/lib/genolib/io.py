@@ -19,7 +19,7 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from   glu.lib.fileutils         import namefile,guess_format
+from   glu.lib.fileutils         import namefile, guess_format, parse_augmented_filename, get_arg
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
 from   glu.lib.genolib.merge     import get_genomerger
@@ -62,7 +62,7 @@ def guess_outformat(filename):
   return guess_format(filename, OUTPUT_FORMATS)
 
 
-def load_genostream(filename, format=None, genorepr=None, limit=None, unique=True, genome=None):
+def load_genostream(filename, extra_args=None, **kwargs):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -86,7 +86,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> ldat = load_genostream(data,'ldat','snp')
+  >>> ldat = load_genostream(data,format='ldat',genorepr='snp')
   >>> ldat.columns
   ('s1', 's2', 's3')
   >>> for row in ldat:
@@ -99,7 +99,7 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genostream(data,'tdat',genorepr='snp')
+  >>> triples = load_genostream(data,format='tdat',genorepr='snp')
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -107,16 +107,28 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   ('s2', 'l1', ('A', 'G'))
   ('s2', 'l2', ('C', 'C'))
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  format   = get_arg(args, ['format'])
+  genome   = get_arg(args, ['genome'])
+  genorepr = get_arg(args, ['genorepr']) or 'snp'
+  unique   = get_arg(args, ['unique'], True)
+  limit    = int(get_arg(args, ['limit']) or 0) or None
+
   if format is None:
     format = guess_informat(filename)
 
   if isinstance(genorepr,basestring):
     genorepr = get_genorepr(genorepr)
 
-  if isinstance(genome,basestring):
-    genome = load_genome(genome)
-
-  samples = loci = None
+  if isinstance(genome,basestring) or genome is None:
+    genome = load_genome(genome,extra_args=args)
 
   if format == 'hapmap':
     genos = load_genomatrix_hapmap(filename,limit=limit,genome=genome)
@@ -139,10 +151,13 @@ def load_genostream(filename, format=None, genorepr=None, limit=None, unique=Tru
   else:
     raise NotImplementedError,"File format '%s' is not supported" % format
 
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
   return genos
 
 
-def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None, compress=True):
+def save_genostream(filename, genos, extra_args=None, **kwargs):
   '''
   Write genotype data to file
 
@@ -160,6 +175,19 @@ def save_genostream(filename, genos, format=None, genorepr=None, mergefunc=None,
   @param  compress: flag indicating if a compressed format is desired. Default is True
   @type   compress: bool
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename  = parse_augmented_filename(filename,args)
+
+  format    = get_arg(args, ['format'])
+  genorepr  = get_arg(args, ['genorepr']) or 'snp'
+  mergefunc = get_arg(args, ['mergefunc'])
+  compress  = get_arg(args, ['compress'], True)
+
   if format is None:
     format = guess_outformat(filename)
 
@@ -253,7 +281,7 @@ def transform_files(infiles,informat,ingenorepr,
   if isinstance(mergefunc,basestring):
     mergefunc = get_genomerger(mergefunc)
 
-  genos = [ load_genostream(f,informat,ingenorepr,limit=limit,genome=genome).transformed(transform) for f in infiles ]
+  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,limit=limit,genome=genome).transformed(transform) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
@@ -279,7 +307,7 @@ def transform_files(infiles,informat,ingenorepr,
     genos = genos.transformed(order_loci=transform.loci.order,
                               order_samples=transform.samples.order)
 
-  save_genostream(outfile,genos,outformat,outgenorepr)
+  save_genostream(outfile,genos,format=outformat,genorepr=outgenorepr)
 
 
 def test():

@@ -180,8 +180,8 @@ def option_parser():
 
   parser.add_option('-f','--format',  dest='format',
                     help='Input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
-                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
+                    help='Input genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
   parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',

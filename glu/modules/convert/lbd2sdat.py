@@ -258,8 +258,8 @@ def option_parser():
                     help='Target strand based on Illumina manifest file: top, bottom, forward, reverse, customer (default), anticustomer, design, antidesign')
   parser.add_option('-F','--outformat',  dest='outformat', metavar='string',
                     help='The file output format for genotype data. Values=sdat, ldat, trip or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
-                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
+                    help='Input genotype representation')
   parser.add_option('-t', '--gcthreshold', dest='gcthreshold', type='float', metavar='N')
   return parser
 
@@ -303,7 +303,7 @@ def main():
   rows  = encode_genotypes(loci, rows, genomap)
   genos = GenomatrixStream(rows, 'sdat', loci=loci, models=models, genome=genome)
 
-  save_genostream(hyphen(options.output,sys.stdout),genos,genorepr=options.genorepr)
+  save_genostream(hyphen(options.output,sys.stdout),genos,format=options.outformat,genorepr=options.genorepr)
 
 
 if __name__ == '__main__':

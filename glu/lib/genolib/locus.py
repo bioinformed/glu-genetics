@@ -233,15 +233,21 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   >>> for lname,max_alleles,alleles,chromosome,location in loci:
   ...   print lname,max_alleles,alleles,chromosome,location
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
   if isinstance(filename,basestring) and filename.startswith(':'):
-    filename = parse_augmented_filename(filename,kwargs)
+    filename = parse_augmented_filename(filename,args)
     assert not filename
   elif filename:
-    rows = load_table(filename,want_header=True,extra_args=kwargs,**kwargs)
+    rows = load_table(filename,want_header=True,extra_args=args)
     header = rows.next()
 
-  default_alleles     = get_arg(kwargs, ['alleles'], None)
-  default_max_alleles = int(get_arg(kwargs, ['max_alleles'], 2)) or None
+  default_alleles     = get_arg(args, ['alleles'], None)
+  default_max_alleles = int(get_arg(args, ['max_alleles'], 2)) or None
 
   if default_alleles is None:
     default_alleles = []
@@ -251,10 +257,8 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   if default_max_alleles is not None and default_alleles is not None:
     default_max_alleles = max(default_max_alleles,len(default_alleles))
 
-  if kwargs and extra_args is not None:
-    extra_args.update(kwargs)
-  elif kwargs:
-    raise ValueError('Unexpected filename arguments: %s' % str(args))
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   if not filename:
     return default_max_alleles,default_alleles,[]

@@ -60,8 +60,8 @@ def option_parser():
   parser = optparse.OptionParser(usage=usage)
   parser.add_option('-f', '--format', dest='format',
                     help='Input data format, either hapmap,ldat,sdat or counts')
-  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REPR', default='snp',
-                    help='Input genotype representations. Values=snp (default), hapmap, or marker')
+  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REP',
+                    help='Input genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
   parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',

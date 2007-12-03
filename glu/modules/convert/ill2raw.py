@@ -44,8 +44,8 @@ def option_parser():
   parser.add_option('-o','--output', dest='output',                    metavar='FILE')
   parser.add_option('-f','--format',  dest='format',
                     help='Output format for genotype data. Default is informat, cannot be hapmap.')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
-                    help='Output genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
+                    help='Output genotype representation')
   parser.add_option('--samplemap',   dest='samplemap',                 metavar='FILE')
   parser.add_option('--locusmap',    dest='locusmap',                  metavar='FILE')
   parser.add_option('--gcthreshold', dest='gcthreshold', type='float', metavar='N')

@@ -74,13 +74,13 @@ def option_parser():
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('--testformat', dest='testformat',metavar='FILE', default='ldat',
-                     help='File format for test genotype data. Values=ldat (default) or hapmap')
-  parser.add_option('-g', '--testgenorepr', dest='testgenorepr', metavar='REP', default='snp',
-                    help='Test data genotype representation.  Values=snp (default), hapmap, marker')
+                     help='File format for test genotype data.')
+  parser.add_option('-g', '--testgenorepr', dest='testgenorepr', metavar='REP',
+                    help='Test data genotype representation')
   parser.add_option('--refformat',  dest='refformat', metavar='FILE', default='ldat',
                      help='File format for reference genotype data. Values=ldat (default) or hapmap')
-  parser.add_option('-G', '--refgenorepr', dest='refgenorepr', metavar='REP', default='snp',
-                    help='Reference data genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-G', '--refgenorepr', dest='refgenorepr', metavar='REP',
+                    help='Reference data genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
   return parser

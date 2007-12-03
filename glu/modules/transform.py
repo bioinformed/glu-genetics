@@ -43,8 +43,8 @@ def option_parser():
   ioopts.add_option('-F','--outformat',  dest='outformat',
                     help='Output format for genotype data. Default is informat, cannot be hapmap.')
 
-  ioopts.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP', default='snp',
-                    help='Input genotype representation.  Values=snp (default), hapmap, marker')
+  ioopts.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP',
+                    help='Input genotype representation')
   ioopts.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP', default=None,
                     help='Output genotype representation (see -g/--ingenorepr).  Default is ingenorepr')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',

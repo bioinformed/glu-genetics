@@ -187,7 +187,7 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
 
 
 def load_reference_genotypes(filename, format, locusset, sampleset, limit):
-  data = load_genostream(filename,format,genorepr=snp)
+  data = load_genostream(filename,format=format,genorepr=snp)
   data = data.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
 
   samples = dict( (s,i) for i,s in enumerate(data.samples) )
@@ -198,7 +198,7 @@ def load_reference_genotypes(filename, format, locusset, sampleset, limit):
 
 
 def load_comparison_genotypes(filename, format, locusset, sampleset, lmapfile, smapfile):
-  genos = load_genostream(filename,format,genorepr=snp)
+  genos = load_genostream(filename,format=format,genorepr=snp)
   genos = genos.transformed(rename_samples=smapfile, include_samples=smapfile,
                             rename_loci=lmapfile,    include_loci=lmapfile)
   genos = genos.transformed(include_samples=sampleset, include_loci=locusset)

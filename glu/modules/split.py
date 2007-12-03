@@ -367,8 +367,8 @@ def option_parser():
 
   parser.add_option('-f','--format', dest='format',
                     help='Input format for genotype data. Values=hapmap, ldat, sdat, trip, or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP', default='snp',
-                    help='genotype representation.  Values=snp (default), hapmap, marker')
+  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
+                    help='genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
   parser.add_option('-d', '--destdir', dest='destdir', default='',
