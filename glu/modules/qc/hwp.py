@@ -19,26 +19,25 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   textwrap              import fill
+from   glu.lib.utils             import izip_exact
+from   glu.lib.fileutils         import autofile, hyphen, load_list
+from   glu.lib.hwp               import hwp_exact_biallelic, hwp_chisq_biallelic, biallelic_counts, HWP_EXACT_THRESHOLD
+from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
-from   glu.lib.utils         import percent
-from   glu.lib.fileutils     import autofile, hyphen, load_list
-from   glu.lib.genolib       import load_genostream
-from   glu.lib.hwp           import hwp_exact_biallelic, hwp_chisq_biallelic, count_genos
-from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
+from   glu.lib.genolib           import load_genostream
+from   glu.lib.genolib.genoarray import count_genotypes
 
 
-# FIXME: Merge constants for maximum use of exact test with glu.lib.hwp_biallelic
-def test_loci_hwp(counts):
-  for lname,count in counts:
-    if count[0]*2 + count[1] < 10000:
-      pexact = hwp_exact_biallelic(*count)
+def test_loci_hwp(data):
+  for lname,_,counts in data:
+    if counts[0]*2 + counts[1] < HWP_EXACT_THRESHOLD:
+      pexact = hwp_exact_biallelic(*counts)
     else:
       pexact = None
 
-    pasymp = hwp_chisq_biallelic(*count)
+    pasymp = hwp_chisq_biallelic(*counts)
 
-    yield lname,pexact,pasymp,count[0],count[1],count[2]
+    yield lname,pexact,pasymp,counts[0],counts[1],counts[2]
 
 
 def hwp_output(out,results):
@@ -100,14 +99,21 @@ def option_parser():
                     help='Exclude a list of loci')
   parser.add_option(      '--limit', dest='limit', metavar='N', type='int',
                     help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
+  parser.add_option('--mingenos', dest='mingenos', metavar='N', default=50, type='int',
+                    help='Exclude loci with less than N non-missing genotypes (default=50)')
+  parser.add_option('--mincompletion', dest='mincompletion', metavar='N', default=0, type='float',
+                    help='Exclude loci with genotype completion rate less than N (default=0 for no no exclusion)')
+  parser.add_option('--minmaf', dest='minmaf', metavar='N', default=0, type='float',
+                    help='Exclude loci with minor allele frequency less than N (default=0 for no exclusion)')
   parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
   return parser
 
 
 def geno_counts(loci):
-  for lname,genos in loci:
-    yield lname,count_genos(genos)
+  for (lname,genos),model in izip_exact(loci,loci.models):
+    counts = count_genotypes(model,genos)
+    yield lname,counts,biallelic_counts(model,counts)
 
 
 def read_counts(filename):
@@ -118,7 +124,36 @@ def read_counts(filename):
 
     hom1,het,hom2 = tuple(map(int,locus[1:4]))
     hom1,hom2 = min(hom1,hom2),max(hom1,hom2)
-    yield locus[0],(hom1,het,hom2)
+    yield locus[0],None,(hom1,het,hom2)
+
+
+def filter_counts(data, mingenos, minmaf, mincompletion):
+  maxmissing = 1-mincompletion
+
+  for locus,counts,bialleleic_counts in data:
+    n = sum(counts)
+    m = sum(bialleleic_counts)
+
+    if sum(bialleleic_counts) < mingenos:
+      continue
+
+    # Completion does count hemizygotes
+    if mincompletion>0 and (not n or float(counts[0])/n > maxmissing):
+      continue
+
+    if minmaf>0:
+      if not m:
+        continue
+
+      # Compute MAF based on non-hemizygous counts only or else users will
+      # be confused
+      maf = float(min(2*bialleleic_counts[0]+bialleleic_counts[1],
+                      2*bialleleic_counts[2]+bialleleic_counts[1])) / m
+
+      if maf < minmaf:
+        continue
+
+    yield locus,counts,bialleleic_counts
 
 
 def main():
@@ -159,6 +194,9 @@ def main():
       counts = [ c for c in counts if c[0] not in excludeloci ]
 
   print >> sys.stderr, 'Checking HWP...',
+
+  if options.mingenos or options.minmaf or options.mincompletion:
+    counts = filter_counts(counts, options.mingenos, options.minmaf, options.mincompletion)
 
   results = test_loci_hwp(counts)
 

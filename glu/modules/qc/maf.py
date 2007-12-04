@@ -49,12 +49,21 @@ def option_parser():
                     help='Exclude a list of samples')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='Exclude a list of loci')
+  parser.add_option('--mingenos', dest='mingenos', metavar='N', default=50, type='int',
+                    help='Exclude loci with less than N non-missing genotypes (default=50)')
+  parser.add_option('--mincompletion', dest='mincompletion', metavar='N', default=0, type='float',
+                    help='Exclude loci with genotype completion rate less than N (default=0 for no no exclusion)')
 
   return parser
 
 
-def compute_maf(model,genos):
-  counts = count_alleles_from_genos(model,genos)
+def geno_counts(loci):
+  for (lname,genos),model in izip(loci,loci.models):
+    # FIXME: Hemizygotes should be excluded
+    yield lname,model,count_alleles_from_genos(model,genos)
+
+
+def compute_frequencies(model,counts):
   n = sum(counts[1:])
 
   as   = model.alleles[1:]
@@ -62,6 +71,23 @@ def compute_maf(model,genos):
   afs  = sorted(izip(as,fs),key=itemgetter(1),reverse=True)
   miss = float(counts[0])/sum(counts)
   return miss,afs
+
+
+def filter_counts(data, mingenos, mincompletion):
+  minalleles = 2*mingenos
+
+  for locus,model,counts in data:
+    n = sum(counts)
+    m = sum(counts[1:])
+
+    # Filter by mingenos
+    if m < minalleles:
+      continue
+
+    if mincompletion>0 and (not n or float(m)/n < mincompletion):
+      continue
+
+    yield locus,model,counts
 
 
 def main():
@@ -83,9 +109,15 @@ def main():
   outfile = autofile(hyphen(options.output,sys.stdout),'w')
   out     = csv.writer(outfile,dialect='excel-tab')
 
-  out.writerow(['Locus','%Missing','Major allele','frequency','...'])
-  for (lname,genos),model in izip(loci,loci.models):
-    missing,afs = compute_maf(model,genos)
+  out.writerow(['Locus','Missing','Major allele','frequency','...'])
+
+  data = geno_counts(loci)
+
+  if options.mingenos or options.mincompletion:
+    data = filter_counts(data, options.mingenos, options.mincompletion)
+
+  for lname,model,counts in data:
+    missing,afs = compute_frequencies(model,counts)
     row = [lname, '%8.6f' % missing]
     for a,f in afs:
       row += [a,'%8.6f' % f]

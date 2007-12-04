@@ -19,13 +19,15 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   textwrap              import fill
-from   operator              import itemgetter
+from   operator                  import itemgetter
+from   itertools                 import izip
 
-from   glu.lib.utils         import percent, tally
-from   glu.lib.fileutils     import autofile, hyphen, load_list
-from   glu.lib.genolib       import load_genostream
-from   glu.lib.sections      import save_section, SectionWriter, save_metadata_section
+from   glu.lib.utils             import percent, izip_exact
+from   glu.lib.fileutils         import autofile, hyphen, load_list
+from   glu.lib.genolib           import load_genostream
+from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
+
+from   glu.lib.genolib.genoarray import count_genotypes
 
 
 def het_output(out,results):
@@ -72,8 +74,8 @@ def option_parser():
                     help='Exclude a list of samples')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='Exclude a list of loci')
-  parser.add_option('-m','--mincount', dest='mincount', metavar='N',default=None, type='int',
-                    help='Minimum number of non-missing genotypes')
+  parser.add_option('-m','--mingenos', '--mincount', dest='mingenos', metavar='N',default=50, type='int',
+                    help='Exclude samples with less than N non-missing genotypes')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')
   parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
@@ -84,25 +86,24 @@ def option_parser():
 def count_genos(genos):
   '''
   '''
-  f = tally(genos)
-
   hom = het = miss = 0
 
-  for g,n in f.iteritems():
-    if not g or None in g:
-      miss += n
-    elif g[0] != g[1]:
-      het  += n
-    else:
-      hom  += n
+  # Ignore hemizygotes
+  for g in genos:
+    if g.missing():
+      miss += 1
+    elif g.homozygote():
+      hom += 1
+    elif g.heterozygote():
+      het += 1
 
   return hom,het,miss
 
 
-def geno_counts(loci):
+def geno_counts(samples):
   # Skip header
-  for lname,genos in loci:
-    yield lname,count_genos(genos)
+  for name,genos in samples:
+    yield name,count_genos(genos)
 
 
 def read_counts(filename):
@@ -115,9 +116,9 @@ def read_counts(filename):
     yield sample[0],(hom,het,miss)
 
 
-def filter_counts(counts,mincount):
+def filter_counts(counts,mingenos):
   for sample,(hom,het,miss) in counts:
-    if hom+het >= mincount:
+    if hom+het >= mingenos:
       yield sample,(hom,het,miss)
 
 
@@ -134,15 +135,15 @@ def main():
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
   if options.format != 'counts':
-    loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+    samples = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
                                    genome=options.loci).as_sdat()
 
-    loci = loci.transformed(include_loci=options.includeloci,
-                            exclude_loci=options.excludeloci,
-                            include_samples=options.includesamples,
-                            exclude_samples=options.excludesamples)
+    samples = samples.transformed(include_loci=options.includeloci,
+                                  exclude_loci=options.excludeloci,
+                                  include_samples=options.includesamples,
+                                  exclude_samples=options.excludesamples)
 
-    counts = geno_counts(loci)
+    counts = geno_counts(samples)
 
   else:
     if options.includeloci or options.excludeloci:
@@ -158,8 +159,8 @@ def main():
       excludesamples = set(load_list(options.excludesamples))
       counts = [ c for c in counts if c[0] not in excludesamples ]
 
-  if options.mincount:
-    counts = filter_counts(counts,options.mincount)
+  if options.mingenos:
+    counts = filter_counts(counts,options.mingenos)
 
   het_output(out,counts)
 

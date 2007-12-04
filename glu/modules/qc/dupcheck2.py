@@ -36,11 +36,11 @@ from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.genoarray import genoarray_concordance, model_from_alleles
 
 
-def write_header(outfile,filename,threshold,mincount):
+def write_header(outfile,filename,threshold,mingenos):
   outfile.write('Duplicate sample analysis\n')
   outfile.write('  Input File:     %s\n' % filename)
   outfile.write('  Timestamp:      %s\n' %  time.asctime())
-  outfile.write('  Threshold: %.2f%%; Mininum Counts: %d (see explanation below)\n' % (threshold,mincount))
+  outfile.write('  Threshold: %.2f%%; Mininum Counts: %d (see explanation below)\n' % (threshold,mingenos))
   outfile.write('''
   This analysis will detect putative duplicate samples within the given
   dataset that share at least %.2f%% of their genotypes in common, provided
@@ -59,7 +59,7 @@ Output:
        1. unexpected
        2. expected, not detectd
        3. expected, detected
-''' % (threshold,mincount))
+''' % (threshold,mingenos))
 
 
 def write_dupsets(filename, dupsets):
@@ -92,8 +92,8 @@ def load_expected_dupsets(file):
   return expected_dupset
 
 
-def find_dups(genos,threshold=85,mincount=20,expected_dupsets=None,sample_phenos=None):
-  if mincount and len(genos.loci)<mincount:
+def find_dups(genos,threshold=85,mingenos=20,expected_dupsets=None,sample_phenos=None):
+  if mingenos and len(genos.loci)<mingenos:
     raise ValueError('Error: the minimum counts (-m option) is greater than the number of loci')
 
   samples = genos.samples
@@ -111,7 +111,7 @@ def find_dups(genos,threshold=85,mincount=20,expected_dupsets=None,sample_phenos
 
   for (s1,genos1),(s2,genos2) in pair_generator(genos.use_stream()):
     matches,total = genoarray_concordance(genos1, genos2)
-    obs_dup = total and matches >= mincount and float(matches)/total >= threshold
+    obs_dup = total and matches >= mingenos and float(matches)/total >= threshold
     exp_dup = (s1,s2) in expected_dupsets
 
     if obs_dup:
@@ -322,7 +322,7 @@ def option_parser():
                     help='Output of duplicate check report')
   parser.add_option('-T', '--threshold', dest='threshold', metavar='N%', type='int', default=85,
                     help='Threshold for the percentage of identity shared between two individuals (default=85)')
-  parser.add_option('-m', '--mincount', dest='mincount', metavar='N', type='int', default=20,
+  parser.add_option('-m', '--mingenos', '--mingenos', dest='mingenos', metavar='N', type='int', default=20,
                     help='Minimum concordant genotypes to be considered informative for duplicate checking')
 
   parser.add_option('--phenofile', dest='phenofile', metavar='FILE',default=None,
@@ -364,7 +364,7 @@ def main():
       return
 
   print >> sys.stderr, 'Checking for duplicates...'
-  samples,dups,dup_sets = find_dups(genos,options.threshold,options.mincount,expected_dupsets,sample_phenos)
+  samples,dups,dup_sets = find_dups(genos,options.threshold,options.mingenos,expected_dupsets,sample_phenos)
 
   if options.dupout:
     union_out = autofile(options.dupout, 'w')
@@ -372,7 +372,7 @@ def main():
 
   out = autofile(hyphen(options.output,sys.stdout), 'w')
 
-  write_header(out,args[0],options.threshold,options.mincount)
+  write_header(out,args[0],options.threshold,options.mingenos)
   write_duplicate_sets(out,samples,dup_sets,expected_dupsets,sample_phenos)
   write_dups_diff_phenos(out,dups,sample_phenos)
   write_duplicate_pairs(out,dups,sample_phenos,options.pairformat)

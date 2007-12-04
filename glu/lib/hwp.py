@@ -19,41 +19,10 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from scipy         import stats
 
-from glu.lib.utils import tally
+from glu.lib.utils import izip_exact
 
 
-def count_genos(genos):
-  '''
-  Count non-hemizygous non-missing genotypes
-
-  @param   genos: genotypes
-  @type    genos: sequence
-  @return       : Count of observed genotypes for homozygote 1,
-                  heterozygotes, and homozygote 2
-  @rtype        : tuple
-  '''
-
-  f = tally(genos)
-
-  hom1 = hom2 = het = 0
-
-  for g,n in f.iteritems():
-    if not g:
-      continue
-
-    a1,a2 = g
-
-    if not a1 or not a2:
-      continue
-    elif a1!=a2:
-      het = n
-    elif hom1:
-      hom2 = n
-    else:
-      hom1 = n
-
-  hom1,hom2 = min(hom1,hom2),max(hom1,hom2)
-  return hom1,het,hom2
+HWP_EXACT_THRESHOLD=8000
 
 
 def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
@@ -171,18 +140,41 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
   return float(stats.distributions.chi2.sf(xx,1))
 
 
-def hwp_biallelic(genos):
+def biallelic_counts(model,counts):
+  '''
+  Convert genotype counts (derived from genolib.genoarray.count_genotypes)
+  into a tuple of homozygote1, heterozygote, and homozygote2 counts.
+  '''
+  if len(model.alleles) > 3:
+    raise ValueError('Biallelic locus required')
+
+  # Set to uninformative values
+  homs = [0,0]
+  hets = [0]
+
+  for g,c in izip_exact(model.genotypes,counts):
+    # Ignore hemizygotes and missing
+    if g.homozygote():
+      homs.append(c)
+    elif g.heterozygote():
+      hets.append(c)
+
+  # Take final counts from the ends of each list
+  hom1_count,hom2_count = min(homs[-2],homs[-1]),max(homs[-2],homs[-1])
+  return hom1_count,hets[-1],hom2_count
+
+
+def hwp_biallelic(model,counts):
   '''
   @param   genos: genotypes
   @type    genos: sequence
   @return       : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
   @rtype        : float
-
   '''
-  return hwp_biallelic_counts(*count_genos(genos))
+  return hwp_biallelic_counts(*hwp_biallelic_counts(model,counts))
 
 
-def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=8000):
+def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=None):
   '''
   Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
 
@@ -197,12 +189,15 @@ def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=8000):
   @return                : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
   @rtype                 : float
 
-  >>> hom1_count, het_count, hom2_count = 15,36,20
+  >>> hom1_count,het_count,hom2_count = 15,36,20
   >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
   0.87188388159827424
   '''
-  # Only use the exact test when there are less than 8000 rare alleles
-  # otherwise, use the asymptotic test
+  if exact_threshold is None:
+    exact_threshold = HWP_EXACT_THRESHOLD
+
+  # Only use the exact test when there are less than a fixed number of rare
+  # alleles otherwise, use the asymptotic test
   if 2*min(hom1_count,hom2_count)+het_count < exact_threshold:
     p = hwp_exact_biallelic(hom1_count, het_count, hom2_count)
   else:

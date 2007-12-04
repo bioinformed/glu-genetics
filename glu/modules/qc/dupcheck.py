@@ -195,7 +195,7 @@ def option_parser():
                     help='Output of duplicate check report')
   parser.add_option('-T', '--threshold', dest='threshold', metavar='N%', type='int', default=85,
                     help='Threshold for the percentage of identity shared between two individuals (default=85)')
-  parser.add_option('-m', '--mincount', dest='mincount', metavar='N', type='int', default=20,
+  parser.add_option('-m', '--mingenos', '--mincount', dest='mingenos', metavar='N', type='int', default=20,
                     help='Minimum concordant genotypes to be considered informative for duplicate checking')
   parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
@@ -264,7 +264,7 @@ Output:
      genotypes, number of comparable genotypes, and the concordance
      rates for each putative duplicate pair of individuals.
 
-''' % (threshold*100,options.mincount))
+''' % (threshold*100,options.mingenos))
 
   expected_dups      = []
   unexpected_dups    = []
@@ -275,7 +275,7 @@ Output:
   for (i1,genos1),(i2,genos2) in pair_generator(genos.use_stream()):
     matches,comparisons = genoarray_concordance(genos1, genos2)
 
-    obs_dup = matches>=options.mincount and comparisons and float(matches)/comparisons >= threshold
+    obs_dup = matches>=options.mingenos and comparisons and float(matches)/comparisons >= threshold
     exp_dup = (i1,i2) in expected_dupset
 
     if not obs_dup and not exp_dup:
