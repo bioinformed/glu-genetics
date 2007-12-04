@@ -116,7 +116,7 @@ def load_genostream(filename, extra_args=None, **kwargs):
   filename = parse_augmented_filename(filename,args)
 
   format   = get_arg(args, ['format'])
-  genome   = get_arg(args, ['genome'])
+  genome   = get_arg(args, ['genome','loci'])
   genorepr = get_arg(args, ['genorepr']) or 'snp'
   unique   = get_arg(args, ['unique'], True)
   limit    = int(get_arg(args, ['limit']) or 0) or None
