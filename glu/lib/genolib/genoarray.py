@@ -743,7 +743,7 @@ def minor_allele_from_allelecounts(model,allelecounts):
   >>> minor_allele_from_allelecounts(model, alleles_from_genos(0,1000,0,0))
   ('B', 0.0)
   >>> minor_allele_from_allelecounts(model, alleles_from_genos(1000,0,0,0))
-  ('A', 0.0)
+  (None, 0.0)
   '''
   n = len(allelecounts)
   if len(model.alleles) != n:
@@ -753,18 +753,44 @@ def minor_allele_from_allelecounts(model,allelecounts):
   elif not n:
     raise ValueError,'minor allele not defined for empty model'
   elif n < 3:
-    return model.alleles[1],0.0
+    return None,0.0
 
   informative = allelecounts[1:]
 
   m = sum(informative)
 
   if not m:
-    return model.alleles[1],0.0
+    return None,0.0
 
   f = min(informative)
   i = informative.index(f)+1
   return model.alleles[i],f/m
+
+
+def minor_allele_from_genocounts(model,counts):
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def mkgenos(nn,aa,ab,bb):
+  ...   g =[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
+  ...   return count_genotypes(model,g)
+  >>> minor_allele_from_genocounts(model,mkgenos(0,1,2,1))
+  ('A', 0.5)
+  >>> minor_allele_from_genocounts(model,mkgenos(0,1000,2000,1000))
+  ('A', 0.5)
+  >>> minor_allele_from_genocounts(model,mkgenos(10000,1000,2000,1000))
+  ('A', 0.5)
+  >>> minor_allele_from_genocounts(model,mkgenos(10000,0,2000,2000))
+  ('A', 0.25)
+  >>> minor_allele_from_genocounts(model,mkgenos(10000,2000,2000,0))
+  ('B', 0.25)
+  >>> minor_allele_from_genocounts(model,mkgenos(0,1000,0,0))
+  ('B', 0.0)
+  >>> minor_allele_from_genocounts(model,mkgenos(1000,0,0,0))
+  (None, 0.0)
+  '''
+  counts = count_alleles_from_genocounts(model,counts)
+  return minor_allele_from_allelecounts(model, counts)
 
 
 def minor_allele_from_genos(model,genos):
@@ -786,7 +812,7 @@ def minor_allele_from_genos(model,genos):
   >>> minor_allele_from_genos(model,mkgenos(0,1000,0,0))
   ('B', 0.0)
   >>> minor_allele_from_genos(model,mkgenos(1000,0,0,0))
-  ('A', 0.0)
+  (None, 0.0)
   '''
   counts = count_alleles_from_genocounts(model,count_genotypes(model,genos))
   return minor_allele_from_allelecounts(model, counts)
