@@ -70,6 +70,27 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
   @type   hom2_count: int
   @return           : Exact p-value for deviation (2-sided) from Hardy-Weinberg Proportions (HWP)
   @rtype            : float
+
+  >>> hwp_exact_biallelic(3, 100, 5)
+  6.1950944758140156e-21
+  >>> hwp_exact_biallelic(14, 57, 50)
+  0.84227975657079257
+  >>> hwp_exact_biallelic(32, 31, 51)
+  2.5637734657550698e-06
+  >>> hwp_exact_biallelic(3, 47, 5)
+  1.1629848615126043e-07
+  >>> hwp_exact_biallelic(32, 150, 55)
+  2.4853416055530676e-05
+  >>> hwp_exact_biallelic(7, 122, 32)
+  6.278449684759094e-13
+  >>> hwp_exact_biallelic(3, 99, 14)
+  4.3090717622326841e-16
+  >>> hwp_exact_biallelic(13, 146, 54)
+  4.0674031361063006e-10
+  >>> hwp_exact_biallelic(100, 177, 57)
+  0.18195180192910754
+  >>> hwp_exact_biallelic(57, 184, 155)
+  0.83102796343705576
   '''
 
   # Computer the number of rare and common alleles
