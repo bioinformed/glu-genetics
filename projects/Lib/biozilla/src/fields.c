@@ -95,7 +95,7 @@ static PyMemberDef fields_members[] = {
 static inline PyTypeObject*
 getfieldtype(fieldsobject* self)
 {
-	int i,n;
+	Py_ssize_t i,n;
 	PyObject* mro = self->ob_type->tp_mro;
 
 	if(!mro || !PyTuple_Check(mro))
@@ -376,7 +376,7 @@ fields_length(fieldsobject* self)
 	return slots? PyTuple_GET_SIZE(slots) : 0;
 }
 
-staticforward PyObject* fields_item(fieldsobject* self, int i);
+staticforward PyObject* fields_item(fieldsobject* self, Py_ssize_t i);
 
 static PyObject*
 fields_subscript(fieldsobject* self, PyObject* key)
@@ -397,7 +397,7 @@ fields_subscript_wrap(fieldsobject* self, PyObject* args)
 }
 #endif
 
-staticforward int fields_ass_item(fieldsobject* self, int i, PyObject* value);
+staticforward int fields_ass_item(fieldsobject* self, Py_ssize_t i, PyObject* value);
 
 static int
 fields_ass_sub(fieldsobject* self, PyObject* key, PyObject* value)
@@ -437,7 +437,7 @@ fields_repeat(fieldsobject* self, Py_ssize_t count)
 }
 
 static PyObject*
-fields_item(fieldsobject* self, int i)
+fields_item(fieldsobject* self, Py_ssize_t i)
 {
 	int n;
 	PyObject* slots;
@@ -473,7 +473,7 @@ fields_item(fieldsobject* self, int i)
 }
 
 static int
-fields_ass_item(fieldsobject* self, int i, PyObject* value)
+fields_ass_item(fieldsobject* self, Py_ssize_t i, PyObject* value)
 {
 	int n;
 	PyObject* slots;
@@ -501,7 +501,7 @@ fields_ass_item(fieldsobject* self, int i, PyObject* value)
 }
 
 static PyObject*
-fields_slice(fieldsobject* self, int ilow, int ihigh)
+fields_slice(fieldsobject* self, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
 	Py_ssize_t n;
 	Py_ssize_t i;
@@ -512,8 +512,16 @@ fields_slice(fieldsobject* self, int ilow, int ihigh)
 
 	n = slots? PyTuple_GET_SIZE(slots) : 0;
 
-	ilow  = (ilow<0)?  0 : ilow;
-	ihigh = (ihigh>n)? n : ihigh;
+	if (ilow < 0)
+		ilow = 0;
+	else if (ilow > n)
+		ilow = n;
+
+	if (ihigh < ilow)
+		ihigh = ilow;
+	else if (ihigh > n)
+		ihigh = n;
+
 
 	slice = PyTuple_New(ihigh - ilow);
 
@@ -534,7 +542,7 @@ fields_slice(fieldsobject* self, int ilow, int ihigh)
 }
 
 static int
-fields_ass_slice(fieldsobject* self, int ilow, int ihigh, PyObject* slice)
+fields_ass_slice(fieldsobject* self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject* slice)
 {
 	int i;
 	int n;
@@ -544,8 +552,15 @@ fields_ass_slice(fieldsobject* self, int ilow, int ihigh, PyObject* slice)
 	slots = getslots(self);
 	n = slots? PyTuple_GET_SIZE(slots) : 0;
 
-	ilow  = (ilow<0)?  0 : ilow;
-	ihigh = (ihigh>n)? n : ihigh;
+	if (ilow < 0)
+		ilow = 0;
+	else if (ilow > n)
+		ilow = n;
+
+	if (ihigh < ilow)
+		ihigh = ilow;
+	else if (ihigh > n)
+		ihigh = n;
 
 	nslice = ihigh - ilow;
 
@@ -557,7 +572,7 @@ fields_ass_slice(fieldsobject* self, int ilow, int ihigh, PyObject* slice)
 
 	if( ihigh - ilow != nslice )
 	{
-		PyErr_SetString(PyExc_ValueError, "incorrect number of values");
+		PyErr_Format(PyExc_ValueError, "incorrect number of values (%d start, %d stop, %d expected, %d found)", ilow, ihigh, ihigh - ilow, nslice);
 		goto error;
 	}
 
