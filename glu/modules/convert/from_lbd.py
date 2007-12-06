@@ -386,7 +386,7 @@ def main():
   samples = encode_genotypes(loci, samples, genomap)
   genos = GenomatrixStream(samples, 'sdat', loci=loci, models=models, genome=genome)
 
-  save_genostream(hyphen(options.output,sys.stdout),genos,format=options.outformat,genorepr=options.outgenorepr)
+  save_genostream(options.output,genos,format=options.outformat,genorepr=options.outgenorepr,hyphen=sys.stdout)
 
   if options.samplestats:
     out = csv.writer(autofile(options.samplestats,'w'),dialect='tsv')

@@ -425,10 +425,9 @@ def main():
   if options.regions:
     regions = list(load_regions(options.regions))
 
-  infile      = hyphen(args[0], sys.stdin)
   outfile     = autofile(hyphen(options.output, sys.stdout),'w')
-  genostream  = load_genostream(infile,format=options.format,genorepr=options.genorepr,
-                                       genome=options.loci,limit=options.limit)
+  genostream  = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                       genome=options.loci,limit=options.limit,hyphen=sys.stdin)
   genotriples = genostream.as_genotriples()
 
   samcomp,samempty,loccomp,locempty,nonmissing,genos_inf,genos_all = completion(genotriples,regions)

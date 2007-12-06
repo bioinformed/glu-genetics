@@ -63,9 +63,8 @@ def main():
     parser.print_help()
     return
 
-  infile = hyphen(args[0],sys.stdin)
-  genos  = load_genostream(infile,format=options.format,genorepr=options.genorepr,
-                                  genome=options.loci)
+  genos  = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                   genome=options.loci,hyphen=sys.stdin)
 
   out = autofile(hyphen(options.output,sys.stdout),'w')
 

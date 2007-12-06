@@ -114,17 +114,15 @@ def main():
     print >> sys.stderr, 'Error: Must specify output file'
     return
 
-  infiles = sorted(set(hyphen(arg,sys.stdin) for arg in args))
-  outfile = hyphen(options.output,sys.stdout)
-
-  merger = get_genomerger(options.merge)
+  infiles = sorted(set(args))
+  merger  = get_genomerger(options.merge)
 
   transform = GenoTransform.from_options(options)
 
   transform_files(infiles, options.informat,  options.ingenorepr,
-                  outfile, options.outformat, options.outgenorepr,
+                  options.output, options.outformat, options.outgenorepr,
                   transform, mergefunc=merger, genome=options.loci,
-                  limit=options.limit)
+                  limit=options.limit,inhyphen=sys.stdin,outhyphen=sys.stdout)
 
   output_merge_statistics(merger, options.samplemerge, options.locusmerge)
 

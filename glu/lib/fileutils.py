@@ -248,6 +248,9 @@ def guess_format(filename, formats):
   if not isstr(filename):
     return None
 
+  # Parse to remove augmented arguments
+  filename = parse_augmented_filename(filename,{})
+
   parts = os.path.basename(filename).split('.')
 
   if parts and parts[-1] in COMPRESSED_SUFFIXES:

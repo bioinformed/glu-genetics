@@ -145,8 +145,7 @@ def main():
   columns,rows = rowsby(data, columns, itemgetter(0), itemgetter(1), itemgetter(2), merge_genos)
   genos = GenomatrixStream.from_strings(rows,'ldat',samples=columns,genorepr=snp)
 
-  out = hyphen(options.output,sys.stdout)
-  save_genostream(out,genos,format=options.format,genorepr=options.genorepr)
+  save_genostream(options.output,genos,format=options.format,genorepr=options.genorepr,hyphen=sys.stdout)
 
 
 if __name__ == '__main__':

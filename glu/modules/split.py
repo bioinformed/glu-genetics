@@ -398,18 +398,20 @@ def main():
     return
 
   filename = options.template if options.template else args[0]
+
+  # FIXME: Must know about augmented filenames
   if filename == '-':
     sys.stderr.write('Error: A filename template must be specified when taking input from stdin')
     return
+
   prefix,suffix = split_fullname(filename,options.destdir)
 
   options.genorepr = get_genorepr(options.genorepr)
 
-  infile   = hyphen(args[0],sys.stdin)
-  genos    = load_genostream(infile,format=options.format,genorepr=options.genorepr,
-                                    genome=options.loci)
+  genos    = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                    genome=options.loci,hyphen=sys.stdin)
 
-  outformat = guess_outformat(infile) or options.format or genos.format
+  outformat = guess_outformat(args[0]) or options.format or genos.format
   split(genos, outformat, prefix, suffix, options)
 
 

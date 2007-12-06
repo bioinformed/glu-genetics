@@ -115,11 +115,19 @@ def load_genostream(filename, extra_args=None, **kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
+  hyphen   = get_arg(args, ['hyphen'])
   format   = get_arg(args, ['format'])
   genome   = get_arg(args, ['genome','loci'])
   genorepr = get_arg(args, ['genorepr']) or 'snp'
   unique   = get_arg(args, ['unique'], True)
   limit    = int(get_arg(args, ['limit']) or 0) or None
+
+  if filename == '-':
+    if hyphen is None:
+      raise ValueError("loading genotypes from '-' is not supported")
+    if isinstance(hyphen,basestring):
+      raise ValueError('a file object must be supplied for hyphen redirection')
+    filename = hyphen
 
   if format is None:
     format = guess_informat(filename)
@@ -183,10 +191,18 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
 
   filename  = parse_augmented_filename(filename,args)
 
+  hyphen    = get_arg(args, ['hyphen'])
   format    = get_arg(args, ['format'])
   genorepr  = get_arg(args, ['genorepr']) or 'snp'
   mergefunc = get_arg(args, ['mergefunc'])
   compress  = get_arg(args, ['compress'], True)
+
+  if filename == '-':
+    if hyphen is None:
+      raise ValueError("saving genotypes to '-' is not supported")
+    if isinstance(hyphen,basestring):
+      raise ValueError('a file object must be supplied for hyphen redirection')
+    filename = hyphen
 
   if format is None:
     format = guess_outformat(filename)
@@ -220,7 +236,8 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
 def transform_files(infiles,informat,ingenorepr,
                     outfile,outformat,outgenorepr,
                     transform=None,genome=None,
-                    mergefunc=None,limit=None):
+                    mergefunc=None,limit=None,
+                    inhyphen=None,outhyphen=None):
   '''
   A driver for transforming multiple genodata files into different formats
   (ldat, sdat, trip, or genotriples), representations (...) and, depending
@@ -281,7 +298,8 @@ def transform_files(infiles,informat,ingenorepr,
   if isinstance(mergefunc,basestring):
     mergefunc = get_genomerger(mergefunc)
 
-  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,limit=limit,genome=genome).transformed(transform) for f in infiles ]
+  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,limit=limit,genome=genome,hyphen=inhyphen)
+                            .transformed(transform) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
@@ -307,7 +325,7 @@ def transform_files(infiles,informat,ingenorepr,
     genos = genos.transformed(order_loci=transform.loci.order,
                               order_samples=transform.samples.order)
 
-  save_genostream(outfile,genos,format=outformat,genorepr=outgenorepr)
+  save_genostream(outfile,genos,format=outformat,genorepr=outgenorepr,hyphen=outhyphen)
 
 
 def test():
