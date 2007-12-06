@@ -21,13 +21,15 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import csv
 
-from   itertools                 import islice,chain,izip,imap,groupby
 from   operator                  import itemgetter
+from   itertools                 import islice,chain,izip,groupby
+
+from   numpy                     import array,zeros
 
 from   glu.lib.utils             import izip_exact
 from   glu.lib.fileutils         import autofile,hyphen
 from   glu.lib.sections          import read_sections
-from   glu.lib.sequence          import norm_snp_seq, complement_base
+from   glu.lib.sequence          import norm_snp_seq,complement_base
 
 from   glu.lib.genolib.locus     import Genome, Nothing
 from   glu.lib.genolib.streams   import GenomatrixStream
@@ -280,28 +282,38 @@ def encode_genotypes(loci, samples, genomap):
 
 class GCSummary(object):
   def __init__(self, loci, samples):
-    self.loci        = loci
-    self.samples     = samples
-    self.locusstats  = [0.0]*len(loci)
-    self.samplestats = []
+    self.loci     = loci
+    self.samples  = samples
 
   def __iter__(self):
-    locusstats  = self.locusstats
-    samplestats = self.samplestats
+    self.samplestats = samplestats = []
+    locusstats1 = zeros(len(self.loci))
+    locusstats2 = zeros(len(self.loci))
 
     n = len(self.loci)
 
     for sampleid,genos,gcscores in self.samples:
-      samplestats.append( (sampleid,sum(gcscores)/n ) )
-      for i in xrange(n):
-        locusstats[i] += gcscores[i]
+      gc = array(gcscores,dtype=float)
+      samplestats.append( (sampleid, gc.mean(), gc.std()) )
+
+      # Track first two uncentered moments
+      locusstats1 += gc
+      locusstats2 += gc**2
 
       yield sampleid,genos,gcscores
 
+    self.locusstats = []
     if samplestats:
-      m = len(samplestats)
-      for i,locus in enumerate(self.loci):
-        locusstats[i] = (locus,locusstats[i]/m)
+      m   = len(samplestats)
+      mu  = locusstats1/m
+
+      # Compute std.dev from sqrt(E(X**2) - E(X)**2), with compensation for
+      # the inherant numerical problems with the approach
+      var = locusstats2/m - mu**2
+      var[var < 0] = 0
+      std = var**0.5
+
+      self.locusstats = [ (locus,mui,stdi) for locus,mui,stdi,gcmax in izip(self.loci,mu,std) ]
 
 
 def option_parser():
@@ -378,14 +390,15 @@ def main():
 
   if options.samplestats:
     out = csv.writer(autofile(options.samplestats,'w'),dialect='tsv')
-    out.writerow(['SAMPLE','MEAN_GC'])
-    out.writerows( [ (s,'%.2f' % gc) for s,gc in summary.samplestats ] )
+    out.writerow(['SAMPLE','GC_MEAN','GC_STDDEV'])
+    out.writerows( [ (s,'%.2f' % gc, '%.3f' % dev)
+                      for s,gc,dev in summary.samplestats ] )
 
   if options.locusstats:
     out = csv.writer(autofile(options.locusstats,'w'),dialect='tsv')
-    out.writerow(['LOCUS','GENTRAIN','MEAN_GC'])
-    out.writerows( [ (l,'%.2f' % gt, '%.2f' % gc)
-                   for (l,gc),gt in izip_exact(summary.locusstats,gentrain) ] )
+    out.writerow(['LOCUS','GENTRAIN','GC_MEAN','GC_STDDEV'])
+    out.writerows( [ (l,'%.2f' % gt, '%.2f' % gc, '%.3f' % dev)
+                      for (l,gc,dev),gt in izip_exact(summary.locusstats,gentrain) ] )
 
 
 if __name__ == '__main__':
