@@ -72,7 +72,7 @@ def main():
     out.write('Materializing genotypes.\n')
     genos = genos.materialize()
 
-  out.write('Filename    : %s\n' % namefile(infile))
+  out.write('Filename    : %s\n' % namefile(args[0]))
   out.write('Format      : %s\n' % genos.format)
 
   if genos.samples is not None:
