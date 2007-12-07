@@ -96,9 +96,23 @@ class Genome(object):
     FIXME: docstring
     '''
     locus = self.loci.get(name)
+
+    # Fastpath: No merge needed
     if locus is None:
       locus = self.loci[name] = Locus(name)
+      if model is not None:
+        locus.model = model
+      if fixed is not None:
+        locus.fixed = fixed
+      if chromosome is not None:
+        locus.chromosome = chromosome
+      if location is not None:
+        locus.location = location
+      if strand is not None:
+        locus.strand = strand
+      return
 
+    # Slowpath: Must check for incompatibilities
     if model is not None:
       if locus.model is None:
         locus.model = model
