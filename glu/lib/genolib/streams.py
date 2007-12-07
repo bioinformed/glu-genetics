@@ -200,6 +200,7 @@ class GenotripleStream(GenotypeStream):
     if mergefunc is not None and order is None:
       order = 'sample'
 
+    # FIXME: Incore sort is deadly
     if order is not None:
       triples = [ t.sorted(order) for t in triples ]
 
@@ -472,10 +473,9 @@ class GenotripleStream(GenotypeStream):
     if transform.samples.rename is not None or transform.loci.rename is not None:
       triples = rename_genotriples(triples,transform.samples.rename,transform.loci.rename)
 
+    # FIXME: recoding and renaming can be combined
     if transform.rename_alleles is not None:
       triples = rename_genotriples_alleles(triples, transform.rename_alleles)
-
-    # FIXME: recoding and renaming can be combined
     if transform.recode_models is not None:
       triples = recode_genotriples(triples, transform.recode_models)
 
@@ -1061,7 +1061,7 @@ class GenomatrixStream(GenotypeStream):
   columns = property(_get_columns,_set_columns)
 
   def _model_pairs(self):
-    return izip_exact(self.loci,self.models)
+    return izip(self.loci,self.models)
 
   model_pairs = property(_model_pairs)
 
@@ -1405,14 +1405,19 @@ class GenomatrixStream(GenotypeStream):
 
 def recode_genomatrixstream(genos, genome):
   '''
-  Returns a new genomatrix with the genotypes encoded to a new internal representation
+  Returns a new genomatrix with the genotypes encoded with representations
+  defined by the supplied genome object.  Locus metadata other than models
+  are merged and discrepencies raise errors, If genotype models change, then
+  all genotypes are recoded to use the same representation provided the
+  models are compatible.
 
   @param        genos: genomatrix stream
   @type         genos: sequence
   @param       genome: genome descriptor
   @type        genome: Genome instance
-  @return            : tuple of columns and a genomatrix generator in packed format
-  @rtype             : 2-tuple of list of str and genomatrix generator
+  @return            : new genomatrixstream with encoding identical to the
+                       supplied genome
+  @rtype             : GenomatrixStream
 
   >>> defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
   >>> genome = Genome()
@@ -1421,12 +1426,16 @@ def recode_genomatrixstream(genos, genome):
   >>> genome.set_locus('l3',model=defmodel)
   >>> genome.set_locus('l4',model=defmodel)
 
+  Test ldat "unknown" models remapped to a default model
+
   >>> samples = ('s1', 's2', 's3')
-  >>> genos = [('l1', [ ('A', 'A'),  (None, None),   ('G', 'G') ]),
-  ...          ('l2', [(None, None), (None, None),  (None, None)]),
-  ...          ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
-  ...          ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
-  >>> genos = GenomatrixStream.from_tuples(genos, 'ldat', samples=samples)
+  >>> rows = [('l1', [ ('A', 'A'),  (None, None),   ('G', 'G') ]),
+  ...         ('l2', [(None, None), (None, None),  (None, None)]),
+  ...         ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
+  ...         ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
+  >>> genos = GenomatrixStream.from_tuples(rows, 'ldat', samples=samples)
+  >>> len(genos.models)
+  0
   >>> genos = recode_genomatrixstream(genos,genome).materialize()
   >>> genos.samples
   ('s1', 's2', 's3')
@@ -1439,14 +1448,17 @@ def recode_genomatrixstream(genos, genome):
   l3 [('A', 'A'), (None, None), (None, None)] True True
   l4 [('G', 'T'), (None, None), ('T', 'T')] True True
 
-  >>> loci = ('l1','l2','l3', 'l4')
-  >>> genos = [('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')]),
-  ...          ('s2', [(None, None), (None, None), (None, None), (None, None)]),
-  ...          ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])]
-  >>> genos = GenomatrixStream.from_tuples(genos, 'sdat', loci=loci)
-  >>> genos = recode_genomatrixstream(genos,genome)
+  Test sdat known models
+
+  >>> samples = ('s1', 's2', 's3')
+  >>> genos = GenomatrixStream.from_tuples(rows, 'ldat', samples=samples).as_sdat()
+  >>> len(genos.models)
+  4
+  >>> genos = recode_genomatrixstream(genos,genome).materialize()
   >>> genos.loci
   ('l1', 'l2', 'l3', 'l4')
+  >>> genos.samples
+  ('s1', 's2', 's3')
   >>> all(model is defmodel for model in genos.models)
   True
   >>> for label,row in genos:
@@ -1454,6 +1466,34 @@ def recode_genomatrixstream(genos, genome):
   s1 [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')] True
   s2 [(None, None), (None, None), (None, None), (None, None)] True
   s3 [('G', 'G'), (None, None), (None, None), ('T', 'T')] True
+
+  Test ldat fastpath for no recoding
+
+  >>> genos = GenomatrixStream.from_tuples(rows, 'ldat', samples=samples).materialize()
+  >>> len(genos.models)
+  4
+  >>> genos = recode_genomatrixstream(genos,Genome())
+  >>> for (label,row),model in izip_exact(genos,genos.models):
+  ...   print label,row,model is not defmodel,all(isinstance(g,Genotype) for g in row)
+  l1 [('A', 'A'), (None, None), ('G', 'G')] True True
+  l2 [(None, None), (None, None), (None, None)] True True
+  l3 [('A', 'A'), (None, None), (None, None)] True True
+  l4 [('G', 'T'), (None, None), ('T', 'T')] True True
+
+  Test ldat fastpath for known models
+
+  >>> genos = GenomatrixStream.from_tuples(rows, 'ldat', samples=samples).materialize()
+  >>> len(genos.models)
+  4
+  >>> genos = recode_genomatrixstream(genos,genome)
+  >>> for (label,row),model in izip_exact(genos,genos.models):
+  ...   print label,row,model is defmodel,all(isinstance(g,Genotype) for g in row)
+  l1 [('A', 'A'), (None, None), ('G', 'G')] True True
+  l2 [(None, None), (None, None), (None, None)] True True
+  l3 [('A', 'A'), (None, None), (None, None)] True True
+  l4 [('G', 'T'), (None, None), ('T', 'T')] True True
+
+  Test sequential recoding to ensure that the same model is used throughout
 
   >>> samples =          ('s1',         's2',        's3')
   >>> rows1 = [('l1',[ ('G', 'G'),   ('G', 'T'),  ('T', 'T')]),
@@ -1486,8 +1526,78 @@ def recode_genomatrixstream(genos, genome):
   '''
   models = []
 
-  # FIXME: Optimize the case for ldat when rows are known and no models change
-  if genos.format=='ldat':
+  # All loci and models are known
+  if genos.loci is not None and len(genos.models) == len(genos.loci):
+    recode = False
+    for i,locus in enumerate(genos.loci):
+      # Get the new model or fix the old model
+      old_model = genos.models[i]
+      old_locus = genos.genome.loci[locus]
+      assert old_locus.model is old_model or None in (old_model,old_locus.model)
+
+      # Get the new model or fix the old model
+      genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
+                                location=old_locus.location, strand=old_locus.strand)
+
+      loc = genome.get_locus(locus)
+      if loc.model is None:
+        loc.model = old_model
+
+      model = loc.model
+
+      # Check to see if a full recoding or update is necessary
+      if model is not old_model:
+        recode = True
+
+      models.append(model)
+
+    # FASTPATH: No models change, so return with the updated genome
+    if not recode:
+      assert genos.models == models
+      return genos.clone(genos.use_stream(), genome=genome, materialized=False)
+
+  # MEDIUM PATH: Ldat, recoding needed, known models
+  if models and genos.format=='ldat':
+    def _recode_genomatrixstream():
+      n = len(genos.samples)
+
+      descrcache = {}
+      packed = genos.packed
+
+      for (locus,row),old_model,model in izip(genos,genos.models,models):
+        # Cache the descriptor for this model, since we're likely to see it again
+        if packed:
+          assert old_model is row.descriptor.models[0]
+          descr = descrcache[old_model] = row.descriptor
+
+        # Get or build the new descriptor
+        descr = descrcache.get(model)
+        if not descr:
+          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
+
+        # If the model changed, recode by adding all genotypes and packing
+        if old_model is not model:
+          loc = genome.get_locus(locus)
+          if not loc.fixed:
+            # Unpack to speed updates and repacking
+            row = row[:]
+            try:
+              for g in set(row):
+                model.add_genotype(g)
+            except ValueError:
+              raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
+                                  % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
+
+          row = GenotypeArray(descr,row)
+
+        # Otherwise, only repack if necessary
+        elif not packed:
+          row = GenotypeArray(descr,row)
+
+        yield locus,row
+
+  # SLOWPATH: Ldat without model information
+  elif genos.format=='ldat':
     def _recode_genomatrixstream():
       n = len(genos.samples)
 
@@ -1502,7 +1612,7 @@ def recode_genomatrixstream(genos, genome):
 
         # Get the new model or fix the old model
         genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
-                                location=old_locus.location, strand=old_locus.strand)
+                                  location=old_locus.location, strand=old_locus.strand)
 
         loc = genome.get_locus(locus)
         if loc.model is None:
@@ -1541,47 +1651,33 @@ def recode_genomatrixstream(genos, genome):
         models.append(model)
         yield locus,row
 
+  # sdat format
   elif genos.format=='sdat':
-    # Find all models that must be updated
-    recode  = False
-    updates = []
-
     assert genome is not genos.genome
+    assert genos.loci is not None and len(genos.loci) == len(genos.models) == len(models)
 
-    for i,locus in enumerate(genos.loci):
-      # Get the new model or fix the old model
-      old_model = genos.models[i]
-      old_locus = genos.genome.loci[locus]
-      assert old_locus.model is old_model or None in (old_model,old_locus.model)
-
-      # Get the new model or fix the old model
-      genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
-                              location=old_locus.location, strand=old_locus.strand)
-
-      loc = genome.get_locus(locus)
-      if loc.model is None:
-        loc.model = old_model
-
-      model = loc.model
-
-      # Check to see if a full recoding or update is necessary
+    # Find all models that must be updated
+    updates = []
+    for i,(locus,old_model,model) in enumerate(izip(genos.loci,genos.models,models)):
       if model is not old_model:
-        recode = True
+        loc = genome.get_locus(locus)
         if not loc.fixed:
           updates.append( (i,model.add_genotype) )
 
-      models.append(model)
+    # FASTERPATH: If all models are fixed, recoding is straightforward
+    if not updates:
+      def _recode_genomatrixstream():
+        descr = GenotypeArrayDescriptor(models)
+        for sample,row in genos:
+          # Recode and yield new row
+          yield sample,GenotypeArray(descr,row)
 
-    # FASTPATH: No models change, so return with the updated genome
-    if not recode:
-      return genos.clone(genos.use_stream(), genome=genome)
-
-    # Otherwise, recode by adding genotypes from all changed
+    # SLOWPATH: Otherwise, recode by adding genotypes from all changed
     # models and packing.
-    def _recode_genomatrixstream():
-      descr = GenotypeArrayDescriptor(models)
-      for sample,row in genos:
-        if updates:
+    else:
+      def _recode_genomatrixstream():
+        descr = GenotypeArrayDescriptor(models)
+        for sample,row in genos:
           # Unpack row to speed access -- both updates and GenotypeArray will
           # need to unpack
           row = row[:]
@@ -1595,8 +1691,9 @@ def recode_genomatrixstream(genos, genome):
             raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
                                 % (genos.loci[i],row[i],model.max_alleles,','.join(model.alleles[1:])))
 
-        # Recode and yield new row
-        yield sample,GenotypeArray(descr,row)
+          # Recode and yield new row
+          yield sample,GenotypeArray(descr,row)
+
   else:
     raise ValueError('Uknown format')
 
@@ -2078,7 +2175,7 @@ def recode_genotriples(triples,genome):
           assert old_locus.model is old_model
 
           genome.merge_locus(old_locus.name, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
-                                           location=old_locus.location)
+                                             location=old_locus.location)
           loc = genome.get_locus(locus)
           if loc.model is None:
             loc.model = old_model
