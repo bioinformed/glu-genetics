@@ -186,7 +186,7 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
   f.writerows(locusstats)
 
 
-def load_reference_genotypes(filename, format, locusset, sampleset, limit):
+def load_reference_genotypes(filename, format, locusset, sampleset):
   data = load_genostream(filename,format=format,genorepr=snp)
   data = data.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
 
@@ -326,7 +326,7 @@ def main():
     sampleeq = load_map(options.sampleeq)
     eqsample = invert_dict(sampleeq)
 
-  refgenos,samples,loci = load_reference_genotypes(args[0],options.refformat,locuseq,sampleeq,None)
+  refgenos,samples,loci = load_reference_genotypes(args[0],options.refformat,locuseq,sampleeq)
 
   compgenos = [ load_comparison_genotypes(arg, options.compformat, eqlocus, eqsample,
                 options.locusmap, options.samplemap) for arg in args[1:] ]

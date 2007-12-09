@@ -45,7 +45,7 @@ def option_parser():
   parser.add_option('-v', '--verbose', dest='verbose', metavar='LEVEL', type='int', default=1,
                     help='Verbosity level of diagnostic output.  O for none, 1 for some (default), 2 for exhaustive.')
   parser.add_option('-p', '--detailsmaxp', dest='detailsmaxp', metavar='P', type='float', default=1.0,
-                    help='Output detailed resutls for only pvalues below P threshold')
+                    help='Output detailed results for only pvalues below P threshold')
   parser.add_option('-i', '--includesamples', dest='includesamples', metavar='FILE',
                     help='List of samples to include')
   parser.add_option('-d', '--excludesamples', dest='excludesamples', metavar='FILE',

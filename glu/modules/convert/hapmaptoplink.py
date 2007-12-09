@@ -30,8 +30,6 @@ def load_hapmap_genotypes(file_or_name):
   Load the hampmap genotype data from file.
   @param file_or_name: file name or file object
   @type  file_or_name: str or file object
-  @param        limit: limit the number of samples loaded
-  @type         limit: int or None
   @return: rows of genotypes with the first row being the sample names
   @rtype:  generator
   '''

@@ -37,14 +37,12 @@ __all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
            'save_genomatrix_text',  'load_genomatrix_text']
 
 
-def load_genomatrix_linkage(filename,limit=None,genome=None):
+def load_genomatrix_linkage(filename,genome=None):
   '''
   Load a Linkage format genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param        limit: limit the number of samples loaded. Default is None
-  @type         limit: int or None
   @rtype             : GenomatrixStream
   '''
   gfile = autofile(filename)
@@ -74,7 +72,7 @@ def load_genomatrix_linkage(filename,limit=None,genome=None):
   return GenomatrixStream.from_tuples(_load(),'sdat',loci=loci,genome=genome)
 
 
-def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,genome=None):
+def load_genomatrix_text(filename,format,genorepr,unique=True,genome=None):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -85,8 +83,6 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,genome=
   @param       format: text string expected in the first header field to
                        indicate data format, if specified
   @type        format: string
-  @param        limit: limit the number of columms loaded
-  @type         limit: int or None
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
@@ -113,9 +109,6 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,genome=
 
   gfile = autofile(filename)
   rows = csv.reader(gfile,dialect='tsv')
-
-  if limit is not None:
-    limit += 1
 
   try:
     columns = iter(rows.next())
@@ -319,7 +312,7 @@ def save_genomatrix_text(filename,genos,genorepr):
     writer.writerows(genos)
 
 
-def load_genotriples_text(filename,genorepr,unique=True,limit=None,genome=None):
+def load_genotriples_text(filename,genorepr,unique=True,genome=None):
   '''
   Load genotype triples from file
 
@@ -330,8 +323,6 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,genome=None):
   @type      genorepr: unary function
   @param       unique: assume rows and columns are uniquely labeled (default is True)
   @type        unique: bool
-  @param        limit: limit the number of genotypes loaded
-  @type         limit: int or None
   @param       genome: genome descriptor
   @type        genome: Genome instance
   @rtype             : GenotripleStream
@@ -350,9 +341,6 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,genome=None):
     raise ValueError('genotype representation must be specified when reading a text genotype format')
 
   rows = csv.reader(autofile(filename),dialect='tsv')
-
-  if limit:
-    rows = islice(rows,limit)
 
   def _load():
     # Micro-optimization

@@ -49,8 +49,6 @@ def option_parser():
                     help='Output genotype representation (see -g/--ingenorepr).  Default is ingenorepr')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
-  ioopts.add_option(      '--limit', dest='limit', metavar='N', type='int', default=None,
-                    help='Limit the number of rows of data to N for testing purposes')
 
   mopts = optparse.OptionGroup(parser, 'Genotype Merging and Reporting')
 
@@ -122,7 +120,7 @@ def main():
   transform_files(infiles, options.informat,  options.ingenorepr,
                   options.output, options.outformat, options.outgenorepr,
                   transform, mergefunc=merger, genome=options.loci,
-                  limit=options.limit,inhyphen=sys.stdin,outhyphen=sys.stdout)
+                  inhyphen=sys.stdin,outhyphen=sys.stdout)
 
   output_merge_statistics(merger, options.samplemerge, options.locusmerge)
 

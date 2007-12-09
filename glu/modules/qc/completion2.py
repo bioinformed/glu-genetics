@@ -365,8 +365,6 @@ def option_parser():
                     help='Locus description file and options')
   parser.add_option('-o', '--output',          dest='output',          metavar='FILE', default='-',
                     help='Output of completion report')
-  parser.add_option(      '--limit',           dest='limit',           metavar='N',    default=0 , type='int',
-                    help='Limit the number of genotypes considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('-e', '--regions', dest='regions', metavar='FILE',
                     help='Regions of genotypes expected to be genotyped. Used to compute overall completion.')
   parser.add_option(     '--samplegroup',     dest='samplegroup',     metavar='FILE',
@@ -427,7 +425,7 @@ def main():
 
   outfile     = autofile(hyphen(options.output, sys.stdout),'w')
   genostream  = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                       genome=options.loci,limit=options.limit,hyphen=sys.stdin)
+                                       genome=options.loci,hyphen=sys.stdin)
   genotriples = genostream.as_genotriples()
 
   samcomp,samempty,loccomp,locempty,nonmissing,genos_inf,genos_all = completion(genotriples,regions)

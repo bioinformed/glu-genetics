@@ -183,7 +183,7 @@ def getWriter(filename,format,genome=None,header=None,genorepr=None,maxrows=None
 class RollingWriter(object):
   '''
   A wrapper around Text and Binary Writer objects that accepts a maximum
-  number of rows per file.  Once that limit is reached, another filed is
+  number of rows per file.  Once that limit is reached, another file is
   opened.
   '''
   def __init__(self, filename, format, genome, maxrows, header=None, genorepr=None):

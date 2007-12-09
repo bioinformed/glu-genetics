@@ -97,8 +97,6 @@ def option_parser():
                     help='Exclude a list of samples')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='Exclude a list of loci')
-  parser.add_option(      '--limit', dest='limit', metavar='N', type='int',
-                    help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
   parser.add_option('--mingenos', dest='mingenos', metavar='N', default=50, type='int',
                     help='Exclude loci with less than N non-missing genotypes (default=50)')
   parser.add_option('--mincompletion', dest='mincompletion', metavar='N', default=0, type='float',
@@ -170,7 +168,7 @@ def main():
 
   if options.format != 'counts':
     loci = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                   genome=options.loci,limit=options.limit).as_ldat()
+                                   genome=options.loci).as_ldat()
 
     loci = loci.transformed(include_loci=options.includeloci,
                             exclude_loci=options.excludeloci,

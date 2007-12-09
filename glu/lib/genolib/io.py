@@ -161,8 +161,6 @@ def load_genostream(filename, extra_args=None, **kwargs):
   @type    format: str
   @param  genorepr: string or representation object for text genotypes. Default is None
   @type   genorepr: str, UnphasedMarkerRepresentation or similar object
-  @param    limit: limit the number of samples loaded. Default is None
-  @type     limit: int or None
   @param   unique: flag indicating if repeated row or column elements do not exist. Default is None
   @type    unique: bool
   @para    genome: map between a locus and an new internal genotype
@@ -208,7 +206,6 @@ def load_genostream(filename, extra_args=None, **kwargs):
   genome   = get_arg(args, ['genome','loci'])
   genorepr = get_arg(args, ['genorepr']) or 'snp'
   unique   = get_arg(args, ['unique'], True)
-  limit    = int(get_arg(args, ['limit']) or 0) or None
 
   if filename == '-':
     if hyphen is None:
@@ -227,21 +224,21 @@ def load_genostream(filename, extra_args=None, **kwargs):
     genome = load_genome(genome,extra_args=args)
 
   if format == 'hapmap':
-    genos = load_genomatrix_hapmap(filename,limit=limit,genome=genome)
+    genos = load_genomatrix_hapmap(filename,genome=genome)
   elif format == 'ldat':
-    genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,genome=genome)
+    genos = load_genomatrix_text(filename,format,genorepr,unique=unique,genome=genome)
   elif format == 'sdat':
-    genos = load_genomatrix_text(filename,format,genorepr,limit=limit,unique=unique,genome=genome)
+    genos = load_genomatrix_text(filename,format,genorepr,unique=unique,genome=genome)
   elif format == 'lbat':
-    genos = load_genomatrix_binary(filename,'ldat',limit=limit,unique=unique,genome=genome)
+    genos = load_genomatrix_binary(filename,'ldat',unique=unique,genome=genome)
   elif format == 'sbat':
-    genos = load_genomatrix_binary(filename,'sdat',limit=limit,unique=unique,genome=genome)
+    genos = load_genomatrix_binary(filename,'sdat',unique=unique,genome=genome)
   elif format in ('tdat','trip','genotriple'):
-    genos = load_genotriples_text(filename,genorepr,limit=limit,unique=unique,genome=genome)
+    genos = load_genotriples_text(filename,genorepr,unique=unique,genome=genome)
   elif format in ('pb','prettybase'):
-    genos = load_genotriples_prettybase(filename,limit=limit,unique=unique,genome=genome)
+    genos = load_genotriples_prettybase(filename,unique=unique,genome=genome)
   elif format=='tbat':
-    genos = load_genotriples_binary(filename,limit=limit,unique=unique,genome=genome)
+    genos = load_genotriples_binary(filename,unique=unique,genome=genome)
   elif not format:
     raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
   else:
@@ -327,7 +324,7 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
 def transform_files(infiles,informat,ingenorepr,
                     outfile,outformat,outgenorepr,
                     transform=None,genome=None,
-                    mergefunc=None,limit=None,
+                    mergefunc=None,
                     inhyphen=None,outhyphen=None):
   '''
   A driver for transforming multiple genodata files into different formats
@@ -354,8 +351,6 @@ def transform_files(infiles,informat,ingenorepr,
   @type    transform: GenoTransform object
   @param   mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
   @type    mergefunc: callable
-  @param       limit: limit the number of samples loaded
-  @type        limit: int or None
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\t\\tCT\\tTT\\n")
@@ -389,7 +384,7 @@ def transform_files(infiles,informat,ingenorepr,
   if isinstance(mergefunc,basestring):
     mergefunc = get_genomerger(mergefunc)
 
-  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,limit=limit,genome=genome,hyphen=inhyphen)
+  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,genome=genome,hyphen=inhyphen)
                             .transformed(transform) for f in infiles ]
   n = len(genos)
 

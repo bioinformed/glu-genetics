@@ -50,7 +50,6 @@ def option_parser():
   parser.add_option('--locusmap',    dest='locusmap',                  metavar='FILE')
   parser.add_option('--gcthreshold', dest='gcthreshold', type='float', metavar='N')
   parser.add_option('--completion',  dest='completion',  type='float', metavar='N')
-  parser.add_option('--limit',       dest='limit',       type='int',   metavar='N')
   parser.add_option('--columns',     dest='columns',                   metavar='FILE')
   parser.add_option('--rowkey',      dest='rowkey',      type='int',   metavar='N')
   parser.add_option('--colkey',      dest='colkey',      type='int',   metavar='N')

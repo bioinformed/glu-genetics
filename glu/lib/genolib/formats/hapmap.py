@@ -33,14 +33,12 @@ HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID 
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
 
-def load_genomatrix_hapmap(filename,limit=None,genome=None):
+def load_genomatrix_hapmap(filename,genome=None):
   '''
   Load a HapMap genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param        limit: limit the number of samples loaded. Default is None
-  @type         limit: int or None
   @rtype             : GenomatrixStream
   '''
   gfile = autofile(filename)
@@ -54,10 +52,7 @@ def load_genomatrix_hapmap(filename,limit=None,genome=None):
   if not any(header.startswith(h) for h in HAPMAP_HEADERS):
     raise ValueError("Input file '%s' does not appear to be in HapMap format." % namefile(filename))
 
-  if limit is not None:
-    limit += 11
-
-  columns = [ intern(h.strip()) for h in islice(header.split(),11,limit) ]
+  columns = [ intern(h.strip()) for h in islice(header.split(),11,None) ]
   modelcache = {}
 
   if genome is None:
@@ -72,7 +67,7 @@ def load_genomatrix_hapmap(filename,limit=None,genome=None):
       chromosome = fields[2].strip()
       position   = tryint(fields[3].strip())
       strand     = intern(fields[4].strip())
-      genos      = fields[11:limit]
+      genos      = fields[11:]
 
       # Normalize 'chrXX' names to just 'XX'
       if chromosome.startswith('chr'):

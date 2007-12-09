@@ -526,7 +526,7 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
     writer.writerows(triples)
 
 
-def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
+def load_genotriples_binary(filename,unique=True,genome=None):
   '''
   Load genotype triples from file
 
@@ -535,8 +535,6 @@ def load_genotriples_binary(filename,unique=True,limit=None,genome=None):
   @param       unique: flag indicating if repeated row or column elements do not exist
                        (default is True)
   @type        unique: bool
-  @param        limit: limit the number of genotypes loaded
-  @type         limit: int or None
   @param       genome: genome descriptor
   @type        genome: Genome instance
   @return:             sequence of tuples of sample name, locus name, and genotype representation
@@ -912,7 +910,7 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
     writer.writerows(genos.transformed(repack=True))
 
 
-def load_genomatrix_binary(filename,format,limit=None,unique=True,genome=None,chunksize=4096,scratch=32*1024*1024):
+def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=4096,scratch=32*1024*1024):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -923,8 +921,6 @@ def load_genomatrix_binary(filename,format,limit=None,unique=True,genome=None,ch
   @param       format: text string expected in the first header field to
                        indicate data format, if specified
   @type        format: string
-  @param        limit: limit the number of columms loaded
-  @type         limit: int or None
   @param       unique: flag indicating if repeated row or column elements do not exist
                        (default is True)
   @type        unique: bool

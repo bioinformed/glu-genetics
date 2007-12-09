@@ -31,7 +31,7 @@ from   glu.lib.genolib.streams   import GenotripleStream
 __all__ = ['PrettybaseGenotripleWriter', 'save_genotriples_prettybase', 'load_genotriples_prettybase']
 
 
-def load_genotriples_prettybase(filename,unique=True,limit=None,genome=None):
+def load_genotriples_prettybase(filename,unique=True,genome=None):
   '''
   Load genotype triples from file
 
@@ -42,8 +42,6 @@ def load_genotriples_prettybase(filename,unique=True,limit=None,genome=None):
   @type      genorepr: unary function
   @param       unique: assume rows and columns are uniquely labeled (default is True)
   @type        unique: bool
-  @param        limit: limit the number of genotypes loaded
-  @type         limit: int or None
   @param       genome: genome descriptor
   @type        genome: Genome instance
   @rtype             : GenotripleStream
@@ -60,9 +58,6 @@ def load_genotriples_prettybase(filename,unique=True,limit=None,genome=None):
   '''
   re_spaces = re.compile('[\t ,]+')
   gfile = autofile(filename)
-
-  if limit:
-    gfile = islice(gfile,limit)
 
   def _load():
     # Micro-optimization
