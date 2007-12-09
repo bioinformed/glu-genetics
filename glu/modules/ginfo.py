@@ -63,8 +63,8 @@ def main():
     parser.print_help()
     return
 
-  genos  = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                   genome=options.loci,hyphen=sys.stdin)
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                  genome=options.loci,hyphen=sys.stdin)
 
   out = autofile(hyphen(options.output,sys.stdout),'w')
 
@@ -85,7 +85,7 @@ def main():
     if options.outputloci:
       emit(options.outputloci, ([l] for l in genos.loci))
 
-  if genos.samples is not None and genos.loci is not None:
+  if None not in (genos.samples,genos.loci):
     if genos.format == 'genotriple':
       models = [ genos.genome.get_model(locus) for locus in genos.loci ]
     else:
