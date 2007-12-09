@@ -24,64 +24,17 @@ import csv
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import autofile,namefile,tryint
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
-from   glu.lib.genolib.reprs     import snp
 from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.reprs     import snp
 
 
 __all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
            'save_genotriples_text', 'load_genotriples_text',
            'save_genomatrix_text',  'load_genomatrix_text']
-
-
-class NonUniqueError(ValueError): pass
-
-
-def unique_check_genomatrixstream(genos):
-  '''
-  Check that all row and column labels of a genomatrix are unique.  Raises
-  a NonUniqueError if they are not.
-
-  @param rows: genotype matrix data with the first row
-               being the column meta-data
-  @type rows: sequence
-
-  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
-  >>> unique_check_genomatrixstream(genos)
-  Traceback (most recent call last):
-       ...
-  NonUniqueError: Non-unique column identifiers: L1:2
-
-  >>> loci=('L1','L2')
-  >>> rows=[('R1',['AA','AC']),
-  ...       ('R1',['AA','AC'])]
-  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
-  >>> genos = unique_check_genomatrixstream(genos)
-  >>> list(genos)
-  Traceback (most recent call last):
-       ...
-  NonUniqueError: Non-unique row identifier: R1
-  '''
-  dcols  = [ (k,n) for k,n in tally(genos.columns).iteritems() if n>1 ]
-  if dcols:
-    dcols = ','.join( '%s:%d' % kv for kv in dcols )
-    raise NonUniqueError,'Non-unique column identifiers: %s' % dcols
-
-  def _check():
-    drows = set()
-    for label,row in genos:
-      if label in drows:
-        raise NonUniqueError,'Non-unique row identifier: %s' % label
-      else:
-        drows.add(label)
-
-      yield label,row
-
-  return genos.clone(_check(),unique=True)
 
 
 def load_genomatrix_linkage(filename,limit=None,genome=None):
@@ -137,8 +90,7 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,genome=
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @param       unique: verify that rows and columns are uniquely labeled
-                       (default is True)
+  @param       unique: assume rows and columns are uniquely labeled (default is True)
   @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
@@ -200,12 +152,9 @@ def load_genomatrix_text(filename,format,genorepr,limit=None,unique=True,genome=
       yield label,genos
 
   if format=='ldat':
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,genome=genome)
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,genome=genome,unique=unique)
   else:
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,genome=genome)
-
-  if unique:
-    genos = unique_check_genomatrixstream(genos)
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,genome=genome,unique=unique)
 
   return genos
 
@@ -379,8 +328,7 @@ def load_genotriples_text(filename,genorepr,unique=True,limit=None,genome=None):
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @param       unique: verify that rows and columns are uniquely labeled
-                       (default is True)
+  @param       unique: assume rows and columns are uniquely labeled (default is True)
   @type        unique: bool
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None

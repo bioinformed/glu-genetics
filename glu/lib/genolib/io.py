@@ -19,6 +19,7 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
+from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import namefile, guess_format, parse_augmented_filename, get_arg
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
@@ -60,6 +61,93 @@ def guess_outformat(filename):
   @type  filename: str or file object
   '''
   return guess_format(filename, OUTPUT_FORMATS)
+
+
+class NonUniqueError(ValueError): pass
+
+
+def unique_check_genomatrixstream(genos):
+  '''
+  Check that all row and column labels of a genomatrix are unique.  Raises
+  a NonUniqueError if they are not.
+
+  @param rows: genotype matrix data with the first row
+               being the column meta-data
+  @type rows: sequence
+
+  >>> from glu.lib.genolib.reprs import snp
+
+  Non-unique columns:
+
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
+  >>> unique_check_genomatrixstream(genos)
+  Traceback (most recent call last):
+       ...
+  NonUniqueError: Non-unique loci: L1:2
+
+  Non-unique rows:
+
+  >>> loci=('L1','L2')
+  >>> rows=[('R1',['AA','AC']),
+  ...       ('R1',['AA','AC'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = unique_check_genomatrixstream(genos)
+  >>> list(genos)
+  Traceback (most recent call last):
+       ...
+  NonUniqueError: Non-unique row name: R1
+
+  Known unique rows and columns:
+
+  >>> loci=('L1','L2')
+  >>> samples=('R1', 'R2')
+  >>> rows=[('R1',['AA','AC']),
+  ...       ('R2',['AA','AC'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci,samples=samples)
+  >>> ugenos = unique_check_genomatrixstream(genos)
+  >>> genos is ugenos
+  True
+
+  Known columns, unknown but unique rows:
+
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = unique_check_genomatrixstream(genos)
+  >>> for sample,row in genos:
+  ...   print sample,row
+  R1 [('A', 'A'), ('A', 'C')]
+  R2 [('A', 'A'), ('A', 'C')]
+  '''
+  assert genos.columns is not None
+
+  if genos.loci is not None:
+    dup_loci = [ (k,n) for k,n in tally(genos.loci).iteritems() if n>1 ]
+    if dup_loci:
+      msg = ','.join( '%s:%d' % kv for kv in dup_loci )
+      raise NonUniqueError('Non-unique loci: %s' % msg)
+
+  if genos.samples is not None:
+    dup_samples = [ (k,n) for k,n in tally(genos.samples).iteritems() if n>1 ]
+    if dup_samples:
+      msg = ','.join( '%s:%d' % kv for kv in dup_samples )
+      raise NonUniqueError('Non-unique samples: %s' % msg)
+
+  # FASTPATH: Unique samples and loci
+  if None not in (genos.samples,genos.loci):
+    genos.unique = True
+    return genos
+
+  # SLOWPATH: Check rows as they stream past
+  def _check():
+    drows = set()
+    for label,row in genos:
+      if label in drows:
+        raise NonUniqueError('Non-unique row name: %s' % label)
+
+      drows.add(label)
+
+      yield label,row
+
+  return genos.clone(_check(),unique=True)
 
 
 def load_genostream(filename, extra_args=None, **kwargs):
@@ -161,6 +249,9 @@ def load_genostream(filename, extra_args=None, **kwargs):
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if genos.format in ('sdat','ldat') and unique:
+    genos = unique_check_genomatrixstream(genos)
 
   return genos
 

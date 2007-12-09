@@ -40,8 +40,7 @@ def load_genotriples_prettybase(filename,unique=True,limit=None,genome=None):
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @param       unique: verify that rows and columns are uniquely labeled
-                       (default is True)
+  @param       unique: assume rows and columns are uniquely labeled (default is True)
   @type        unique: bool
   @param        limit: limit the number of genotypes loaded
   @type         limit: int or None
