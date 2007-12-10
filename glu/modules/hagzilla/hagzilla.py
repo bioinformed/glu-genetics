@@ -29,11 +29,11 @@ import fcntl
 import subprocess
 import sqlite3
 
-from   itertools         import groupby,chain
-from   operator          import itemgetter
+from   itertools                      import groupby,chain
+from   operator                       import itemgetter
 
-from   glu.lib.fileutils import autofile,load_list
-from   tagzilla          import launcher,locus_result_sequence
+from   glu.lib.fileutils              import autofile,load_list
+from   glu.modules.tagzilla.tagzilla  import launcher,locus_result_sequence
 
 
 POPS = {'CEU'    : 'hapmap',
@@ -44,7 +44,7 @@ POPS = {'CEU'    : 'hapmap',
         'NHS'    : 'NHS',
        }
 
-GENOMEDB='/usr/local/share/genedb/genome36.db'
+GENOMEDB='/usr/local/share/genedb/genome36-1.db'
 
 #FIXME: Make configurable
 if 1:
@@ -454,7 +454,7 @@ class SubprocessManager(object):
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genofile...'
+  usage = 'usage: %prog [options] outdir jobfile'
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-D', '--designscores', dest='designscores', metavar='FILE', action='append',
@@ -491,6 +491,9 @@ def main():
 
   con = sqlite3.connect(options.genomedb)
   outdir = args[0]
+
+  if not os.path.isdir(outdir):
+    sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % outdir)
 
   taskfile   = csv.reader(autofile(args[1]),dialect='excel-tab')
   header     = taskfile.next()
