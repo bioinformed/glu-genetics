@@ -26,19 +26,21 @@ from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.reprs     import hapmap
 from   glu.lib.genolib.locus     import Genome
 
-__all__ = ['load_genomatrix_hapmap']
+__all__ = ['load_hapmap']
 
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
 
-def load_genomatrix_hapmap(filename,genome=None):
+def load_hapmap(filename,genome=None):
   '''
   Load a HapMap genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
   @rtype             : GenomatrixStream
   '''
   gfile = autofile(filename)
@@ -58,7 +60,7 @@ def load_genomatrix_hapmap(filename,genome=None):
   if genome is None:
     genome = Genome()
 
-  def _load():
+  def _load_hapmap():
     n = len(columns)
     for line in gfile:
       fields     = line.split()
@@ -94,7 +96,7 @@ def load_genomatrix_hapmap(filename,genome=None):
 
       yield locus,genos
 
-  return GenomatrixStream.from_strings(_load(),'ldat',hapmap,samples=columns,genome=genome)
+  return GenomatrixStream.from_strings(_load_hapmap(),'ldat',hapmap,samples=columns,genome=genome)
 
 
 def test():

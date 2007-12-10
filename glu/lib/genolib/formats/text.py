@@ -468,17 +468,17 @@ class TextGenotripleWriter(object):
     self.close()
 
 
-def save_genotriples_text(filename,triples,genorepr):
+def save_genotriples_text(filename,genos,genorepr):
   '''
-  Write the genotype triple data to file.
+  Write the genotype stream to a text genotriple file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param      triples: genotype triple data
-  @type       triples: sequence
-  @param     genorepr: function to convert internal genotype representation
-                       to the desired string representation
-  @type      genorepr: unary function
+  @param        genos: Genotype stream to write
+  @type         genos: GenotypeStream
+  @param     genorepr: object representing the input/output encoding and
+                       internal representation of genotypes
+  @type      genorepr: UnphasedMarkerRepresentation or similar object
 
   >>> triples = [ ('s1', 'l1',  ('C','T')),
   ...             ('s1', 'l2', (None,None)),
@@ -493,7 +493,7 @@ def save_genotriples_text(filename,triples,genorepr):
   s1	l3	AA
   '''
   with TextGenotripleWriter(filename,genorepr) as w:
-    w.writerows(triples)
+    w.writerows(genos.as_genotriples())
 
 
 def test():

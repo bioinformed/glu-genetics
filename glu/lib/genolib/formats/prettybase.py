@@ -28,10 +28,10 @@ from   glu.lib.fileutils         import autofile,namefile
 from   glu.lib.genolib.streams   import GenotripleStream
 
 
-__all__ = ['PrettybaseGenotripleWriter', 'save_genotriples_prettybase', 'load_genotriples_prettybase']
+__all__ = ['PrettybaseWriter', 'save_prettybase', 'load_prettybase']
 
 
-def load_genotriples_prettybase(filename,unique=True,genome=None):
+def load_prettybase(filename,unique=True,genome=None):
   '''
   Load genotype triples from file
 
@@ -48,7 +48,7 @@ def load_genotriples_prettybase(filename,unique=True,genome=None):
 
   >>> from StringIO import StringIO
   >>> data = StringIO('l1 s1 A A\\nl2 s1 G G\\nl1 s2 N N\\nl2 s2 C C\\n')
-  >>> triples = load_genotriples_prettybase(data)
+  >>> triples = load_prettybase(data)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -83,7 +83,7 @@ def load_genotriples_prettybase(filename,unique=True,genome=None):
   return GenotripleStream.from_tuples(_load(),unique=unique,genome=genome)
 
 
-class PrettybaseGenotripleWriter(object):
+class PrettybaseWriter(object):
   '''
   Object to write genotype triple data to a Prettybase format file
 
@@ -103,7 +103,7 @@ class PrettybaseGenotripleWriter(object):
   >>> triples = iter(GenotripleStream.from_tuples(triples))
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with PrettybaseGenotripleWriter(o) as w:
+  >>> with PrettybaseWriter(o) as w:
   ...   w.writerow(*triples.next())
   ...   w.writerow(*triples.next())
   ...   w.writerows(triples)
@@ -180,7 +180,7 @@ class PrettybaseGenotripleWriter(object):
     self.close()
 
 
-def save_genotriples_prettybase(filename,triples):
+def save_prettybase(filename,genos):
   '''
   Write the genotype triple data to file.
 
@@ -195,14 +195,14 @@ def save_genotriples_prettybase(filename,triples):
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> save_genotriples_prettybase(o,triples)
+  >>> save_prettybase(o,triples)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   l1 s1 C T
   l2 s1 N N
   l3 s1 A A
   '''
-  with PrettybaseGenotripleWriter(filename) as w:
-    w.writerows(triples)
+  with PrettybaseWriter(filename) as w:
+    w.writerows(genos.as_genotriples())
 
 
 def test():

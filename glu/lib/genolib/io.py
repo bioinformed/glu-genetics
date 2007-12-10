@@ -224,7 +224,7 @@ def load_genostream(filename, extra_args=None, **kwargs):
     genome = load_genome(genome,extra_args=args)
 
   if format == 'hapmap':
-    genos = load_genomatrix_hapmap(filename,genome=genome)
+    genos = load_hapmap(filename,genome=genome)
   elif format == 'ldat':
     genos = load_genomatrix_text(filename,format,genorepr,unique=unique,genome=genome)
   elif format == 'sdat':
@@ -236,13 +236,13 @@ def load_genostream(filename, extra_args=None, **kwargs):
   elif format in ('tdat','trip','genotriple'):
     genos = load_genotriples_text(filename,genorepr,unique=unique,genome=genome)
   elif format in ('pb','prettybase'):
-    genos = load_genotriples_prettybase(filename,unique=unique,genome=genome)
+    genos = load_prettybase(filename,unique=unique,genome=genome)
   elif format=='tbat':
     genos = load_genotriples_binary(filename,unique=unique,genome=genome)
   elif not format:
-    raise ValueError, "Input file format for '%s' must be specified" % namefile(filename)
+    raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
-    raise NotImplementedError,"File format '%s' is not supported" % format
+    raise NotImplementedError("File format '%s' is not supported" % format)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -306,9 +306,9 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   elif format == 'sdat':
     save_genomatrix_text(filename, genos.as_sdat(mergefunc), genorepr)
   elif format in ('tdat','trip','genotriple'):
-    save_genotriples_text(filename, genos.as_genotriples(), genorepr)
+    save_genotriples_text(filename, genos, genorepr)
   elif format in ('pb','prettybase'):
-    genos = save_genotriples_prettybase(filename, genos.as_genotriples())
+    genos = save_prettybase(filename, genos)
   elif format == 'lbat':
     save_genomatrix_binary(filename, genos.as_ldat(mergefunc), compress=compress)
   elif format == 'sbat':
@@ -316,9 +316,9 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   elif format == 'tbat':
     save_genotriples_binary(filename, genos.as_genotriples(), compress=compress)
   elif not format:
-    raise ValueError, "Output file format for '%s' must be specified" % namefile(filename)
+    raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:
-    raise NotImplementedError,"File format '%s' is not supported" % format
+    raise NotImplementedError("File format '%s' is not supported" % format)
 
 
 def transform_files(infiles,informat,ingenorepr,
@@ -342,7 +342,7 @@ def transform_files(infiles,informat,ingenorepr,
   @type   ingenorepr: UnphasedMarkerRepresentation or similar object
   @param    outfiles: output file name or file object
   @type     outfiles: str or file object
-  @param   outformat: format of output file: hapmap,ldat,sdat,trip,genotriple,prettybase,pb,
+  @param   outformat: format of output file: ldat,sdat,trip,genotriple,prettybase,pb,
                       lbat,sbat,tbat. Default is None, which attempts to autodetect the file type.
   @type    outformat: str
   @param outgenorepr: internal genotype representation for the output
@@ -402,9 +402,9 @@ def transform_files(infiles,informat,ingenorepr,
   elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
   elif not outformat:
-    raise ValueError, "Output file format for '%s' must be specified" % namefile(outfile)
+    raise ValueError("Output file format for '%s' must be specified" % namefile(outfile))
   else:
-    raise NotImplementedError,"File format '%s' is not supported" % outformat
+    raise NotImplementedError("File format '%s' is not supported" % outformat)
 
   # Order again after merging, if necessary
   if n>1 and (transform.loci.order or transform.samples.order):
