@@ -313,7 +313,7 @@ class GCSummary(object):
       var[var < 0] = 0
       std = var**0.5
 
-      self.locusstats = [ (locus,mui,stdi) for locus,mui,stdi,gcmax in izip(self.loci,mu,std) ]
+      self.locusstats = [ (locus,mui,stdi) for locus,mui,stdi in izip(self.loci,mu,std) ]
 
 
 def option_parser():
@@ -368,7 +368,7 @@ def main():
 
   loci = list(loci)
   for arg in args:
-    more_loci,more_gentrain,more_samples = load_lbd_file(arg,gcthreshold=options.gcthreshold)
+    more_loci,more_gentrain,more_samples = load_lbd_file(arg)
 
     if list(more_loci) != loci:
       raise RuntimeError,'Genotype headers do not match'
