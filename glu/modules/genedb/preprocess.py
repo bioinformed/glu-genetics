@@ -55,7 +55,7 @@ def load_features(filename,limit=None):
   return islice(csv.reader(autofile(filename),dialect='excel-tab'),1,limit)
 
 
-def process(con,features,options):
+def resolve_features(con,features,options):
   for feature in features:
     feature += [None]*(5-len(feature))
 
@@ -63,10 +63,10 @@ def process(con,features,options):
 
     marginup1   = marginup2   = None
     margindown1 = margindown2 = None
-    chr   = feature[1] or None
-    start = feature[2] or None
-    end   = feature[3] or None
-    strand = feature[4] or '+'
+    chr         = feature[1] or None
+    start       = feature[2] or None
+    end         = feature[3] or None
+    strand      = feature[4] or '+'
 
     #FIXME: handle only one part of margins is missing
     marginup1,marginup2 = options.upstream,options.Upstream
@@ -140,7 +140,7 @@ def main():
 
   for infile in args[1:]:
     features = load_features(hyphen(infile,sys.stdin))
-    results = process(con,features,options)
+    results = resolve_features(con,features,options)
     out.writerows(results)
 
 
