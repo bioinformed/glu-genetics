@@ -186,7 +186,7 @@ def main():
     out.write('\t'.join([lname, ','.join(m.alleles), '%.3f' % m.maf ]))
     out.write('\t')
 
-    counts = [ str((g.y_ord==cat).sum()) for cat in g.categories]
+    counts = [ str((g.y==cat).sum()) for cat in g.categories]
     out.write('|'.join(counts))
 
     sp = wp = lp = 1

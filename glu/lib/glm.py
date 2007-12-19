@@ -1151,7 +1151,7 @@ class GLogit(object):
     y_ord = zeros_like(y)
 
     for i,v in enumerate(categories):
-      y_ord += where(y==v, i, 0)
+      y_ord[y==v] = i
 
     self.y     = y
     self.y_ord = y_ord

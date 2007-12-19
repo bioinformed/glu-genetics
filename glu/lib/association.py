@@ -1144,7 +1144,7 @@ def print_results(out,locus_model,linear_model,verbose=1):
 
   out.write('Observations = %d\n' % len(linear_model.X))
   for c in linear_model.categories:
-    out.write('  CATEGORY %2d: %5d\n' % (c,(linear_model.y_ord==c).sum()))
+    out.write('  CATEGORY %2d: %5d\n' % (c,(linear_model.y==c).sum()))
   out.write('Covariate summary:\n')
   for name,x in izip(vars,linear_model.X.T):
     out.write('  %-12s: ' % name)
