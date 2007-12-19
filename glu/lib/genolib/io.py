@@ -31,7 +31,7 @@ from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.formats   import *
 
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
+INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped')
 OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
 
 
@@ -201,11 +201,11 @@ def load_genostream(filename, extra_args=None, **kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  hyphen   = get_arg(args, ['hyphen'])
-  format   = get_arg(args, ['format'])
-  genome   = get_arg(args, ['genome','loci'])
-  genorepr = get_arg(args, ['genorepr']) or 'snp'
-  unique   = get_arg(args, ['unique'], True)
+  hyphen    = get_arg(args, ['hyphen'])
+  format    = get_arg(args, ['format'])
+  genome    = get_arg(args, ['genome'])
+  genorepr  = get_arg(args, ['genorepr']) or 'snp'
+  unique    = get_arg(args, ['unique'], True)
 
   if filename == '-':
     if hyphen is None:
@@ -239,6 +239,8 @@ def load_genostream(filename, extra_args=None, **kwargs):
     genos = load_prettybase(filename,unique=unique,genome=genome)
   elif format=='tbat':
     genos = load_genotriples_binary(filename,unique=unique,genome=genome)
+  elif format in ('plink_ped','ped'):
+    genos = load_plink_ped(filename,unique=unique,genome=genome,extra_args=args)
   elif not format:
     raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
@@ -397,7 +399,7 @@ def transform_files(infiles,informat,ingenorepr,
 
   if outformat in ('ldat','lbat'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
-  elif outformat in ('sdat','sbat'):
+  elif outformat in ('sdat','sbat','ped'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
   elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
