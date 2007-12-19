@@ -339,6 +339,24 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   return default_max_alleles,default_alleles,_loci()
 
 
+def populate_genome(genome,loci,modelcache=None):
+  '''
+  Return the default model and a sequence of Locus objects from an augmented
+  locus description file
+
+  FIXME: Add docstring and doctests
+  '''
+  if modelcache is None:
+    modelcache = {}
+
+  for lname,max_alleles,alleles,chromosome,location in loci:
+    key   = (max_alleles,)+tuple(sorted(alleles))
+    model = modelcache.get(key)
+    if model is None:
+      model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
+    genome.merge_locus(lname, model, bool(alleles), chromosome, location)
+
+
 def load_genome(filename,modelcache=None,**kwargs):
   '''
   Return the default model and a sequence of Locus objects from an augmented
@@ -349,22 +367,14 @@ def load_genome(filename,modelcache=None,**kwargs):
   default_max_alleles,default_alleles,loci = load_locus_records(filename,**kwargs)
 
   if default_alleles:
-    default_model = model_from_alleles(alleles,max_alleles=default_max_alleles)
+    default_model = model_from_alleles(default_alleles,max_alleles=default_max_alleles)
   else:
     default_model = None
 
   genome = Genome(default_model=default_model, default_fixed=bool(default_alleles),
                   max_alleles=default_max_alleles, alleles=default_alleles)
 
-  if modelcache is None:
-    modelcache = {}
-
-  for lname,max_alleles,alleles,chromosome,location in loci:
-    key   = (max_alleles,)+tuple(sorted(alleles))
-    model = modelcache.get(key)
-    if model is None:
-      model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
-    genome.merge_locus(lname, model, bool(alleles), chromosome, location)
+  populate_genome(genome,loci,modelcache)
 
   return genome
 
