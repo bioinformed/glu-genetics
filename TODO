@@ -26,7 +26,7 @@ genolib
   * Improve genoarray exceptions so they can be better distinguished and
     handled
 
-  * File auto detection based on headers (HapMap, primarily)
+  * File auto detection based on headers (HapMap, ldat, sdat, ?bat, primarily)
 
   * File format support:
     * PLINK text (http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml)
@@ -34,6 +34,7 @@ genolib
     * MERLIN/MACH (http://www.sph.umich.edu/csg/abecasis/MACH/tour/)
     * WTCCC (http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html)
     * GenABEL (http://rss.acs.unt.edu/Rdoc/library/GenABEL/html/GenABEL-package.html)
+    * PHASE (http://stephenslab.uchicago.edu/instruct2.1.pdf)
 
 ----------------------
 modules.qc.concordance
