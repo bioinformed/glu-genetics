@@ -14,10 +14,10 @@ import os
 #
 # The short X.Y version.
 # version = '2.6'
-version = '0.61'
+version = '0.81'
 # The full version, including alpha/beta/rc tags.
 # release = '2.6a0'
-release = '0.61'
+release = '0.81'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -29,7 +29,7 @@ today_fmt = '%B %d, %Y'
 templates_path=os.path.join(os.getcwd(), 'templates')
 
 # The base URL for download links.
-download_base_url = 'http://docs.python.org/ftp/python/doc/'
+html_download_base_url = 'http://cgf.nci.nih.gov/glu/'
 
 # List of files that shouldn't be included in the build.
 unused_files = [
