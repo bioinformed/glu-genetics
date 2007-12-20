@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 '''
-File:          linkage.py
+File:          plink.py
 
 Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
 Created:       2006-01-01
 
-Abstract:      GLU Linkage genotype format input/output objects
+Abstract:      GLU Plink genotype format input/output objects
 
 Requires:      Python 2.5
 
@@ -22,26 +22,54 @@ __license__   = 'See GLU license for terms by running: glu license'
 import re
 import csv
 
-from   itertools                 import islice,dropwhile
+from   itertools                 import islice,izip,tee
 
-from   glu.lib.fileutils         import autofile,namefile,tryint
+from   glu.lib.utils             import gcdisabled
+from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg
 
-from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
+from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.reprs     import snp
 from   glu.lib.genolib.locus     import Genome
 
 
-__all__ = ['LinkageWriter', 'LinkageWriter',
-           'save_linkage', 'load_linkage' ]
+__all__ = ['PlinkWriter', 'PlinkWriter',
+           'save_plink', 'load_plink_ped' ]
 
 
 ALLELE_MAP = {None:'0'}
 
 
-def load_linkage(filename,genome=None,unique=True,extra_args,**kwargs):
+def load_plink_map(filename,genome):
+  mfile = autofile(filename)
+
+  for i,line in enumerate(mfile):
+    line = line.rstrip()
+
+    if not line or line.startswith('#'):
+      continue
+
+    fields = line.split()
+
+    if len(fields) != 4:
+      raise ValueError('Invalid PLINK MAP record %d' % (i+1))
+
+    chr   = fields[0] or None
+    lname = fields[1]
+    gdist = int(fields[2])      if fields[2] else None
+    pdist = abs(int(fields[3])) if fields[3] else None
+
+    if not lname:
+      raise ValueError('Invalid PLINK MAP record %d' % (i+1))
+
+    genome.merge_locus(lname, chromosome=chr, location=pdist)
+
+    yield lname
+
+
+def load_plink_ped(filename,genome=None,unique=True,extra_args=None,**kwargs):
   '''
-  Load a Linkage format genotype data file.
+  Load a Plink format genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
@@ -62,60 +90,60 @@ def load_linkage(filename,genome=None,unique=True,extra_args,**kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  split = re.compile('[\t ,]+').split
+  loci = get_arg(args, ['loci'])
+  lmap = get_arg(args, ['map'])
+
+  if loci is None and lmap is None:
+    raise ValueError('Map file or locus list must be specified when loading PLINK PED files')
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   if genome is None:
     genome = Genome()
 
+  if loci is not None:
+    if isinstance(loci,basestring):
+      loci = list(load_locus_records(loci)[2])
+      # Merge map data into genome
+      populate_genome(genome,loci)
+      loci  = [ intern(l[0]) for l in loci ]
+
+  if lmap is not None:
+    map_loci = list(load_plink_map(lmap,genome))
+    if loci is not None:
+      if loci != map_loci:
+        raise ValueError('Locus list and PLINK MAP file are not identical')
+    else:
+      loci = map_loci
+
   gfile = autofile(filename)
+  n     = 6 + 2*len(loci)
 
-  loci = get_arg(args, ['loci','map'])
-  if loci not is None:
-    loci = list(load_locus_records(loci)[2])
-    # Merge map data into genome
-    populate_genome(genome,loci)
-    loci  = [ intern(l[0]) for l in loci ]
-    n     = 6 + 2*len(loci)
-  else:
-    line = gfile.next()
-    while not line.strip() or line.startswith('#'):
-      line = gfile.next()
-
-    gfile = chain([line],gfile)
-    n     = (len(split(line))-6)/2
-    loci  = [ '%s' % i for i in range(n) ]
-
-  def _load_linkage():
-    amap  = {'0':None}
+  def _load_plink():
+    amap  = {'0':None,'A':'A','C':'C','G':'G','T':'T','1':'1','2':'2','3':'3','4':'4'}
 
     for line_num,line in enumerate(gfile):
-      line = line.rstrip()
-
       if not line or line.startswith('#'):
         continue
 
-      fields = split(line)
+      with gcdisabled:
+        fields = line.split()
 
-      if len(fields) != n:
-        raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
+        if len(fields) != n:
+          raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
 
-      #FIXME: Bad idea for files with multiple pedigrees that just happen to
-      #       begin with, e.g., "1 1"
-      if field[0] == field[1]:
-        sample = field[0]
-      else:
-        sample = '%s_%s' % (field[0],field[1])
+        sample = '%s_%s' % (fields[0],fields[1])
 
-      a1s    = islice(fields,6,None,2)
-      a2s    = islice(fields,7,None,2)
-      genos  = [ (amap.get(a1,a1),amap.get(a2,a2)) for a1,a2 in izip(a1s,a2s) ]
+        fields = [ amap.get(a,a) for a in islice(fields,6,None) ]
+        genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
 
       yield sample,genos
 
-  return GenomatrixStream.from_tuples(_load_linkage(),'sdat',loci=loci,genome=genome,unique=unique)
+  return GenomatrixStream.from_tuples(_load_plink(),'sdat',loci=loci,genome=genome,unique=unique)
 
 
-class LinkageWriter(object):
+class PlinkWriter(object):
   '''
   Object to write the genotype matrix data to a text file
 
@@ -143,7 +171,7 @@ class LinkageWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenomatrixWriter(o,genos.format,genos.columns,snp) as w:
+  >>> with PlinkWriter(o,genos.loci) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -250,7 +278,7 @@ class LinkageWriter(object):
     self.close()
 
 
-def save_linkage(filename,genos,genome):
+def save_plink(filename,genos,genome):
   '''
   Write the genotype matrix data to file.
 
@@ -266,7 +294,7 @@ def save_linkage(filename,genos,genome):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_genomatrix_text(o,genos,snp)
+  >>> save_plink(o,genos,snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   sdat	l1	l2	l3
   s1	AA	  	CT
@@ -274,7 +302,7 @@ def save_linkage(filename,genos,genome):
   s3	GG	  	CT
   '''
   genos = genos.as_sdat()
-  with LinkageWriter(filename, genos.loci) as writer:
+  with PlinkWriter(filename, genos.loci) as writer:
     writer.writerows(genos)
 
 
