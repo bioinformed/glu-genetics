@@ -28,6 +28,7 @@ from   glu.lib.xtab      import xtab,rowsby
 
 from   glu.lib.genolib.reprs     import snp
 from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.phenos    import Phenome
 from   glu.lib.genolib.transform import GenoTransform, prove_unique_transform
 from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,Genotype, \
@@ -89,8 +90,8 @@ class GenotripleStream(GenotypeStream):
   '''
   format = 'genotriple'
 
-  def __init__(self, triples, samples=None, loci=None, genome=None, order=None,
-                              unique=False, materialized=False):
+  def __init__(self, triples, samples=None, loci=None, genome=None, phenome=None,
+                              order=None, unique=False, materialized=False):
     '''
     Create a new GenotripleStream object
 
@@ -117,6 +118,8 @@ class GenotripleStream(GenotypeStream):
     @type          loci: sequence, set, or None
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     @param        order: sort order, 'sample' or 'locus', or None, Default is None
     @type         order: str or None
 
@@ -143,6 +146,7 @@ class GenotripleStream(GenotypeStream):
     self.loci         = loci
     self.order        = order
     self.genome       = genome
+    self.phenome      = phenome
     self.unique       = bool(unique)
     self.materialized = materialized or isinstance(triples, (list,tuple))
 
@@ -216,7 +220,8 @@ class GenotripleStream(GenotypeStream):
     return triples
 
   @staticmethod
-  def from_tuples(triples, samples=None, loci=None, order=None, unique=False, genome=None):
+  def from_tuples(triples, samples=None, loci=None, order=None, unique=False,
+                           genome=None, phenome=None):
     '''
     Alternate constructor that builds a new GenotripleStream object from a
     sequence of triples with genotypes in tuple
@@ -233,6 +238,8 @@ class GenotripleStream(GenotypeStream):
     @type        unique: bool
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
 
     >>> triples = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
     ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
@@ -250,7 +257,8 @@ class GenotripleStream(GenotypeStream):
     if genome is None:
       genome = Genome()
     triples = encode_genotriples_from_tuples(triples, genome)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, unique=unique)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
+                                     unique=unique)
 
   def to_tuples(self):
     '''
@@ -297,7 +305,8 @@ class GenotripleStream(GenotypeStream):
       yield sample,locus,repr(geno)
 
   @staticmethod
-  def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False, genome=None):
+  def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False,
+                            genome=None, phenome=None):
     '''
     Alternate constructor that builds a new GenotripleStream object from a
     sequence of triples with genotypes in a string format
@@ -316,6 +325,8 @@ class GenotripleStream(GenotypeStream):
     @type        unique: bool
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
 
     >>> triples = [('l1','s1','AA'),('l1','s1','  '),('l1','s2','AB'),('l2','s1','AA'),
     ...            ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
@@ -334,7 +345,8 @@ class GenotripleStream(GenotypeStream):
     if genome is None:
       genome = Genome()
     triples = encode_genotriples_from_strings(triples, genorepr, genome)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, unique=unique)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
+                                     unique=unique)
 
   def clone(self, triples, **kwargs):
     '''
@@ -352,6 +364,8 @@ class GenotripleStream(GenotypeStream):
     @type         order: str
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     @param       unique: flag indicating if repeated row or column elements do not exist
     @type        unique: bool
     @param materialized: flag indicating if this stream is materialized and
@@ -372,6 +386,7 @@ class GenotripleStream(GenotypeStream):
     kwargs.setdefault('loci',         self.loci)
     kwargs.setdefault('order',        self.order)
     kwargs.setdefault('genome',       self.genome)
+    kwargs.setdefault('phenome',      self.phenome)
     kwargs.setdefault('unique',       self.unique)
     kwargs.setdefault('materialized', self.materialized)
 
@@ -393,6 +408,8 @@ class GenotripleStream(GenotypeStream):
       return self
 
     genos   = list(self.use_stream())
+
+    # FIXME: These extraction operators should work in parallel to avoid thrashing
     loci    = set(imap(itemgetter(0),genos))
     samples = set(imap(itemgetter(1),genos))
 
@@ -678,8 +695,9 @@ class GenomatrixStream(GenotypeStream):
   '''
   A stream of genomatrix by sample or locus with optional metadata
   '''
-  def __init__(self, genos, format, samples=None, loci=None, models=None, genome=None,
-                     unique=True, materialized=False, packed=False):
+  def __init__(self, genos, format, samples=None, loci=None, models=None,
+                     genome=None, phenome=None, unique=True, materialized=False,
+                     packed=False):
     '''
     Create a new GenomatrixStream object
 
@@ -713,6 +731,8 @@ class GenomatrixStream(GenotypeStream):
     @type        models: UnphasedMarkerRepresentation or similar object
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     @param       unique: flag indicating if repeated row or column elements do not exist
     @type        unique: bool
     @param materialized: flag indicating if this stream is materialized and
@@ -727,6 +747,11 @@ class GenomatrixStream(GenotypeStream):
 
     assert genome is not None
     assert isinstance(genome,Genome)
+
+    assert phenome is None or isinstance(phenome,Phenome)
+
+    if phenome is None:
+      phenome = Phenome()
 
     if format not in ('sdat','ldat'):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
@@ -768,6 +793,7 @@ class GenomatrixStream(GenotypeStream):
     self.loci         = loci
     self.models       = models
     self.genome       = genome
+    self.phenome      = phenome
     self.unique       = unique
     self.materialized = materialized
     self.packed       = packed
@@ -898,7 +924,8 @@ class GenomatrixStream(GenotypeStream):
       self.samples = columns
 
   @staticmethod
-  def from_tuples(genos, format, samples=None, loci=None, unique=True, genome=None):
+  def from_tuples(genos, format, samples=None, loci=None, unique=True,
+                         genome=None, phenome=None):
     '''
     Alternate constructor that builds a new GenomatrixStream object from a
     genotype matrix stream with genotypes in a string format.
@@ -915,6 +942,8 @@ class GenomatrixStream(GenotypeStream):
     @type        unique: bool
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
 
     >>> samples = ['s1', 's2', 's3']
     >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
@@ -935,11 +964,12 @@ class GenomatrixStream(GenotypeStream):
     columns,models,genome,genos = encode_genomatrixstream_from_tuples(columns,genos,format,
                                    genome=genome,unique=unique)
     return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
-                                   genome=genome, unique=unique, packed=True, materialized=False)
+                                   genome=genome, phenome=phenome, unique=unique,
+                                   packed=True, materialized=False)
 
   @staticmethod
   def from_strings(genos, format, genorepr, samples=None, loci=None, unique=True,
-               packed=False, genome=None):
+               packed=False, genome=None, phenome=None):
     '''
     Alternate constructor that builds a new GenomatrixStream object from a
     genotype matrix stream with genotypes in a string format.
@@ -961,6 +991,8 @@ class GenomatrixStream(GenotypeStream):
     @type        packed: bool
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     '''
     if format=='ldat':
       columns = samples
@@ -972,7 +1004,8 @@ class GenomatrixStream(GenotypeStream):
     columns,models,genome,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,
                                    genome=genome,unique=unique)
     return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
-                                   genome=genome, unique=unique, packed=True, materialized=False)
+                                   genome=genome, phenome=phenome, unique=unique,
+                                   packed=True, materialized=False)
 
   def to_tuples(self):
     '''
@@ -1028,6 +1061,8 @@ class GenomatrixStream(GenotypeStream):
     @type        unique: bool
     @param       genome: genome descriptor
     @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     @param materialized: flag indicating if this stream is materialized and
                          allows iteration multiple times
     @type  materialized: bool
@@ -1051,6 +1086,7 @@ class GenomatrixStream(GenotypeStream):
     kwargs.setdefault('loci',         self.loci)
     kwargs.setdefault('models',       self.models)
     kwargs.setdefault('genome',       self.genome)
+    kwargs.setdefault('phenome',      self.phenome)
     kwargs.setdefault('unique',       self.unique)
     kwargs.setdefault('materialized', self.materialized)
     kwargs.setdefault('packed',       self.packed)
@@ -1535,7 +1571,6 @@ def recode_genomatrixstream(genos, genome):
       old_locus = genos.genome.loci[locus]
       assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
-      # Get the new model or fix the old model
       genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
                                 location=old_locus.location, strand=old_locus.strand)
 
@@ -1610,7 +1645,6 @@ def recode_genomatrixstream(genos, genome):
         old_locus = genos.genome.loci[locus]
         assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
-        # Get the new model or fix the old model
         genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
                                   location=old_locus.location, strand=old_locus.strand)
 
@@ -2424,6 +2458,8 @@ def combine_unsorted_genotriple_list(triplelist):
   genome = Genome()
   triplelist = [ triples.transformed(recode_models=genome) for triples in triplelist ]
 
+  # FIXME: !!! Merge phenome !!!
+
   # Extract parts of all of the triples
   samples = [ triples.samples  for triples in triplelist ]
   loci    = [ triples.loci     for triples in triplelist ]
@@ -2493,6 +2529,8 @@ def combine_sorted_genotriple_list(triplelist):
   # Normalize all triples to the same models
   genome = Genome()
   triplelist = [ triples.transformed(recode_models=genome) for triples in triplelist ]
+
+  # FIXME: !!! Merge phenome !!!
 
   # Extract parts of all of the triples
   samples = [ triples.samples  for triples in triplelist ]
@@ -3056,6 +3094,8 @@ def merge_genomatrixstream_list(genos, mergefunc):
   genome = Genome()
   genos = [ g.transformed(recode_models=genome) for g in genos ]
 
+  # FIXME: !!! Merge phenome !!!
+
   columns = [ g.columns for g in genos ]
   if all(columns[0]==c for c in columns):
     # Pass-through from merge_genomatrix
@@ -3257,6 +3297,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   elif format == 'ldat' and order != 'locus':
     order = False
 
+  # SLOWPATH: full xtab because of unknown columns or unordered rows
   if columns is None or not order:
     columns,rows,data = xtab(triples, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
     genos  = tuple(izip(rows,data))
@@ -3265,6 +3306,8 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
       models = [ genome.get_model(row) for row in rows ]
     else:
       models = [ genome.get_model(column) for column in columns ]
+
+  # FASTPATH: rowsby using order and known columns
   else:
     columns,genos = rowsby(triples, columns, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
     rows = None
@@ -3288,7 +3331,8 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   else:
     samples,loci = rows,columns
 
-  return GenomatrixStream(genos,format,samples=samples,loci=loci,models=models,genome=genome,unique=True)
+  return GenomatrixStream(genos,format,samples=samples,loci=loci,models=models,
+                                genome=genome,phenome=triples.phenome,unique=True)
 
 
 #######################################################################################
@@ -3641,7 +3685,8 @@ def build_genotriples_from_genomatrix(genos):
                             or sorted(genos.loci)    != list(genos.loci)):
     order = None
 
-  return GenotripleStream(_build(),samples=genos.samples,loci=genos.loci,genome=genos.genome,
+  return GenotripleStream(_build(),samples=genos.samples,loci=genos.loci,
+                                   genome=genos.genome,phenome=genos.phenome,
                                    order=order, unique=genos.unique)
 
 
@@ -3687,6 +3732,33 @@ def _genome_rename(old_genome, locusmap):
   return new_genome,recode
 
 
+def _phenome_rename(old_phenome, samplemap):
+  '''
+  Helper to merge loci
+  '''
+  if not samplemap or old_phenome is None:
+    return old_phenome
+
+  new_phenome = Phenome()
+
+  for old_name in old_phenome.phenos:
+    new_name = samplemap.get(old_name,old_name)
+    _phenome_merge_individuals(old_phenome, old_name, new_phenome, new_name)
+
+  return new_phenome
+
+
+def _phenome_merge_individuals(old_phenome, old_name, new_phenome, new_name):
+  old_phenos = old_phenome.get_phenos(old_name)
+
+  # FIXME: individual name is muddled
+  new_phenome.merge_phenos(new_name,family     = old_phenos.family,
+                                    parent1    = old_phenos.parent1,
+                                    parent2    = old_phenos.parent2,
+                                    phenoclass = old_phenos.phenoclass,
+                                    sex        = old_phenos.sex)
+
+
 def rename_genotriples(triples,samplemap,locusmap):
   '''
   Rename the sample and locus for each genotriple according to the samplemap
@@ -3719,7 +3791,8 @@ def rename_genotriples(triples,samplemap,locusmap):
   samplemap = samplemap or {}
   locusmap  = locusmap  or {}
 
-  genome,recode = _genome_rename(triples.genome, locusmap)
+  genome,recode = _genome_rename(triples.genome,   locusmap)
+  phenome       = _phenome_rename(triples.phenome, samplemap)
 
   def _rename(triples):
     for sample,locus,geno in triples:
@@ -3896,7 +3969,13 @@ def rename_genomatrixstream_column(genos,colmap):
   unique = genos.unique and unique_columns
 
   if genos.format=='ldat':
-    genos = genos.clone(genos.use_stream(), samples=new_columns, unique=unique)
+    phenome = Phenome()
+
+    for old_name in genos.columns:
+      new_name = colmap.get(old_name, old_name)
+      _phenome_merge_individuals(genos.phenome, old_name, phenome, new_name)
+
+    genos = genos.clone(genos.use_stream(), samples=new_columns, phenome=phenome, unique=unique)
   else:
     genome = Genome()
 
@@ -4210,8 +4289,12 @@ def rename_genomatrixstream_row(genos,rowmap):
   else:
     def _rename():
       for sample,row in genos:
-        yield rowmap.get(sample,sample),row
-    new_genos = genos.clone(_rename(),samples=rows,materialized=False)
+        new_name = rowmap.get(sample,sample)
+        _phenome_merge_individuals(genos.phenome, sample, phenome, new_name)
+
+        yield new_name,row
+
+    new_genos = genos.clone(_rename(),samples=rows,phenome=phenome,materialized=False)
 
   return new_genos
 
