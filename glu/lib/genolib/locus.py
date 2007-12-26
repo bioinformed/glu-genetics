@@ -41,7 +41,7 @@ class Locus(object):
   '''
   Locus metadata
   '''
-  __slots__ = ('name','chromosome','fixed','location','strand','model')
+  __slots__ = ('name','model','fixed','chromosome','location','strand')
 
   def __init__(self, name, model=None, fixed=None, chromosome=None, location=None, strand=None):
     self.name       = name
@@ -99,17 +99,7 @@ class Genome(object):
 
     # Fastpath: No merge needed
     if locus is None:
-      locus = self.loci[name] = Locus(name)
-      if model is not None:
-        locus.model = model
-      if fixed is not None:
-        locus.fixed = fixed
-      if chromosome is not None:
-        locus.chromosome = chromosome
-      if location is not None:
-        locus.location = location
-      if strand is not None:
-        locus.strand = strand
+      locus = self.loci[name] = Locus(name,model,fixed,chromosome,location,strand)
       return
 
     # Slowpath: Must check for incompatibilities
@@ -298,7 +288,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
       if lname_index >= n:
         lname = ''
       else:
-        lname = intern(row[lname_index])
+        lname = intern(row[lname_index].strip())
 
       if not lname:
         raise ValueError('Invalid locus file record %d in %s (blank locus name)' % (i+1,namefile(filename)))
