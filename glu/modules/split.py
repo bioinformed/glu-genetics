@@ -163,19 +163,19 @@ def genotriple_multiplexer(triples, samplegroups, locusgroups, sampledefault, lo
       yield key,None,(sample,locus,geno)
 
 
-def getWriter(filename,format,genome=None,header=None,genorepr=None,maxrows=None):
+def getWriter(filename,format,genome=None,phenome=None,header=None,genorepr=None,maxrows=None):
   if maxrows:
-    return RollingWriter(filename,format,genome,maxrows,header,genorepr)
+    return RollingWriter(filename,format,genome,phenome,maxrows,header,genorepr)
   elif format in ('ldat','sdat'):
     return TextGenomatrixWriter(filename,format,header,genorepr=genorepr)
   elif format == 'lbat':
-    return BinaryGenomatrixWriter(filename,'ldat',header,genome)
+    return BinaryGenomatrixWriter(filename,'ldat',header,genome,phenome)
   elif format == 'sbat':
-    return BinaryGenomatrixWriter(filename,'sdat',header,genome)
+    return BinaryGenomatrixWriter(filename,'sdat',header,genome,phenome)
   elif format in ('tdat','trip','genotriple'):
     return TextGenotripleWriter(filename,genorepr)
   elif format == 'tbat':
-    return BinaryGenotripleWriter(filename,genome)
+    return BinaryGenotripleWriter(filename,genome,phenome)
   else:
     raise ValueError('Unknown format')
 
@@ -186,10 +186,11 @@ class RollingWriter(object):
   number of rows per file.  Once that limit is reached, another file is
   opened.
   '''
-  def __init__(self, filename, format, genome, maxrows, header=None, genorepr=None):
+  def __init__(self, filename, format, genome, phenome, maxrows, header=None, genorepr=None):
     self.filename = filename
     self.format   = format
     self.genome   = genome
+    self.phenome  = phenome
     self.maxrows  = maxrows
     self.header   = header
     self.genorepr = genorepr
@@ -210,7 +211,8 @@ class RollingWriter(object):
       prefix,suffix = split_fullname(self.filename,'')
       filename = build_filename(prefix + '_part', suffix, (self.cycles,) )
 
-    self.writer = getWriter(filename,self.format,self.genome,header=self.header,genorepr=self.genorepr)
+    self.writer = getWriter(filename,self.format,self.genome,self.phenome,
+                                     header=self.header,genorepr=self.genorepr)
 
   def writerow(self, *row):
     if self.rows >= self.maxrows:
@@ -242,12 +244,13 @@ class FileMap(object):
   Container for TextGenomatrixWriter and RollingTextGenomatrixWriter objects
   stored by a key tuple.
   '''
-  def __init__(self, prefix, suffix, format, genome, outformat=None, genorepr=None, maxrows=None):
+  def __init__(self, prefix, suffix, format, genome, phenome, outformat=None, genorepr=None, maxrows=None):
     self.writers   = {}
     self.prefix    = prefix
     self.suffix    = suffix
     self.format    = format
     self.genome    = genome
+    self.phenome   = phenome
     self.outformat = outformat or format
     self.genorepr  = genorepr
     self.maxrows   = maxrows
@@ -265,8 +268,9 @@ class FileMap(object):
     if writer is None:
       filename = build_filename(self.prefix, self.suffix, keys)
 
-      writer = getWriter(filename,self.outformat,self.genome,header=header,
-                                  genorepr=self.genorepr,maxrows=self.maxrows)
+      writer = getWriter(filename,self.outformat,self.genome,self.phenome,
+                                  header=header,genorepr=self.genorepr,
+                                  maxrows=self.maxrows)
 
       self.writers[keys] = writer
 
@@ -336,7 +340,7 @@ def split(genos, outformat, prefix, suffix, options):
   samplegroups = load_map(options.samplegroups,unique=False,default=options.defaultsamplegroup) if options.samplegroups else None
 
   if samplegroups is not None or locusgroups is not None:
-    filecache = FileMap(prefix,suffix,genos.format,genos.genome,outformat=outformat,
+    filecache = FileMap(prefix,suffix,genos.format,genos.genome,genos.phenome,outformat=outformat,
                         genorepr=options.genorepr,maxrows=options.maxrows)
 
     if genos.format in ('sdat','ldat'):
@@ -350,8 +354,8 @@ def split(genos, outformat, prefix, suffix, options):
       filecache.emit_sequence(mplx)
 
   elif options.maxrows:
-    writer = RollingWriter('%s.%s' % (prefix,suffix),outformat,genome=genos.genome,header=header,
-                                     genorepr=options.genorepr,maxrows=options.maxrows)
+    writer = RollingWriter('%s.%s' % (prefix,suffix),outformat,genome=genos.genome,phenome=genos.phenome,
+                                     header=header,genorepr=options.genorepr,maxrows=options.maxrows)
     with writer:
       writer.writerows(genos)
 
@@ -408,8 +412,8 @@ def main():
 
   options.genorepr = get_genorepr(options.genorepr)
 
-  genos    = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                    genome=options.loci,hyphen=sys.stdin)
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                  genome=options.loci,hyphen=sys.stdin)
 
   outformat = guess_outformat(args[0]) or options.format or genos.format
   split(genos, outformat, prefix, suffix, options)

@@ -32,12 +32,13 @@ from   glu.lib.utils             import izip_exact, gcdisabled
 from   glu.lib.fileutils         import compressed_filename
 
 from   glu.lib.genolib.locus     import Genome, Locus
+from   glu.lib.genolib.phenos    import Phenome
 from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
 
-GENOMATRIX_COMPAT_VERSION,GENOMATRIX_VERSION=1,2
-GENOTRIPLE_COMPAT_VERSION,GENOTRIPLE_VERSION=1,2
+GENOMATRIX_COMPAT_VERSION,GENOMATRIX_VERSION=1,3
+GENOTRIPLE_COMPAT_VERSION,GENOTRIPLE_VERSION=1,3
 
 
 class TripleDesc(tables.IsDescription):
@@ -63,13 +64,19 @@ class BinaryGenomatrixWriter(object):
   Object to write the genotype matrix data to a compressed binary file
 
   '''
-  def __init__(self,filename,format,header,genome,compress=True,scratch=16*1024*1024):
+  def __init__(self,filename,format,header,genome,phenome,compress=True,scratch=16*1024*1024):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
     @param       format: text string output in the first header field to
                          indicate data format (default is blank)
     @type        format: str
+    @param       header: column lables
+    @type        header: list of str
+    @param       genome: genome descriptor
+    @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     @param     compress: flag indicating if compression should be used when writing a binary genotype file.
                          Default is True.
     @type      compress: bool
@@ -85,7 +92,7 @@ class BinaryGenomatrixWriter(object):
     >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
     >>> import tempfile
     >>> f = tempfile.NamedTemporaryFile()
-    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.loci,genos.genome) as writer:
+    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.loci,genos.genome,genos.phenome) as writer:
     ...   writer.writerows(genos)
     >>> genos = load_genomatrix_binary(f.name,'sdat')
     >>> genos.format
@@ -105,7 +112,7 @@ class BinaryGenomatrixWriter(object):
     ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
     ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
     >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
-    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.samples,genos.genome) as writer:
+    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.samples,genos.genome,genos.phenome) as writer:
     ...   writer.writerows(genos)
     >>> genos = load_genomatrix_binary(f.name,'ldat')
     >>> genos.format
@@ -128,6 +135,7 @@ class BinaryGenomatrixWriter(object):
     self.format   = format
     self.header   = header
     self.genome   = genome
+    self.phenome  = phenome
 
     self.scratch  = scratch
     self.state    = NOTOPEN
@@ -275,13 +283,16 @@ class BinaryGenomatrixWriter(object):
     save_strings(gfile, 'cols', self.header,  filters=self.filters)
 
     if self.format == 'ldat':
-      loci = self.rowkeys
+      loci    = self.rowkeys
+      samples = self.header
     else:
-      loci = self.header
+      loci    = self.header
+      samples = self.rowkeys
 
     save_models(gfile, loci, self.genome, self.models, filters=self.filters)
+    save_phenos(gfile, samples, self.phenome, filters=self.filters)
 
-    self.rowkeys = self.header = self.genome = self.models = None
+    self.rowkeys = self.header = self.genome = self.models = self.phenome = None
 
     gfile.close()
 
@@ -326,7 +337,7 @@ class BinaryGenotripleWriter(object):
   ...            ('s2', 'l2', ('C','C'))]
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> trips = iter(triples)
-  >>> with BinaryGenotripleWriter(f.name,triples.genome) as w:
+  >>> with BinaryGenotripleWriter(f.name,triples.genome,triples.phenome) as w:
   ...   w.writerow(*trips.next())
   ...   w.writerow(*trips.next())
   ...   w.writerows(trips)
@@ -337,10 +348,14 @@ class BinaryGenotripleWriter(object):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  def __init__(self,filename,genome,compress=True,chunksize=232960):
+  def __init__(self,filename,genome,phenome,compress=True,chunksize=232960):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
+    @param       genome: genome descriptor
+    @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     @param     compress: flag indicating if compression should be used when writing a binary genotype file.
                          Default is True.
     @type      compress: bool
@@ -350,7 +365,8 @@ class BinaryGenotripleWriter(object):
     if compressed_filename(filename):
       raise IOError('Binary genotype files must not have a compressed extension')
 
-    self.genome = genome
+    self.genome  = genome
+    self.phenome = phenome
 
     # Initialize self.gfile in case the next statement fails for __del__
     self.gfile = None
@@ -358,7 +374,7 @@ class BinaryGenotripleWriter(object):
     self.gfile = tables.openFile(filename,mode='w')
 
     # V1 attributes
-    self.gfile.root._v_attrs.format     = 'genotriple'
+    self.gfile.root._v_attrs.format = 'genotriple'
 
     # V2 attributes
     self.gfile.root._v_attrs.GLU_FORMAT         = 'genotriple'
@@ -469,6 +485,9 @@ class BinaryGenotripleWriter(object):
     save_strings(gfile,'loci',   loci,   filters=self.filters)
 
     save_models(gfile,loci,self.genome,models,filters=self.filters)
+    save_phenos(gfile,samples,self.phenome,filters=self.filters)
+
+    self.genome = self.phenome = None
 
     gfile.close()
 
@@ -521,7 +540,7 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  with BinaryGenotripleWriter(filename,triples.genome,compress=compress,
+  with BinaryGenotripleWriter(filename,triples.genome,triples.phenome,compress=compress,
                                        chunksize=chunksize) as writer:
     writer.writerows(triples)
 
@@ -576,14 +595,14 @@ def load_genotriples_binary(filename,unique=True,genome=None):
   samples = map(str,gfile.root.samples[:])
   loci    = map(str,gfile.root.loci[:])
 
-  file_genome,models = load_models(gfile,loci,version)
+  file_genome,models = load_models(gfile,loci,version,compat_version)
+  phenome = load_phenos(gfile,samples,version,compat_version)
 
   def _load():
     for row in gfile.root.genotypes:
       locusid = row[1]
       yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
     gfile.close()
-
 
   # FIXME: Order must be restored
   genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique,genome=file_genome)
@@ -747,21 +766,25 @@ def save_models(gfile, loci, genome, models, filters=None):
   save_strings(gfile,'model_alleles',alleles,filters=filters)
 
 
-def load_models(gfile,loci,version):
+def load_models(gfile,loci,version,compat_version):
   '''
   Load models from an HDF5 binary genotype file
 
   Implements model compression upon input.
 
-  @param   gfile: output file
-  @type    gfile: PyTables HDF5 file instance
+  @param          gfile: output file
+  @type           gfile: PyTables HDF5 file instance
+  @param        version: genotype file version number
+  @type         version: int
+  @param compat_version: genotype file version backward compatibility number
+  @type  compat_version: int
   '''
   if version == 1:
     return load_models_v1(gfile,loci)
-  elif version == 2:
+  elif version in (2,3) or compat_version in (2,3):
     return load_models_v2(gfile,loci)
   else:
-    raise ValueError('Unknown Genotriple file version: %s' % version)
+    raise ValueError('Unknown genotype file version: %s' % version)
 
 
 def load_models_v1(gfile,loci):
@@ -850,6 +873,139 @@ def load_models_v2(gfile,loci):
     return Genome(loci=locs),models
 
 
+#######################################################################################
+
+
+def save_phenos(gfile, samples, phenome, filters=None):
+  '''
+  Save the phenotypes associated with the specified list of samples to an
+  open HDF5 file instance.  A series of table are created with the
+  following attributes:
+
+  /phenotypes, table of:
+    sample     : int32
+    family     : int32
+    subject    : int32
+    parent1    : int32
+    parent2    : int32
+    phenoclass : int32
+    sex        : int32
+
+  /names, list of family, subject and parent strings
+  /pheno_strings, list if phenoclass strings
+
+  @param   gfile: output file
+  @type    gfile: PyTables HDF5 file instance
+  @param samples: samples to be saved
+  @type  samples: list of str
+  @param phenome: phenome descriptor
+  @type  phenome: Phenome instance
+  @param filters: compression and filter settings to apply
+  @type  filters: PyTables HDF5 file filter instance
+  '''
+  namemap  = {None:0}
+  phenomap = {None:0}
+
+  #####
+  # WRITE LOCUS MODELS: vector of locus -> model index
+  #
+  # Collect and collapse redundant models and write index array
+  # also, collect an index array of alleles to write later
+  class PhenotypeDesc(tables.IsDescription):
+    sample     = tables.Int32Col(pos=0)
+    family     = tables.Int32Col(pos=1)
+    subject    = tables.Int32Col(pos=2)
+    parent1    = tables.Int32Col(pos=3)
+    parent2    = tables.Int32Col(pos=4)
+    phenoclass = tables.Int32Col(pos=5)
+    sex        = tables.Int32Col(pos=6)
+
+  phenotypes = gfile.createTable(gfile.root, 'phenotypes', PhenotypeDesc,
+                                             'basic phenotype data',
+                                             filters=filters, expectedrows=len(samples))
+
+  if phenome:
+    pheno_row = phenotypes.row
+    for sampleid,sample in enumerate(samples):
+      phenos = phenome.phenos.get(sample)
+
+      if phenos is None:
+        continue
+
+      pheno_row['sample']     = sampleid
+      pheno_row['family']     =  namemap.setdefault(phenos.family,     len(namemap))
+      pheno_row['subject']    =  namemap.setdefault(phenos.subject,    len(namemap))
+      pheno_row['parent1']    =  namemap.setdefault(phenos.parent1,    len(namemap))
+      pheno_row['parent2']    =  namemap.setdefault(phenos.parent2,    len(namemap))
+      pheno_row['phenoclass'] = phenomap.setdefault(phenos.phenoclass, len(phenomap))
+      pheno_row['sex']        = phenos.sex or 0
+
+      pheno_row.append()
+
+  phenotypes.flush()
+
+  # Smash namemap and phenomap down to an ordered list of tuples
+  names  = map(itemgetter(0), sorted( namemap.iteritems(), key=itemgetter(1)))
+  phenos = map(itemgetter(0), sorted(phenomap.iteritems(), key=itemgetter(1)))
+  names[0] = phenos[0] = ''
+
+  save_strings(gfile,'names', names, filters=filters)
+  save_strings(gfile,'pheno_strings',phenos,filters=filters)
+
+
+def load_phenos(gfile,samples,version,compat_version):
+  '''
+  Load models from an HDF5 binary genotype file
+
+  Implements model compression upon input.
+
+  @param          gfile: output file
+  @type           gfile: PyTables HDF5 file instance
+  @param        samples: list of sample names
+  @type         samples: list of str
+  @param        version: genotype file version number
+  @type         version: int
+  @param compat_version: genotype file version backward compatibility number
+  @type  compat_version: int
+  '''
+  if version < 3:
+    return Phenome()
+  elif version == 3 or compat_version == 3:
+    return load_phenos_v3(gfile,samples)
+  else:
+    raise ValueError('Unknown genotype file version: %s' % version)
+
+
+def load_phenos_v3(gfile,samples):
+  '''
+  Load phenome from an HDF5 binary genotype file
+
+  Implements model compression upon input.
+
+  @param   gfile: output file
+  @type    gfile: PyTables HDF5 file instance
+  '''
+  names  = map(str,gfile.root.names[:])
+  pstrs  = map(str,gfile.root.pheno_strings[:])
+  phenos = gfile.root.phenotypes[:]
+
+  names[0] = pstrs[0] = None
+
+  phenome = Phenome()
+  for sample,family,subject,parent1,parent2,phenoclass,sex in phenos:
+    phenome.merge_phenos(samples[sample],
+                           names[family],
+                           names[subject],
+                           names[parent1],
+                           names[parent2],
+                           pstrs[phenoclass],
+                           sex)
+  return phenome
+
+
+#######################################################################################
+
+
 def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
   '''
   Write the genotype matrix data to file.
@@ -905,7 +1061,7 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
   ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
   ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
   '''
-  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,genos.genome,
+  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,genos.genome,genos.phenome,
                                        compress=compress,scratch=scratch) as writer:
     writer.writerows(genos.transformed(repack=True))
 
@@ -998,7 +1154,8 @@ def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=409
     if len(set(rows)) != len(rows):
       raise ValueError('Non-unique column identifiers')
 
-  file_genome,models = load_models(gfile,loci,version)
+  file_genome,models = load_models(gfile,loci,version,compat_version)
+  phenome = load_phenos(gfile,samples,version,compat_version)
 
   if format == format_found == 'sdat':
     def _load():
@@ -1124,7 +1281,7 @@ def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=409
       gfile.close()
 
   genos = GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,genome=file_genome,
-                                         unique=unique,packed=True)
+                                         phenome=phenome,unique=unique,packed=True)
 
   if genome:
     genos = genos.transformed(recode_models=genome)
