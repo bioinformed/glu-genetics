@@ -35,8 +35,8 @@ from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN,
                                         PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
 
 
-__all__ = ['PlinkWriter', 'PlinkWriter',
-           'save_plink', 'load_plink_ped' ]
+__all__ = ['PlinkPedWriter',
+           'save_plink_ped', 'load_plink_ped' ]
 
 
 ALLELE_MAP = {None:'0'}
@@ -170,7 +170,7 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
   return GenomatrixStream.from_tuples(_load_plink(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
 
 
-class PlinkWriter(object):
+class PlinkPedWriter(object):
   '''
   Object to write the genotype matrix data to a text file
 
@@ -198,18 +198,17 @@ class PlinkWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with PlinkWriter(o,genos.loci) as w:
+  >>> with PlinkPedWriter(o,genos.loci,genos.genome,genos.phenome) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
   ...   w.writerows(genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  sdat  l1      l2      l3
-  s1    AA              CT
-  s2    AG      CG      CC
-  s3    GG              CT
+  s1 s1 0 0 ? 0 A A 0 0 C T
+  s2 s2 0 0 ? 0 A G C G C C
+  s3 s3 0 0 ? 0 G G 0 0 C T
   '''
-  def __init__(self,filename,loci,mapfile,genome,dialect='tsv'):
+  def __init__(self,filename,loci,genome,phenome,mapfile=None,dialect='tsv'):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -223,26 +222,19 @@ class PlinkWriter(object):
     @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @type       dialect: str or csv dialect object
     '''
-    if genorepr is None:
-      raise ValueError('genotype representation must be specified when reading a text genotype format')
-
-    self.out       = csv.writer(autofile(filename,'w'),dialect=dialect)
+    self.out       = autofile(filename,'wb')
     self.loci      = loci
+    self.genome    = genome
+    self.phenome   = phenome
+    self.mapfile   = mapfile
 
-    self.write_map(mapfile,loci,genome)
-
-
-    self.out.writerow( [format]+[h.strip() for h in self.header] )
-
-  def writerow(self, sample, genos):
+  def writerow(self, sample, genos, phenome=None):
     '''
     Write a row of genotypes given the row key and list of genotypes
 
     @param rowkey: row identifier
     @type  rowkey: str
-    @param  genos: sequence of genotypes in an internal representation, to
-                   be converted to the appropiate string representation by
-                   the supplied genorepr class.
+    @param  genos: sequence of genotypes in an internal representation
     @type   genos: sequence
     '''
     out = self.out
@@ -252,19 +244,38 @@ class PlinkWriter(object):
     if len(genos) != len(self.loci):
       raise ValueError('[ERROR] Internal error: Genotypes do not match header')
 
-    row = [sample,sample,'0','0','?','0']
-    for g in samplegenos:
-      row += [ ALLELE_MAP[a] for a in g ]
-    out.write('%s\n' % ' '.join(row))
+    if phenome is None:
+      phenome = self.phenome
+    if phenome is None:
+      phenome = Phenome()
 
-  def writerows(self, rows):
+    phenos     = phenome.get_phenos(sample)
+    family     = phenos.family
+    individual = phenos.individual or sample
+    parent1    = phenos.parent1
+    parent2    = phenos.parent2
+
+    if parent1 and parent2:
+      p1 = phenome.get_phenos(parent1)
+      p2 = phenome.get_phenos(parent2)
+      if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
+        parent1,parent2 = parent2,parent1
+
+    sex   = {SEX_UNKNOWN:'?', SEX_MALE:'1', SEX_FEMALE:'2'}[phenos.sex]
+    pheno = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}[phenos.phenoclass]
+
+    row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
+    for g in genos:
+      row += [ ALLELE_MAP.get(a,a) for a in g ]
+    out.write(' '.join(row))
+    out.write('\r\n')
+
+  def writerows(self, rows, phenome=None):
     '''
     Write rows of genotypes given pairs of row key and list of genotypes
 
     @param rows: sequence of pairs of row key and sequence of genotypes in
-                 an internal representation, to be converted to the
-                 appropiate string representation by the supplied genorepr
-                 class.
+                 an internal representation
     @type  rows: sequence of (str,sequence)
     '''
     out = self.out
@@ -273,13 +284,37 @@ class PlinkWriter(object):
 
     n = len(self.loci)
 
-    for rowkey,genos in rows:
+    if phenome is None:
+      phenome = self.phenome
+    if phenome is None:
+      phenome = Phenome()
+
+    for sample,genos in rows:
       if len(genos) != n:
         raise ValueError('[ERROR] Internal error: Genotypes do not match header')
-      row = [sample,sample,'0','0','?','0']
+
+      phenos     = phenome.get_phenos(sample)
+      family     = phenos.family
+      individual = phenos.individual or sample
+      parent1    = phenos.parent1
+      parent2    = phenos.parent2
+
+      if parent1 and parent2:
+        p1 = phenome.get_phenos(parent1)
+        p2 = phenome.get_phenos(parent2)
+        if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
+          parent1,parent2 = parent2,parent1
+
+      sex   = {SEX_UNKNOWN:'?', SEX_MALE:'1', SEX_FEMALE:'2'}[phenos.sex]
+      pheno = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}[phenos.phenoclass]
+
+      row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
+
       for g in genos:
-        row += [ ALLELE_MAP[a] for a in g ]
-      out.write('%s\n' % ' '.join(row))
+        row += [ ALLELE_MAP.get(a,a) for a in g ]
+
+      out.write(' '.join(row))
+      out.write('\r\n')
 
   def close(self):
     '''
@@ -291,6 +326,8 @@ class PlinkWriter(object):
     if self.out is None:
       raise IOError('Writer object already closed')
     self.out = None
+
+    # FIXME: Write mapfile
 
   def __enter__(self):
     '''
@@ -305,7 +342,7 @@ class PlinkWriter(object):
     self.close()
 
 
-def save_plink(filename,genos,genome):
+def save_plink_ped(filename,genos,mapfile=None):
   '''
   Write the genotype matrix data to file.
 
@@ -321,15 +358,14 @@ def save_plink(filename,genos,genome):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_plink(o,genos,snp)
+  >>> save_plink_ped(o,genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  sdat	l1	l2	l3
-  s1	AA	  	CT
-  s2	AG	CG	CC
-  s3	GG	  	CT
+  s1 s1 0 0 ? 0 A A 0 0 C T
+  s2 s2 0 0 ? 0 A G C G C C
+  s3 s3 0 0 ? 0 G G 0 0 C T
   '''
   genos = genos.as_sdat()
-  with PlinkWriter(filename, genos.loci) as writer:
+  with PlinkPedWriter(filename, genos.loci, genos.genome, genos.phenome, mapfile) as writer:
     writer.writerows(genos)
 
 

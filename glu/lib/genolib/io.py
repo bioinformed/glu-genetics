@@ -32,7 +32,7 @@ from   glu.lib.genolib.formats   import *
 
 
 INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped')
-OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat')
+OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped')
 
 
 def guess_informat(filename):
@@ -317,6 +317,8 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     save_genomatrix_binary(filename, genos.as_sdat(mergefunc), compress=compress)
   elif format == 'tbat':
     save_genotriples_binary(filename, genos.as_genotriples(), compress=compress)
+  elif format in ('plink_ped','ped'):
+    save_plink_ped(filename, genos.as_sdat(mergefunc))
   elif not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:

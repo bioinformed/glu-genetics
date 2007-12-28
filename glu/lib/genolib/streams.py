@@ -3741,6 +3741,7 @@ def _phenome_rename(old_phenome, samplemap):
 
   new_phenome = Phenome()
 
+  # FIXME: Parents are not renamed correctly
   for old_name in old_phenome.phenos:
     new_name = samplemap.get(old_name,old_name)
     _phenome_merge_individuals(old_phenome, old_name, new_phenome, new_name)
@@ -3752,6 +3753,7 @@ def _phenome_merge_individuals(old_phenome, old_name, new_phenome, new_name):
   old_phenos = old_phenome.get_phenos(old_name)
 
   # FIXME: individual name is muddled
+  # FIXME: Parents are not renamed correctly
   new_phenome.merge_phenos(new_name,family     = old_phenos.family,
                                     parent1    = old_phenos.parent1,
                                     parent2    = old_phenos.parent2,
