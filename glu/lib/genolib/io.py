@@ -31,8 +31,8 @@ from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.formats   import *
 
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped')
-OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped')
+INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped')
+OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped')
 
 
 def guess_informat(filename):
@@ -241,6 +241,8 @@ def load_genostream(filename, extra_args=None, **kwargs):
     genos = load_genotriples_binary(filename,unique=unique,genome=genome)
   elif format in ('plink_ped','ped'):
     genos = load_plink_ped(filename,unique=unique,genome=genome,extra_args=args)
+  elif format in ('plink_tped','tped'):
+    genos = load_plink_tped(filename,unique=unique,genome=genome,extra_args=args)
   elif not format:
     raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
@@ -319,6 +321,8 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     save_genotriples_binary(filename, genos.as_genotriples(), compress=compress)
   elif format in ('plink_ped','ped'):
     save_plink_ped(filename, genos.as_sdat(mergefunc))
+  elif format in ('plink_tped','tped'):
+    save_plink_tped(filename, genos.as_ldat(mergefunc))
   elif not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:
@@ -399,7 +403,7 @@ def transform_files(infiles,informat,ingenorepr,
   if outformat is None:
     outformat = informat
 
-  if outformat in ('ldat','lbat'):
+  if outformat in ('ldat','lbat','tped'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
   elif outformat in ('sdat','sbat','ped'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
