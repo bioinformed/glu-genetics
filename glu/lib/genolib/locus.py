@@ -203,7 +203,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   2
   >>> alleles
   []
-  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  >>> for lname,max_alleles,alleles,chromosome,location,strand in loci:
   ...   print lname,max_alleles,alleles,chromosome,location
   l1 2 ['A', 'C'] 1 0
   l2 2 [] None None
@@ -216,7 +216,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   4
   >>> alleles
   ['A', 'C', 'G', 'T']
-  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  >>> for lname,max_alleles,alleles,chromosome,location,strand in loci:
   ...   print lname,max_alleles,alleles,chromosome,location
   l1 2 ['A', 'C'] 1 0
   l2 4 ['A', 'C', 'G', 'T'] None None
@@ -229,7 +229,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   >>> f.write(l)
   >>> f.flush()
   >>> max_alleles,alleles,loci = load_locus_records(f.name + ':max_alleles=4:alleles=A,C,G,T')
-  >>> for lname,max_alleles,alleles,chromosome,location in loci:
+  >>> for lname,max_alleles,alleles,chromosome,location,strand in loci:
   ...   print lname,max_alleles,alleles,chromosome,location
   l1 2 ['A', 'C'] 1 0
   l2 4 ['A', 'C', 'G', 'T'] None None
