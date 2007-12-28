@@ -38,9 +38,15 @@ __all__ = ['PlinkPedWriter',  'PlinkTPedWriter',
            'save_plink_tped', 'load_plink_tped' ]
 
 
-ALLELE_MAP = {None:'0'}
+ALLELE_MAP  = {'0':None}
+ALLELE_RMAP = {None:'0'}
+
 SEX_MAP    = {'1':SEX_MALE,'2':SEX_FEMALE}
+SEX_RMAP   = {SEX_UNKNOWN:'0', SEX_MALE:'1', SEX_FEMALE:'2'}
+
 PHENO_MAP  = {'1':PHENO_UNAFFECTED, '2':PHENO_AFFECTED}
+PHENO_RMAP = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}
+
 PARENT_MAP = {'0':None}
 
 
@@ -128,8 +134,6 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
   n     = 6 + 2*len(loci)
 
   def _load_plink():
-    amap  = {'0':None,'A':'A','C':'C','G':'G','T':'T','1':'1','2':'2','3':'3','4':'4'}
-
     for line_num,line in enumerate(gfile):
       if not line or line.startswith('#'):
         continue
@@ -161,7 +165,7 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
 
         phenome.merge_phenos(ename, family, name, efather, emother, sex, pheno)
 
-        fields = [ amap.get(a,a) for a in islice(fields,6,None) ]
+        fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,6,None) ]
         genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
 
       yield ename,genos
@@ -263,12 +267,12 @@ class PlinkPedWriter(object):
       if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
         parent1,parent2 = parent2,parent1
 
-    sex   = {SEX_UNKNOWN:'?', SEX_MALE:'1', SEX_FEMALE:'2'}[phenos.sex]
-    pheno = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}[phenos.phenoclass]
+    sex   = SEX_RMAP[phenos.sex]
+    pheno = PHENO_RMAP[phenos.phenoclass]
 
     row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
     for g in genos:
-      row += [ ALLELE_MAP.get(a,a) for a in g ]
+      row += [ ALLELE_RMAP.get(a,a) for a in g ]
     out.write(' '.join(row))
     out.write('\r\n')
 
@@ -307,13 +311,13 @@ class PlinkPedWriter(object):
         if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
           parent1,parent2 = parent2,parent1
 
-      sex   = {SEX_UNKNOWN:'?', SEX_MALE:'1', SEX_FEMALE:'2'}[phenos.sex]
-      pheno = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}[phenos.phenoclass]
+      sex   = SEX_RMAP[phenos.sex]
+      pheno = PHENO_RMAP[phenos.phenoclass]
 
       row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
 
       for g in genos:
-        row += [ ALLELE_MAP.get(a,a) for a in g ]
+        row += [ ALLELE_RMAP.get(a,a) for a in g ]
 
       out.write(' '.join(row))
       out.write('\r\n')
@@ -472,8 +476,6 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
   n     = 4 + 2*len(samples)
 
   def _load_plink():
-    amap  = {'0':None,'A':'A','C':'C','G':'G','T':'T','1':'1','2':'2','3':'3','4':'4'}
-
     for line_num,line in enumerate(gfile):
       if not line or line.startswith('#'):
         continue
@@ -494,7 +496,7 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
 
         genome.merge_locus(lname, chromosome=chr, location=pdist)
 
-        fields = [ amap.get(a,a) for a in islice(fields,4,None) ]
+        fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,4,None) ]
         genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
 
       yield lname,genos
@@ -569,7 +571,7 @@ class PlinkTPedWriter(object):
     row = map(str,[loc.chromosome or 0,locus,0,loc.location or 0] )
 
     for g in genos:
-      row += [ ALLELE_MAP.get(a,a) for a in g ]
+      row += [ ALLELE_RMAP.get(a,a) for a in g ]
 
     out.write(' '.join(row))
     out.write('\r\n')
@@ -597,7 +599,7 @@ class PlinkTPedWriter(object):
       row = map(str,[loc.chromosome or 0,locus,0,loc.location or 0] )
 
       for g in genos:
-        row += [ ALLELE_MAP.get(a,a) for a in g ]
+        row += [ ALLELE_RMAP.get(a,a) for a in g ]
 
       out.write(' '.join(row))
       out.write('\r\n')
@@ -632,8 +634,8 @@ class PlinkTPedWriter(object):
           if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
             parent1,parent2 = parent2,parent1
 
-        sex   = {SEX_UNKNOWN:'?', SEX_MALE:'1', SEX_FEMALE:'2'}[phenos.sex]
-        pheno = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}[phenos.phenoclass]
+        sex   = SEX_RMAP[phenos.sex]
+        pheno = PHENO_RMAP[phenos.phenoclass]
 
         row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
         out.write( ' '.join(row))

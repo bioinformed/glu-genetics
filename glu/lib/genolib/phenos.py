@@ -224,10 +224,10 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
         parent2 = intern(row[parent2].strip()) or None
 
       if sex_index is not None and sex_index<n:
-        sex = SEX_MAP[row[sex].strip()]
+        sex = SEX_MAP[row[sex].strip().upper()]
 
       if pheno_index is not None and pheno_index<n:
-        pheno = PHENO_MAP.get(row[pheno],PHENO_UNKNOWN)
+        pheno = PHENO_MAP.get(row[pheno].upper(),PHENO_UNKNOWN)
 
       if family is not None:
         name    = '%s:%s' % (family,ind)
