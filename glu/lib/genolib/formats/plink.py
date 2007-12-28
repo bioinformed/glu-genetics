@@ -31,6 +31,8 @@ from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.reprs     import snp
 from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN, \
+                                        PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
 
 
 __all__ = ['PlinkWriter', 'PlinkWriter',
@@ -38,6 +40,9 @@ __all__ = ['PlinkWriter', 'PlinkWriter',
 
 
 ALLELE_MAP = {None:'0'}
+SEX_MAP    = {'1':SEX_MALE,'2':SEX_FEMALE}
+PHENO_MAP  = {'1':PHENO_UNAFFECTED, '2':PHENO_AFFECTED}
+PARENT_MAP = {'0':None}
 
 
 def load_plink_map(filename,genome):
@@ -67,7 +72,7 @@ def load_plink_map(filename,genome):
     yield lname
 
 
-def load_plink_ped(filename,genome=None,unique=True,extra_args=None,**kwargs):
+def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
   '''
   Load a Plink format genotype data file.
 
@@ -102,6 +107,9 @@ def load_plink_ped(filename,genome=None,unique=True,extra_args=None,**kwargs):
   if genome is None:
     genome = Genome()
 
+  if phenome is None:
+    phenome = Phenome()
+
   if loci is not None:
     if isinstance(loci,basestring):
       loci = list(load_locus_records(loci)[2])
@@ -133,14 +141,33 @@ def load_plink_ped(filename,genome=None,unique=True,extra_args=None,**kwargs):
         if len(fields) != n:
           raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
 
-        sample = '%s_%s' % (fields[0],fields[1])
+        family,name,father,mother,sex,pheno = [ s.strip() for s in fields[:6] ]
+
+        if name == '0':
+          raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
+
+        father  = PARENT_MAP.get(father,father)
+        mother  = PARENT_MAP.get(mother,mother)
+
+        ename   = '%s:%s' % (family,name)
+        efather = '%s:%s' % (family,father) if father else None
+        emother = '%s:%s' % (family,mother) if mother else None
+        sex     = SEX_MAP.get(sex,SEX_UNKNOWN)
+        pheno   = PHENO_MAP.get(pheno,PHENO_UNKNOWN)
+
+        if father:
+          phenome.merge_phenos(efather, family, father, sex=SEX_MALE)
+        if mother:
+          phenome.merge_phenos(emother, family, mother, sex=SEX_FEMALE)
+
+        phenome.merge_phenos(ename, family, name, efather, emother, sex, pheno)
 
         fields = [ amap.get(a,a) for a in islice(fields,6,None) ]
         genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
 
-      yield sample,genos
+      yield ename,genos
 
-  return GenomatrixStream.from_tuples(_load_plink(),'sdat',loci=loci,genome=genome,unique=unique)
+  return GenomatrixStream.from_tuples(_load_plink(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
 
 
 class PlinkWriter(object):

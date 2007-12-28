@@ -18,16 +18,23 @@ from collections               import defaultdict
 from glu.lib.fileutils         import namefile,load_table,get_arg,tryint,parse_augmented_filename
 from glu.lib.genolib.genoarray import model_from_alleles
 
-UNKNOWN,MALE,FEMALE = range(3)
 
-SEXMAP = {'':UNKNOWN, '?':UNKNOWN,
-          '1':MALE,   'M':MALE,   'MALE':MALE,
-          '2':FEMALE, 'F':FEMALE, 'FEMALE':FEMALE}
+SEX_UNKNOWN,SEX_MALE,SEX_FEMALE = None,0,1
+PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED = None,0,1
+
+SEX_MAP = { '':SEX_UNKNOWN, '?':SEX_UNKNOWN,
+           '1':SEX_MALE,    'M':SEX_MALE,     'MALE':SEX_MALE,
+           '2':SEX_FEMALE,  'F':SEX_FEMALE, 'FEMALE':SEX_FEMALE}
+
+PHENO_MAP = {  '':PHENO_UNKNOWN,    '?':PHENO_UNKNOWN,    'UNKNOWN':PHENO_UNKNOWN,
+              '0':PHENO_UNAFFECTED, '-':PHENO_UNAFFECTED, 'UNAFFECTED':PHENO_UNAFFECTED,
+              '1':PHENO_AFFECTED,   '+':PHENO_AFFECTED,   'AFFECTED':PHENO_AFFECTED}
+
 
 class Nothing(object): pass
 
 
-# FIXME: Try various cases
+# FIXME: Try various cases, accept aliases
 def _get_header(filename,hmap,header,required=False):
   index = hmap.get(header,[])
 
@@ -46,17 +53,17 @@ class Phenotypes(object):
   '''
   Locus metadata
   '''
-  __slots__ = ('name','family','individual','parent1','parent2','phenoclass','sex')
+  __slots__ = ('name','family','individual','parent1','parent2','sex','phenoclass')
 
   def __init__(self, name, family=None, individual=None, parent1=None, parent2=None,
-                           phenoclass=None, sex=UNKNOWN):
+                           sex=SEX_UNKNOWN, phenoclass=None):
     self.name       = name
     self.family     = family
     self.individual = individual
     self.parent1    = parent1
     self.parent2    = parent2
-    self.phenoclass = phenoclass
     self.sex        = sex
+    self.phenoclass = phenoclass
 
 
 class Phenome(object):
@@ -73,7 +80,7 @@ class Phenome(object):
     self.phenos = dict( (pheno.name,pheno) for pheno in phenos or [])
 
   def set_phenos(self, name, family=Nothing, individual=Nothing, parent1=Nothing, parent2=Nothing,
-                             phenoclass=Nothing, sex=Nothing):
+                             sex=Nothing, phenoclass=Nothing):
     '''
     FIXME: docstring
     '''
@@ -89,13 +96,13 @@ class Phenome(object):
       pheno.parent1 = parent1
     if parent2 is not Nothing:
       pheno.parent2 = parent2
-    if phenoclass is not Nothing:
-      pheno.phenoclass = phenoclass
     if sex is not Nothing:
       pheno.sex = sex
+    if phenoclass is not Nothing:
+      pheno.phenoclass = phenoclass
 
   def merge_phenos(self, name, family=None, individual=None, parent1=None, parent2=None,
-                              phenoclass=None, sex=UNKNOWN):
+                               sex=SEX_UNKNOWN, phenoclass=None):
     '''
     FIXME: docstring
     '''
@@ -103,7 +110,7 @@ class Phenome(object):
 
     # Fastpath: No merge needed
     if pheno is None:
-      self.phenos[name] = Phenotypes(name,family,individual,parent1,parent2,phenoclass,sex)
+      self.phenos[name] = Phenotypes(name,family,individual,parent1,parent2,sex,phenoclass)
       return
 
     # Slowpath: Must check for incompatibilities
@@ -131,17 +138,17 @@ class Phenome(object):
       elif pheno.parent2 is not parent2:
         raise ValueError('Incompatible parent2')
 
-    if phenoclass is not None:
-      if pheno.phenoclass is None:
-        pheno.phenoclass = phenoclass
-      elif pheno.phenoclass is not phenoclass:
-        raise ValueError('Incompatible phenoclass')
-
-    if sex is not UNKNOWN:
-      if pheno.sex is UNKNOWN:
+    if sex is not SEX_UNKNOWN:
+      if pheno.sex is SEX_UNKNOWN:
         pheno.sex = sex
       elif pheno.sex is not sex:
         raise ValueError('Incompatible sex')
+
+    if phenoclass is not PHENO_UNKNOWN:
+      if pheno.phenoclass is PHENO_UNKNOWN:
+        pheno.phenoclass = phenoclass
+      elif pheno.phenoclass is not phenoclass:
+        raise ValueError('Incompatible phenoclass')
 
   def get_phenos(self, name):
     '''
@@ -180,13 +187,13 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
   for i,h in enumerate(header):
     hmap[h].append(i)
 
-  # FIXME: Add aliases
+  # FIXME: Add aliases (MOTHER AND FATHER!!!)
   ind_index     = _get_header(filename,hmap,'NAME',required=True)
   family_index  = _get_header(filename,hmap,'FAMILY')
   parent1_index = _get_header(filename,hmap,'PARENT1')
   parent2_index = _get_header(filename,hmap,'PARENT2')
-  pheno_index   = _get_header(filename,hmap,'PHENO')
   sex_index     = _get_header(filename,hmap,'SEX')
+  pheno_index   = _get_header(filename,hmap,'PHENO')
 
   def _phenos():
     for i,row in enumerate(rows):
@@ -203,8 +210,9 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
       if not ind:
         raise ValueError('Invalid phenotype record %d in %s (blank individual name)' % (i+1,namefile(filename)))
 
-      family = individual = parent1 = parent2 = phenoclass = None
-      sex = UNKNOWN
+      family = individual = parent1 = parent2 = None
+      sex    = SEX_UNKNOWN
+      pheno  = PHENO_UNKNOWN
 
       if family_index is not None and family_index<n:
         family = intern(row[family].strip()) or None
@@ -215,18 +223,20 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
       if parent2_index is not None and parent2_index<n:
         parent2 = intern(row[parent2].strip()) or None
 
-      if pheno_index is not None and pheno_index<n:
-        pheno = intern(row[pheno].strip()) or None
-
       if sex_index is not None and sex_index<n:
-        sex = SEXMAP[row[sex].strip()]
+        sex = SEX_MAP[row[sex].strip()]
+
+      if pheno_index is not None and pheno_index<n:
+        pheno = PHENO_MAP.get(row[pheno],PHENO_UNKNOWN)
 
       if family is not None:
-        name = '%s:%s' % (ind,family)
+        name    = '%s:%s' % (family,ind)
+        parent1 = '%s:%s' % (family,parent1) if parent1 else None
+        parent2 = '%s:%s' % (family,parent2) if parent2 else None
       else:
         name = ind
 
-      yield name,family,individual,parent1,parent2,phenoclass,sex
+      yield name,family,individual,parent1,parent2,sex,phenoclass
 
   return _pheno()
 
@@ -242,8 +252,12 @@ def load_phenome(filename,**kwargs):
 
   phenome = Phenome()
 
-  for p in phenos:
-    phenome.merge_phenos(*p)
+  for name,family,individual,parent1,parent2,sex,phenoclass in phenos:
+    if parent1:
+      phenome.merge_phenos(parent1)
+    if parent2:
+      phenome.merge_phenos(parent2)
+    phenome.merge_phenos(name,family,individual,parent1,parent2,sex,phenoclass)
 
   return phenome
 

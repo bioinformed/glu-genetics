@@ -22,6 +22,14 @@ from glu.lib.genolib.genoarray import model_from_alleles
 class Nothing(object): pass
 
 
+STRAND_UNKNOWN,STRAND_FORWARD,STRAND_REVERSE = None,'+','-'
+
+STRAND_MAP = {'+':STRAND_FORWARD, 'F':STRAND_FORWARD, 'FORWARD':STRAND_FORWARD,
+              '-':STRAND_REVERSE, 'R':STRAND_REVERSE, 'REVERSE':STRAND_REVERSE,
+               '':STRAND_UNKNOWN, 'U':STRAND_UNKNOWN, 'UNKNOWN':STRAND_UNKNOWN,
+              '?':STRAND_UNKNOWN}
+
+
 # FIXME: Try various cases
 def _get_header(filename,hmap,header,required=False):
   index = hmap.get(header,[])
@@ -43,7 +51,7 @@ class Locus(object):
   '''
   __slots__ = ('name','model','fixed','chromosome','location','strand')
 
-  def __init__(self, name, model=None, fixed=None, chromosome=None, location=None, strand=None):
+  def __init__(self, name, model=None, fixed=None, chromosome=None, location=None, strand=STRAND_UNKNOWN):
     self.name       = name
     self.model      = model
     self.fixed      = fixed
@@ -91,7 +99,7 @@ class Genome(object):
       locus.strand = strand
 
   def merge_locus(self, name, model=None, fixed=None, chromosome=None,
-                              location=None, strand=None):
+                              location=None, strand=STRAND_UNKNOWN):
     '''
     FIXME: docstring
     '''
@@ -127,8 +135,8 @@ class Genome(object):
       elif locus.location != location:
         raise ValueError('Incompatible locations')
 
-    if strand is not None:
-      if locus.strand is None:
+    if strand is not STRAND_UNKNOWN:
+      if locus.strand is STRAND_UNKNOWN:
         locus.strand = strand
       elif locus.strand != strand:
         raise ValueError('Incompatible strands')
@@ -277,6 +285,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   alleles_index     = _get_header(filename,hmap,'ALLELES')
   chromosome_index  = _get_header(filename,hmap,'CHROMOSOME')
   location_index    = _get_header(filename,hmap,'LOCATION')
+  strand_index      = _get_header(filename,hmap,'STRAND')
 
   def _loci():
     for i,row in enumerate(rows):
@@ -324,7 +333,11 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
         if loc:
           location = int(loc)
 
-      yield lname,max_alleles,alleles,chromosome,location
+      strand = None
+      if strand_index is not None and strand_index<n:
+        strand = intern(row[chromosome_index].strip()) or None
+
+      yield lname,max_alleles,alleles,chromosome,location,strand
 
   return default_max_alleles,default_alleles,_loci()
 
@@ -339,12 +352,12 @@ def populate_genome(genome,loci,modelcache=None):
   if modelcache is None:
     modelcache = {}
 
-  for lname,max_alleles,alleles,chromosome,location in loci:
+  for lname,max_alleles,alleles,chromosome,location,strand in loci:
     key   = (max_alleles,)+tuple(sorted(alleles))
     model = modelcache.get(key)
     if model is None:
       model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
-    genome.merge_locus(lname, model, bool(alleles), chromosome, location)
+    genome.merge_locus(lname, model, bool(alleles), chromosome, location, strand)
 
 
 def load_genome(filename,modelcache=None,**kwargs):

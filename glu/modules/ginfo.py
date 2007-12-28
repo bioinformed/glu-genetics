@@ -21,8 +21,13 @@ Revision:      $Id: $
 import sys
 import csv
 
-from   glu.lib.fileutils     import autofile, namefile, hyphen
-from   glu.lib.genolib.io    import load_genostream
+from   itertools              import chain
+
+from   glu.lib.fileutils      import autofile, namefile, hyphen
+
+from   glu.lib.genolib.io     import load_genostream
+from   glu.lib.genolib.phenos import SEX_UNKNOWN,SEX_MALE,SEX_FEMALE, \
+                                     PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
 
 
 def emit(filename,rows):
@@ -50,8 +55,6 @@ def option_parser():
                      help='Output the list of loci to FILE')
   parser.add_option('--outputsamples',dest='outputsamples', metavar='FILE',
                      help='Output the list of samples to FILE')
-  parser.add_option('--outputmodels',  dest='outputmodels', metavar='FILE',
-                     help='Output the genotype models (alleles for each locus) to FILE')
   return parser
 
 
@@ -78,30 +81,52 @@ def main():
   if genos.samples is not None:
     out.write('sample count: %d\n' % len(genos.samples))
     if options.outputsamples:
-      emit(options.outputsamples,([s] for s in genos.samples) )
+
+      def _samples():
+        yield ['SAMPLE','FAMILY','INDIVIDUAL','PARENT1','PARENT2','SEX','PHENOCLASS']
+
+        phenome = genos.phenome or Phenome()
+
+        for sample in genos.samples:
+          phenos = genos.phenome.get_phenos(sample)
+          sex    = {SEX_UNKNOWN:'',SEX_MALE:'MALE',SEX_FEMALE:'FEMALE'}[phenos.sex]
+          pheno  = {PHENO_UNKNOWN:'',PHENO_UNAFFECTED:'UNAFFECTED',PHENO_AFFECTED:'AFFECTED'}[phenos.phenoclass]
+
+          yield [sample, phenos.family or '', phenos.individual,
+                         phenos.parent1 or '', phenos.parent2 or '',
+                         sex, pheno]
+
+      emit(options.outputsamples,_samples())
 
   if genos.loci is not None:
     out.write('locus  count: %d\n' % len(genos.loci))
-    if options.outputloci:
-      emit(options.outputloci, ([l] for l in genos.loci))
 
-  if None not in (genos.samples,genos.loci):
     if genos.format == 'genotriple':
       models = [ genos.genome.get_model(locus) for locus in genos.loci ]
     else:
       models = genos.models
 
-    out.write('model  count: %d\n' % len(set(models)))
-    if options.outputmodels:
-      def _models():
-        for locus,model in genos.model_pairs:
-          loc = genos.genome.get_locus(locus)
-          assert loc.model is model
+    known_models = None not in (genos.loci,genos.samples) or all(m.fixed for m in models)
+  else:
+    models = None
+    known_models = False
 
-          yield [locus, str(model.max_alleles), ','.join(sorted(model.alleles[1:])),
+  if known_models:
+    out.write('model  count: %d\n' % len(set(models)))
+
+    if options.outputloci:
+      def _loci():
+        yield ['LOCUS','MAX_ALLELES','ALLELES','CHROMOSOME','LOCATION','STRAND']
+        for locus in genos.loci:
+          loc = genos.genome.get_locus(locus)
+
+          yield [locus, str(loc.model.max_alleles), ','.join(sorted(loc.model.alleles[1:])),
                         loc.chromosome or '', loc.location or '', loc.strand or '']
 
-      emit(options.outputmodels,_models())
+      emit(options.outputloci,_loci())
+
+  elif genos.loci is not None and options.outputloci:
+    emit(options.outputloci, chain([['LOCUS']],([l] for l in genos.loci)))
 
 
 if __name__=='__main__':

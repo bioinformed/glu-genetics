@@ -32,7 +32,7 @@ from   glu.lib.utils             import izip_exact, gcdisabled
 from   glu.lib.fileutils         import compressed_filename
 
 from   glu.lib.genolib.locus     import Genome, Locus
-from   glu.lib.genolib.phenos    import Phenome
+from   glu.lib.genolib.phenos    import Phenome, SEX_UNKNOWN, PHENO_UNKNOWN
 from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
@@ -761,6 +761,7 @@ def save_models(gfile, loci, genome, models, filters=None):
   # WRITE MODEL_ALLELES: sequence of allele strings
   #
   # Used to re-construct model objects.  Ordered list of all possible alleles
+  assert '' not in allelemap
   alleles = map(itemgetter(0), sorted(allelemap.iteritems(),  key=itemgetter(1)))
   alleles[0] = ''
   save_strings(gfile,'model_alleles',alleles,filters=filters)
@@ -888,11 +889,10 @@ def save_phenos(gfile, samples, phenome, filters=None):
     subject    : int32
     parent1    : int32
     parent2    : int32
-    phenoclass : int32
     sex        : int32
+    phenoclass : int32
 
   /names, list of family, subject and parent strings
-  /pheno_strings, list if phenoclass strings
 
   @param   gfile: output file
   @type    gfile: PyTables HDF5 file instance
@@ -904,7 +904,6 @@ def save_phenos(gfile, samples, phenome, filters=None):
   @type  filters: PyTables HDF5 file filter instance
   '''
   namemap  = {None:0}
-  phenomap = {None:0}
 
   #####
   # WRITE LOCUS MODELS: vector of locus -> model index
@@ -914,11 +913,11 @@ def save_phenos(gfile, samples, phenome, filters=None):
   class PhenotypeDesc(tables.IsDescription):
     sample     = tables.Int32Col(pos=0)
     family     = tables.Int32Col(pos=1)
-    subject    = tables.Int32Col(pos=2)
+    individual = tables.Int32Col(pos=2)
     parent1    = tables.Int32Col(pos=3)
     parent2    = tables.Int32Col(pos=4)
-    phenoclass = tables.Int32Col(pos=5)
-    sex        = tables.Int32Col(pos=6)
+    sex        = tables.Int32Col(pos=5)
+    phenoclass = tables.Int32Col(pos=6)
 
   phenotypes = gfile.createTable(gfile.root, 'phenotypes', PhenotypeDesc,
                                              'basic phenotype data',
@@ -932,25 +931,27 @@ def save_phenos(gfile, samples, phenome, filters=None):
       if phenos is None:
         continue
 
+      sex        = phenos.sex        if phenos.sex        is not SEX_UNKNOWN   else -1
+      phenoclass = phenos.phenoclass if phenos.phenoclass is not PHENO_UNKNOWN else -1
+
       pheno_row['sample']     = sampleid
       pheno_row['family']     =  namemap.setdefault(phenos.family,     len(namemap))
-      pheno_row['subject']    =  namemap.setdefault(phenos.subject,    len(namemap))
+      pheno_row['individual'] =  namemap.setdefault(phenos.individual, len(namemap))
       pheno_row['parent1']    =  namemap.setdefault(phenos.parent1,    len(namemap))
       pheno_row['parent2']    =  namemap.setdefault(phenos.parent2,    len(namemap))
-      pheno_row['phenoclass'] = phenomap.setdefault(phenos.phenoclass, len(phenomap))
-      pheno_row['sex']        = phenos.sex or 0
+      pheno_row['sex']        = sex
+      pheno_row['phenoclass'] = phenoclass
 
       pheno_row.append()
 
   phenotypes.flush()
 
-  # Smash namemap and phenomap down to an ordered list of tuples
+  # Smash namemap down to an ordered list of tuples
+  assert '' not in namemap
   names  = map(itemgetter(0), sorted( namemap.iteritems(), key=itemgetter(1)))
-  phenos = map(itemgetter(0), sorted(phenomap.iteritems(), key=itemgetter(1)))
-  names[0] = phenos[0] = ''
+  names[0] = ''
 
   save_strings(gfile,'names', names, filters=filters)
-  save_strings(gfile,'pheno_strings',phenos,filters=filters)
 
 
 def load_phenos(gfile,samples,version,compat_version):
@@ -986,20 +987,24 @@ def load_phenos_v3(gfile,samples):
   @type    gfile: PyTables HDF5 file instance
   '''
   names  = map(str,gfile.root.names[:])
-  pstrs  = map(str,gfile.root.pheno_strings[:])
   phenos = gfile.root.phenotypes[:]
 
-  names[0] = pstrs[0] = None
+  names[0] = None
 
   phenome = Phenome()
-  for sample,family,subject,parent1,parent2,phenoclass,sex in phenos:
+  for sample,family,individual,parent1,parent2,sex,phenoclass in phenos:
+    if sex == -1:
+      sex = SEX_UNKNOWN
+    if phenoclass == -1:
+      phenoclass = PHENO_UNKNOWN
+
     phenome.merge_phenos(samples[sample],
                            names[family],
-                           names[subject],
+                           names[individual],
                            names[parent1],
                            names[parent2],
-                           pstrs[phenoclass],
-                           sex)
+                           sex,
+                           phenoclass)
   return phenome
 
 
