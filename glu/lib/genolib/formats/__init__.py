@@ -19,3 +19,4 @@ from   glu.lib.genolib.formats.binary     import *
 from   glu.lib.genolib.formats.prettybase import *
 from   glu.lib.genolib.formats.hapmap     import *
 from   glu.lib.genolib.formats.plink      import *
+from   glu.lib.genolib.formats.merlin     import *
