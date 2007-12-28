@@ -22,11 +22,9 @@ import csv
 
 from   textwrap              import fill
 
-from   glu.lib.utils         import autofile
-from   glu.lib.fileutils     import percent
+from   glu.lib.utils         import percent, pair_generator
+from   glu.lib.fileutils     import autofile
 from   glu.lib.union_find    import union_find
-
-from   dupcheck              import generate_pairs
 
 
 def duplicate_output_concordance(data, details=False):
@@ -55,7 +53,7 @@ def locus_concordance(dupsets, genos, locus_ids):
     for dset in dupsets:
       g = [ (ind,genos[ind][i+1]) for ind in dset if genos[ind][i+1] ]
 
-      for (i1,g1),(i2,g2) in generate_pairs(g):
+      for (i1,g1),(i2,g2) in pair_generator(g):
         if g1==g2:
           conc+=1
         else:

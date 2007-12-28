@@ -46,9 +46,10 @@ class ols(object):
     Step 2: Get specific metrics
 
       To print the coefficients:
-        >>> print m.b
+      > print m.b
+
       To print the coefficients p-values:
-        >>> print m.p
+      > print m.p
   '''
 
   def __init__(self,y,x,y_varnm = 'y',x_varnm = ''):

@@ -73,8 +73,8 @@ def option_parser():
 
 def window(loci,n):
   '''
-  >>> list(window(range(10),3))
-
+  >>> list(window(range(5),3))
+  [([], 0, [1, 2, 3]), ([0], 1, [2, 3, 4]), ([], 2, [3, 4]), ([0, 1, 2], 3, [4]), ([1, 2, 3], 4, [])]
   '''
   import collections
 
