@@ -217,9 +217,9 @@ class PlinkPedWriter(object):
   ...   w.writerow(*genos.next())
   ...   w.writerows(genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  s1 s1 0 0 ? 0 A A 0 0 C T
-  s2 s2 0 0 ? 0 A G C G C C
-  s3 s3 0 0 ? 0 G G 0 0 C T
+  s1 s1 0 0 0 0 A A 0 0 C T
+  s2 s2 0 0 0 0 A G C G C C
+  s3 s3 0 0 0 0 G G 0 0 C T
   >>> print m.getvalue() # doctest: +NORMALIZE_WHITESPACE
   0 l1 0 0
   0 l2 0 0
@@ -384,9 +384,9 @@ def save_plink_ped(filename,genos,mapfile=None):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> save_plink_ped(o,genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  s1 s1 0 0 ? 0 A A 0 0 C T
-  s2 s2 0 0 ? 0 A G C G C C
-  s3 s3 0 0 ? 0 G G 0 0 C T
+  s1 s1 0 0 0 0 A A 0 0 C T
+  s2 s2 0 0 0 0 A G C G C C
+  s3 s3 0 0 0 0 G G 0 0 C T
   '''
   genos = genos.as_sdat()
   with PlinkPedWriter(filename, genos.loci, genos.genome, genos.phenome, mapfile) as writer:
@@ -537,9 +537,9 @@ class PlinkTPedWriter(object):
   0 l2 0 0 0 0 C G 0 0
   0 l3 0 0 C T C C C T
   >>> print m.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  s1 s1 0 0 ? 0
-  s2 s2 0 0 ? 0
-  s3 s3 0 0 ? 0
+  s1 s1 0 0 0 0
+  s2 s2 0 0 0 0
+  s3 s3 0 0 0 0
   '''
   def __init__(self,filename,samples,genome,phenome,tfamfile=None):
     '''
