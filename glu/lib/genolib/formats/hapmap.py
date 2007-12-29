@@ -92,7 +92,7 @@ def load_hapmap(filename,genome=None):
       if not model:
         model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
 
-      loc = genome.merge_locus(locus, model, True, chromosome, position, strand)
+      genome.merge_locus(locus, model, True, chromosome, position, strand)
 
       yield locus,genos
 
