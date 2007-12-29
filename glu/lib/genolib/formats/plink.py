@@ -73,13 +73,16 @@ def load_plink_map(filename,genome):
     if len(fields) != 4:
       raise ValueError('Invalid PLINK MAP record %d' % (i+1))
 
-    chr   = fields[0] or None
+    chr   = fields[0]
     lname = fields[1]
     gdist = int(fields[2])      if fields[2] else None
     pdist = abs(int(fields[3])) if fields[3] else None
 
     if not lname:
       raise ValueError('Invalid PLINK MAP record %d' % (i+1))
+
+    if chr == '0':
+      chr = None
 
     genome.merge_locus(lname, chromosome=chr, location=pdist)
 
@@ -96,6 +99,8 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
   @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param      phenome: phenome descriptor
+  @type       phenome: Phenome instance
   @param   extra_args: optional dictionary to store extraneous arguments, instead of
                        raising an error.
   @type    extra_args: dict
@@ -184,24 +189,7 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
 
 class PlinkPedWriter(object):
   '''
-  Object to write the genotype matrix data to a text file
-
-  Genotype matrix files are delimited ASCII files with the following format:
-
-  format	heading1	heading2	heading2	...
-  rowkey1	G11		G12		G13		...
-  rowkey2	G21		G22		G23		...
-  rowkey3	G31		G32		G33		...
-  ...
-
-  All rows must have the same number of columns, as determined by the header
-  supplied, with each subsequent data row conforming.  Headers and row keys
-  are user-specified, although they are typically either sample/subject
-  identifiers and locus identifiers, although which are mapped to rows and
-  columns is arbitrary.  When loci are given in rows, the format is
-  typically 'ldat' and when samples are given in rows the format is
-  typically 'sdat'.  However, these formatting issues are handled at a
-  higher level by callers of TextGenomatrixWriter.
+  Object to write a matrix data to a PLINK PED file
 
   >>> loci =           ('l1',      'l2',      'l3')
   >>> rows = [('s1', [('A','A'),(None,None),('C','T')]),
@@ -231,11 +219,12 @@ class PlinkPedWriter(object):
     @type      filename: str or file object
     @param       format: data format string
     @type        format: str
-    @param       header: column headings
-    @type        header: list or str
-    @param     genorepr: object representing the input/output encoding and
-                         internal representation of genotypes
-    @type      genorepr: UnphasedMarkerRepresentation or similar object
+    @param         loci: locus names
+    @type          loci: list of str
+    @param       genome: genome descriptor
+    @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     '''
     self.out       = autofile(filename,'wb')
     self.loci      = loci
@@ -440,10 +429,12 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param       unique: rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param      phenome: phenome descriptor
+  @type       phenome: Phenome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
   @param   extra_args: optional dictionary to store extraneous arguments, instead of
                        raising an error.
   @type    extra_args: dict
@@ -503,6 +494,9 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
         if not lname:
           raise ValueError('Invalid PLINK TPED record %d' % (i+1))
 
+        if chr == '0':
+          chr = None
+
         genome.merge_locus(lname, chromosome=chr, location=pdist)
 
         fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,4,None) ]
@@ -547,11 +541,12 @@ class PlinkTPedWriter(object):
     @type      filename: str or file object
     @param       format: data format string
     @type        format: str
-    @param       header: column headings
-    @type        header: list or str
-    @param     genorepr: object representing the input/output encoding and
-                         internal representation of genotypes
-    @type      genorepr: UnphasedMarkerRepresentation or similar object
+    @param      samples: sample names
+    @type       samples: list of str
+    @param       genome: genome descriptor
+    @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
     '''
     self.out       = autofile(filename,'wb')
     self.samples   = samples
@@ -692,6 +687,7 @@ def save_plink_tped(filename,genos,tfamfile=None):
 
 ##############################################################################################
 
+
 def load_plink_bim(filename,genome):
   mfile = autofile(filename)
 
@@ -708,7 +704,7 @@ def load_plink_bim(filename,genome):
     if len(fields) != 6:
       raise ValueError('Invalid PLINK BIM record %d' % (i+1))
 
-    chr     = fields[0] or None
+    chr     = fields[0]
     locus   = fields[1]
     gdist   = int(fields[2])      if fields[2] else None
     pdist   = abs(int(fields[3])) if fields[3] else None
@@ -718,12 +714,16 @@ def load_plink_bim(filename,genome):
     if not locus:
       raise ValueError('Invalid PLINK BIM record %d' % (i+1))
 
+    if chr == '0':
+      chr = None
+
     alleles = []
 
     if allele1 == '0':
       allele1 = None
     else:
       alleles.append(allele1)
+
     if allele2 == '0':
       allele2 = None
     else:
@@ -739,13 +739,12 @@ def load_plink_bim(filename,genome):
     if not model:
       model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
 
-    loc = genome.merge_locus(locus, model, True, chr, pdist)
+    genome.merge_locus(locus, model, True, chr, pdist)
 
     yield locus,allele1,allele2
 
 
 def _plink_decode(model,allele1,allele2):
-  n = len(model.alleles)
   genos = [model.genotypes[0]]*4
 
   if allele1:
@@ -768,10 +767,12 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param       unique: rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param      phenome: phenome descriptor
+  @type       phenome: Phenome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
   @param   extra_args: optional dictionary to store extraneous arguments, instead of
                        raising an error.
   @type    extra_args: dict
@@ -831,15 +832,15 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
     def _load_plink():
       rowbytes = (len(loci)*2+7)//8
 
-      modelcache = {}
+      valuecache = {}
       genovalues = []
 
       for i,(locus,allele1,allele2) in enumerate(bim_loci):
         model = models[i]
-        values = modelcache.get(model)
+        values = valuecache.get(model)
 
         if values is None:
-          values = modelcache[model] = _plink_decode(model,allele1,allele2)
+          values = valuecache[model] = _plink_decode(model,allele1,allele2)
 
         byte,offset = divmod(i,4)
         shift       = 2*offset
@@ -847,7 +848,7 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
         genovalues.append( (byte,shift,values) )
 
       for sample in samples:
-        data  = map(ord,gfile.read(rowbytes))
+        data = map(ord,gfile.read(rowbytes))
         genos = [ values[(data[byte]>>shift)&3] for byte,shift,values in genovalues ]
         yield sample,genos
 
@@ -862,9 +863,16 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
         shift       = 2*offset
         genovalues.append( (byte,shift) )
 
+      valuecache = {}
+
       for (locus,allele1,allele2),model in izip(bim_loci,models):
         data = map(ord,gfile.read(rowbytes))
-        values = _plink_decode(model,allele1,allele2)
+
+        values = valuecache.get(model)
+
+        if values is None:
+          values = valuecache[model] = _plink_decode(model,allele1,allele2)
+
         genos  = [ values[(data[byte]>>shift)&3] for byte,shift in genovalues ]
         yield locus,genos
 
