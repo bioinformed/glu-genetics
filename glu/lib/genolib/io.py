@@ -31,7 +31,7 @@ from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.formats   import *
 
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','mach','merlin')
+INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','bed','mach','merlin')
 OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','mach','merlin')
 
 
@@ -243,6 +243,8 @@ def load_genostream(filename, extra_args=None, **kwargs):
     genos = load_plink_ped(filename,unique=unique,genome=genome,extra_args=args)
   elif format in ('plink_tped','tped'):
     genos = load_plink_tped(filename,unique=unique,genome=genome,extra_args=args)
+  elif format in ('plink_bed','bed'):
+    genos = load_plink_bed(filename,unique=unique,genome=genome,extra_args=args)
   elif format in ('merlin','mach'):
     genos = load_merlin(filename,unique=unique,genome=genome,extra_args=args)
   elif not format:
@@ -325,6 +327,11 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     save_plink_ped(filename, genos.as_sdat(mergefunc))
   elif format in ('plink_tped','tped'):
     save_plink_tped(filename, genos.as_ldat(mergefunc))
+  # FIXME: Not yet
+  #elif format in ('plink_bed','bed'):
+  #  if genos.format not in ('sdat','ldat'):
+  #    genos = genos.as_ldat(mergefunc)
+  #  save_plink_bed(filename, genos)
   elif format in ('merlin','mach'):
     save_merlin(filename, genos.as_sdat(mergefunc))
   elif not format:
@@ -407,9 +414,9 @@ def transform_files(infiles,informat,ingenorepr,
   if outformat is None:
     outformat = informat
 
-  if outformat in ('ldat','lbat','tped'):
+  if outformat in ('ldat','lbat','plink_tped','tped'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
-  elif outformat in ('sdat','sbat','ped','merlin','mach'):
+  elif outformat in ('sdat','sbat','plink_ped','ped','merlin','mach'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
   elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)

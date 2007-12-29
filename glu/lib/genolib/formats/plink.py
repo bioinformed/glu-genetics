@@ -6,7 +6,7 @@ Authors:       Kevin Jacobs (jacobske@bioinformed.com)
 
 Created:       2006-01-01
 
-Abstract:      GLU Plink genotype format input/output objects
+Abstract:      GLU PLINK genotype format input/output objects
 
 Requires:      Python 2.5
 
@@ -19,23 +19,23 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-import re
-import csv
+import os
 
-from   itertools                 import islice
+from   itertools                 import islice,izip
 
 from   glu.lib.utils             import gcdisabled
 from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
+from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN, \
                                         PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
 
 
-__all__ = ['PlinkPedWriter',  'PlinkTPedWriter',
-           'save_plink_ped',  'load_plink_ped',
-           'save_plink_tped', 'load_plink_tped' ]
+__all__ = ['PlinkPedWriter',  'save_plink_ped',  'load_plink_ped',
+           'PlinkTPedWriter', 'save_plink_tped', 'load_plink_tped',
+           'load_plink_bed']
 
 
 ALLELE_MAP  = {'0':None}
@@ -48,6 +48,15 @@ PHENO_MAP  = {'1':PHENO_UNAFFECTED, '2':PHENO_AFFECTED}
 PHENO_RMAP = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}
 
 PARENT_MAP = {'0':None}
+
+
+def guess_file(filename,extensions):
+  prefix,ext = os.path.splitext(filename)
+  for new_ext in extensions:
+    testfile = '%s.%s' % (prefix,new_ext)
+    if os.path.isfile(testfile):
+      return testfile
+  return None
 
 
 def load_plink_map(filename,genome):
@@ -79,7 +88,7 @@ def load_plink_map(filename,genome):
 
 def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
   '''
-  Load a Plink PED format genotype data file.
+  Load a PLINK PED format genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
@@ -101,7 +110,7 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
   filename = parse_augmented_filename(filename,args)
 
   loci = get_arg(args, ['loci'])
-  lmap = get_arg(args, ['map'])
+  lmap = get_arg(args, ['map']) or guess_file(filename,['map'])
 
   if loci is None and lmap is None:
     raise ValueError('Map file or locus list must be specified when loading PLINK PED files')
@@ -427,7 +436,7 @@ def load_plink_tfam(filename,phenome):
 
 def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
   '''
-  Load a Plink TPED format genotype data file.
+  Load a PLINK TPED format genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
@@ -449,7 +458,7 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
   filename = parse_augmented_filename(filename,args)
 
   loci = get_arg(args, ['loci'])
-  tfam = get_arg(args, ['tfam'])
+  tfam = get_arg(args, ['tfam']) or guess_file(filename,['tfam'])
 
   if tfam is None:
     raise ValueError('A TFAM file must be specified when loading PLINK TPED data')
@@ -679,6 +688,191 @@ def save_plink_tped(filename,genos,tfamfile=None):
   genos = genos.as_ldat()
   with PlinkTPedWriter(filename, genos.samples, genos.genome, genos.phenome, tfamfile) as writer:
     writer.writerows(genos)
+
+
+##############################################################################################
+
+def load_plink_bim(filename,genome):
+  mfile = autofile(filename)
+
+  modelcache = {}
+
+  for i,line in enumerate(mfile):
+    line = line.rstrip()
+
+    if not line or line.startswith('#'):
+      continue
+
+    fields = line.split()
+
+    if len(fields) != 6:
+      raise ValueError('Invalid PLINK BIM record %d' % (i+1))
+
+    chr     = fields[0] or None
+    locus   = fields[1]
+    gdist   = int(fields[2])      if fields[2] else None
+    pdist   = abs(int(fields[3])) if fields[3] else None
+    allele1 = fields[4]
+    allele2 = fields[5]
+
+    if not locus:
+      raise ValueError('Invalid PLINK BIM record %d' % (i+1))
+
+    alleles = []
+
+    if allele1 == '0':
+      allele1 = None
+    else:
+      alleles.append(allele1)
+    if allele2 == '0':
+      allele2 = None
+    else:
+      alleles.append(allele2)
+
+    alleles = tuple(alleles)
+
+    model = genome.get_locus(locus).model
+
+    if not model:
+      model = modelcache.get(alleles)
+
+    if not model:
+      model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
+
+    loc = genome.merge_locus(locus, model, True, chr, pdist)
+
+    yield locus,allele1,allele2
+
+
+def _plink_decode(model,allele1,allele2):
+  n = len(model.alleles)
+  genos = [model.genotypes[0]]*4
+
+  if allele1:
+    genos[0] = model.add_genotype( (allele1,allele1) )
+  if allele2:
+    genos[3] = model.add_genotype( (allele2,allele2) )
+  if allele1 and allele2:
+    genos[2] = model.add_genotype( (allele1,allele2) )
+
+  return genos
+
+
+def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
+  '''
+  Load a PLINK BED format genotype data file.
+
+  See http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
+
+  Use undocumented "--make-bed --ind-major" PLINK options to get sdat flavor.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
+  @rtype             : GenomatrixStream
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  gfile = autofile(filename)
+
+  magic = map(ord,gfile.read(2))
+  mode  = ord(gfile.read(1))
+
+  if magic != [0x6c,0x1b]:
+    raise ValueError('Invalid PLINK BED file magic number')
+
+  if mode not in [0,1]:
+    raise ValueError('Invalid PLINK BED file mode')
+
+  loc = get_arg(args, ['loci'])
+  bim = get_arg(args, ['map']) or guess_file(filename,['bim'])
+  fam = get_arg(args, ['fam']) or guess_file(filename,['fam'])
+
+  if bim is None:
+    raise ValueError('BIM file must be specified when loading PLINK BED data')
+
+  if fam is None:
+    raise ValueError('A FAM file must be specified when loading PLINK BED data')
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if genome is None:
+    genome = Genome()
+
+  if phenome is None:
+    phenome = Phenome()
+
+  bim_loci = list(load_plink_bim(bim,genome))
+  loci     = [ l[0] for l in bim_loci ]
+  samples  = list(load_plink_tfam(fam,phenome))
+  models   = [ genome.get_model(locus) for locus in loci ]
+
+  if loc is not None:
+    if isinstance(loc,basestring):
+      loc = list(load_locus_records(loc)[2])
+      # Merge map data into genome
+      populate_genome(genome,loc)
+
+  if mode == 0:
+    format = 'sdat'
+    def _load_plink():
+      rowbytes = (len(loci)*2+7)//8
+
+      modelcache = {}
+      genovalues = []
+
+      for i,(locus,allele1,allele2) in enumerate(bim_loci):
+        model = models[i]
+        values = modelcache.get(model)
+
+        if values is None:
+          values = modelcache[model] = _plink_decode(model,allele1,allele2)
+
+        byte,offset = divmod(i,4)
+        shift       = 2*offset
+
+        genovalues.append( (byte,shift,values) )
+
+      for sample in samples:
+        data  = map(ord,gfile.read(rowbytes))
+        genos = [ values[(data[byte]>>shift)&3] for byte,shift,values in genovalues ]
+        yield sample,genos
+
+  elif mode == 1:
+    format = 'ldat'
+    def _load_plink():
+      rowbytes = (len(samples)*2+7)//8
+
+      genovalues = []
+      for i,sample in enumerate(samples):
+        byte,offset = divmod(i,4)
+        shift       = 2*offset
+        genovalues.append( (byte,shift) )
+
+      for (locus,allele1,allele2),model in izip(bim_loci,models):
+        data = map(ord,gfile.read(rowbytes))
+        values = _plink_decode(model,allele1,allele2)
+        genos  = [ values[(data[byte]>>shift)&3] for byte,shift in genovalues ]
+        yield locus,genos
+
+  return GenomatrixStream(_load_plink(),format,loci=loci,samples=samples,models=models,
+                                        genome=genome,phenome=phenome,unique=unique)
+
+
+###############################################################################################
 
 
 def test():
