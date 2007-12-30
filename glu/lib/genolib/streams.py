@@ -379,7 +379,8 @@ class GenotripleStream(GenotypeStream):
     is equivalent to
 
     GenotripleStream(triples, samples=stream.samples, loci=stream.loci,
-                              order=stream.order, unique=stream.unique,
+                              order=stream.order, genome=stream.genome,
+                              phenome=stream.phenome, unique=stream.unique,
                               materialized=False)
     '''
     kwargs.setdefault('samples',      self.samples)
@@ -1077,8 +1078,9 @@ class GenomatrixStream(GenotypeStream):
     is equivalent to
 
       GenomatrixStream(genos, format=stream.format, samples=stream.samples,
-                              loci=stream.loci, model=models, genome=genome,
-                              unique=stream.unique, materialized=False,
+                              loci=stream.loci, model=stream.models,
+                              genome=stream.genome, phenome=stream.phenome,
+                              unique=stream.unique, materialized=stream.materialized,
                               packed=stream.packed)
     '''
     kwargs.setdefault('format',       self.format)
@@ -1304,6 +1306,52 @@ class GenomatrixStream(GenotypeStream):
     '''
     return merge_genomatrixstream(self, mergefunc)
 
+  def unique_checked(self):
+    '''
+    Return a genomatrix stream that is verified to have unique row and
+    column labels
+
+    Non-unique columns:
+
+    >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
+    >>> genos.unique_checked()
+    Traceback (most recent call last):
+         ...
+    NonUniqueError: Non-unique loci: L1:2
+
+    Non-unique rows:
+
+    >>> loci=('L1','L2')
+    >>> rows=[('R1',['AA','AC']),
+    ...       ('R1',['AA','AC'])]
+    >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+    >>> genos.unique_checked().materialize()
+    Traceback (most recent call last):
+         ...
+    NonUniqueError: Non-unique row name: R1
+
+    Known unique rows and columns:
+
+    >>> loci=('L1','L2')
+    >>> samples=('R1', 'R2')
+    >>> rows=[('R1',['AA','AC']),
+    ...       ('R2',['AA','AC'])]
+    >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci,samples=samples)
+    >>> ugenos = genos.unique_checked()
+    >>> genos is ugenos
+    True
+
+    Known columns, unknown but unique rows:
+
+    >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+    >>> genos = genos.unique_checked()
+    >>> for sample,row in genos:
+    ...   print sample,row
+    R1 [('A', 'A'), ('A', 'C')]
+    R2 [('A', 'A'), ('A', 'C')]
+    '''
+    return unique_check_genomatrixstream(self)
+
   def transposed(self):
     '''
     Return the transpose of this genomatrix stream; the same genotypes but
@@ -1434,6 +1482,94 @@ class GenomatrixStream(GenotypeStream):
       genos = genos.transposed()
 
     return genos
+
+
+#######################################################################################
+
+
+class NonUniqueError(ValueError): pass
+
+
+def unique_check_genomatrixstream(genos):
+  '''
+  Check that all row and column labels of a genomatrix are unique.  Raises
+  a NonUniqueError if they are not.
+
+  @param rows: genotype matrix data with the first row
+               being the column meta-data
+  @type rows: sequence
+
+  Non-unique columns:
+
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
+  >>> unique_check_genomatrixstream(genos)
+  Traceback (most recent call last):
+       ...
+  NonUniqueError: Non-unique loci: L1:2
+
+  Non-unique rows:
+
+  >>> loci=('L1','L2')
+  >>> rows=[('R1',['AA','AC']),
+  ...       ('R1',['AA','AC'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = unique_check_genomatrixstream(genos)
+  >>> list(genos)
+  Traceback (most recent call last):
+       ...
+  NonUniqueError: Non-unique row name: R1
+
+  Known unique rows and columns:
+
+  >>> loci=('L1','L2')
+  >>> samples=('R1', 'R2')
+  >>> rows=[('R1',['AA','AC']),
+  ...       ('R2',['AA','AC'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci,samples=samples)
+  >>> ugenos = unique_check_genomatrixstream(genos)
+  >>> genos is ugenos
+  True
+
+  Known columns, unknown but unique rows:
+
+  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
+  >>> genos = unique_check_genomatrixstream(genos)
+  >>> for sample,row in genos:
+  ...   print sample,row
+  R1 [('A', 'A'), ('A', 'C')]
+  R2 [('A', 'A'), ('A', 'C')]
+  '''
+  assert genos.columns is not None
+
+  if genos.loci is not None:
+    dup_loci = [ (k,n) for k,n in tally(genos.loci).iteritems() if n>1 ]
+    if dup_loci:
+      msg = ','.join( '%s:%d' % kv for kv in dup_loci )
+      raise NonUniqueError('Non-unique loci: %s' % msg)
+
+  if genos.samples is not None:
+    dup_samples = [ (k,n) for k,n in tally(genos.samples).iteritems() if n>1 ]
+    if dup_samples:
+      msg = ','.join( '%s:%d' % kv for kv in dup_samples )
+      raise NonUniqueError('Non-unique samples: %s' % msg)
+
+  # FASTPATH: Unique samples and loci
+  if None not in (genos.samples,genos.loci):
+    genos.unique = True
+    return genos
+
+  # SLOWPATH: Check rows as they stream past
+  def _check():
+    drows = set()
+    for label,row in genos:
+      if label in drows:
+        raise NonUniqueError('Non-unique row name: %s' % label)
+
+      drows.add(label)
+
+      yield label,row
+
+  return genos.clone(_check(),materialized=False,unique=True)
 
 
 #######################################################################################
