@@ -28,12 +28,12 @@ from   itertools                 import izip,groupby,imap
 
 import tables
 
-from   glu.lib.utils             import izip_exact, gcdisabled
-from   glu.lib.fileutils         import compressed_filename
+from   glu.lib.utils             import izip_exact,gcdisabled
+from   glu.lib.fileutils         import parse_augmented_filename,compressed_filename
 
-from   glu.lib.genolib.locus     import Genome, Locus
-from   glu.lib.genolib.phenos    import Phenome, SEX_UNKNOWN, PHENO_UNKNOWN
-from   glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
+from   glu.lib.genolib.locus     import Genome,Locus
+from   glu.lib.genolib.phenos    import Phenome,SEX_UNKNOWN,PHENO_UNKNOWN
+from   glu.lib.genolib.streams   import GenomatrixStream,GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
 
@@ -545,15 +545,12 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
     writer.writerows(triples)
 
 
-def load_genotriples_binary(filename,unique=True,genome=None):
+def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
   @param     filename: a file name or file object
   @type      filename: str or file object
-  @param       unique: flag indicating if repeated row or column elements do not exist
-                       (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
   @return:             sequence of tuples of sample name, locus name, and genotype representation
@@ -574,10 +571,21 @@ def load_genotriples_binary(filename,unique=True,genome=None):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
   if compressed_filename(filename):
     raise IOError('Binary genotype files must not have a compressed extension')
 
-  gfile   = tables.openFile(filename,mode='r')
+  gfile = tables.openFile(filename,mode='r')
 
   format         = _get_v_attr(gfile,['GLU_FORMAT', 'format'])
   version        = _get_v_attr(gfile,['GLU_VERSION','version'],1)
@@ -605,7 +613,7 @@ def load_genotriples_binary(filename,unique=True,genome=None):
     gfile.close()
 
   # FIXME: Order must be restored
-  genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),unique=unique,genome=file_genome)
+  genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),genome=file_genome)
 
   if genome:
     genos = genos.transformed(recode_models=genome)
@@ -1071,7 +1079,7 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
     writer.writerows(genos.transformed(repack=True))
 
 
-def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=4096,scratch=32*1024*1024):
+def load_genomatrix_binary(filename,format,genome=None,chunksize=4096,scratch=32*1024*1024,extra_args=None,**kwargs):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -1082,9 +1090,6 @@ def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=409
   @param       format: text string expected in the first header field to
                        indicate data format, if specified
   @type        format: string
-  @param       unique: flag indicating if repeated row or column elements do not exist
-                       (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
   @param    chunksize: size of chunks to write/compress in bytes
@@ -1125,6 +1130,17 @@ def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=409
   ('l2', [(None, None), ('C', 'T'), ('C', 'T')])
   ('l3', [('T', 'T'), ('G', 'T'), ('G', 'G')])
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
   if compressed_filename(filename):
     raise ValueError('Binary genotype files must not have a compressed extension')
 
@@ -1153,11 +1169,7 @@ def load_genomatrix_binary(filename,format,unique=True,genome=None,chunksize=409
     samples  = columns
     loci     = rows
 
-  if unique:
-    if len(set(columns)) != len(columns):
-      raise ValueError('Non-unique column identifiers')
-    if len(set(rows)) != len(rows):
-      raise ValueError('Non-unique column identifiers')
+  unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
   file_genome,models = load_models(gfile,loci,version,compat_version)
   phenome = load_phenos(gfile,samples,version,compat_version)

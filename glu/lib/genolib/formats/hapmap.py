@@ -19,7 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.fileutils         import autofile,namefile,tryint
+from   glu.lib.fileutils         import autofile,namefile,tryint,parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
@@ -33,7 +33,7 @@ HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID 
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
 
-def load_hapmap(filename,genome=None):
+def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
   '''
   Load a HapMap genotype data file.
 
@@ -41,8 +41,26 @@ def load_hapmap(filename,genome=None):
   @type      filename: str or file object
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
   @rtype             : GenomatrixStream
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  unique = get_arg(args, ['unique'], True)
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
   gfile = autofile(filename)
   gfile = dropwhile(lambda s: s.startswith('#'), gfile)
 
@@ -96,7 +114,12 @@ def load_hapmap(filename,genome=None):
 
       yield locus,genos
 
-  return GenomatrixStream.from_strings(_load_hapmap(),'ldat',hapmap,samples=columns,genome=genome)
+  genos = GenomatrixStream.from_strings(_load_hapmap(),'ldat',hapmap,samples=columns,genome=genome,unique=unique)
+
+  if unique:
+    genos = genos.unique_checked()
+
+  return genos
 
 
 def test():

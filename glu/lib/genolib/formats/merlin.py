@@ -65,16 +65,16 @@ def load_merlin_dat(filename,genome):
     yield lname
 
 
-def load_merlin(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
+def load_merlin(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a Merlin format genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param       unique: rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
   @param   extra_args: optional dictionary to store extraneous arguments, instead of
                        raising an error.
   @type    extra_args: dict
@@ -88,8 +88,9 @@ def load_merlin(filename,genome=None,phenome=None,unique=True,extra_args=None,**
 
   filename = parse_augmented_filename(filename,args)
 
-  loci = get_arg(args, ['loci'])
-  dat  = get_arg(args, ['dat','data']) or guess_related_file(filename,['dat'])
+  unique = get_arg(args, ['unique'], True)
+  loci   = get_arg(args, ['loci'])
+  dat    = get_arg(args, ['dat','data']) or guess_related_file(filename,['dat'])
 
   if loci is None and dat is None:
     raise ValueError('Dat file or locus file must be specified when loading Merlin files')
@@ -158,7 +159,12 @@ def load_merlin(filename,genome=None,phenome=None,unique=True,extra_args=None,**
 
       yield ename,genos
 
-  return GenomatrixStream.from_tuples(_load_merlin(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
+  genos = GenomatrixStream.from_tuples(_load_merlin(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
+
+  if unique:
+    genos = genos.unique_checked()
+
+  return genos
 
 
 class MerlinWriter(object):

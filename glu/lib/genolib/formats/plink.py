@@ -79,18 +79,18 @@ def load_plink_map(filename,genome):
     yield lname
 
 
-def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
+def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK PED format genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param       unique: rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
   @param      phenome: phenome descriptor
   @type       phenome: Phenome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
   @param   extra_args: optional dictionary to store extraneous arguments, instead of
                        raising an error.
   @type    extra_args: dict
@@ -104,8 +104,9 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
 
   filename = parse_augmented_filename(filename,args)
 
-  loci = get_arg(args, ['loci'])
-  lmap = get_arg(args, ['map']) or guess_related_file(filename,['map'])
+  unique = get_arg(args, ['unique'], True)
+  loci   = get_arg(args, ['loci'])
+  lmap   = get_arg(args, ['map']) or guess_related_file(filename,['map'])
 
   if loci is None and lmap is None:
     raise ValueError('Map file or locus list must be specified when loading PLINK PED files')
@@ -174,7 +175,12 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
 
       yield ename,genos
 
-  return GenomatrixStream.from_tuples(_load_plink(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
+  genos = GenomatrixStream.from_tuples(_load_plink(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
+
+  if unique:
+    genos = genos.unique_checked()
+
+  return genos
 
 
 class PlinkPedWriter(object):
@@ -413,7 +419,7 @@ def load_plink_tfam(filename,phenome):
     yield ename
 
 
-def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
+def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK TPED format genotype data file.
 
@@ -438,8 +444,9 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
 
   filename = parse_augmented_filename(filename,args)
 
-  loci = get_arg(args, ['loci'])
-  tfam = get_arg(args, ['tfam','fam']) or guess_related_file(filename,['tfam','fam'])
+  unique = get_arg(args, ['unique'], True)
+  loci   = get_arg(args, ['loci'])
+  tfam   = get_arg(args, ['tfam','fam']) or guess_related_file(filename,['tfam','fam'])
 
   if tfam is None:
     raise ValueError('A TFAM file must be specified when loading PLINK TPED data')
@@ -495,7 +502,12 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
 
       yield lname,genos
 
-  return GenomatrixStream.from_tuples(_load_plink(),'ldat',samples=samples,genome=genome,phenome=phenome,unique=unique)
+  genos = GenomatrixStream.from_tuples(_load_plink(),'ldat',samples=samples,genome=genome,phenome=phenome,unique=unique)
+
+  if unique:
+    genos = genos.unique_checked()
+
+  return genos
 
 
 class PlinkTPedWriter(object):
@@ -748,7 +760,7 @@ def _plink_decode(model,allele1,allele2):
   return genos
 
 
-def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
+def load_plink_bed(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK BED format genotype data file.
 
@@ -762,8 +774,6 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
   @type        genome: Genome instance
   @param      phenome: phenome descriptor
   @type       phenome: Phenome instance
-  @param       unique: rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param   extra_args: optional dictionary to store extraneous arguments, instead of
                        raising an error.
   @type    extra_args: dict
@@ -788,9 +798,10 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
   if mode not in [0,1]:
     raise ValueError('Invalid PLINK BED file mode')
 
-  loc = get_arg(args, ['loci'])
-  bim = get_arg(args, ['map','bim' ]) or guess_related_file(filename,['bim'])
-  fam = get_arg(args, ['fam','tfam']) or guess_related_file(filename,['fam','tfam'])
+  unique = get_arg(args, ['unique'], True)
+  loc    = get_arg(args, ['loci'])
+  bim    = get_arg(args, ['map','bim' ]) or guess_related_file(filename,['bim'])
+  fam    = get_arg(args, ['fam','tfam']) or guess_related_file(filename,['fam','tfam'])
 
   if bim is None:
     raise ValueError('BIM file must be specified when loading PLINK BED data')
@@ -816,6 +827,8 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
     loc = list(load_locus_records(loc)[2])
     # Merge map data into genome
     populate_genome(genome,loc)
+
+  unique = len(set(samples))==len(samples) and len(set(loci))==len(loci)
 
   if mode == 0:
     format = 'sdat'

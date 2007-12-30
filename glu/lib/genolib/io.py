@@ -63,93 +63,6 @@ def guess_outformat(filename):
   return guess_format(filename, OUTPUT_FORMATS)
 
 
-class NonUniqueError(ValueError): pass
-
-
-def unique_check_genomatrixstream(genos):
-  '''
-  Check that all row and column labels of a genomatrix are unique.  Raises
-  a NonUniqueError if they are not.
-
-  @param rows: genotype matrix data with the first row
-               being the column meta-data
-  @type rows: sequence
-
-  >>> from glu.lib.genolib.reprs import snp
-
-  Non-unique columns:
-
-  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
-  >>> unique_check_genomatrixstream(genos)
-  Traceback (most recent call last):
-       ...
-  NonUniqueError: Non-unique loci: L1:2
-
-  Non-unique rows:
-
-  >>> loci=('L1','L2')
-  >>> rows=[('R1',['AA','AC']),
-  ...       ('R1',['AA','AC'])]
-  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
-  >>> genos = unique_check_genomatrixstream(genos)
-  >>> list(genos)
-  Traceback (most recent call last):
-       ...
-  NonUniqueError: Non-unique row name: R1
-
-  Known unique rows and columns:
-
-  >>> loci=('L1','L2')
-  >>> samples=('R1', 'R2')
-  >>> rows=[('R1',['AA','AC']),
-  ...       ('R2',['AA','AC'])]
-  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci,samples=samples)
-  >>> ugenos = unique_check_genomatrixstream(genos)
-  >>> genos is ugenos
-  True
-
-  Known columns, unknown but unique rows:
-
-  >>> genos = GenomatrixStream.from_strings(rows,'sdat',snp,loci=loci)
-  >>> genos = unique_check_genomatrixstream(genos)
-  >>> for sample,row in genos:
-  ...   print sample,row
-  R1 [('A', 'A'), ('A', 'C')]
-  R2 [('A', 'A'), ('A', 'C')]
-  '''
-  assert genos.columns is not None
-
-  if genos.loci is not None:
-    dup_loci = [ (k,n) for k,n in tally(genos.loci).iteritems() if n>1 ]
-    if dup_loci:
-      msg = ','.join( '%s:%d' % kv for kv in dup_loci )
-      raise NonUniqueError('Non-unique loci: %s' % msg)
-
-  if genos.samples is not None:
-    dup_samples = [ (k,n) for k,n in tally(genos.samples).iteritems() if n>1 ]
-    if dup_samples:
-      msg = ','.join( '%s:%d' % kv for kv in dup_samples )
-      raise NonUniqueError('Non-unique samples: %s' % msg)
-
-  # FASTPATH: Unique samples and loci
-  if None not in (genos.samples,genos.loci):
-    genos.unique = True
-    return genos
-
-  # SLOWPATH: Check rows as they stream past
-  def _check():
-    drows = set()
-    for label,row in genos:
-      if label in drows:
-        raise NonUniqueError('Non-unique row name: %s' % label)
-
-      drows.add(label)
-
-      yield label,row
-
-  return genos.clone(_check(),unique=True)
-
-
 def load_genostream(filename, extra_args=None, **kwargs):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
@@ -201,11 +114,9 @@ def load_genostream(filename, extra_args=None, **kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  hyphen    = get_arg(args, ['hyphen'])
-  format    = get_arg(args, ['format'])
-  genome    = get_arg(args, ['genome'])
-  genorepr  = get_arg(args, ['genorepr']) or 'snp'
-  unique    = get_arg(args, ['unique'], True)
+  hyphen = get_arg(args, ['hyphen'])
+  format = get_arg(args, ['format'])
+  genome = get_arg(args, ['genome'])
 
   if filename == '-':
     if hyphen is None:
@@ -217,46 +128,48 @@ def load_genostream(filename, extra_args=None, **kwargs):
   if format is None:
     format = guess_informat(filename)
 
-  if isinstance(genorepr,basestring):
-    genorepr = get_genorepr(genorepr)
-
+  # FIXME: Check genome is None behavior
   if isinstance(genome,basestring) or genome is None:
     genome = load_genome(genome,extra_args=args)
 
   if format == 'hapmap':
-    genos = load_hapmap(filename,genome=genome)
+    genos = load_hapmap(filename,genome=genome,extra_args=args)
   elif format == 'ldat':
-    genos = load_genomatrix_text(filename,format,genorepr,unique=unique,genome=genome)
+    genos = load_genomatrix_text(filename,format,genome=genome,extra_args=args)
   elif format == 'sdat':
-    genos = load_genomatrix_text(filename,format,genorepr,unique=unique,genome=genome)
+    genos = load_genomatrix_text(filename,format,genome=genome,extra_args=args)
   elif format == 'lbat':
-    genos = load_genomatrix_binary(filename,'ldat',unique=unique,genome=genome)
+    genos = load_genomatrix_binary(filename,'ldat',genome=genome,extra_args=args)
   elif format == 'sbat':
-    genos = load_genomatrix_binary(filename,'sdat',unique=unique,genome=genome)
+    genos = load_genomatrix_binary(filename,'sdat',genome=genome,extra_args=args)
   elif format in ('tdat','trip','genotriple'):
-    genos = load_genotriples_text(filename,genorepr,unique=unique,genome=genome)
+    genos = load_genotriples_text(filename,genome=genome,extra_args=args)
   elif format in ('pb','prettybase'):
-    genos = load_prettybase(filename,unique=unique,genome=genome)
+    genos = load_prettybase(filename,genome=genome,extra_args=args)
   elif format=='tbat':
-    genos = load_genotriples_binary(filename,unique=unique,genome=genome)
+    genos = load_genotriples_binary(filename,genome=genome,extra_args=args)
   elif format in ('plink_ped','ped'):
-    genos = load_plink_ped(filename,unique=unique,genome=genome,extra_args=args)
+    genos = load_plink_ped(filename,genome=genome,extra_args=args)
   elif format in ('plink_tped','tped'):
-    genos = load_plink_tped(filename,unique=unique,genome=genome,extra_args=args)
+    genos = load_plink_tped(filename,genome=genome,extra_args=args)
   elif format in ('plink_bed','bed'):
-    genos = load_plink_bed(filename,unique=unique,genome=genome,extra_args=args)
+    genos = load_plink_bed(filename,genome=genome,extra_args=args)
   elif format in ('merlin','mach'):
-    genos = load_merlin(filename,unique=unique,genome=genome,extra_args=args)
+    genos = load_merlin(filename,genome=genome,extra_args=args)
   elif not format:
     raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
 
+  # Kludge until extra_args is smarter about default values.
+  #   This is needed in the short term for genorepr=None for formats that do
+  #   not use genoreprs.
+  for k,v in args.items():
+    if v is None:
+      del args[k]
+
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
-
-  if genos.format in ('sdat','ldat') and unique:
-    genos = unique_check_genomatrixstream(genos)
 
   return genos
 

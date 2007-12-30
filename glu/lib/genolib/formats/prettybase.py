@@ -23,7 +23,7 @@ import re
 
 from   itertools                 import islice
 
-from   glu.lib.fileutils         import autofile,namefile
+from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenotripleStream
 
@@ -31,15 +31,12 @@ from   glu.lib.genolib.streams   import GenotripleStream
 __all__ = ['PrettybaseWriter', 'save_prettybase', 'load_prettybase']
 
 
-def load_prettybase(filename,unique=True,genome=None):
+def load_prettybase(filename,genome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
   @param     filename: file name or file object
   @type      filename: str or file object
-  @param     genorepr: function to convert list genotype strings to desired
-                       internal representation
-  @type      genorepr: unary function
   @param       unique: assume rows and columns are uniquely labeled (default is True)
   @type        unique: bool
   @param       genome: genome descriptor
@@ -56,6 +53,19 @@ def load_prettybase(filename,unique=True,genome=None):
   ('s2', 'l1', (None, None))
   ('s2', 'l2', ('C', 'C'))
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  unique   = get_arg(args, ['unique'], False)
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
   re_spaces = re.compile('[\t ,]+')
   gfile = autofile(filename)
 
@@ -80,7 +90,7 @@ def load_prettybase(filename,unique=True,genome=None):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),unique=unique,genome=genome)
+  return GenotripleStream.from_tuples(_load(),genome=genome, unique=unique)
 
 
 class PrettybaseWriter(object):

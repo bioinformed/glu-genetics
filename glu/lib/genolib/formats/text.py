@@ -24,12 +24,12 @@ import csv
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.fileutils         import autofile,namefile,tryint
+from   glu.lib.fileutils         import autofile,namefile,tryint,parse_augmented_filename,get_arg
 
-from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
+from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.locus     import Genome
-from   glu.lib.genolib.reprs     import snp
+from   glu.lib.genolib.reprs     import get_genorepr,snp
 
 
 __all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
@@ -37,42 +37,7 @@ __all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
            'save_genomatrix_text',  'load_genomatrix_text']
 
 
-def load_genomatrix_linkage(filename,genome=None):
-  '''
-  Load a Linkage format genotype data file.
-
-  @param     filename: file name or file object
-  @type      filename: str or file object
-  @rtype             : GenomatrixStream
-  '''
-  gfile = autofile(filename)
-
-  line,gfile = peekfirst(gfile)
-
-  n    = len(split(line))
-  loci = [ '%s' % i for i in range(n-6) ]
-
-  def _load():
-    split = re_spaces.split
-    amap  = {'0':None}
-
-    for line_num,line in enumerate(gfile):
-      fields = split(line)
-
-      if len(fields) != n:
-        raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
-
-      sample = '%s_%s' % (field[0],field[1])
-      a1s    = islice(fields,6,None,2)
-      a2s    = islice(fields,7,None,2)
-      genos  = [ (amap.get(a1,a1),amap.get(a2,a2)) for a1,a2 in izip(a1s,a2s) ]
-
-      yield sample,genos
-
-  return GenomatrixStream.from_tuples(_load(),'sdat',loci=loci,genome=genome)
-
-
-def load_genomatrix_text(filename,format,genorepr,unique=True,genome=None):
+def load_genomatrix_text(filename,format,genome=None,extra_args=None,**kwargs):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -86,15 +51,18 @@ def load_genomatrix_text(filename,format,genorepr,unique=True,genome=None):
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @param       unique: assume rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
   @rtype             : GenomatrixStream
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> genos = load_genomatrix_text(data,'ldat',snp)
+  >>> genos = load_genomatrix_text(data,'ldat',genorepr=snp)
   >>> genos.format
   'ldat'
   >>> genos.columns
@@ -104,8 +72,25 @@ def load_genomatrix_text(filename,format,genorepr,unique=True,genome=None):
   ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
   ('l2', [('C', 'C'), ('C', 'T'), ('T', 'T')])
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  genorepr = get_arg(args, ['genorepr']) or 'snp'
+  unique   = get_arg(args, ['unique'], True)
+
+  if isinstance(genorepr,basestring):
+    genorepr = get_genorepr(genorepr)
+
   if genorepr is None:
     raise ValueError('genotype representation must be specified when reading a text format')
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   gfile = autofile(filename)
   rows = csv.reader(gfile,dialect='tsv')
@@ -148,6 +133,9 @@ def load_genomatrix_text(filename,format,genorepr,unique=True,genome=None):
     genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,genome=genome,unique=unique)
   else:
     genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,genome=genome,unique=unique)
+
+  if unique:
+    genos = genos.unique_checked()
 
   return genos
 
@@ -312,7 +300,7 @@ def save_genomatrix_text(filename,genos,genorepr):
     writer.writerows(genos)
 
 
-def load_genotriples_text(filename,genorepr,unique=True,genome=None):
+def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -321,15 +309,18 @@ def load_genotriples_text(filename,genorepr,unique=True,genome=None):
   @param     genorepr: function to convert list genotype strings to desired
                        internal representation
   @type      genorepr: unary function
-  @param       unique: assume rows and columns are uniquely labeled (default is True)
-  @type        unique: bool
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param       unique: assume rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
   @rtype             : GenotripleStream
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriples_text(data,snp)
+  >>> triples = load_genotriples_text(data,genorepr=snp)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -337,8 +328,25 @@ def load_genotriples_text(filename,genorepr,unique=True,genome=None):
   ('s2', 'l1', ('A', 'G'))
   ('s2', 'l2', ('C', 'C'))
   '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  genorepr = get_arg(args, ['genorepr']) or 'snp'
+  unique   = get_arg(args, ['unique'], False)
+
+  if isinstance(genorepr,basestring):
+    genorepr = get_genorepr(genorepr)
+
   if genorepr is None:
-    raise ValueError('genotype representation must be specified when reading a text genotype format')
+    raise ValueError('genotype representation must be specified when reading a text format')
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   rows = csv.reader(autofile(filename),dialect='tsv')
 
@@ -360,7 +368,7 @@ def load_genotriples_text(filename,genorepr,unique=True,genome=None):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),unique=unique,genome=genome)
+  return GenotripleStream.from_tuples(_load(),genome=genome,unique=unique)
 
 
 class TextGenotripleWriter(object):
