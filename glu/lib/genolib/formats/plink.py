@@ -829,9 +829,8 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
 
   if mode == 0:
     format = 'sdat'
-    def _load_plink():
-      rowbytes = (len(loci)*2+7)//8
 
+    def _load_plink():
       valuecache = {}
       genovalues = []
 
@@ -842,28 +841,31 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
         if values is None:
           values = valuecache[model] = _plink_decode(model,allele1,allele2)
 
-        byte,offset = divmod(i,4)
-        shift       = 2*offset
+        byte  = i//4
+        shift = 2*(i%4)
 
         genovalues.append( (byte,shift,values) )
 
+      rowbytes = (len(loci)*2+7)//8
+
       for sample in samples:
-        data = map(ord,gfile.read(rowbytes))
+        data  = map(ord,gfile.read(rowbytes))
         genos = [ values[(data[byte]>>shift)&3] for byte,shift,values in genovalues ]
         yield sample,genos
 
   elif mode == 1:
     format = 'ldat'
-    def _load_plink():
-      rowbytes = (len(samples)*2+7)//8
 
+    def _load_plink():
       genovalues = []
+
       for i,sample in enumerate(samples):
-        byte,offset = divmod(i,4)
-        shift       = 2*offset
+        byte  = i//4
+        shift = 2*(i%4)
         genovalues.append( (byte,shift) )
 
       valuecache = {}
+      rowbytes = (len(samples)*2+7)//8
 
       for (locus,allele1,allele2),model in izip(bim_loci,models):
         data = map(ord,gfile.read(rowbytes))
@@ -873,7 +875,8 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
         if values is None:
           values = valuecache[model] = _plink_decode(model,allele1,allele2)
 
-        genos  = [ values[(data[byte]>>shift)&3] for byte,shift in genovalues ]
+        genos = [ values[(data[byte]>>shift)&3] for byte,shift in genovalues ]
+
         yield locus,genos
 
   return GenomatrixStream(_load_plink(),format,loci=loci,samples=samples,models=models,
