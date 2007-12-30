@@ -262,6 +262,31 @@ def guess_format(filename, formats):
   return None
 
 
+def guess_related_file(filename,extensions):
+  '''
+  Find a related file with the same name except different prefix.  Only
+  files that exist are returned.
+
+  @param   filename: base filename with extension
+  @type    filename: str
+  @param extensions: list of alternative extensions (without a '.')
+  @type  extensions: list of str
+  @return          : new filename
+  @rtype           : str
+
+  >>> guess_related_file('fileutils.dat',['py'])
+  'fileutils.py'
+  '''
+  prefix,ext = os.path.splitext(filename)
+
+  for new_ext in extensions:
+    testfile = '%s.%s' % (prefix,new_ext)
+    if os.path.isfile(testfile):
+      return testfile
+
+  return None
+
+
 def parse_augmented_filename(filename,args):
   '''
   Retrieve option-value pairs from the filename delimited by colon
