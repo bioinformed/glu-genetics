@@ -19,12 +19,11 @@ __copyright__ = 'Copyright (c) 2007 Science Applications International Corporati
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-import os
-
 from   itertools                 import islice,izip
 
 from   glu.lib.utils             import gcdisabled
-from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg
+from   glu.lib.fileutils         import autofile,namefile,guess_related_file, \
+                                        parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
@@ -48,15 +47,6 @@ PHENO_MAP  = {'1':PHENO_UNAFFECTED, '2':PHENO_AFFECTED}
 PHENO_RMAP = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}
 
 PARENT_MAP = {'0':None}
-
-
-def guess_file(filename,extensions):
-  prefix,ext = os.path.splitext(filename)
-  for new_ext in extensions:
-    testfile = '%s.%s' % (prefix,new_ext)
-    if os.path.isfile(testfile):
-      return testfile
-  return None
 
 
 def load_plink_map(filename,genome):
@@ -115,7 +105,7 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
   filename = parse_augmented_filename(filename,args)
 
   loci = get_arg(args, ['loci'])
-  lmap = get_arg(args, ['map']) or guess_file(filename,['map'])
+  lmap = get_arg(args, ['map']) or guess_related_file(filename,['map'])
 
   if loci is None and lmap is None:
     raise ValueError('Map file or locus list must be specified when loading PLINK PED files')
@@ -129,20 +119,20 @@ def load_plink_ped(filename,genome=None,phenome=None,unique=True,extra_args=None
   if phenome is None:
     phenome = Phenome()
 
-  if loci is not None:
-    if isinstance(loci,basestring):
-      loci = list(load_locus_records(loci)[2])
-      # Merge map data into genome
-      populate_genome(genome,loci)
-      loci  = [ intern(l[0]) for l in loci ]
+  if loci and isinstance(loci,basestring):
+    loci = list(load_locus_records(loci)[2])
+    # Merge map data into genome
+    populate_genome(genome,loci)
+    loci = [ intern(l[0]) for l in loci ]
 
-  if lmap is not None:
-    map_loci = list(load_plink_map(lmap,genome))
-    if loci is not None:
-      if loci != map_loci:
-        raise ValueError('Locus list and PLINK MAP file are not identical')
-    else:
+  if dat:
+    map_loci = list(load_merlin_dat(dat,genome))
+    if not loci:
       loci = map_loci
+    elif loci != map_loci:
+      raise ValueError('Locus list and PLINK MAP file are not identical')
+
+  loci = loci or []
 
   gfile = autofile(filename)
   n     = 6 + 2*len(loci)
@@ -449,7 +439,7 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
   filename = parse_augmented_filename(filename,args)
 
   loci = get_arg(args, ['loci'])
-  tfam = get_arg(args, ['tfam']) or guess_file(filename,['tfam'])
+  tfam = get_arg(args, ['tfam','fam']) or guess_related_file(filename,['tfam','fam'])
 
   if tfam is None:
     raise ValueError('A TFAM file must be specified when loading PLINK TPED data')
@@ -463,12 +453,13 @@ def load_plink_tped(filename,genome=None,phenome=None,unique=True,extra_args=Non
   if phenome is None:
     phenome = Phenome()
 
-  if loci is not None:
-    if isinstance(loci,basestring):
-      loci = list(load_locus_records(loci)[2])
-      # Merge map data into genome
-      populate_genome(genome,loci)
-      loci  = [ intern(l[0]) for l in loci ]
+  if loci and isinstance(loci,basestring):
+    loci = list(load_locus_records(loci)[2])
+    # Merge map data into genome
+    populate_genome(genome,loci)
+    loci = [ intern(l[0]) for l in loci ]
+
+  loci = loci or []
 
   samples = list(load_plink_tfam(tfam,phenome))
 
@@ -729,7 +720,7 @@ def load_plink_bim(filename,genome):
     else:
       alleles.append(allele2)
 
-    alleles = tuple(alleles)
+    alleles = tuple(sorted(alleles))
 
     model = genome.get_locus(locus).model
 
@@ -798,8 +789,8 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
     raise ValueError('Invalid PLINK BED file mode')
 
   loc = get_arg(args, ['loci'])
-  bim = get_arg(args, ['map']) or guess_file(filename,['bim'])
-  fam = get_arg(args, ['fam']) or guess_file(filename,['fam'])
+  bim = get_arg(args, ['map','bim' ]) or guess_related_file(filename,['bim'])
+  fam = get_arg(args, ['fam','tfam']) or guess_related_file(filename,['fam','tfam'])
 
   if bim is None:
     raise ValueError('BIM file must be specified when loading PLINK BED data')
@@ -821,11 +812,10 @@ def load_plink_bed(filename,genome=None,phenome=None,unique=True,extra_args=None
   samples  = list(load_plink_tfam(fam,phenome))
   models   = [ genome.get_model(locus) for locus in loci ]
 
-  if loc is not None:
-    if isinstance(loc,basestring):
-      loc = list(load_locus_records(loc)[2])
-      # Merge map data into genome
-      populate_genome(genome,loc)
+  if loc and isinstance(loc,basestring):
+    loc = list(load_locus_records(loc)[2])
+    # Merge map data into genome
+    populate_genome(genome,loc)
 
   if mode == 0:
     format = 'sdat'
