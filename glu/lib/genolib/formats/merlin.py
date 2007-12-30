@@ -1,0 +1,361 @@
+# -*- coding: utf-8 -*-
+'''
+File:          merlin.py
+
+Authors:       Kevin Jacobs (jacobske@bioinformed.com)
+
+Created:       2006-01-01
+
+Abstract:      GLU Merlin/MACH genotype format input/output objects
+
+Requires:      Python 2.5
+
+Revision:      $Id$
+'''
+
+from __future__ import with_statement
+
+__copyright__ = 'Copyright (c) 2007 Science Applications International Corporation ("SAIC")'
+__license__   = 'See GLU license for terms by running: glu license'
+
+
+from   itertools                 import islice
+
+from   glu.lib.utils             import gcdisabled
+from   glu.lib.fileutils         import autofile,namefile,guess_related_file, \
+                                        parse_augmented_filename,get_arg
+
+from   glu.lib.genolib.streams   import GenomatrixStream
+from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
+
+
+__all__ = ['MerlinWriter', 'save_merlin', 'load_merlin']
+
+
+ALLELE_MAP  = {'0':None}
+ALLELE_RMAP = {None:'0'}
+
+SEX_MAP     = {'1':SEX_MALE,'2':SEX_FEMALE}
+SEX_RMAP    = {SEX_UNKNOWN:'0', SEX_MALE:'M', SEX_FEMALE:'F'}
+
+PARENT_MAP  = {'0':None}
+
+
+def load_merlin_dat(filename,genome):
+  mfile = autofile(filename)
+
+  for i,line in enumerate(mfile):
+    line = line.rstrip()
+
+    if not line or line.startswith('#'):
+      continue
+
+    fields = line.split()
+
+    if len(fields) != 2:
+      raise ValueError('Invalid Merlin data record %d' % (i+1))
+
+    if fields[0] != 'M':
+      raise ValueError('Merlin file reader only supports marker (M) records')
+
+    lname = fields[1]
+    genome.merge_locus(lname)
+
+    yield lname
+
+
+def load_merlin(filename,genome=None,phenome=None,unique=True,extra_args=None,**kwargs):
+  '''
+  Load a Merlin format genotype data file.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
+  @rtype             : GenomatrixStream
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  loci = get_arg(args, ['loci'])
+  dat  = get_arg(args, ['dat','data']) or guess_related_file(filename,['dat'])
+
+  if loci is None and dat is None:
+    raise ValueError('Dat file or locus file must be specified when loading Merlin files')
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if genome is None:
+    genome = Genome()
+
+  if phenome is None:
+    phenome = Phenome()
+
+  if loci and isinstance(loci,basestring):
+    loci = list(load_locus_records(loci)[2])
+    # Merge map data into genome
+    populate_genome(genome,loci)
+    loci = [ intern(l[0]) for l in loci ]
+
+  if dat:
+    map_loci = list(load_merlin_dat(dat,genome))
+    if not loci:
+      loci = map_loci
+    elif loci != map_loci:
+      raise ValueError('Locus list and MERLIN DAT file are not identical')
+
+  loci = loci or []
+
+  gfile = autofile(filename)
+  n     = 5 + 2*len(loci)
+
+  def _load_merlin():
+    for line_num,line in enumerate(gfile):
+      if not line or line.startswith('#'):
+        continue
+
+      with gcdisabled:
+        fields = line.split()
+
+        if len(fields) != n:
+          print len(fields)
+          raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
+
+        family,name,father,mother,sex = [ s.strip() for s in fields[:5] ]
+
+        if name == '0':
+          raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
+
+        father  = PARENT_MAP.get(father,father)
+        mother  = PARENT_MAP.get(mother,mother)
+
+        ename   = '%s:%s' % (family,name)
+        efather = '%s:%s' % (family,father) if father else None
+        emother = '%s:%s' % (family,mother) if mother else None
+        sex     = SEX_MAP.get(sex,SEX_UNKNOWN)
+
+        if father:
+          phenome.merge_phenos(efather, family, father, sex=SEX_MALE)
+        if mother:
+          phenome.merge_phenos(emother, family, mother, sex=SEX_FEMALE)
+
+        phenome.merge_phenos(ename, family, name, efather, emother, sex)
+
+        fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,5,None) ]
+        genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
+
+      yield ename,genos
+
+  return GenomatrixStream.from_tuples(_load_merlin(),'sdat',loci=loci,genome=genome,phenome=phenome,unique=unique)
+
+
+class MerlinWriter(object):
+  '''
+  Object to write Merlin data
+
+  >>> loci =           ('l1',      'l2',      'l3')
+  >>> rows = [('s1', [('A','A'),(None,None),('C','T')]),
+  ...         ('s2', [('A','G'), ('C','G'), ('C','C')]),
+  ...         ('s3', [('G','G'),(None,None),('C','T')]) ]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> from cStringIO import StringIO
+  >>> o = StringIO()
+  >>> m = StringIO()
+  >>> with MerlinWriter(o,genos.loci,genos.genome,genos.phenome,m) as w:
+  ...   genos=iter(genos)
+  ...   w.writerow(*genos.next())
+  ...   w.writerow(*genos.next())
+  ...   w.writerows(genos)
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  s1 s1 0 0 0 A A 0 0 C T
+  s2 s2 0 0 0 A G C G C C
+  s3 s3 0 0 0 G G 0 0 C T
+  >>> print m.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  M l1
+  M l2
+  M l3
+  '''
+  def __init__(self,filename,loci,genome,phenome,datfile=None):
+    '''
+    @param     filename: file name or file object
+    @type      filename: str or file object
+    @param       format: data format string
+    @type        format: str
+    @param       header: column headings
+    @type        header: list or str
+    @param     genorepr: object representing the input/output encoding and
+                         internal representation of genotypes
+    @type      genorepr: UnphasedMarkerRepresentation or similar object
+    '''
+    self.out       = autofile(filename,'wb')
+    self.loci      = loci
+    self.genome    = genome
+    self.phenome   = phenome
+    self.datfile   = datfile
+
+  def writerow(self, sample, genos, phenome=None):
+    '''
+    Write a row of genotypes given the row key and list of genotypes
+
+    @param rowkey: row identifier
+    @type  rowkey: str
+    @param  genos: sequence of genotypes in an internal representation
+    @type   genos: sequence
+    '''
+    out = self.out
+    if out is None:
+      raise IOError('Cannot write to closed writer object')
+
+    if len(genos) != len(self.loci):
+      raise ValueError('[ERROR] Internal error: Genotypes do not match header')
+
+    if phenome is None:
+      phenome = self.phenome
+    if phenome is None:
+      phenome = Phenome()
+
+    phenos     = phenome.get_phenos(sample)
+    family     = phenos.family
+    individual = phenos.individual or sample
+    parent1    = phenos.parent1
+    parent2    = phenos.parent2
+
+    if parent1 and parent2:
+      p1 = phenome.get_phenos(parent1)
+      p2 = phenome.get_phenos(parent2)
+      if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
+        parent1,parent2 = parent2,parent1
+
+    sex = SEX_RMAP[phenos.sex]
+    row = [family or individual,individual,parent1 or '0',parent2 or '0',sex]
+
+    for g in genos:
+      row += [ ALLELE_RMAP.get(a,a) for a in g ]
+
+    out.write(' '.join(row))
+    out.write('\r\n')
+
+  def writerows(self, rows, phenome=None):
+    '''
+    Write rows of genotypes given pairs of row key and list of genotypes
+
+    @param rows: sequence of pairs of row key and sequence of genotypes in
+                 an internal representation
+    @type  rows: sequence of (str,sequence)
+    '''
+    out = self.out
+    if out is None:
+      raise IOError('Cannot write to closed writer object')
+
+    n = len(self.loci)
+
+    if phenome is None:
+      phenome = self.phenome
+    if phenome is None:
+      phenome = Phenome()
+
+    for sample,genos in rows:
+      if len(genos) != n:
+        raise ValueError('[ERROR] Internal error: Genotypes do not match header')
+
+      phenos     = phenome.get_phenos(sample)
+      family     = phenos.family
+      individual = phenos.individual or sample
+      parent1    = phenos.parent1
+      parent2    = phenos.parent2
+
+      if parent1 and parent2:
+        p1 = phenome.get_phenos(parent1)
+        p2 = phenome.get_phenos(parent2)
+        if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
+          parent1,parent2 = parent2,parent1
+
+      sex = SEX_RMAP[phenos.sex]
+
+      row = [family or individual,individual,parent1 or '0',parent2 or '0',sex]
+
+      for g in genos:
+        row += [ ALLELE_RMAP.get(a,a) for a in g ]
+
+      out.write(' '.join(row))
+      out.write('\r\n')
+
+  def close(self):
+    '''
+    Close the writer
+
+    A closed writer cannot be used for further I/O operations and will
+    result in an error if called more than once.
+    '''
+    if self.out is None:
+      raise IOError('Writer object already closed')
+
+    # FIXME: Closing out causes problems with StringIO objects used for
+    #        testing
+    #self.out.close()
+    self.out = None
+
+    if self.datfile:
+      out = autofile(self.datfile,'wb')
+      for locus in self.loci:
+        out.write('M %s\r\n' % locus)
+
+  def __enter__(self):
+    '''
+    Context enter function
+    '''
+    return self
+
+  def __exit__(self, *exc_info):
+    '''
+    Context exit function that closes the writer upon exit
+    '''
+    self.close()
+
+
+def save_merlin(filename,genos,datfile=None):
+  '''
+  Write the genotype matrix data to file.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param        genos: genomatrix stream
+  @type         genos: sequence
+
+  >>> from cStringIO import StringIO
+  >>> o = StringIO()
+  >>> loci =              ('l1',     'l2',    'l3')
+  >>> rows = [('s1', [('A','A'),(None,None),('C','T')]),
+  ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
+  ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> save_merlin(o,genos)
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  s1 s1 0 0 0 A A 0 0 C T
+  s2 s2 0 0 0 A G C G C C
+  s3 s3 0 0 0 G G 0 0 C T
+  '''
+  genos = genos.as_sdat()
+  with MerlinWriter(filename, genos.loci, genos.genome, genos.phenome, datfile) as writer:
+    writer.writerows(genos)
+
+
+def test():
+  import doctest
+  return doctest.testmod()
+
+
+if __name__ == '__main__':
+  test()
