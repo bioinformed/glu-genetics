@@ -22,7 +22,9 @@ import csv
 
 from   itertools import islice
 
-__all__ = ['autofile','namefile','hyphen','guess_format','load_list','load_map','load_table']
+__all__ = ['autofile','namefile','hyphen',
+           'guess_format','related_file','guess_related_file',
+           'load_list','load_map','load_table']
 
 
 COMPRESSED_SUFFIXES = set(['gz','Z'])
@@ -262,6 +264,30 @@ def guess_format(filename, formats):
   return None
 
 
+def related_file(filename,extension):
+  '''
+  Return a filename with the extension provided
+
+  @param   filename: base filename with extension
+  @type    filename: str
+  @param extensions: new extension (without a '.')
+  @type  extensions: str
+  @return          : new filename
+  @rtype           : str
+
+  >>> related_file('foo.ldat', 'sdat')
+  'foo.sdat'
+  >>> related_file('foo', 'sdat')
+  'foo.sdat'
+  '''
+  prefix = os.path.splitext(filename)[0]
+
+  if not prefix:
+    raise ValueError('invalid filename')
+
+  return '%s.%s' % (prefix,extension)
+
+
 def guess_related_file(filename,extensions):
   '''
   Find a related file with the same name except different prefix.  Only
@@ -278,6 +304,9 @@ def guess_related_file(filename,extensions):
   'fileutils.py'
   '''
   prefix,ext = os.path.splitext(filename)
+
+  if not prefix:
+    raise ValueError('invalid filename')
 
   for new_ext in extensions:
     testfile = '%s.%s' % (prefix,new_ext)
