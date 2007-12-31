@@ -280,6 +280,9 @@ def related_file(filename,extension):
   >>> related_file('foo', 'sdat')
   'foo.sdat'
   '''
+  if not isstr(filename):
+    return None
+
   prefix = os.path.splitext(filename)[0]
 
   if not prefix:
@@ -303,6 +306,9 @@ def guess_related_file(filename,extensions):
   >>> guess_related_file('fileutils.dat',['py'])
   'fileutils.py'
   '''
+  if not isstr(filename):
+    return None
+
   prefix,ext = os.path.splitext(filename)
 
   if not prefix:
