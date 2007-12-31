@@ -123,11 +123,22 @@ class PrettybaseWriter(object):
   l3 s1 A A
   l2 s2 C C
   '''
-  def __init__(self,filename):
+  def __init__(self,filename,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     self.out = autofile(filename,'w')
 
   def writerow(self, sample, locus, geno):
@@ -190,7 +201,7 @@ class PrettybaseWriter(object):
     self.close()
 
 
-def save_prettybase(filename,genos):
+def save_prettybase(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype triple data to file.
 
@@ -211,7 +222,7 @@ def save_prettybase(filename,genos):
   l2 s1 N N
   l3 s1 A A
   '''
-  with PrettybaseWriter(filename) as w:
+  with PrettybaseWriter(filename,extra_args=extra_args,**kwargs) as w:
     w.writerows(genos.as_genotriples())
 
 

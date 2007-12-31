@@ -22,7 +22,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 from   itertools                 import islice,izip
 
 from   glu.lib.utils             import gcdisabled
-from   glu.lib.fileutils         import autofile,namefile,guess_related_file, \
+from   glu.lib.fileutils         import autofile,namefile,               \
+                                        guess_related_file,related_file, \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
@@ -195,7 +196,7 @@ class PlinkPedWriter(object):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> m = StringIO()
-  >>> with PlinkPedWriter(o,genos.loci,genos.genome,genos.phenome,m) as w:
+  >>> with PlinkPedWriter(o,genos.loci,genos.genome,genos.phenome,mapfile=m) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -209,7 +210,7 @@ class PlinkPedWriter(object):
   0 l2 0 0
   0 l3 0 0
   '''
-  def __init__(self,filename,loci,genome,phenome,mapfile=None):
+  def __init__(self,filename,loci,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -222,6 +223,23 @@ class PlinkPedWriter(object):
     @param      phenome: phenome descriptor
     @type       phenome: Phenome instance
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    mapfile  = get_arg(args, ['mapfile','map'])
+
+    # Careful: mapfile=<blank> is intended to supress output
+    if mapfile is None:
+      mapfile = related_file(filename,'map')
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     self.out       = autofile(filename,'wb')
     self.loci      = loci
     self.genome    = genome
@@ -351,7 +369,7 @@ class PlinkPedWriter(object):
     self.close()
 
 
-def save_plink_ped(filename,genos,mapfile=None):
+def save_plink_ped(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -373,8 +391,24 @@ def save_plink_ped(filename,genos,mapfile=None):
   s2 s2 0 0 0 0 A G C G C C
   s3 s3 0 0 0 0 G G 0 0 C T
   '''
-  genos = genos.as_sdat()
-  with PlinkPedWriter(filename, genos.loci, genos.genome, genos.phenome, mapfile) as writer:
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename  = parse_augmented_filename(filename,args)
+
+  mergefunc = get_arg(args, ['mergefunc'])
+
+  genos = genos.as_sdat(mergefunc)
+
+  with PlinkPedWriter(filename, genos.loci, genos.genome, genos.phenome,
+                                extra_args=args) as writer:
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     writer.writerows(genos)
 
 
@@ -524,7 +558,7 @@ class PlinkTPedWriter(object):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> m = StringIO()
-  >>> with PlinkTPedWriter(o,genos.samples,genos.genome,genos.phenome,m) as w:
+  >>> with PlinkTPedWriter(o,genos.samples,genos.genome,genos.phenome,tfamfile=m) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -538,7 +572,7 @@ class PlinkTPedWriter(object):
   s2 s2 0 0 0 0
   s3 s3 0 0 0 0
   '''
-  def __init__(self,filename,samples,genome,phenome,tfamfile=None):
+  def __init__(self,filename,samples,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -551,6 +585,23 @@ class PlinkTPedWriter(object):
     @param      phenome: phenome descriptor
     @type       phenome: Phenome instance
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    tfamfile = get_arg(args, ['tfamfile','tfam'])
+
+    # Careful: mapfile=<blank> is intended to supress output
+    if tfamfile is None:
+      tfamfile = related_file(filename,'tfam')
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     self.out       = autofile(filename,'wb')
     self.samples   = samples
     self.genome    = genome
@@ -661,7 +712,7 @@ class PlinkTPedWriter(object):
     self.close()
 
 
-def save_plink_tped(filename,genos,tfamfile=None):
+def save_plink_tped(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -683,8 +734,24 @@ def save_plink_tped(filename,genos,tfamfile=None):
   0 l2 0 0 0 0 C G 0 0
   0 l3 0 0 C T C C C T
   '''
-  genos = genos.as_ldat()
-  with PlinkTPedWriter(filename, genos.samples, genos.genome, genos.phenome, tfamfile) as writer:
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename  = parse_augmented_filename(filename,args)
+
+  mergefunc = get_arg(args, ['mergefunc'])
+
+  genos = genos.as_ldat(mergefunc)
+
+  with PlinkTPedWriter(filename, genos.samples, genos.genome, genos.phenome,
+                                 extra_args=args) as writer:
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     writer.writerows(genos)
 
 

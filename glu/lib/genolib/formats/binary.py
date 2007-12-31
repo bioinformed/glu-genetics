@@ -29,7 +29,7 @@ from   itertools                 import izip,groupby,imap
 import tables
 
 from   glu.lib.utils             import izip_exact,gcdisabled
-from   glu.lib.fileutils         import parse_augmented_filename,compressed_filename
+from   glu.lib.fileutils         import parse_augmented_filename,get_arg,compressed_filename
 
 from   glu.lib.genolib.locus     import Genome,Locus
 from   glu.lib.genolib.phenos    import Phenome,SEX_UNKNOWN,PHENO_UNKNOWN
@@ -64,7 +64,7 @@ class BinaryGenomatrixWriter(object):
   Object to write the genotype matrix data to a compressed binary file
 
   '''
-  def __init__(self,filename,format,header,genome,phenome,compress=True,scratch=16*1024*1024):
+  def __init__(self,filename,format,header,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
@@ -125,6 +125,20 @@ class BinaryGenomatrixWriter(object):
     ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
     ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    compress = get_arg(args,['compress'],True)
+    scratch  = int(get_arg(args,['scratch'],16*1024*1024))
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     if format not in ('ldat','sdat'):
       raise IOError('format must be either ldat or sdat')
 
@@ -348,7 +362,7 @@ class BinaryGenotripleWriter(object):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  def __init__(self,filename,genome,phenome,compress=True,chunksize=232960):
+  def __init__(self,filename,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
@@ -362,6 +376,20 @@ class BinaryGenotripleWriter(object):
     @param    chunksize: size of chunks to write/compress in bytes
     @type     chunksize: int
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    compress  = get_arg(args,['compress'],True)
+    chunksize = int(get_arg(args,['chunksize'],232960))
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     if compressed_filename(filename):
       raise IOError('Binary genotype files must not have a compressed extension')
 
@@ -511,16 +539,16 @@ class BinaryGenotripleWriter(object):
       self.close()
 
 
-def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
+def save_genotriples_binary(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype triple data to file.
 
   @param  filename: a file name or file object
   @type   filename: str or file object
-  @param   triples: a sequence of genotriples(str,str,genotype representation)
-  @type    triples: sequence
+  @param     genos: a sequence of genotriples(str,str,genotype representation)
+  @type      genos: sequence
   @param  compress: flag indicating if compression should be used when writing a binary genotype file.
-                   Default is True.
+                    Default is True.
   @type   compress: bool
   @param chunksize: size of chunks to write/compress in bytes
   @type  chunksize: int
@@ -540,9 +568,9 @@ def save_genotriples_binary(filename,triples,compress=True,chunksize=232960):
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  with BinaryGenotripleWriter(filename,triples.genome,triples.phenome,compress=compress,
-                                       chunksize=chunksize) as writer:
-    writer.writerows(triples)
+  with BinaryGenotripleWriter(filename,genos.genome,genos.phenome,
+                                       extra_args=extra_args,**kwargs) as writer:
+    writer.writerows(genos.as_genotriples())
 
 
 def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
@@ -1019,7 +1047,7 @@ def load_phenos_v3(gfile,samples):
 #######################################################################################
 
 
-def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
+def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -1074,12 +1102,34 @@ def save_genomatrix_binary(filename,genos,compress=True,scratch=16*1024*1024):
   ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
   ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
   '''
-  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,genos.genome,genos.phenome,
-                                       compress=compress,scratch=scratch) as writer:
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  format    = get_arg(args, ['format']) or genos.format
+  mergefunc = get_arg(args, ['mergefunc'])
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if format == 'ldat':
+    genos = genos.as_ldat(mergefunc)
+  elif format == 'sdat':
+    genos = genos.as_sdat(mergefunc)
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,
+                                       genos.genome,genos.phenome,
+                                       extra_args=args) as writer:
     writer.writerows(genos.transformed(repack=True))
 
 
-def load_genomatrix_binary(filename,format,genome=None,chunksize=4096,scratch=32*1024*1024,extra_args=None,**kwargs):
+def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -1137,6 +1187,9 @@ def load_genomatrix_binary(filename,format,genome=None,chunksize=4096,scratch=32
     args.update(kwargs)
 
   filename = parse_augmented_filename(filename,args)
+
+  chunksize = int(get_arg(args,['chunksize'],4096))
+  scratch   = int(get_arg(args,['scratch'],32*1024*1024))
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))

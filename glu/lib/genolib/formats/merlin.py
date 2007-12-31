@@ -22,7 +22,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 from   itertools                 import islice
 
 from   glu.lib.utils             import gcdisabled
-from   glu.lib.fileutils         import autofile,namefile,guess_related_file, \
+from   glu.lib.fileutils         import autofile,namefile,               \
+                                        guess_related_file,related_file, \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
@@ -179,7 +180,7 @@ class MerlinWriter(object):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> m = StringIO()
-  >>> with MerlinWriter(o,genos.loci,genos.genome,genos.phenome,m) as w:
+  >>> with MerlinWriter(o,genos.loci,genos.genome,genos.phenome,datfile=m) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -193,7 +194,7 @@ class MerlinWriter(object):
   M l2
   M l3
   '''
-  def __init__(self,filename,loci,genome,phenome,datfile=None):
+  def __init__(self,filename,loci,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -205,6 +206,23 @@ class MerlinWriter(object):
                          internal representation of genotypes
     @type      genorepr: UnphasedMarkerRepresentation or similar object
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    datfile  = get_arg(args, ['datfile','dat'])
+
+    # Careful: mapfile=<blank> is intended to supress output
+    if datfile is None:
+      datfile = related_file(filename,'dat')
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     self.out       = autofile(filename,'wb')
     self.loci      = loci
     self.genome    = genome
@@ -331,7 +349,7 @@ class MerlinWriter(object):
     self.close()
 
 
-def save_merlin(filename,genos,datfile=None):
+def save_merlin(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -353,8 +371,24 @@ def save_merlin(filename,genos,datfile=None):
   s2 s2 0 0 0 A G C G C C
   s3 s3 0 0 0 G G 0 0 C T
   '''
-  genos = genos.as_sdat()
-  with MerlinWriter(filename, genos.loci, genos.genome, genos.phenome, datfile) as writer:
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename  = parse_augmented_filename(filename,args)
+
+  mergefunc = get_arg(args, ['mergefunc'])
+
+  genos = genos.as_sdat(mergefunc)
+
+  with MerlinWriter(filename, genos.loci, genos.genome, genos.phenome,
+                                          extra_args=args) as writer:
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     writer.writerows(genos)
 
 

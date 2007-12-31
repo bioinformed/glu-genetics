@@ -202,9 +202,6 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
 
   hyphen    = get_arg(args, ['hyphen'])
   format    = get_arg(args, ['format'])
-  genorepr  = get_arg(args, ['genorepr']) or 'snp'
-  mergefunc = get_arg(args, ['mergefunc'])
-  compress  = get_arg(args, ['compress'], True)
 
   if filename == '-':
     if hyphen is None:
@@ -216,37 +213,31 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   if format is None:
     format = guess_outformat(filename)
 
-  if isinstance(genorepr,basestring):
-    genorepr = get_genorepr(genorepr)
-
-  if mergefunc is not None:
-    genos = genos.merged(mergefunc)
-
   if format == 'ldat':
-    save_genomatrix_text(filename, genos.as_ldat(mergefunc), genorepr)
+    save_genomatrix_text(filename, genos, extra_args=args)
   elif format == 'sdat':
-    save_genomatrix_text(filename, genos.as_sdat(mergefunc), genorepr)
+    save_genomatrix_text(filename, genos, extra_args=args)
   elif format in ('tdat','trip','genotriple'):
-    save_genotriples_text(filename, genos, genorepr)
+    save_genotriples_text(filename, genos, extra_args=args)
   elif format in ('pb','prettybase'):
-    genos = save_prettybase(filename, genos)
+    genos = save_prettybase(filename, genos, extra_args=args)
   elif format == 'lbat':
-    save_genomatrix_binary(filename, genos.as_ldat(mergefunc), compress=compress)
+    save_genomatrix_binary(filename, genos, extra_args=args)
   elif format == 'sbat':
-    save_genomatrix_binary(filename, genos.as_sdat(mergefunc), compress=compress)
+    save_genomatrix_binary(filename, genos, extra_args=args)
   elif format == 'tbat':
-    save_genotriples_binary(filename, genos.as_genotriples(), compress=compress)
+    save_genotriples_binary(filename, genos, extra_args=args)
   elif format in ('plink_ped','ped'):
-    save_plink_ped(filename, genos.as_sdat(mergefunc))
+    save_plink_ped(filename, genos, extra_args=args)
   elif format in ('plink_tped','tped'):
-    save_plink_tped(filename, genos.as_ldat(mergefunc))
+    save_plink_tped(filename, genos, extra_args=args)
   # FIXME: Not yet
   #elif format in ('plink_bed','bed'):
   #  if genos.format not in ('sdat','ldat'):
   #    genos = genos.as_ldat(mergefunc)
-  #  save_plink_bed(filename, genos)
+  #  save_plink_bed(filename, genos, extra_args=args)
   elif format in ('merlin','mach'):
-    save_merlin(filename, genos.as_sdat(mergefunc))
+    save_merlin(filename, genos, extra_args=args)
   elif not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:

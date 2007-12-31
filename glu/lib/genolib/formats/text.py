@@ -24,7 +24,7 @@ import csv
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.fileutils         import autofile,namefile,tryint,parse_augmented_filename,get_arg
+from   glu.lib.fileutils         import autofile,namefile,tryint,parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
@@ -168,7 +168,7 @@ class TextGenomatrixWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenomatrixWriter(o,genos.format,genos.columns,snp) as w:
+  >>> with TextGenomatrixWriter(o,genos.format,genos.columns,genorepr=snp) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -179,7 +179,7 @@ class TextGenomatrixWriter(object):
   s2    AG      CG      CC
   s3    GG              CT
   '''
-  def __init__(self,filename,format,header,genorepr,dialect='tsv'):
+  def __init__(self,filename,format,header,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -193,10 +193,27 @@ class TextGenomatrixWriter(object):
     @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @type       dialect: str or csv dialect object
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    genorepr = get_arg(args, ['genorepr']) or 'snp'
+    dialect  = get_csv_dialect(args,'tsv')
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    if isinstance(genorepr,basestring):
+      genorepr = get_genorepr(genorepr)
+
     if genorepr is None:
       raise ValueError('genotype representation must be specified when reading a text genotype format')
 
-    self.out       = csv.writer(autofile(filename,'w'),dialect=dialect)
+    self.out       = csv.writer(autofile(filename,'w'), **dialect)
     self.header    = header
     self.headerlen = len(header)
     self.genorepr  = genorepr
@@ -270,7 +287,7 @@ class TextGenomatrixWriter(object):
     self.close()
 
 
-def save_genomatrix_text(filename,genos,genorepr):
+def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -289,14 +306,37 @@ def save_genomatrix_text(filename,genos,genorepr):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_genomatrix_text(o,genos,snp)
+  >>> save_genomatrix_text(o,genos,genorepr=snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   sdat	l1	l2	l3
   s1	AA	  	CT
   s2	AG	CG	CC
   s3	GG	  	CT
   '''
-  with TextGenomatrixWriter(filename, genos.format, genos.columns, genorepr) as writer:
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename = parse_augmented_filename(filename,args)
+
+  format    = get_arg(args, ['format']) or genos.format
+  mergefunc = get_arg(args, ['mergefunc'])
+
+  if format == 'ldat':
+    genos = genos.as_ldat(mergefunc)
+  elif format == 'sdat':
+    genos = genos.as_sdat(mergefunc)
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  with TextGenomatrixWriter(filename,genos.format,genos.columns,
+                                     extra_args=args) as writer:
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
     writer.writerows(genos)
 
 
@@ -390,7 +430,7 @@ class TextGenotripleWriter(object):
   >>> triples = iter(GenotripleStream.from_tuples(triples))
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenotripleWriter(o,snp) as w:
+  >>> with TextGenotripleWriter(o,genorepr=snp) as w:
   ...   w.writerow(*triples.next())
   ...   w.writerow(*triples.next())
   ...   w.writerows(triples)
@@ -400,7 +440,7 @@ class TextGenotripleWriter(object):
   s1	l3	AA
   s2	l2	CC
   '''
-  def __init__(self,filename,genorepr,dialect='tsv'):
+  def __init__(self,filename,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -410,11 +450,28 @@ class TextGenotripleWriter(object):
     @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
     @type       dialect: str or csv dialect object
     '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    genorepr = get_arg(args, ['genorepr']) or 'snp'
+    dialect  = get_csv_dialect(args,'tsv')
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    if isinstance(genorepr,basestring):
+      genorepr = get_genorepr(genorepr)
+
     if genorepr is None:
       raise ValueError('genotype representation must be specified when reading a text genotype format')
 
-    self.out       = csv.writer(autofile(filename,'w'),dialect=dialect)
-    self.genorepr  = genorepr
+    self.out      = csv.writer(autofile(filename,'w'),**dialect)
+    self.genorepr = genorepr
 
   def writerow(self, sample, locus, geno):
     '''
@@ -476,7 +533,7 @@ class TextGenotripleWriter(object):
     self.close()
 
 
-def save_genotriples_text(filename,genos,genorepr):
+def save_genotriples_text(filename,genos,extra_args=None,**kwargs):
   '''
   Write the genotype stream to a text genotriple file.
 
@@ -487,6 +544,8 @@ def save_genotriples_text(filename,genos,genorepr):
   @param     genorepr: object representing the input/output encoding and
                        internal representation of genotypes
   @type      genorepr: UnphasedMarkerRepresentation or similar object
+  @param      dialect: csv module dialect name ('csv' or 'tsv', default is 'tsv')
+  @type       dialect: str or csv dialect object
 
   >>> triples = [ ('s1', 'l1',  ('C','T')),
   ...             ('s1', 'l2', (None,None)),
@@ -494,13 +553,13 @@ def save_genotriples_text(filename,genos,genorepr):
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> save_genotriples_text(o,triples,snp)
+  >>> save_genotriples_text(o,triples,genorepr=snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1	l1      CT
   s1	l2
   s1	l3	AA
   '''
-  with TextGenotripleWriter(filename,genorepr) as w:
+  with TextGenotripleWriter(filename,extra_args=extra_args,**kwargs) as w:
     w.writerows(genos.as_genotriples())
 
 

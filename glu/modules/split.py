@@ -173,7 +173,7 @@ def getWriter(filename,format,genome=None,phenome=None,header=None,genorepr=None
   elif format == 'sbat':
     return BinaryGenomatrixWriter(filename,'sdat',header,genome,phenome)
   elif format in ('tdat','trip','genotriple'):
-    return TextGenotripleWriter(filename,genorepr)
+    return TextGenotripleWriter(filename,genorepr=genorepr)
   elif format == 'tbat':
     return BinaryGenotripleWriter(filename,genome,phenome)
   else:
