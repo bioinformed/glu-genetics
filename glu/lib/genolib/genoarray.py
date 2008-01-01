@@ -268,23 +268,29 @@ except ImportError:
 
 
   class GenotypeArrayDescriptor(object):
-    __slots__ = ('models','offsets','byte_size','bit_size')
+    __slots__ = ('models','offsets','byte_size','bit_size','homogeneous')
 
     def __init__(self, models, initial_offset=0):
       '''
       Construct a new GenotypeArrayDescriptor
       '''
       n = len(models)
+
+      homogeneous = models[0].bit_size if models else 0
+
       offsets = [0]*(n+1)
 
       offsets[0] = initial_offset
       for i,m in enumerate(models):
         offsets[i+1] = offsets[i] + m.bit_size
+        if m.bit_size != homogeneous:
+          homogeneous = 0
 
-      self.models    = models
-      self.offsets   = offsets
-      self.bit_size  = offsets[-1]
-      self.byte_size = byte_array_size(self.bit_size)
+      self.models      = models
+      self.offsets     = offsets
+      self.bit_size    = offsets[-1]
+      self.byte_size   = byte_array_size(self.bit_size)
+      self.homogeneous = homogeneous
 
     def __len__(self):
       return len(self.models)
@@ -378,7 +384,12 @@ except ImportError:
       startbit = descr.offsets[i]
       width    = model.bit_size
 
-      assert geno.model is model
+      if isinstance(geno,Genotype):
+        if geno.model is not model:
+          geno = model[geno.alleles()]
+      else:
+        geno = model[geno]
+
       setbits(self.data, startbit, geno.index, width)
 
     def __repr__(self):
@@ -462,6 +473,11 @@ except ImportError:
       @return    : genotype object
       @rtype     : Genotype
       '''
+      if isinstance(geno,Genotype):
+        if geno.model is self:
+          return geno
+        geno = geno.alleles()
+
       return self.genomap[geno]
 
     __getitem__ = get_genotype
@@ -476,6 +492,11 @@ except ImportError:
       @return    : genotype object
       @rtype     : Genotype
       '''
+      if isinstance(geno,Genotype):
+        if geno.model is self:
+          return geno
+        geno = geno.alleles()
+
       g = self.genomap.get(geno)
 
       # If the genotype has not already been seen for this locus
@@ -983,8 +1004,8 @@ def test_concordance_generic():
 def test_concordance_4bit():
   '''
   >>> model = model_from_alleles('AB',max_alleles=5)
-  >>> model.bit_size
-  4L
+  >>> int(model.bit_size)
+  4
 
   Test even number of genotypes
 
@@ -1021,8 +1042,8 @@ def test_concordance_4bit():
 def test_concordance_2bit():
   '''
   >>> model = model_from_alleles('AB')
-  >>> model.bit_size
-  2L
+  >>> int(model.bit_size)
+  2
 
   Test even number of genotypes
 
