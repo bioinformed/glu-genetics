@@ -1870,6 +1870,152 @@ def recode_genomatrixstream(genos, genome):
   return genos.clone(_recode_genomatrixstream(),models=models,genome=genome,packed=True,materialized=False)
 
 
+def sdat_model_lookahead_from_strings(loci,genos,genome,genorepr,min_unknown=10,max_lookahead=50):
+  '''
+  Lookahead in an sdat genotype stream to determine alleles and fixed
+  models.  This is a major optimization that can usually avoid the majority
+  of the overhead associated with creating len(loci) default models
+  '''
+  # Do not attempt to lookahead if a fixed model is used for unknown loci
+  if genome.default_fixed:
+    return genos
+
+  # Do not attempt to lookahead if only a small number of loci are unknown
+  unknown = sum(1 for locus in loci if genome.get_locus(locus).model is None)
+  if unknown < min_unknown:
+    return genos
+
+  # Track the alleles seen
+  alleles_seen = [ [] for i in range(len(loci)) ]
+
+  # Start looking ahead up to max_lookahead rows
+  lookahead_rows = []
+  for sample,row in genos:
+    lookahead_rows.append( (sample,row) )
+
+    row = genorepr.from_strings(row)
+
+    for g,seen in izip(row,alleles_seen):
+      seen.append(g[0])
+      seen.append(g[1])
+
+    if len(lookahead_rows) == max_lookahead:
+      break
+
+  # If there are rows in the lookahead buffer
+  if lookahead_rows:
+    max_alleles = genome.max_alleles
+    modelcache = {}
+
+    try:
+      # Review the alleles seen at each locus
+      for locus,seen in izip(loci,alleles_seen):
+        loc = genome.get_locus(locus)
+        model = loc.model
+
+        # If the model is unknown, then check the alleles
+        if model is None:
+          seen = set(seen)
+          seen.discard(None)
+
+          # Create or reuse a fixed model if all alleles have been seen
+          if len(seen) == max_alleles:
+            seen  = tuple(sorted(seen))
+            model = modelcache.get(seen)
+            if model is None:
+              model = modelcache[seen] = model_from_alleles(seen, max_alleles=max_alleles)
+            loc.model = model
+            loc.fixed = True
+            continue
+
+          # Otherwise create an empty default model
+          model = genome.get_model(locus)
+
+        # Populate the observed alleles when a fixed model cannot be used
+        for allele in seen:
+          model.add_allele(allele)
+
+    except ValueError:
+      raise ValueError('Locus model %s cannot accommodate additional allele %s (max_alleles=%d,alleles=%s)'
+                          % (locus,allele,model.max_alleles,','.join(model.alleles[1:])))
+
+    return chain(lookahead_rows,genos)
+  else:
+    return genos
+
+
+def sdat_model_lookahead_from_tuples(loci,genos,genome,min_unknown=10,max_lookahead=25):
+  '''
+  Lookahead in an sdat genotype stream to determine alleles and fixed
+  models.  This is a major optimization that can usually avoid the majority
+  of the overhead associated with creating len(loci) default models
+  '''
+  # Do not attempt to lookahead if a fixed model is used for unknown loci
+  if genome.default_fixed:
+    return genos
+
+  # Do not attempt to lookahead if only a small number of loci are unknown
+  unknown = sum(1 for locus in loci if genome.get_locus(locus).model is None)
+  if unknown < min_unknown:
+    return genos
+
+  # Track the alleles seen
+  alleles_seen = [ [] for i in range(len(loci)) ]
+
+  # Start looking ahead up to max_lookahead rows
+  lookahead_rows = []
+  for sample,row in genos:
+    lookahead_rows.append( (sample,row) )
+
+    for g,seen in izip(row,alleles_seen):
+      seen.append(g[0])
+      seen.append(g[1])
+
+    if len(lookahead_rows) == max_lookahead:
+      break
+
+  # If there are rows in the lookahead buffer
+  if lookahead_rows:
+    max_alleles = genome.max_alleles
+    modelcache = {}
+
+    try:
+      # Review the alleles seen at each locus
+      for locus,seen in izip(loci,alleles_seen):
+        loc = genome.get_locus(locus)
+        model = loc.model
+
+        # If the model is unknown, then check the alleles
+        if model is None:
+          seen = set(seen)
+          seen.discard(None)
+
+          # Create or reuse a fixed model if all alleles have been seen
+          if len(seen) == max_alleles:
+            seen  = tuple(sorted(seen))
+            model = modelcache.get(seen)
+            if model is None:
+              model = modelcache[seen] = model_from_alleles(seen, max_alleles=max_alleles)
+            loc.model = model
+            loc.fixed = True
+            continue
+
+          # Otherwise create an empty default model
+          model = genome.get_model(locus)
+
+        # Populate the observed alleles when a fixed model cannot be used
+        for allele in seen:
+          model.add_allele(allele)
+
+    except ValueError:
+      raise ValueError('Locus model %s cannot accommodate additional allele %s (max_alleles=%d,alleles=%s)'
+                          % (locus,allele,model.max_alleles,','.join(model.alleles[1:])))
+
+    return chain(lookahead_rows,genos)
+  else:
+    return genos
+
+
 def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
                                                  unique=False):
   '''
@@ -1987,7 +2133,6 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
 
       modelcache = dict( (_genokey(m.genotypes),m) for m in models )
       descrcache = {}
-      unknown    = set()
 
       for locus,row in genos:
         key = None
@@ -2032,8 +2177,10 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
         yield locus,GenotypeArray(descr,row)
 
   elif format=='sdat':
+
+    genos = sdat_model_lookahead_from_tuples(columns,genos,genome)
+
     updates = []
-    unknown = set()
 
     for i,locus in enumerate(columns):
       loc = genome.get_locus_model(locus)
@@ -2051,14 +2198,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
         for sample,row in genos:
           try:
             for i,add in updates:
-              # Aggressively form homozygote genotypes and cache them.  Thus
-              # we only see cache misses when we encounter previously
-              # unobserved alleles.
-              g = g1,g2 = row[i]
-              if g1!=g2:
-                add( (g1,g1) )
-                add( (g2,g2) )
-              add(g)
+              add(row[i])
           except ValueError:
             model = models[i]
             raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
@@ -2183,7 +2323,6 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
       modelcache   = {}
       descrcache   = {}
       strcache     = {}
-      unknown      = set()
       to_string    = genorepr.to_string
       from_strings = genorepr.from_strings
 
@@ -2239,11 +2378,13 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
           yield locus,GenotypeArray(descr,imap(getitem, repeat(cache), row))
 
   elif format=='sdat':
+
+    genos = sdat_model_lookahead_from_strings(columns,genos,genome,genorepr)
+
     n = len(columns)
     updates   = []
     cachemap  = {}
     cachelist = []
-    unknown   = set()
 
     to_string    = genorepr.to_string
     from_strings = genorepr.from_strings
