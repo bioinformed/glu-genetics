@@ -32,7 +32,7 @@ from   glu.lib.genolib.formats   import *
 
 
 INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','bed','mach','merlin')
-OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','mach','merlin')
+OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','bed','mach','merlin')
 
 
 def guess_informat(filename):
@@ -231,11 +231,8 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     save_plink_ped(filename, genos, extra_args=args)
   elif format in ('plink_tped','tped'):
     save_plink_tped(filename, genos, extra_args=args)
-  # FIXME: Not yet
-  #elif format in ('plink_bed','bed'):
-  #  if genos.format not in ('sdat','ldat'):
-  #    genos = genos.as_ldat(mergefunc)
-  #  save_plink_bed(filename, genos, extra_args=args)
+  elif format in ('plink_bed','bed'):
+    save_plink_bed(filename, genos, extra_args=args)
   elif format in ('merlin','mach'):
     save_merlin(filename, genos, extra_args=args)
   elif not format:
@@ -318,9 +315,9 @@ def transform_files(infiles,informat,ingenorepr,
   if outformat is None:
     outformat = informat
 
-  if outformat in ('ldat','lbat','plink_tped','tped'):
+  if outformat in ('ldat','lbat','plink_tped','tped','plink_bed','bed'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
-  elif outformat in ('sdat','sbat','plink_ped','ped','merlin','mach'):
+  elif outformat in ('sdat','sbat','plink_ped','ped','plink_bed_ind','merlin','mach'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
   elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)

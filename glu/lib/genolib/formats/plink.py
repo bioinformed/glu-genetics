@@ -35,7 +35,7 @@ from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN,
 
 __all__ = ['PlinkPedWriter',  'save_plink_ped',  'load_plink_ped',
            'PlinkTPedWriter', 'save_plink_tped', 'load_plink_tped',
-           'load_plink_bed']
+           'PlinkBedWriter',  'save_plink_bed',  'load_plink_bed']
 
 
 ALLELE_MAP  = {'0':None}
@@ -349,6 +349,7 @@ class PlinkPedWriter(object):
     #self.out.close()
     self.out = None
 
+    # FIXME: map file writer should be refactored
     if self.mapfile:
       out = autofile(self.mapfile,'wb')
       for locus in self.loci:
@@ -677,6 +678,7 @@ class PlinkTPedWriter(object):
     #self.out.close()
     self.out = None
 
+    # FIXME: tfam file writer should be refactored
     if self.tfamfile:
       out = autofile(self.tfamfile,'wb')
       for sample in self.samples:
@@ -827,6 +829,31 @@ def _plink_decode(model,allele1,allele2):
   return genos
 
 
+def _plink_encode(model, shift=0):
+  genos = [1<<shift]*4
+
+  _plink_update_encoding(model, genos, shift)
+
+  return genos
+
+
+def _plink_update_encoding(model, genos, shift):
+  n  = len(model.alleles)
+
+  if n > 3:
+    raise ValueError('PLINK BIM files support only biallic models')
+
+  a1 = model.alleles[1] if n>1 else None
+  a2 = model.alleles[2] if n>2 else None
+
+  if a1:
+    genos[ model.add_genotype( (a1,a1) ).index ] = 0
+  if a2:
+    genos[ model.add_genotype( (a2,a2) ).index ] = 3<<shift
+  if a1 and a2:
+    genos[ model.add_genotype( (a1,a2) ).index ] = 2<<shift
+
+
 def load_plink_bed(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK BED format genotype data file.
@@ -865,10 +892,9 @@ def load_plink_bed(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   if mode not in [0,1]:
     raise ValueError('Invalid PLINK BED file mode')
 
-  unique = get_arg(args, ['unique'], True)
-  loc    = get_arg(args, ['loci'])
-  bim    = get_arg(args, ['map','bim' ]) or guess_related_file(filename,['bim'])
-  fam    = get_arg(args, ['fam','tfam']) or guess_related_file(filename,['fam','tfam'])
+  loc = get_arg(args, ['loci'])
+  bim = get_arg(args, ['map','bim' ]) or guess_related_file(filename,['bim'])
+  fam = get_arg(args, ['fam','tfam']) or guess_related_file(filename,['fam','tfam'])
 
   if bim is None:
     raise ValueError('BIM file must be specified when loading PLINK BED data')
@@ -905,11 +931,14 @@ def load_plink_bed(filename,genome=None,phenome=None,extra_args=None,**kwargs):
       genovalues = []
 
       for i,(locus,allele1,allele2) in enumerate(bim_loci):
-        model = models[i]
-        values = valuecache.get(model)
+        # Cache must key off model and allele order
+        model  = models[i]
+        key    = model,allele1,allele2
+
+        values = valuecache.get(key)
 
         if values is None:
-          values = valuecache[model] = _plink_decode(model,allele1,allele2)
+          values = valuecache[key] = _plink_decode(*key)
 
         byte  = i//4
         shift = 2*(i%4)
@@ -938,19 +967,335 @@ def load_plink_bed(filename,genome=None,phenome=None,extra_args=None,**kwargs):
       rowbytes = (len(samples)*2+7)//8
 
       for (locus,allele1,allele2),model in izip(bim_loci,models):
-        data = map(ord,gfile.read(rowbytes))
-
-        values = valuecache.get(model)
+        # Cache must key off model and allele order
+        key    = model,allele1,allele2
+        values = valuecache.get(key)
 
         if values is None:
-          values = valuecache[model] = _plink_decode(model,allele1,allele2)
+          values = valuecache[key] = _plink_decode(*key)
 
+        data = map(ord,gfile.read(rowbytes))
         genos = [ values[(data[byte]>>shift)&3] for byte,shift in genovalues ]
 
         yield locus,genos
 
   return GenomatrixStream(_load_plink(),format,loci=loci,samples=samples,models=models,
                                         genome=genome,phenome=phenome,unique=unique)
+
+
+class PlinkBedWriter(object):
+  '''
+  Object to write a PLINK BED file
+
+  See http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml
+
+  Example of writing an sdat file:
+
+  >>> loci =         (    'l1',       'l2',        'l3'  )
+  >>> rows = [('s1', ( ('A', 'A'), (None,None),  ('T','T'))),
+  ...         ('s2', ((None,None),  ('C','T'),   ('G','T'))),
+  ...         ('s3', ( ('A', 'T'),  ('T','C'),   ('G','G')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> import tempfile
+  >>> bed = tempfile.NamedTemporaryFile()
+  >>> bim = tempfile.NamedTemporaryFile()
+  >>> fam = tempfile.NamedTemporaryFile()
+  >>> with PlinkBedWriter(bed.name,genos.format,genos.columns,genos.genome,genos.phenome,
+  ...                     bim=bim.name,fam=fam.name) as writer:
+  ...   writer.writerows(genos)
+  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> genos.format
+  'sdat'
+  >>> genos.loci
+  ('l1', 'l2', 'l3')
+  >>> for row in genos:
+  ...   print row
+  ('s1:s1', [('A', 'A'), (None, None), ('T', 'T')])
+  ('s2:s2', [(None, None), ('C', 'T'), ('G', 'T')])
+  ('s3:s3', [('A', 'T'), ('C', 'T'), ('G', 'G')])
+
+  Example of writing an ldat file:
+
+  >>> samples =         (    's1',       's2',       's3'   )
+  >>> rows    = [('l1', ( ('A', 'A'), (None,None),  ('T','T'))),
+  ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
+  ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
+  >>> with PlinkBedWriter(bed.name,genos.format,genos.columns,genos.genome,genos.phenome,
+  ...                     bim=bim.name,fam=fam.name) as writer:
+  ...   writer.writerows(genos)
+  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> genos.format
+  'ldat'
+  >>> genos.samples
+  ('s1:s1', 's2:s2', 's3:s3')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), (None, None), ('T', 'T')])
+  ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
+  ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
+  '''
+  def __init__(self,filename,format,columns,genome,phenome,extra_args=None,**kwargs):
+    '''
+    @param     filename: file name or file object
+    @type      filename: str or file object
+    @param       format: data format string
+    @type        format: str
+    @param      samples: sample names
+    @type       samples: list of str
+    @param       genome: genome descriptor
+    @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
+    '''
+    if format not in ('ldat','sdat'):
+      raise IOError('format must be either ldat or sdat')
+
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    filename = parse_augmented_filename(filename,args)
+
+    bimfile = get_arg(args, ['bim'])
+    famfile = get_arg(args, ['fam'])
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    # Careful: file=<blank> is intended to supress output
+    if famfile is None:
+      famfile = related_file(filename,'fam')
+    if bimfile is None:
+      bimfile = related_file(filename,'bim')
+
+    self.out     = autofile(filename,'wb')
+    self.format  = format
+    self.columns = columns
+    self.rowkeys = []
+    self.genome  = genome
+    self.phenome = phenome
+    self.famfile = famfile
+    self.bimfile = bimfile
+
+    # Write magic number
+    self.out.write( ''.join( map(chr,[0x6c,0x1b]) ) )
+
+    # Write magic number and mode=1
+    if format=='ldat':
+      # Write BED mode
+      self.out.write( chr(1) )
+    else:
+      # Write BED mode
+      self.out.write( chr(0) )
+      models = [ self.genome.get_model(locus) for locus in self.columns ]
+
+      # Build encodings for each locus and store the set of cached encodings
+      # so they can be updated as new alleles are detected.
+      #
+      # FIXME: This approach is optimal if all alleles are known, but falls
+      #        apart otherwise.  A better approach would be to use an
+      #        optimistic dict based approach that resolves new genotypes
+      #        only when encoding results in a KeyError.
+      #
+      # FIXME: Even using this appoach, we should be able to remove fixed
+      #        models from the cache to avoid unnecessary updates.
+      self.valuecache = valuecache = {}
+      self.genovalues = genovalues = []
+
+      for i,model in enumerate(models):
+        shift  = 2*(i%4)
+        key    = model,shift
+        values = valuecache.get(key)
+        if values is None:
+          values = valuecache[key] = _plink_encode(model,shift)
+        genovalues.append(values)
+
+  def writerow(self, rowkey, genos):
+    '''
+    Write a row of genotypes given the row key and list of genotypes
+
+    @param rowkey: row identifier
+    @type  rowkey: str
+    @param  genos: sequence of genotypes in an internal representation
+    @type   genos: sequence
+    '''
+    out = self.out
+    if out is None:
+      raise IOError('Cannot write to closed writer object')
+
+    n = len(self.columns)
+    if len(genos) != n:
+      raise ValueError('[ERROR] Internal error: Genotypes do not match columns')
+
+    rowbytes = (n*2+7)//8
+    row      = [0]*rowbytes
+
+    if self.format == 'ldat':
+      # Build encodings for each of the 4 shift values for each model
+      model  = self.genome.get_model(rowkey)
+      values = [ _plink_encode(model,shift) for shift in [0,2,4,6] ]
+
+      for i,g in enumerate(genos):
+        row[i//4] |= values[i%4][g.index]
+    else:
+      # FIXME: This update encodings once per model,shift value, but it is
+      #        still fairly blecherously slow.
+      for (model,shift),values in self.valuecache.iteritems():
+        _plink_update_encoding(model, values, shift)
+
+      values = self.genovalues
+
+      for i,g in enumerate(genos):
+        row[i//4] |= values[i][g.index]
+
+    # Write row
+    out.write( ''.join(map(chr,row)) )
+    self.rowkeys.append(rowkey)
+
+  def writerows(self, rows):
+    '''
+    Write rows of genotypes given pairs of row key and list of genotypes
+
+    @param rows: sequence of pairs of row key and sequence of genotypes in
+                 an internal representation
+    @type  rows: sequence of (str,sequence)
+    '''
+    out = self.out
+    if out is None:
+      raise IOError('Cannot write to closed writer object')
+
+    n = len(self.columns)
+    rowbytes = (n*2+7)//8
+
+    if self.format=='sdat':
+      values = self.genovalues
+
+    for rowkey,genos in rows:
+      if len(genos) != n:
+        raise ValueError('[ERROR] Internal error: Genotypes do not match columns')
+
+      row = [0]*rowbytes
+
+      if self.format=='ldat':
+        # Build encodings for each of the 4 shift values for each model
+        model  = self.genome.get_model(rowkey)
+        values = [ _plink_encode(model,shift) for shift in [0,2,4,6] ]
+
+        for i,g in enumerate(genos):
+          row[i//4] |= values[i%4][g.index]
+      else:
+        # FIXME: This updates once per model,shift value, but it is still
+        #        fairly blecherously slow.
+        for (model,shift),values in self.valuecache.iteritems():
+          _plink_update_encoding(model, values, shift)
+
+        values = self.genovalues
+
+        for i,g in enumerate(genos):
+          row[i//4] |= values[i][g.index]
+
+      # Write row
+      out.write( ''.join(map(chr,row)) )
+      self.rowkeys.append(rowkey)
+
+  def close(self):
+    '''
+    Close the writer
+
+    A closed writer cannot be used for further I/O operations and will
+    result in an error if called more than once.
+    '''
+    if self.out is None:
+      raise IOError('Writer object already closed')
+
+    self.out.close()
+    self.out = None
+
+    if self.format=='ldat':
+      loci,samples = self.rowkeys,self.columns
+    else:
+      loci,samples = self.columns,self.rowkeys
+
+    # FIXME: fam file writer should be refactored
+    if self.famfile:
+      out = autofile(self.famfile,'wb')
+      for sample in samples:
+        phenos     = self.phenome.get_phenos(sample)
+        family     = phenos.family
+        individual = phenos.individual or sample
+        parent1    = phenos.parent1
+        parent2    = phenos.parent2
+
+        if parent1 and parent2:
+          p1 = phenome.get_phenos(parent1)
+          p2 = phenome.get_phenos(parent2)
+          if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
+            parent1,parent2 = parent2,parent1
+
+        sex   = SEX_RMAP[phenos.sex]
+        pheno = PHENO_RMAP[phenos.phenoclass]
+
+        row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
+        out.write( ' '.join(row))
+        out.write('\r\n')
+
+    # FIXME: bim file writer should be refactored
+    if self.bimfile:
+      out = autofile(self.bimfile,'wb')
+      for locus in loci:
+        loc   = self.genome.get_locus(locus)
+        a1,a2 = (loc.model.alleles[1:]+[0,0])[:2]
+
+        out.write( ' '.join( map(str,[loc.chromosome or 0,locus,0,loc.location or 0, a1, a2] )) )
+        out.write('\r\n')
+
+  def __enter__(self):
+    '''
+    Context enter function
+    '''
+    return self
+
+  def __exit__(self, *exc_info):
+    '''
+    Context exit function that closes the writer upon exit
+    '''
+    self.close()
+
+
+def save_plink_bed(filename,genos,extra_args=None,**kwargs):
+  '''
+  Write the genotype matrix data to file.
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param        genos: genomatrix stream
+  @type         genos: sequence
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename  = parse_augmented_filename(filename,args)
+
+  mergefunc = get_arg(args, ['mergefunc'])
+
+  if genos.format not in ('sdat','ldat'):
+    genos = genos.as_ldat(mergefunc)
+  elif mergefunc is not None:
+    genos = genos.merged(mergefunc)
+
+  with PlinkBedWriter(filename, genos.format, genos.columns, genos.genome, genos.phenome,
+                                extra_args=args) as writer:
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    writer.writerows(genos)
 
 
 ###############################################################################################
