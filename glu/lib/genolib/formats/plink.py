@@ -127,8 +127,8 @@ def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
     populate_genome(genome,loci)
     loci = [ intern(l[0]) for l in loci ]
 
-  if dat:
-    map_loci = list(load_merlin_dat(dat,genome))
+  if lmap:
+    map_loci = list(load_plink_map(lmap,genome))
     if not loci:
       loci = map_loci
     elif loci != map_loci:
