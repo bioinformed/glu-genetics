@@ -223,6 +223,9 @@ class MerlinWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
+    if phenome is None:
+      phenome = Phenome()
+
     self.out       = autofile(filename,'wb')
     self.loci      = loci
     self.genome    = genome
@@ -247,8 +250,6 @@ class MerlinWriter(object):
 
     if phenome is None:
       phenome = self.phenome
-    if phenome is None:
-      phenome = Phenome()
 
     phenos     = phenome.get_phenos(sample)
     family     = phenos.family
@@ -287,8 +288,6 @@ class MerlinWriter(object):
 
     if phenome is None:
       phenome = self.phenome
-    if phenome is None:
-      phenome = Phenome()
 
     for sample,genos in rows:
       if len(genos) != n:

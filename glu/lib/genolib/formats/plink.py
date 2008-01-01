@@ -240,6 +240,9 @@ class PlinkPedWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
+    if phenome is None:
+      phenome = Phenome()
+
     self.out       = autofile(filename,'wb')
     self.loci      = loci
     self.genome    = genome
@@ -264,8 +267,6 @@ class PlinkPedWriter(object):
 
     if phenome is None:
       phenome = self.phenome
-    if phenome is None:
-      phenome = Phenome()
 
     phenos     = phenome.get_phenos(sample)
     family     = phenos.family
@@ -304,8 +305,6 @@ class PlinkPedWriter(object):
 
     if phenome is None:
       phenome = self.phenome
-    if phenome is None:
-      phenome = Phenome()
 
     for sample,genos in rows:
       if len(genos) != n:
@@ -492,9 +491,6 @@ def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   if genome is None:
     genome = Genome()
 
-  if phenome is None:
-    phenome = Phenome()
-
   if loci and isinstance(loci,basestring):
     loci = list(load_locus_records(loci)[2])
     # Merge map data into genome
@@ -602,6 +598,9 @@ class PlinkTPedWriter(object):
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    if phenome is None:
+      phenome = Phenome()
 
     self.out       = autofile(filename,'wb')
     self.samples   = samples
@@ -1070,6 +1069,9 @@ class PlinkBedWriter(object):
       famfile = related_file(filename,'fam')
     if bimfile is None:
       bimfile = related_file(filename,'bim')
+
+    if phenome is None:
+      phenome = Phenome()
 
     self.out     = autofile(filename,'wb')
     self.format  = format
