@@ -42,6 +42,11 @@ except ImportError:
 
   MISSING,HEMIZYGOTE,HETEROZYGOTE,HOMOZYGOTE=range(4)
 
+
+  def _hemi(geno):
+    return (geno[0] is None) ^ (geno[1] is None)
+
+
   class Genotype(object):
     '''
     Python implementation of a genotype representation object.  Genotype
@@ -478,7 +483,13 @@ except ImportError:
           return geno
         geno = geno.alleles()
 
-      return self.genomap[geno]
+      try:
+        return self.genomap[geno]
+      except KeyError:
+        if (geno[0] in self.alleles and geno[1] in self.alleles and
+           (self.allow_hemizygote or not _hemi(geno))):
+          return self.add_genotype(geno)
+        raise
 
     __getitem__ = get_genotype
 

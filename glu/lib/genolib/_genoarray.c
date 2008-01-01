@@ -697,49 +697,6 @@ genomodel_add_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 }
 
 static PyObject *
-genomodel_get_genotype(UnphasedMarkerModelObject *self,  PyObject *geno)
-{
-	PyObject *g;
-
-	/* If geno is a genotype object */
-	if(Genotype_CheckExact(geno))
-	{
-		GenotypeObject *genoobj = (GenotypeObject *)geno;
-		/* If it belongs to this model, just return it */
-		if(genoobj->model == self)
-		{
-			Py_INCREF(geno);
-			return geno;
-		}
-		else
-		{
-			/* Handle foreign genotypes by looking them up by their alleles */
-			geno = genotype_alleles(genoobj);
-			if(!geno)
-				return NULL;
-			Py_DECREF(geno); /* safe to treat as a borrowed reference */
-		}
-
-	}
-
-	if(!PyTuple_CheckExact(geno) || PyTuple_GET_SIZE(geno) != 2)
-	{
-		PyErr_SetString(PyExc_ValueError,"genotype must be specified as a 2-tuple");
-		return NULL;
-	}
-
-	g = PyDict_GetItem(self->genomap, geno);
-	if(!g)
-	{
-		PyErr_SetObject(PyExc_KeyError, geno);
-		return NULL;
-	}
-
-	Py_INCREF(g);
-	return g;
-}
-
-static PyObject *
 genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 {
 	PyObject *allele1, *allele2, *args, *g;
@@ -853,6 +810,80 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 error:
 	Py_XDECREF(g);
 	return NULL;
+}
+
+static PyObject *
+genomodel_get_genotype(UnphasedMarkerModelObject *self,  PyObject *geno)
+{
+	PyObject *g;
+
+	/* If geno is a genotype object */
+	if(Genotype_CheckExact(geno))
+	{
+		GenotypeObject *genoobj = (GenotypeObject *)geno;
+		/* If it belongs to this model, just return it */
+		if(genoobj->model == self)
+		{
+			Py_INCREF(geno);
+			return geno;
+		}
+		else
+		{
+			/* Handle foreign genotypes by looking them up by their alleles */
+			geno = genotype_alleles(genoobj);
+			if(!geno)
+				return NULL;
+			Py_DECREF(geno); /* safe to treat as a borrowed reference */
+		}
+
+	}
+
+	if(!PyTuple_CheckExact(geno) || PyTuple_GET_SIZE(geno) != 2)
+	{
+		PyErr_SetString(PyExc_ValueError,"genotype must be specified as a 2-tuple");
+		return NULL;
+	}
+
+	g = PyDict_GetItem(self->genomap, geno);
+
+	/* If genotype contains both alleles, then create it implicitly.
+	   This is the most obvious behavior and deals with a slew of tricky
+	   and inefficient alternative workarounds. */
+	if(!g)
+	{
+		int c1,c2;
+		PyObject *allele1, *allele2;
+
+		allele1 = PyTuple_GET_ITEM(geno, 0);
+		allele2 = PyTuple_GET_ITEM(geno, 1);
+
+		/* Do not implicitly try to add hemizygotes if they are not allowed */
+		if( !self->allow_hemizygote && ((allele1 == Py_None) ^ (allele2 == Py_None)) )
+		{
+			PyErr_SetObject(PyExc_KeyError, geno);
+			return NULL;
+		}
+
+		c1 = PySequence_Contains(self->alleles, allele1);
+		if(c1 == -1)
+			return NULL;
+
+		c2 = PySequence_Contains(self->alleles, allele2);
+		if(c2 == -1)
+			return NULL;
+
+		if(c1 && c2)
+			return genomodel_add_genotype(self, geno);
+	}
+
+	if(!g)
+	{
+		PyErr_SetObject(PyExc_KeyError, geno);
+		return NULL;
+	}
+
+	Py_INCREF(g);
+	return g;
 }
 
 static int
