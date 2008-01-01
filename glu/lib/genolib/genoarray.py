@@ -494,7 +494,7 @@ except ImportError:
       g = Genotype(self, allele1, allele2, len(self.genotypes))
 
       if not self.allow_hemizygote and g.hemizygote():
-        raise GenotypeError('Genotype model does not all hemizygous genotypes')
+        raise GenotypeError('Genotype model does not allow hemizygous genotypes')
 
       self.genotypes.append(g)
       self.genomap[allele1,allele2] = g
