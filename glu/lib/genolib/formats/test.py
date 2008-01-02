@@ -21,7 +21,8 @@ def test(report=True):
   import os
   import doctest
 
-  from   glu.lib.genolib.formats import binary,text,hapmap,prettybase,plink,merlin,structure,phase
+  from   glu.lib.genolib.formats import binary,text,hapmap,prettybase,plink, \
+                                        merlin,structure,phase,wtccc
   import text as local_text
 
   # Standardize on the .py source, since one can load the .py and the other the .pyc
@@ -34,7 +35,7 @@ def test(report=True):
   except OSError:
     raise ImportError('Your PYTHONPATH/pkg_resources are not set correctly to find this GLU tree')
 
-  for module in text,binary,hapmap,prettybase,plink,merlin,structure,phase:
+  for module in text,binary,hapmap,prettybase,plink,merlin,structure,phase,wtccc:
     doctest.testmod(module,report=False)
   doctest.master.summarize()
 

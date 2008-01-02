@@ -41,7 +41,7 @@ OUTPUT_FORMATS = ['ldat','sdat','tdat','trip','genotriple',
                   'prettybase','pb',
                   'lbat','sbat','tbat',
                   'ped','tped','bed',
-                  'mach','merlin','structure','phase']
+                  'mach','merlin','structure','phase','wtccc']
 
 
 def guess_informat(filename):
@@ -248,6 +248,8 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     save_structure(filename, genos, extra_args=args)
   elif format == 'phase':
     save_phase(filename, genos, extra_args=args)
+  elif format == 'wtccc':
+    save_wtccc(filename, genos, extra_args=args)
   elif not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:
@@ -328,7 +330,7 @@ def transform_files(infiles,informat,ingenorepr,
   if outformat is None:
     outformat = informat
 
-  if outformat in ('ldat','lbat','plink_tped','tped','plink_bed','bed'):
+  if outformat in ('ldat','lbat','plink_tped','tped','plink_bed','bed','wtccc'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
   elif outformat in ('sdat','sbat','plink_ped','ped','plink_bed_ind','merlin','mach','structure','phase'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
