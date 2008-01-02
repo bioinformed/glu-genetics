@@ -21,3 +21,4 @@ from   glu.lib.genolib.formats.hapmap     import *
 from   glu.lib.genolib.formats.plink      import *
 from   glu.lib.genolib.formats.merlin     import *
 from   glu.lib.genolib.formats.structure  import *
+from   glu.lib.genolib.formats.phase      import *

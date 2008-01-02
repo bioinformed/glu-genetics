@@ -31,8 +31,17 @@ from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.formats   import *
 
 
-INPUT_FORMATS  = ('ldat','hapmap','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','bed','mach','merlin')
-OUTPUT_FORMATS = ('ldat','sdat','tdat','trip','genotriple','prettybase','pb','lbat','sbat','tbat','ped','tped','bed','mach','merlin')
+INPUT_FORMATS  = ['ldat','sdat','tdat','trip','genotriple',
+                  'prettybase','pb',
+                  'lbat','sbat','tbat',
+                  'ped','tped','bed',
+                  'hapmap','mach','merlin']
+
+OUTPUT_FORMATS = ['ldat','sdat','tdat','trip','genotriple',
+                  'prettybase','pb',
+                  'lbat','sbat','tbat',
+                  'ped','tped','bed',
+                  'mach','merlin','structure','phase']
 
 
 def guess_informat(filename):
@@ -235,6 +244,10 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     save_plink_bed(filename, genos, extra_args=args)
   elif format in ('merlin','mach'):
     save_merlin(filename, genos, extra_args=args)
+  elif format == 'structure':
+    save_structure(filename, genos, extra_args=args)
+  elif format == 'phase':
+    save_phase(filename, genos, extra_args=args)
   elif not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:
@@ -317,7 +330,7 @@ def transform_files(infiles,informat,ingenorepr,
 
   if outformat in ('ldat','lbat','plink_tped','tped','plink_bed','bed'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
-  elif outformat in ('sdat','sbat','plink_ped','ped','plink_bed_ind','merlin','mach'):
+  elif outformat in ('sdat','sbat','plink_ped','ped','plink_bed_ind','merlin','mach','structure','phase'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
   elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
