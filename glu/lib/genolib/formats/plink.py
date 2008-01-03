@@ -1001,6 +1001,9 @@ class PlinkBedWriter(object):
   >>> fam = tempfile.NamedTemporaryFile()
   >>> with PlinkBedWriter(bed.name,genos.format,genos.columns,genos.genome,genos.phenome,
   ...                     bim=bim.name,fam=fam.name) as writer:
+  ...   genos=iter(genos)
+  ...   writer.writerow(*genos.next())
+  ...   writer.writerow(*genos.next())
   ...   writer.writerows(genos)
   >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
   >>> genos.format
@@ -1022,6 +1025,9 @@ class PlinkBedWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
   >>> with PlinkBedWriter(bed.name,genos.format,genos.columns,genos.genome,genos.phenome,
   ...                     bim=bim.name,fam=fam.name) as writer:
+  ...   genos=iter(genos)
+  ...   writer.writerow(*genos.next())
+  ...   writer.writerow(*genos.next())
   ...   writer.writerows(genos)
   >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
   >>> genos.format
@@ -1275,6 +1281,48 @@ def save_plink_bed(filename,genos,extra_args=None,**kwargs):
   @type      filename: str or file object
   @param        genos: genomatrix stream
   @type         genos: sequence
+
+  Example of writing an sdat file:
+
+  >>> loci =         (    'l1',       'l2',        'l3'  )
+  >>> rows = [('s1', ( ('A', 'A'), (None,None),  ('T','T'))),
+  ...         ('s2', ((None,None),  ('C','T'),   ('G','T'))),
+  ...         ('s3', ( ('A', 'T'),  ('T','C'),   ('G','G')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> import tempfile
+  >>> bed = tempfile.NamedTemporaryFile()
+  >>> bim = tempfile.NamedTemporaryFile()
+  >>> fam = tempfile.NamedTemporaryFile()
+  >>> save_plink_bed(bed.name,genos,bim=bim.name,fam=fam.name)
+  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> genos.format
+  'sdat'
+  >>> genos.loci
+  ('l1', 'l2', 'l3')
+  >>> for row in genos:
+  ...   print row
+  ('s1:s1', [('A', 'A'), (None, None), ('T', 'T')])
+  ('s2:s2', [(None, None), ('C', 'T'), ('G', 'T')])
+  ('s3:s3', [('A', 'T'), ('C', 'T'), ('G', 'G')])
+
+  Example of writing an ldat file:
+
+  >>> samples =         (    's1',       's2',       's3'   )
+  >>> rows    = [('l1', ( ('A', 'A'), (None,None),  ('T','T'))),
+  ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
+  ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
+  >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
+  >>> save_plink_bed(bed.name,genos,bim=bim.name,fam=fam.name)
+  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> genos.format
+  'ldat'
+  >>> genos.samples
+  ('s1:s1', 's2:s2', 's3:s3')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), (None, None), ('T', 'T')])
+  ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
+  ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
   '''
   if extra_args is None:
     args = kwargs

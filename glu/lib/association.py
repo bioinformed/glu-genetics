@@ -124,6 +124,18 @@ contingency_table = contingency_table_categorical
 
 
 def contingency_analysis(c,mincell=5,minmargin=15):
+  '''
+  >>> t,df,ors = contingency_analysis( [[1,2,3],[3,3,1],[1,4,1]],mincell=0,minmargin=1)
+  >>> t
+  3.7798941798941801
+  >>> df
+  4
+  >>> ors
+  array([[ 0.5       ,  0.11111111],
+         [ 2.        ,  0.33333333]])
+  '''
+  c = asanyarray(c,dtype=int)
+
   if not c.size:
     return nan,0,array([],dtype=float)
 
@@ -171,9 +183,15 @@ def contingency_analysis(c,mincell=5,minmargin=15):
   return t,df,ors
 
 
-# Cochrane-Armitage Trend Test for 2xc tables
 def table_trend(x):
   '''
+  Cochrane-Armitage Trend Test for 2xc tables
+
+  @param  x: 2xc table of counts
+  @type   x: 2d array or list of lists
+  @return  : Cochrane-Armitage trend test statistic (chi-squared w/ 1 df)
+  @rtype   : float
+
   >>> x = [[26,26,23,18,9],[6,7,9,14,23]]
   >>> table_trend(x)
   22.9614677639
