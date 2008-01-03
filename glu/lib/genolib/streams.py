@@ -2938,6 +2938,36 @@ def merge_genomatrixstream_columns(genos, mergefunc):
   ('s2', [(None, None), ('A', 'C')])
   ('s3', [('A', 'A'), ('A', 'A')])
   ('s4', [(None, None), (None, None)])
+
+  >>> loci = ('l1','l2','l3')
+  >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'G') ]),
+  ...         ('s2',[(None, None), (None, None), (None, None)]),
+  ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
+  ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T') ])]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).as_ldat()
+  >>> geons = merge_genomatrixstream_columns(genos,VoteMerger())
+  >>> genos.samples
+  ('s1', 's2', 's3', 's4')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), (None, None), ('A', 'A'), ('A', 'T')])
+  ('l2', [(None, None), (None, None), (None, None), (None, None)])
+  ('l3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
+
+  >>> loci = ('l1','l2','l3')
+  >>> rows = [('s1',[ ('A','A'), (None,None), ('G', 'G')]),
+  ...         ('s2',[(None,None), ('A','C'), (None,None)]),
+  ...         ('s1',[ ('A','A'),  ('A','A'), (None,None)]),
+  ...         ('s4',[ ('G','A'), (None,None), ('G','G') ])]
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).as_ldat()
+  >>> genos = merge_genomatrixstream_columns(genos,VoteMerger())
+  >>> genos.samples
+  ('s1', 's2', 's4')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), (None, None), ('A', 'G')])
+  ('l2', [('A', 'A'), ('A', 'C'), (None, None)])
+  ('l3', [('G', 'G'), (None, None), ('G', 'G')])
   '''
   assert mergefunc is not None
 
@@ -3122,7 +3152,6 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
   ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T')])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
-
   >>> merger= VoteMerger()
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
@@ -3138,12 +3167,27 @@ def merge_genomatrixstream(genos, mergefunc):
   >>> sorted(merger.locusstats.iteritems())
   [('l1', [3, 0, 0, 0, 1]), ('l2', [0, 0, 0, 0, 4]), ('l3', [2, 0, 0, 0, 2])]
 
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
+  >>> genos.loci = None
+  >>> merger= VoteMerger()
+  >>> genos = merge_genomatrixstream(genos,merger)
+  >>> genos.samples
+  ('s1', 's2', 's3', 's4')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), (None, None), ('A', 'A'), ('A', 'T')])
+  ('l2', [(None, None), (None, None), (None, None), (None, None)])
+  ('l3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
+  >>> sorted(merger.samplestats.iteritems())
+  [('s1', [2, 0, 0, 0, 1]), ('s2', [0, 0, 0, 0, 3]), ('s3', [1, 0, 0, 0, 2]), ('s4', [2, 0, 0, 0, 1])]
+  >>> sorted(merger.locusstats.iteritems())
+  [('l1', [3, 0, 0, 0, 1]), ('l2', [0, 0, 0, 0, 4]), ('l3', [2, 0, 0, 0, 2])]
+
   >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'T') ]),
   ...         ('s2',[(None, None), ('A', 'C'),   (None, None)]),
   ...         ('s1',[ ('A', 'A'),  ('A', 'A'),   (None, None)]),
   ...         ('s1',[ ('A', 'T'), (None, None),  ('G', 'T') ])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
-
   >>> merger=VoteMerger()
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
@@ -3157,13 +3201,27 @@ def merge_genomatrixstream(genos, mergefunc):
   >>> sorted(merger.locusstats.iteritems())
   [('l1', [0, 0, 0, 1, 1]), ('l2', [1, 1, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
 
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
+  >>> merger=VoteMerger()
+  >>> genos = merge_genomatrixstream(genos,merger)
+  >>> genos.samples
+  ('s1', 's2')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [(None, None), (None, None)])
+  ('l2', [('A', 'A'), ('A', 'C')])
+  ('l3', [('G', 'T'), (None, None)])
+  >>> sorted(merger.samplestats.iteritems())
+  [('s1', [0, 2, 0, 1, 0]), ('s2', [1, 0, 0, 0, 2])]
+  >>> sorted(merger.locusstats.iteritems())
+  [('l1', [0, 0, 0, 1, 1]), ('l2', [1, 1, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
+
   >>> loci = ('l1','l2','l1')
   >>> rows = [('s1',[(None, None), (None, None),  ('C', 'T')]),
   ...         ('s2',[(None, None),  ('A', 'G'),   ('T', 'T')]),
   ...         ('s1',[ ('C', 'C'),   ('A', 'A'),  (None, None)]),
   ...         ('s1',[ ('C', 'T'),  (None, None),  ('C', 'T')])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
-
   >>> merger=VoteMerger()
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
@@ -3176,15 +3234,31 @@ def merge_genomatrixstream(genos, mergefunc):
   [('s1', [0, 1, 0, 1, 0]), ('s2', [1, 1, 0, 0, 0])]
   >>> sorted(merger.locusstats.iteritems())
   [('l1', [0, 1, 0, 1, 0]), ('l2', [1, 1, 0, 0, 0])]
+
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
+  >>> merger=VoteMerger()
+  >>> genos = merge_genomatrixstream(genos,merger)
+  >>> genos.samples
+  ('s1', 's2')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [(None, None), ('T', 'T')])
+  ('l2', [('A', 'A'), ('A', 'G')])
+  >>> sorted(merger.samplestats.iteritems())
+  [('s1', [0, 1, 0, 1, 0]), ('s2', [1, 1, 0, 0, 0])]
+  >>> sorted(merger.locusstats.iteritems())
+  [('l1', [0, 1, 0, 1, 0]), ('l2', [1, 1, 0, 0, 0])]
   '''
   assert mergefunc is not None
 
+  # FIXME: Does not update stats
   if genos.unique:
     return genos
 
   merge_rows = genos.rows    is None or len(genos.rows)    != len(set(genos.rows))
   merge_cols = genos.columns is None or len(genos.columns) != len(set(genos.columns))
 
+  # FIXME: Does not update stats
   if not merge_rows and not merge_cols:
     return genos
 
@@ -4544,6 +4618,21 @@ def rename_genomatrixstream_row(genos,rowmap):
   ...   print row
   ('L1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
   ('L2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
+
+  >>> samples =     ('s1','s2','s3')
+  >>> rows = [('l1',['AA','AG','GG']),
+  ...         ('l2',['AA','AT','TT'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'ldat',snp,samples=samples).as_sdat()
+
+  >>> rowmap = {'s1':'S1','s2':'S2','s3':'S3'}
+  >>> genos = rename_genomatrixstream_row(genos,rowmap)
+  >>> genos.loci
+  ('l1', 'l2')
+  >>> for row in genos:
+  ...   print row
+  ('S1', [('A', 'A'), ('A', 'A')])
+  ('S2', [('A', 'G'), ('A', 'T')])
+  ('S3', [('G', 'G'), ('T', 'T')])
   '''
   if genos.rows is not None:
     rows = tuple(rowmap.get(label,label) for label in genos.rows)
@@ -4566,6 +4655,8 @@ def rename_genomatrixstream_row(genos,rowmap):
     new_genos = new_genos.transformed(recode_models=Genome())
 
   else:
+    phenome = Phenome()
+
     def _rename():
       for sample,row in genos:
         new_name = rowmap.get(sample,sample)
@@ -4619,6 +4710,30 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
   >>> for row in new_genos:
   ...   print row
   ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
+
+  >>> genos = GenomatrixStream.from_strings(rows,'ldat',snp,samples=samples).as_sdat().materialize()
+  >>> genos.loci
+  ('l1', 'l2')
+  >>> for row in genos:
+  ...   print row
+  ('s1', [('A', 'A'), ('A', 'A')])
+  ('s2', [('A', 'G'), ('A', 'T')])
+  ('s3', [('G', 'G'), ('T', 'T')])
+
+  >>> rowset = set(['s1'])
+  >>> new_genos = filter_genomatrixstream_by_row(genos,rowset)
+  >>> new_genos.loci
+  ('l1', 'l2')
+  >>> for row in new_genos:
+  ...   print row
+  ('s1', [('A', 'A'), ('A', 'A')])
+  >>> new_genos = filter_genomatrixstream_by_row(genos,rowset,exclude=True)
+  >>> new_genos.loci
+  ('l1', 'l2')
+  >>> for row in new_genos:
+  ...   print row
+  ('s2', [('A', 'G'), ('A', 'T')])
+  ('s3', [('G', 'G'), ('T', 'T')])
   '''
   # FIXME: Implement fast path when rows are known
   rows = genos.rows
