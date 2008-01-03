@@ -1322,25 +1322,6 @@ class GLogit(object):
     return bmat2d(XX)
 
 
-  def update_estimates(self,w,W,mu,eta):
-    '''
-    Update parameter estimates by least-squares by regressing the weighted
-    augmented design matrix on the weighted dependent vector.
-    '''
-    X = self.X
-    k = len(mu)
-
-    ww = block_cholesky(w,lower=False)
-    uw = [ [ ww[i][j].copy() for j in xrange(k) ] for i in xrange(k) ]
-    iw = block_inverse_from_triangular(ww,lower=False)
-
-    zz = self.dependent_vector(mu,eta,iw,uw)
-    XX = self.design_matrix(uw)
-
-    b,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz)
-    return asmatrix(b,dtype=float),asmatrix(W,dtype=float)
-
-
   def score_test(self,parameters=None,indices=None):
     return GLogitScoreTest(self,parameters=parameters,indices=indices)
 
