@@ -391,13 +391,13 @@ def main():
   if options.samplestats:
     out = csv.writer(autofile(options.samplestats,'w'),dialect='tsv')
     out.writerow(['SAMPLE','GC_MEAN','GC_STDDEV'])
-    out.writerows( [ (s,'%.2f' % gc, '%.3f' % dev)
+    out.writerows( [ (s,'%.4f' % gc, '%.4f' % dev)
                       for s,gc,dev in summary.samplestats ] )
 
   if options.locusstats:
     out = csv.writer(autofile(options.locusstats,'w'),dialect='tsv')
     out.writerow(['LOCUS','GENTRAIN','GC_MEAN','GC_STDDEV'])
-    out.writerows( [ (l,'%.2f' % gt, '%.2f' % gc, '%.3f' % dev)
+    out.writerows( [ (l,'%.4f' % gt, '%.4f' % gc, '%.4f' % dev)
                       for (l,gc,dev),gt in izip_exact(summary.locusstats,gentrain) ] )
 
 
