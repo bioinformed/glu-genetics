@@ -68,10 +68,13 @@ class Genome(object):
   FIXME: docstring
   '''
 
-  def __init__(self, default_model=None, default_fixed=False, max_alleles=0, alleles=None, loci=None):
+  def __init__(self, default_model=None, default_fixed=False, max_alleles=None, alleles=None, loci=None):
     '''
     FIXME: docstring
     '''
+    if not alleles and not max_alleles:
+      max_alleles = 2
+
     self.loci          = dict( (locus.name,locus) for locus in loci or [])
     self.max_alleles   = max_alleles or 0
     self.alleles       = alleles or []
