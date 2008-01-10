@@ -2125,14 +2125,16 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   if format=='ldat':
     def _encode():
       n = len(columns)
+      m = genome.max_alleles+1
+
+      modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
+                               if locus.model is not None and len(locus.model.alleles)==m )
+      descrcache = {}
 
       def _genokey(genos):
-        gset = set(tuple(sorted(g)) for g in set(genos))
-        gset.discard( (None,None) )
+        gset = set(a for g in set(genos) for a in g)
+        gset.discard(None)
         return tuple(sorted(gset))
-
-      modelcache = dict( (_genokey(m.genotypes),m) for m in models )
-      descrcache = {}
 
       for locus,row in genos:
         key = None
@@ -2140,19 +2142,17 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
         loc = genome.get_locus(locus)
 
         if loc.model is None:
-          if unique:
-            # If we can assume that loci are unique, then aggressively reuse
-            # compatible models
-            key   = _genokey(row)
-            model = modelcache.get(key)
-          else:
-            model = None
+          key = _genokey(row)
+          cachable = genome.default_model is None and len(key) == genome.max_alleles
 
-          # FIXME: Awkward
-          genome.merge_locus(locus, model, unique)
-          genome.get_locus_model(locus)
+          if cachable:
+            # Aggressively reuse models with fully compatible alleles
+            loc.model = modelcache.get(key)
 
-          if unique:
+          if loc.model is None:
+            genome.get_locus_model(locus)
+
+          if cachable:
             modelcache[key] = loc.model
 
         model = loc.model
@@ -2160,13 +2160,13 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
         assert model is not None
 
         if not loc.fixed:
-          key = key or set(row)
+          key = key or _genokey(row)
           try:
-            for g in key:
-              model.add_genotype(g)
+            for a in key:
+              model.add_allele(a)
           except ValueError:
-            raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
-                                % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
+            raise ValueError('Locus model %s cannot accommodate allele %s (max_alleles=%d,alleles=%s)'
+                                % (locus,s,model.max_alleles,','.join(model.alleles[1:])))
 
         descr = descrcache.get(model)
         if not descr:
@@ -2319,44 +2319,48 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   if format=='ldat':
     def _encode():
       n = len(columns)
+      m = genome.max_alleles+1
 
-      modelcache   = {}
+      modelcache   = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
+                               if locus.model is not None and len(locus.model.alleles)==m )
       descrcache   = {}
       strcache     = {}
       to_string    = genorepr.to_string
       from_strings = genorepr.from_strings
 
+      def _genokey(genos):
+        gset = set(a for g in set(from_strings(genos)) for a in g)
+        gset.discard(None)
+        return tuple(sorted(gset))
+
       for locus,row in genos:
         key = None
-
         loc = genome.get_locus(locus)
 
         if loc.model is None:
-          if unique:
-            # If we can assume that loci are unique, then aggressively reuse
-            # models with compatible alleles
-            key = tuple(sorted(from_strings(set(row))))
-            model = modelcache.get(key)
-          else:
-            model = None
+          key = _genokey(row)
+          cachable = genome.default_model is None and len(key) == genome.max_alleles
 
-          # FIXME: Awkward
-          genome.merge_locus(locus, model, unique)
-          genome.get_locus_model(locus)
+          if cachable:
+            # Aggressively reuse models with fully compatible alleles
+            loc.model = modelcache.get(key)
 
-          if unique:
+          if loc.model is None:
+            genome.get_locus_model(locus)
+
+          if cachable:
             modelcache[key] = loc.model
 
         model = loc.model
 
         if not loc.fixed:
-          key = key or tuple(sorted(from_strings(set(row))))
+          key = key or _genokey(row)
           try:
-            for g in key:
-              model.add_genotype(g)
+            for a in key:
+              model.add_allele(a)
           except ValueError:
-            raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
-                                % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
+            raise ValueError('Locus model %s cannot accommodate allele %s (max_alleles=%d,alleles=%s)'
+                                % (locus,a,model.max_alleles,','.join(model.alleles[1:])))
 
         descr = descrcache.get(model)
         if not descr:
