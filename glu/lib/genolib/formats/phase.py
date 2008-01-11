@@ -140,9 +140,9 @@ class PhaseWriter(object):
     row2 = [ g.allele2 or '?' for g in genos ]
 
     out.write('%s\n' % sample)
-    out.write(' '.join(row1))
+    out.write(''.join(row1))
     out.write('\n')
-    out.write(' '.join(row2))
+    out.write(''.join(row2))
     out.write('\n')
     self.samplecount += 1
 
@@ -168,9 +168,9 @@ class PhaseWriter(object):
       row2 = [ g.allele2 or '?' for g in genos ]
 
       out.write('%s\n' % sample)
-      out.write(' '.join(row1))
+      out.write(''.join(row1))
       out.write('\n')
-      out.write(' '.join(row2))
+      out.write(''.join(row2))
       out.write('\n')
       self.samplecount += 1
 
