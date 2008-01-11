@@ -355,11 +355,22 @@ def populate_genome(genome,loci,modelcache=None):
   if modelcache is None:
     modelcache = {}
 
+  # FIXME: Model merge must be more careful about stepping on existing
+  #        models, when they are actually compatible.  The current interface
+  #        is required identical model objects, so problems will result if
+  #        populate genome is called on a non-empty instance.
+
   for lname,max_alleles,alleles,chromosome,location,strand in loci:
-    key   = (max_alleles,)+tuple(sorted(alleles))
-    model = modelcache.get(key)
-    if model is None:
-      model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
+    model = None
+
+    if alleles:
+      key   = (max_alleles,)+tuple(sorted(alleles))
+      model = modelcache.get(key)
+      if model is None:
+        model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
+    elif max_alleles!=genome.max_alleles:
+      model = model_from_alleles([],max_alleles=max_alleles)
+
     genome.merge_locus(lname, model, bool(alleles), chromosome, location, strand)
 
 
