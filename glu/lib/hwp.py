@@ -189,9 +189,12 @@ def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=None):
   @return                : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
   @rtype                 : float
 
-  >>> hom1_count,het_count,hom2_count = 15,36,20
-  >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
+  >>> hwp_biallelic_counts(15,36,20,0)
   0.87188388159827424
+  >>> hwp_biallelic_counts(15,36,10)
+  0.19960651078273423
+  >>> hwp_biallelic_counts(15,36,10,0)
+  0.14135568108811056
   '''
   if exact_threshold is None:
     exact_threshold = HWP_EXACT_THRESHOLD
