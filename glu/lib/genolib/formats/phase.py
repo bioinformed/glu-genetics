@@ -67,14 +67,14 @@ class PhaseWriter(object):
   00000003
   SSS
   s1
-  A ? C
-  A ? T
+  A?C
+  A?T
   s2
-  A C C
-  G G C
+  ACC
+  GGC
   s3
-  G ? C
-  G ? T
+  G?C
+  G?T
   '''
   def __init__(self,filename,loci,genome,extra_args=None,**kwargs):
     '''
@@ -241,14 +241,14 @@ def save_phase(filename,genos,extra_args=None,**kwargs):
   00000003
   SSS
   s1
-  A ? C
-  A ? T
+  A?C
+  A?T
   s2
-  A C C
-  G G C
+  ACC
+  GGC
   s3
-  G ? C
-  G ? T
+  G?C
+  G?T
   '''
   if extra_args is None:
     args = kwargs
