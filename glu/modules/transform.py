@@ -39,15 +39,15 @@ def option_parser():
   ioopts.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output transformed data to FILE(default is "-" for standard out)')
   ioopts.add_option('-f','--informat',  dest='informat',
-                    help='Input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
+                    help='Input format of genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
   ioopts.add_option('-F','--outformat',  dest='outformat',
-                    help='Output format for genotype data. Default is informat, cannot be hapmap.')
+                    help='Output format of genotype data. Default is informat, cannot be hapmap.')
 
   ioopts.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP',
                     help='Input genotype representation')
   ioopts.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP', default=None,
                     help='Output genotype representation (see -g/--ingenorepr).  Default is ingenorepr')
-  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
+  ioopts.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
 
   mopts = optparse.OptionGroup(parser, 'Genotype Merging and Reporting')
