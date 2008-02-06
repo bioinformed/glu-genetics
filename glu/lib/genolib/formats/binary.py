@@ -858,7 +858,7 @@ def load_models_v1(gfile,loci):
 
   # Performance hot spot (potentially millions of objects allocated here)
   with gcdisabled:
-    locs = [ Locus(locus, model=model, fixed=True, chromosome=None, location=None)
+    locs = [ Locus(locus, model=model, chromosome=None, location=None)
                       for locus,model in izip_exact(loci,models) ]
     return Genome(loci=locs),models
 
@@ -901,7 +901,7 @@ def load_models_v2(gfile,loci):
       if location == -1:
         location = None
 
-      locs.append( Locus(locus, model=models[lmod[0]], fixed=True,
+      locs.append( Locus(locus, model=models[lmod[0]],
                                 chromosome=chrs[lmod[1]], location=location,
                                 strand=STRANDS[lmod[3]] ) )
 
