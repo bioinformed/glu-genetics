@@ -110,7 +110,7 @@ class Genome(object):
 
     # Fastpath: No merge needed
     if locus is None:
-      locus = self.loci[name] = Locus(name,model,fixed,chromosome,location,strand)
+      self.loci[name] = Locus(name,model,fixed,chromosome,location,strand)
       return
 
     # Slowpath: Must check for incompatibilities
@@ -124,25 +124,25 @@ class Genome(object):
       if locus.fixed is None:
         locus.fixed = fixed
       elif locus.fixed != fixed:
-        raise ValueError('Incompatible models')
+        raise ValueError('Incompatible fixed status of models')
 
     if chromosome is not None:
       if locus.chromosome is None:
         locus.chromosome = chromosome
       elif locus.chromosome != chromosome:
-        raise ValueError('Incompatible chromsomes')
+        raise ValueError('Incompatible chromsomes (%s != %s)' % (locus.chromosome,chromosome))
 
     if location is not None:
       if locus.location is None:
         locus.location = location
       elif locus.location != location:
-        raise ValueError('Incompatible locations')
+        raise ValueError('Incompatible locations (%s != %s)' % (locus.location,location))
 
     if strand is not STRAND_UNKNOWN:
       if locus.strand is STRAND_UNKNOWN:
         locus.strand = strand
       elif locus.strand != strand:
-        raise ValueError('Incompatible strands')
+        raise ValueError('Incompatible strands (%s != %s)' % (locus.strand,strand))
 
   def get_locus(self, name):
     '''
