@@ -1838,9 +1838,18 @@ def recode_genomatrixstream(genos, genome):
     if not updates:
       def _recode_genomatrixstream():
         descr = GenotypeArrayDescriptor(models)
-        for sample,row in genos:
-          # Recode and yield new row
-          yield sample,GenotypeArray(descr,row)
+        try:
+          for sample,row in genos:
+            # Recode and yield new row
+            yield sample,GenotypeArray(descr,row)
+        except KeyError:
+          raise
+          for locus,model,g in izip(genos.loci,models,row):
+            try:
+              model[g]
+            except KeyError:
+              raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
+                                  % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
 
     # SLOWPATH: Otherwise, recode by adding genotypes from all changed
     # models and packing.
@@ -2166,7 +2175,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
               model.add_allele(a)
           except ValueError:
             raise ValueError('Locus model %s cannot accommodate allele %s (max_alleles=%d,alleles=%s)'
-                                % (locus,s,model.max_alleles,','.join(model.alleles[1:])))
+                                % (locus,a,model.max_alleles,','.join(model.alleles[1:])))
 
         descr = descrcache.get(model)
         if not descr:
@@ -2434,7 +2443,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
                 gh = g2,g2
                 cache[genorepr.to_string_from_alleles(gh)] = update(gh)
               cache[gstr] = update(g)
-          except ValueError:
+          except (KeyError,ValueError):
             model = genome.get_model(locus)
             raise ValueError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
                                 % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
@@ -2489,8 +2498,9 @@ def recode_genotriples(triples,genome):
           assert old_model is triples.genome.loci[locus].model
           assert old_locus.model is old_model
 
-          genome.merge_locus(old_locus.name, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
-                                             location=old_locus.location)
+          genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
+                                          location=old_locus.location)
+
           loc = genome.get_locus(locus)
           if loc.model is None:
             loc.model = old_model
@@ -3794,9 +3804,10 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
   def _rename():
     if genos.format=='ldat':
       for locus,row in genos:
-        old_loc = genos.genome.get_locus(locus)
-        genome.merge_locus(locus, chromosome=old_loc.chromosome,
-                                  location=old_loc.chromosome, strand=old_loc.strand)
+        old_locus = genos.genome.get_locus(locus)
+
+        genome.merge_locus(locus, chromosome=old_locus.chromosome,
+                                  location=old_locus.chromosome, strand=old_locus.strand)
 
         if locus in rename_alleles:
           r = rename_alleles[locus]
@@ -3806,9 +3817,9 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
 
     elif genos.format=='sdat':
       for locus in genos.loci:
-        old_loc = genos.genome.get_locus(locus)
-        genome.merge_locus(locus, chromosome=old_loc.chromosome,
-                                  location=old_loc.chromosome, strand=old_loc.strand)
+        old_locus = genos.genome.get_locus(locus)
+        genome.merge_locus(locus, chromosome=old_locus.chromosome,
+                                  location=old_locus.chromosome, strand=old_locus.strand)
 
       remaps = [ rename_alleles.get(h) for h in genos.loci ]
       for sample,row in genos:
