@@ -22,7 +22,7 @@ def test(report=True):
 
   import glu
   from   glu.lib import (utils,fileutils,association,glm,imerge,sections,sequence,stats,
-                         utils,ca,hwp,xtab,union_find,regionparser)
+                         utils,hwp,xtab,union_find,regionparser)
   import utils as local_utils
 
   # Standardize on the .py source, since one can load the .py and the other the .pyc
@@ -35,7 +35,7 @@ def test(report=True):
   except OSError:
     raise ImportError('Your PYTHONPATH/pkg_resources are not set correctly to find this GLU tree')
 
-  for module in association,fileutils,glm,imerge,sections,sequence,stats,utils,ca,hwp,xtab,union_find,regionparser:
+  for module in association,fileutils,glm,imerge,sections,sequence,stats,utils,hwp,xtab,union_find,regionparser:
     doctest.testmod(module,report=False)
 
   from glu.lib.genolib.test import test as test_genolib
