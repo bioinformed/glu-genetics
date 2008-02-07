@@ -3211,9 +3211,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ('s1', [(None, None), ('A', 'A'), ('G', 'T')])
   ('s2', [(None, None), ('A', 'C'), (None, None)])
   >>> sorted(merger.samplestats.iteritems())
-  [('s1', [0, 2, 0, 1, 0]), ('s2', [1, 0, 0, 0, 2])]
+  [('s1', [1, 1, 0, 1, 0]), ('s2', [1, 0, 0, 0, 2])]
   >>> sorted(merger.locusstats.iteritems())
-  [('l1', [0, 0, 0, 1, 1]), ('l2', [1, 1, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
+  [('l1', [0, 0, 0, 1, 1]), ('l2', [2, 0, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
 
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
   >>> merger=VoteMerger()
@@ -3226,9 +3226,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ('l2', [('A', 'A'), ('A', 'C')])
   ('l3', [('G', 'T'), (None, None)])
   >>> sorted(merger.samplestats.iteritems())
-  [('s1', [0, 2, 0, 1, 0]), ('s2', [1, 0, 0, 0, 2])]
+  [('s1', [1, 1, 0, 1, 0]), ('s2', [1, 0, 0, 0, 2])]
   >>> sorted(merger.locusstats.iteritems())
-  [('l1', [0, 0, 0, 1, 1]), ('l2', [1, 1, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
+  [('l1', [0, 0, 0, 1, 1]), ('l2', [2, 0, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
 
   >>> loci = ('l1','l2','l1')
   >>> rows = [('s1',[(None, None), (None, None),  ('C', 'T')]),
@@ -3245,9 +3245,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ('s1', [(None, None), ('A', 'A')])
   ('s2', [('T', 'T'), ('A', 'G')])
   >>> sorted(merger.samplestats.iteritems())
-  [('s1', [0, 1, 0, 1, 0]), ('s2', [1, 1, 0, 0, 0])]
+  [('s1', [1, 0, 0, 1, 0]), ('s2', [2, 0, 0, 0, 0])]
   >>> sorted(merger.locusstats.iteritems())
-  [('l1', [0, 1, 0, 1, 0]), ('l2', [1, 1, 0, 0, 0])]
+  [('l1', [1, 0, 0, 1, 0]), ('l2', [2, 0, 0, 0, 0])]
 
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
   >>> merger=VoteMerger()
@@ -3259,9 +3259,9 @@ def merge_genomatrixstream(genos, mergefunc):
   ('l1', [(None, None), ('T', 'T')])
   ('l2', [('A', 'A'), ('A', 'G')])
   >>> sorted(merger.samplestats.iteritems())
-  [('s1', [0, 1, 0, 1, 0]), ('s2', [1, 1, 0, 0, 0])]
+  [('s1', [1, 0, 0, 1, 0]), ('s2', [2, 0, 0, 0, 0])]
   >>> sorted(merger.locusstats.iteritems())
-  [('l1', [0, 1, 0, 1, 0]), ('l2', [1, 1, 0, 0, 0])]
+  [('l1', [1, 0, 0, 1, 0]), ('l2', [2, 0, 0, 0, 0])]
   '''
   assert mergefunc is not None
 

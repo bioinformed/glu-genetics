@@ -129,7 +129,7 @@ class Vote(object):
   >>> vote(model,[missing,missing,missing])
   (4, (None, None))
   >>> vote(model,[AA,missing,missing,missing])
-  (1, ('A', 'A'))
+  (0, ('A', 'A'))
   >>> vote(model,[AA,AA,missing,AA,AA,AA])
   (1, ('A', 'A'))
   >>> vote(model,[AA,AA,missing,AA,AB,AA])
@@ -177,7 +177,11 @@ class Vote(object):
     if not genocounts:
       return MISSING,model[None,None]
     elif len(genocounts) == 1:
-      return CONCORDANT,genocounts.popitem()[0]
+      geno,n = genocounts.popitem()
+      if n == 1:
+        return UNAMBIGUOUS,geno
+      else:
+        return CONCORDANT,geno
 
     counts = sorted(genocounts.iteritems(), key=itemgetter(1))
 
@@ -226,7 +230,7 @@ class Ordered(object):
   >>> ordered(model,[missing,missing,missing])
   (4, (None, None))
   >>> ordered(model,[AA,missing,missing,missing])
-  (1, ('A', 'A'))
+  (0, ('A', 'A'))
   >>> ordered(model,[AA,AA,missing,AA,AA,AA])
   (1, ('A', 'A'))
   >>> ordered(model,[AA,AA,missing,AA,AB,AA])
@@ -248,7 +252,7 @@ class Ordered(object):
   >>> ordered(model,[missing,missing,missing])
   (4, (None, None))
   >>> ordered(model,[AA,missing,missing,missing])
-  (1, ('A', 'A'))
+  (0, ('A', 'A'))
   >>> ordered(model,[AA,AA,missing,AA,AA,AA])
   (1, ('A', 'A'))
   >>> ordered(model,[AA,AA,missing,AA,AB,AA])
@@ -278,6 +282,7 @@ class Ordered(object):
     @return           : concordance class, the consensus genotype
     @rtype            : int,str
     '''
+
     # Fast path
     if not genos:
       return MISSING,model[None,None]
@@ -294,7 +299,11 @@ class Ordered(object):
     if not genocounts:
       return MISSING,model[None,None]
     elif len(genocounts) == 1:
-      return CONCORDANT,iter(genocounts).next()
+      geno,n = genocounts.popitem()
+      if n == 1:
+        return UNAMBIGUOUS,geno
+      else:
+        return CONCORDANT,geno
 
     total = sum(genocounts.itervalues())
     geno  = dropwhile(lambda g: not g, genos).next()
@@ -465,29 +474,27 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   >>> locusout  = StringIO.StringIO()
   >>> output_merge_statistics(merger,sampleout,locusout)
   >>> print sampleout.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  SAMPLE_ID   UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCONCORDANCE_RATE       MISSING_COUNT    CONSENSUS_MISSING_RATE
+  SAMPLE_ID   UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCONCORDANCE_RATE     MISSING_COUNT     CONSENSUS_MISSING_RATE
   s3  2       1       1       0       0.000000        0       0.000000
-  s4  0       3       0       1       0.250000        0       0.250000
   s1  0       1       1       1       0.333333        1       0.500000
-  s2  1       1       0       1       0.500000        1       0.500000
-  <BLANKLINE>
+  s4  1       2       0       1       0.333333        0       0.250000
+  s2  2       0       0       1       1.000000        1       0.500000
   >>> print locusout.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  LOCUS_ID    UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCONCORDANCE_RATE       MISSING_COUNT    CONSENSUS_MISSING_RATE
-  l3  0       3       1       0       0.000000        0       0.000000
+  LOCUS_ID    UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCONCORDANCE_RATE     MISSING_COUNT     CONSENSUS_MISSING_RATE
+  l3  2       1       1       0       0.000000        0       0.000000
   l4  0       2       0       1       0.333333        1       0.500000
-  l2  2       1       0       1       0.500000        0       0.250000
   l1  1       0       1       1       0.500000        1       0.500000
-  <BLANKLINE>
+  l2  2       1       0       1       0.500000        0       0.250000
   '''
   if samplefile is not None:
     f = csv.writer(autofile(samplefile,'w'), dialect='tsv')
     f.writerow(SAMPLE_CONCORDANCE_HEADER)
-    f.writerows(sorted(build_concordance_output(mergefunc.samplestats),key=itemgetter(5)))
+    f.writerows(sorted(build_concordance_output(mergefunc.samplestats),key=itemgetter(5,0)))
 
   if locusfile is not None:
     fl = csv.writer(autofile(locusfile,'w'), dialect='tsv')
     fl.writerow(LOCUS_CONCORDANCE_HEADER)
-    fl.writerows(sorted(build_concordance_output(mergefunc.locusstats),key=itemgetter(5)))
+    fl.writerows(sorted(build_concordance_output(mergefunc.locusstats),key=itemgetter(5,0)))
 
 
 def build_concordance_output(stats):
