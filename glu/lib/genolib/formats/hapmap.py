@@ -108,13 +108,13 @@ def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
         model = modelcache.get(alleles)
 
       if not model:
-        model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
+        model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=genome.max_alleles)
 
-      genome.merge_locus(locus, model, True, chromosome, position, strand)
+      genome.merge_locus(locus, model, False, chromosome, position, strand)
 
       yield locus,genos
 
-  genos = GenomatrixStream.from_strings(_load_hapmap(),'ldat',hapmap,samples=columns,genome=genome,unique=unique)
+  genos = GenomatrixStream.from_strings(_load_hapmap(),'ldat',genorepr=hapmap,samples=columns,genome=genome,unique=unique)
 
   if unique:
     genos = genos.unique_checked()
