@@ -2387,8 +2387,12 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
           yield locus,GenotypeArray(descr,imap(getitem, repeat(cache), row))
         except KeyError:
           gset = set(row)
-          cache.update( (g,model[r]) for g,r in izip(gset,from_strings(gset)) )
-          yield locus,GenotypeArray(descr,imap(getitem, repeat(cache), row))
+          try:
+            cache.update( (g,model[r]) for g,r in izip(gset,from_strings(gset)) )
+            yield locus,GenotypeArray(descr,imap(getitem, repeat(cache), row))
+          except KeyError,g:
+            raise ValueError('Locus model %s cannot accommodate alleles %s (max_alleles=%d,alleles=%s)'
+                               % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
 
   elif format=='sdat':
 
