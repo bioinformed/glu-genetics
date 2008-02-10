@@ -1707,12 +1707,16 @@ def recode_genomatrixstream(genos, genome):
       old_locus = genos.genome.loci[locus]
       assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
-      genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
-                                location=old_locus.location, strand=old_locus.strand)
+      if locus not in genome.loci and old_locus.model is not None:
+        loc = genome.loci[locus] = old_locus
+      else:
+        genome.merge_locus(locus, None, old_locus.fixed,    old_locus.chromosome,
+                                        old_locus.location, old_locus.strand)
 
-      loc = genome.get_locus(locus)
-      if loc.model is None:
-        loc.model = old_model
+        loc = genome.get_locus(locus)
+
+        if loc.model is None:
+          loc.model = old_model
 
       model = loc.model
 
@@ -1928,6 +1932,7 @@ def sdat_model_lookahead_from_strings(loci,genos,genome,genorepr,min_unknown=10,
           seen.discard(None)
 
           # Create or reuse a fixed model if all alleles have been seen
+          # FIXME: add support for hemizygote models
           if len(seen) == max_alleles:
             seen  = tuple(sorted(seen))
             model = modelcache.get(seen)
@@ -2000,6 +2005,7 @@ def sdat_model_lookahead_from_tuples(loci,genos,genome,min_unknown=10,max_lookah
           seen.discard(None)
 
           # Create or reuse a fixed model if all alleles have been seen
+          # FIXME: add support for hemizygote models
           if len(seen) == max_alleles:
             seen  = tuple(sorted(seen))
             model = modelcache.get(seen)
@@ -2136,6 +2142,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
       n = len(columns)
       m = genome.max_alleles+1
 
+      # FIXME: add support for hemizygote models
       modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
                                if locus.model is not None and len(locus.model.alleles)==m )
       descrcache = {}
@@ -2330,6 +2337,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
       n = len(columns)
       m = genome.max_alleles+1
 
+      # FIXME: add support for hemizygote models
       modelcache   = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
                                if locus.model is not None and len(locus.model.alleles)==m )
       descrcache   = {}
