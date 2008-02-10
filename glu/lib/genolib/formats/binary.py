@@ -816,12 +816,13 @@ def load_models(gfile,loci,version,compat_version):
   @param compat_version: genotype file version backward compatibility number
   @type  compat_version: int
   '''
-  if version == 1:
-    return load_models_v1(gfile,loci)
-  elif version in (2,3) or compat_version in (2,3):
-    return load_models_v2(gfile,loci)
-  else:
-    raise ValueError('Unknown genotype file version: %s' % version)
+  with gcdisabled:
+    if version == 1:
+      return load_models_v1(gfile,loci)
+    elif version in (2,3) or compat_version in (2,3):
+      return load_models_v2(gfile,loci)
+    else:
+      raise ValueError('Unknown genotype file version: %s' % version)
 
 
 def load_models_v1(gfile,loci):
@@ -841,26 +842,28 @@ def load_models_v1(gfile,loci):
   model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
                            for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
 
+  locs = []
+  models = []
   modelcache = {}
-  allmodels = []
-  for i,mod in enumerate(mods):
-    genotypes = model_genotypes.get(i,())
-    key = (mod[1],mod[0])+genotypes
-    model = modelcache.get(key)
+
+  for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
+    max_alleles,allow_hemizygotes = mods[lmod[0]]
+
+    genotypes = model_genotypes.get(lmod[0],())
+    key       = (allow_hemizygotes,max_alleles)+genotypes
+    model     = modelcache.get(key)
+
     if model is None:
-      model = modelcache[key] = UnphasedMarkerModel(mod[1],mod[0])
+      model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
       for g in genotypes:
         model.add_genotype(g)
-    allmodels.append(model)
+      if len(model.alleles)-1 == max_alleles:
+        modelcache[key] = model
 
-  locus_models = [ m[0] for m in gfile.root.locus_models[:] ]
-  models = [ allmodels[i] for i in locus_models ]
+    models.append(model)
+    locs.append( Locus(locus, model) )
 
-  # Performance hot spot (potentially millions of objects allocated here)
-  with gcdisabled:
-    locs = [ Locus(locus, model=model, chromosome=None, location=None)
-                      for locus,model in izip_exact(loci,models) ]
-    return Genome(loci=locs),models
+  return Genome(loci=locs),models
 
 
 def load_models_v2(gfile,loci):
@@ -881,33 +884,34 @@ def load_models_v2(gfile,loci):
   model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
                            for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
 
-  modelcache = {}
+  locs = []
   models = []
-  for i,mod in enumerate(mods):
-    genotypes = model_genotypes.get(i,())
-    key = (mod[1],mod[0])+genotypes
-    model = modelcache.get(key)
+  modelcache = {}
+
+  for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
+    max_alleles,allow_hemizygotes = mods[lmod[0]]
+
+    genotypes = model_genotypes.get(lmod[0],())
+    key       = (allow_hemizygotes,max_alleles)+genotypes
+    model     = modelcache.get(key)
+
     if model is None:
-      model = modelcache[key] = UnphasedMarkerModel(mod[1],mod[0])
+      model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
       for g in genotypes:
         model.add_genotype(g)
+      if len(model.alleles)-1 == max_alleles:
+        modelcache[key] = model
+
+    location = lmod[2]
+    if location == -1:
+      location = None
+
     models.append(model)
+    locs.append( Locus(locus, model, None,
+                              chrs[lmod[1]], location,
+                              STRANDS[lmod[3]] ) )
 
-  # Performance hot spot (potentially millions of objects allocated here)
-  with gcdisabled:
-    locs = []
-    for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
-      location = lmod[2]
-      if location == -1:
-        location = None
-
-      locs.append( Locus(locus, model=models[lmod[0]],
-                                chromosome=chrs[lmod[1]], location=location,
-                                strand=STRANDS[lmod[3]] ) )
-
-    models = [ locus.model for locus in locs ]
-
-    return Genome(loci=locs),models
+  return Genome(loci=locs),models
 
 
 #######################################################################################

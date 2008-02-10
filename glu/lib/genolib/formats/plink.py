@@ -762,7 +762,10 @@ def save_plink_tped(filename,genos,extra_args=None,**kwargs):
 def load_plink_bim(filename,genome):
   mfile = autofile(filename)
 
-  modelcache = {}
+  # FIXME: Add support for hemizygote models
+  m = genome.max_alleles+1
+  modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
+                           if locus.model is not None and len(locus.model.alleles)==m )
 
   for i,line in enumerate(mfile):
     line = line.rstrip()
@@ -808,7 +811,10 @@ def load_plink_bim(filename,genome):
       model = modelcache.get(alleles)
 
     if not model:
-      model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=2)
+      model = model_from_alleles(alleles,max_alleles=2)
+
+      if genome.default_model is None and len(alleles) == genome.max_alleles:
+        modelcache[alleles] = model
 
     genome.merge_locus(locus, model, True, chr, pdist)
 

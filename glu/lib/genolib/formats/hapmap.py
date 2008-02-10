@@ -73,10 +73,14 @@ def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
     raise ValueError("Input file '%s' does not appear to be in HapMap format." % namefile(filename))
 
   columns = [ intern(h.strip()) for h in islice(header.split(),11,None) ]
-  modelcache = {}
 
   if genome is None:
     genome = Genome()
+
+  # FIXME: Add support for hemizygote models
+  m = genome.max_alleles+1
+  modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
+                           if locus.model is not None and len(locus.model.alleles)==m )
 
   def _load_hapmap():
     n = len(columns)
@@ -108,7 +112,10 @@ def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
         model = modelcache.get(alleles)
 
       if not model:
-        model = modelcache[alleles] = model_from_alleles(alleles,max_alleles=genome.max_alleles)
+        model = model_from_alleles(alleles,max_alleles=genome.max_alleles)
+
+        if genome.default_model is None and len(alleles) == genome.max_alleles:
+          modelcache[alleles] = model
 
       genome.merge_locus(locus, model, False, chromosome, position, strand)
 
