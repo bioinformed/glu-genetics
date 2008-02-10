@@ -391,7 +391,7 @@ static PyTypeObject GenotypeType = {
 	0,					/* tp_getattro       */
 	0,					/* tp_setattro       */
 	0,					/* tp_as_buffer      */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags          */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags          */
 	"Genotype objects",			/* tp_doc            */
 	(traverseproc)genotype_traverse,	/* tp_traverse       */
 	(inquiry)genotype_clear,		/* tp_clear          */
@@ -410,7 +410,7 @@ static PyTypeObject GenotypeType = {
 	(initproc)genotype_init,		/* tp_init           */
 	PyType_GenericAlloc,			/* tp_alloc          */
 	PyType_GenericNew,			/* tp_new            */
-	PyObject_GC_Del,			/* tp_free           */
+	PyObject_Del,				/* tp_free           */
 };
 
 static int
@@ -568,7 +568,7 @@ static PyTypeObject GenotypeArrayDescriptorType = {
 	0,					/* tp_getattro       */
 	0,					/* tp_setattro       */
 	0,					/* tp_as_buffer      */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,/* tp_flags          */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags          */
 	"Genotype Array Descriptor objects",	/* tp_doc            */
 	(traverseproc)descr_traverse,		/* tp_traverse       */
 	(inquiry)descr_clear,			/* tp_clear          */
@@ -587,7 +587,7 @@ static PyTypeObject GenotypeArrayDescriptorType = {
 	(initproc)descr_init,			/* tp_init           */
 	PyType_GenericAlloc,			/* tp_alloc          */
 	PyType_GenericNew,			/* tp_new            */
-	PyObject_GC_Del,			/* tp_free           */
+	PyObject_Del,				/* tp_free           */
 };
 
 /* UnphasedMarkerModelObject object implementation*/
@@ -987,8 +987,7 @@ static PyTypeObject UnphasedMarkerModelType = {
 	PyObject_GenericGetAttr,		/* tp_getattro       */
 	0,					/* tp_setattro       */
 	0,					/* tp_as_buffer      */
-	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_GC|
-		Py_TPFLAGS_BASETYPE,		/* tp_flags          */
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,	/* tp_flags          */
 	genomodel_doc,				/* tp_doc            */
 	(traverseproc)genomodel_traverse,	/* tp_traverse       */
 	(inquiry)genomodel_clear,		/* tp_clear          */
@@ -1007,7 +1006,7 @@ static PyTypeObject UnphasedMarkerModelType = {
 	(initproc)genomodel_init,		/* tp_init           */
 	PyType_GenericAlloc,			/* tp_alloc          */
 	PyType_GenericNew,			/* tp_new            */
-	PyObject_GC_Del,			/* tp_free           */
+	PyObject_Del,				/* tp_free           */
 };
 
 /***************************************/
@@ -1721,7 +1720,7 @@ static PyTypeObject GenotypeArrayType = {
 	PyObject_GenericGetAttr,		/* tp_getattro       */
 	0,					/* tp_setattro       */
 	&genoarray_as_buffer,			/* tp_as_buffer      */
-	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_GC,	/* tp_flags          */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags          */
 	genoarray_doc,				/* tp_doc            */
 	(traverseproc)genoarray_traverse,	/* tp_traverse       */
 	(inquiry)genoarray_clear,		/* tp_clear          */
@@ -1740,7 +1739,7 @@ static PyTypeObject GenotypeArrayType = {
 	0,					/* tp_init           */
 	genoarray_alloc,			/* tp_alloc          */
 	genoarray_new,				/* tp_new            */
-	PyObject_GC_Del,			/* tp_free           */
+	PyObject_Del,				/* tp_free           */
 };
 
 static PyObject *
