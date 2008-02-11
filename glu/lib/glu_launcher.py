@@ -104,7 +104,7 @@ def run_profile(options,progmain):
 
 
 def module_info(name,module,out=sys.stderr):
-  program   = 'GLU module: %s' % name
+  program   = 'GLU %s module: %s' % (__version__,name)
   version   = getattr(module,'__version__',   None)
   authors   = getattr(module,'__authors__',   [])
   copyright = getattr(module,'__copyright__', None)
