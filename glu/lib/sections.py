@@ -190,6 +190,17 @@ def read_sections(data):
     yield heading,row
 
 
+def safe_getlogin():
+  '''
+  Return the current user's login name by os.getlogin().  If that fails,
+  fall back to os.environ['USER'].
+  '''
+  try:
+    return os.getlogin()
+  except OSError:
+    return os.environ['USER']
+
+
 def save_metadata_section(swriter, **kwargs):
   '''
   A general method for writing a section of meta data to a file.
@@ -215,7 +226,7 @@ def save_metadata_section(swriter, **kwargs):
   kwargs.setdefault('generated', time.asctime())
   kwargs.setdefault('cwd',       os.getcwd())
   kwargs.setdefault('uname',     ' '.join(os.uname()))
-  kwargs.setdefault('user',      os.getlogin())
+  kwargs.setdefault('user',      safe_getlogin())
   kwargs.setdefault('argv',      str(sys.argv))
 
   save_section(swriter, header, kwargs.iteritems())
