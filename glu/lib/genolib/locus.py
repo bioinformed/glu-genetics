@@ -371,7 +371,7 @@ def populate_genome(genome,loci,modelcache=None):
     elif max_alleles!=genome.max_alleles:
       model = model_from_alleles([],max_alleles=max_alleles)
 
-    genome.merge_locus(lname, model, bool(alleles), chromosome, location, strand)
+    genome.merge_locus(lname, model, len(alleles)==max_alleles, chromosome, location, strand)
 
 
 def load_genome(filename,modelcache=None,**kwargs):
