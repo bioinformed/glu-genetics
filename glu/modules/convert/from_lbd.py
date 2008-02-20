@@ -150,6 +150,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
   Parse an Illumina manifest to obtain mappings from A/B probes to alleles
   relative to a specific genomic strand
   '''
+  indelmap = {'D':'-','I':'+'}
   targetstrand = targetstrand.lower()
   assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
 
@@ -174,17 +175,27 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
     cstrand = assay[cstrand_idx].lower()
     dstrand = assay[dstrand_idx].lower()
     topseq  = assay[topseq_idx]
+    gstrand = assay[assayid_idx].split('_')[-2]
 
-    assert cstrand in ('top','bot')
-    assert dstrand in ('top','bot')
+    assert cstrand in ('top','bot','p','m')
+    assert dstrand in ('top','bot','p','m')
+    assert gstrand in 'FRU','Unknown gstrand %s' % gstrand
     assert (snp[0],snp[2],snp[4]) == ('[','/',']')
+
+    aa,bb = snp[1],snp[3]
 
     if loc:
       loc = int(loc)
 
-    # Alleles on the design strand
-    aa,bb = snp[1],snp[3]
+    # Handle indels, which are strand neutral
+    if cstrand in 'pm' and dstrand in 'pm':
+      a = indelmap[aa]
+      b = indelmap[bb]
+      genome.merge_locus(locus, chromosome=chr, location=loc)
+      abmap[locus] = (a,b)
+      continue
 
+    # Otherwise, we have a SNP with A and B alleles on the design strand
     try:
       tstrand,a,b = norm_snp_seq(topseq)
       tstrand     = tstrand.lower()
@@ -198,9 +209,6 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
 
     if (a,b) != (aa,bb):
       raise ValueError('Sequence alleles do not match assay alleles')
-
-    gstrand = assay[assayid_idx].split('_')[2]
-    assert gstrand in 'FRU'
 
     if gstrand != 'U':
       # Get the strand orientation of the design sequence
