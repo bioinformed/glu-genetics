@@ -27,21 +27,64 @@ def _remap_comp(a1s,a2s):
 def remap_category(allelemap):
   '''
   Categorize the allelemap into six groups: identity, complement, swap, partial complement, partial swap and other
+
+  >>> remap_category({'C': 'C', 'T': 'T'})
+  'identity'
+  >>> remap_category({'C': 'G', 'T': 'A'})
+  'complement'
+  >>> remap_category({'C': 'A', 'A': 'C'})
+  'swap'
+  >>> remap_category({'C': 'A', 'T': 'T'})
+  'other'
+  >>> remap_category({'C': 'A', 'A': 'C', 'C' : 'C'})
+  'other'
+  >>> remap_category({'A':'A','C':'C'})
+  'identity'
+  >>> remap_category({'A':'T','T':'A'})
+  'complement'
+  >>> remap_category({'A':'T','C':'C'})
+  'partial complement'
+  >>> remap_category({'A':'C','C':'A'})
+  'swap'
+  >>> remap_category({'A':'C'})
+  'other'
+  >>> remap_category({'G':'C'})
+  'complement'
+  >>> remap_category({'A':'C','C':'A','G':'G'})
+  'partial swap'
+  >>> remap_category({'A':'T','T':'A','G':'G'})
+  'partial complement'
+  >>> remap_category({'A':'C','C':'T'})
+  'other'
+  >>> remap_category({'A':'G','G':'A','T':'T'})
+  'partial swap'
+  >>> remap_category({'A':'G','G':'A','T':'T'})
+  'partial swap'
+  >>> remap_category({'A':'A','G':'C'})
+  'partial complement'
+  >>> remap_category({'A':'G','G':'A','G':'C'})
+  'other'
+  >>> remap_category({'A':'A','G':'G'})
+  'identity'
+  >>> remap_category({'A':'T','G':'C'})
+  'complement'
+  >>> remap_category({'A':'G','G':'A'})
+  'swap'
   '''
   # FIXME: Use genoarray model once support is available
   complement = {'A':'T','T':'A','G':'C','C':'G'}
-  a1s,a2s    = zip(*( (a1,a2) for a1,a2 in allelemap.iteritems() if a1 and a2 ))
+  a1s,a2s    = zip(*( (a1,a2) for a1,a2 in allelemap.iteritems() if a1 or a2 ))
   identity   = _remap_comp(a1s,a2s)
   complement = _remap_comp(a1s, (complement.get(a2) for a2 in a2s))
   swap       = _remap_comp(a1s, (allelemap.get(a2)  for a2 in a2s))
 
-  n = len(allelemap)
+  n = len(a1s)
 
   if identity == n:
     return 'identity'
   elif complement == n:
     return 'complement'
-  elif not identity and swap == n or (identity,swap,complement,n) == (0,0,0,1):
+  elif not identity and swap == n:
     return 'swap'
   elif complement+identity == n:
     return 'partial complement'
@@ -161,7 +204,7 @@ class TestRemap(unittest.TestCase):
              ({'A':'T','T':'A'},         'complement'),
              ({'A':'T','C':'C'},         'partial complement'),
              ({'A':'C','C':'A'},         'swap'),
-             ({'A':'C'},                 'swap'),
+             ({'A':'C'},                 'other'),
              ({'G':'C'},                 'complement'),
              ({'A':'C','C':'A','G':'G'}, 'partial swap'),
              ({'A':'T','T':'A','G':'G'}, 'partial complement'),

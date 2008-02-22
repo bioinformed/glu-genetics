@@ -24,15 +24,16 @@ __license__   = 'See GLU license for terms by running: glu license'
 import csv
 import sys
 
-from   operator          import itemgetter
-from   itertools         import islice, chain
-from   collections       import defaultdict
+from   operator                  import itemgetter
+from   itertools                 import islice, chain
+from   collections               import defaultdict
 
-from   glu.lib.fileutils import autofile, load_map
-from   glu.lib.genolib   import GenotripleStream, load_genostream, snp
-from   glu.lib.remap     import remap_alleles, remap_category
-from   glu.lib.hwp       import hwp_exact_biallelic
-from   glu.lib.sections  import save_section, SectionWriter, save_metadata_section
+from   glu.lib.fileutils         import autofile, load_map
+from   glu.lib.remap             import remap_alleles, remap_category
+from   glu.lib.hwp               import hwp_exact_biallelic
+from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
+from   glu.lib.genolib           import GenotripleStream, load_genostream, snp
+from   glu.lib.genolib.transform import load_rename_alleles_file
 
 
 SAMPLE_HEADER = ['REFKEY','COMPKEY','CONCORD','DISCORD_HET_HET','DISCORD_HET_HOM','DISCORD_HOM_HET',
@@ -155,8 +156,8 @@ def generate_locus_output(locusconcord,allelemaps):
     if allelemaps is not None:
       amap = allelemaps.get(locus[1])
       if amap is not None:
-        locusstat.append(remap_category(dict(amap)))
-        locusstat.append(', '.join( '%s->%s' % (a,b) for a,b in amap if a and b))
+        locusstat.append(remap_category(amap))
+        locusstat.append(', '.join( '%s->%s' % (a or '',b or '') for a,b in amap.iteritems() if a or b))
       else:
         locusstat.extend(['',''])
 
@@ -335,7 +336,8 @@ def main():
 
   allelemaps = None
   if options.allelemap:
-    compgenos = compgenos.transformed(rename_alleles=options.allelemap)
+    allelemaps = load_rename_alleles_file(options.allelemap)
+    compgenos = compgenos.transformed(rename_alleles=allelemaps)
 
   sampleconcord = SampleConcordStat()
   locusconcord  = LocusConcordStat()
