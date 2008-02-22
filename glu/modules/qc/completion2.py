@@ -218,7 +218,7 @@ def process_expected(regions,loccomp,samcomp,samempty,locempty):
       expected = expected_samples(locus,regions)
       stats    = calculate(samempty,expected,samcomp,counts)
     else:
-      inf      = max(0,len(samcomp)-len(samempty))
+      inf      = len(samcomp)-len(samempty) if locus not in locempty else 0
       stats    = [len(samempty),0,inf,len(samcomp),len(samcomp)-sum(counts)]
     loccomp[locus].extend(stats)
 
@@ -227,7 +227,7 @@ def process_expected(regions,loccomp,samcomp,samempty,locempty):
       expected = expected_loci(sample,regions)
       stats    = calculate(locempty,expected,loccomp,counts)
     else:
-      inf      = max(0,len(loccomp)-len(locempty))
+      inf      = len(loccomp)-len(locempty) if sample not in samempty else 0
       stats    = [len(locempty),0,inf,len(loccomp),len(loccomp)-sum(counts)]
     samcomp[sample].extend(stats)
 
