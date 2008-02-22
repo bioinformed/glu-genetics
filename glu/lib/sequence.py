@@ -194,6 +194,8 @@ def top_or_bottom_comp(a,b):
   'Top'
   >>> top_or_bottom_comp('T','G')
   'Top'
+  >>> top_or_bottom_comp('G','T')
+  'Bot'
   >>> top_or_bottom_comp('A','G')
   'Top'
   >>> top_or_bottom_comp('C','G')
@@ -295,6 +297,16 @@ def norm_snp_seq(seq):
   ('Top', 'C', 'G')
   >>> norm_snp_seq('TCCTTTTAATTATTTTTATAGATAATTTTCAACTGCAAGGTGATACATCA[C/T]GTTAATTACTGAATATGGAAAATGTTTGATAAGCCAAAAGGAAAAAACTG')
   ('Bot', 'T', 'C')
+  >>> norm_snp_seq('CAGAAATCATA[C/G]AGAGAACCT')
+  ('Top', 'C', 'G')
+  >>> norm_snp_seq('GGACCCGCAA[G/A]GAGGGCGCGG')
+  ('Top', 'A', 'G')
+  >>> norm_snp_seq('CCGCGCCCTC[C/T]TTGCGGGTCC')
+  ('Bot', 'T', 'C')
+  >>> norm_snp_seq('GGTAGCCTGA[A/T]ACCCCCAAGA')
+  ('Top', 'A', 'T')
+  >>> norm_snp_seq('TCTTGGGGGT[A/T]TCAGGCTACC')
+  ('Bot', 'T', 'A')
   '''
   seq = seq.upper()
   s = seq.index('[')
