@@ -128,7 +128,7 @@ def load_illumina_manifest(filename):
   # Infinium manifest
   elif heading == 'Heading':
     contents = dict(c[:2] for c in contents if len(c) > 1)
-    assert contents['Assay Format'] in ('Infinium','Infinium II')
+    assert contents['Assay Format'] in ('Infinium','Infinium II','Infinium 2')
 
     heading,contents = sections.next()
     assert heading == 'Assay'
@@ -136,20 +136,26 @@ def load_illumina_manifest(filename):
   return contents
 
 
-def find_index(header,headings):
+def find_index(header,headings,optional=False):
   for h in headings:
     try:
       return header.index(h)
     except ValueError:
       pass
-  raise ValueError,'Cannot find heading index'
+
+  if not optional:
+    raise ValueError('Cannot find heading index')
 
 
-def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
+def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=None):
   '''
   Parse an Illumina manifest to obtain mappings from A/B probes to alleles
   relative to a specific genomic strand
   '''
+  if errorhandler is None:
+    def errorhandler(msg):
+      raise ValueError(msg)
+
   indelmap = {'D':'-','I':'+'}
   targetstrand = targetstrand.lower()
   assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
@@ -161,10 +167,14 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
   snp_idx     = find_index(header,['SNP'])
   chr_idx     = find_index(header,['Chr'])
   loc_idx     = find_index(header,['MapInfo'])
-  cstrand_idx = find_index(header,['CustomerStrand'])
+  cstrand_idx = find_index(header,['CustomerStrand','SourceStrand'])
   dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
   topseq_idx  = find_index(header,['TopGenomicSeq'])
-  max_idx     = max(topseq_idx,dstrand_idx,cstrand_idx,snp_idx,name_idx,assayid_idx)
+  probea_idx  = find_index(header,['AlleleA_ProbeSeq'],optional=True)
+  probeb_idx  = find_index(header,['AlleleB_ProbeSeq'],optional=True)
+
+  max_idx     = max(topseq_idx,dstrand_idx,cstrand_idx,snp_idx,name_idx,
+                    assayid_idx,probea_idx,probeb_idx)
 
   for assay in manifest:
     assay  += ['']*(max_idx-len(assay)+1)
@@ -177,38 +187,61 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer'):
     topseq  = assay[topseq_idx]
     gstrand = assay[assayid_idx].split('_')[-2]
 
-    assert cstrand in ('top','bot','p','m')
-    assert dstrand in ('top','bot','p','m')
-    assert gstrand in 'FRU','Unknown gstrand %s' % gstrand
-    assert (snp[0],snp[2],snp[4]) == ('[','/',']')
+    if cstrand not in cstrand in ('top','bot','p','m'):
+      errorhandler('Invalid customer strand %s for %s' % (cstrand,locus))
+      continue
 
-    aa,bb = snp[1],snp[3]
+    if dstrand not in ('top','bot','p','m'):
+      errorhandler('Invalid design strand %s for %s' % (dstrand,locus))
+      continue
+
+    if gstrand not in 'FRU':
+      errorhandler('Unknown gstrand %s for %s' % (gstrand,locus))
+      continue
+
+    if len(snp) != 5 or (snp[0],snp[2],snp[4]) != ('[','/',']'):
+      errorhandler('Invalid SNP alleles %s for %s' % (snp,locus))
+      continue
+
+    a,b = snp[1],snp[3]
 
     if loc:
       loc = int(loc)
 
     # Handle indels, which are strand neutral
     if cstrand in 'pm' and dstrand in 'pm':
-      a = indelmap[aa]
-      b = indelmap[bb]
+      a = indelmap[a]
+      b = indelmap[b]
       genome.merge_locus(locus, chromosome=chr, location=loc)
       abmap[locus] = (a,b)
       continue
 
     # Otherwise, we have a SNP with A and B alleles on the design strand
+    if None not in (probea_idx,probeb_idx):
+      probea = assay[probea_idx]
+      probeb = assay[probeb_idx]
+      if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
+        errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
+                         % (a,b,probea[-1],probeb[-1],locus))
+        continue
+
     try:
-      tstrand,a,b = norm_snp_seq(topseq)
-      tstrand     = tstrand.lower()
-      assert tstrand == 'top'
+      tstrand,aa,bb = norm_snp_seq(topseq)
+      tstrand       = tstrand.lower()
+      if tstrand != 'top':
+        errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % locus)
+        continue
+
     except ValueError:
-      tstrand,a,b = dstrand,aa,bb
+      tstrand,aa,bb = dstrand,a,b
 
     if dstrand!=tstrand:
-      aa = complement_base(aa)
-      bb = complement_base(bb)
+      a,b = complement_base(a),complement_base(b)
 
+    # a,b and aa,bb should both be normalized to tstrand and must be equal
     if (a,b) != (aa,bb):
-      raise ValueError('Sequence alleles do not match assay alleles')
+      errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,locus))
+      continue
 
     if gstrand != 'U':
       # Get the strand orientation of the design sequence
@@ -344,6 +377,8 @@ def option_parser():
                          'reverse, customer (default), anticustomer, design, antidesign')
   parser.add_option('-t', '--gcthreshold', dest='gcthreshold', type='float', metavar='N', default=0,
                     help='Genotypes with GC score less than N set to missing')
+  parser.add_option('-w', '--warnings', action='store_true', dest='warnings',
+                    help='Emit warnings and A/B calls for SNPs with invalid manifest data')
   parser.add_option('--samplestats', dest='samplestats', metavar='FILE',
                     help='Output per sample average GC statistics to FILE')
   parser.add_option('--locusstats',  dest='locusstats',  metavar='FILE',
@@ -362,10 +397,15 @@ def main():
   genome = Genome()
   abmap = {}
 
+  errorhandler = None
+  if options.warnings:
+    def errorhandler(msg):
+      print >> sys.stderr, 'WARNING: %s' % msg
+
   if options.manifest:
     print >> sys.stderr, 'Processing Illumina manifest file...',
     manifest = load_illumina_manifest(options.manifest)
-    parse_manifest(manifest,genome,abmap,targetstrand=options.targetstrand)
+    parse_manifest(manifest,genome,abmap,targetstrand=options.targetstrand,errorhandler=errorhandler)
     print >> sys.stderr, 'done.'
 
   if options.abmap:
@@ -379,7 +419,7 @@ def main():
     more_loci,more_gentrain,more_samples = load_lbd_file(arg)
 
     if list(more_loci) != loci:
-      raise RuntimeError,'Genotype headers do not match'
+      raise RuntimeError('Genotype headers do not match')
 
     samples = chain(samples,more_samples)
 
