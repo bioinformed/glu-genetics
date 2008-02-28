@@ -3819,7 +3819,7 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
         old_locus = genos.genome.get_locus(locus)
 
         genome.merge_locus(locus, chromosome=old_locus.chromosome,
-                                  location=old_locus.chromosome, strand=old_locus.strand)
+                                  location=old_locus.location, strand=old_locus.strand)
 
         if locus in rename_alleles:
           r = rename_alleles[locus]
@@ -3831,7 +3831,7 @@ def rename_genomatrixstream_alleles(genos, rename_alleles):
       for locus in genos.loci:
         old_locus = genos.genome.get_locus(locus)
         genome.merge_locus(locus, chromosome=old_locus.chromosome,
-                                  location=old_locus.chromosome, strand=old_locus.strand)
+                                  location=old_locus.location, strand=old_locus.strand)
 
       remaps = [ rename_alleles.get(h) for h in genos.loci ]
       for sample,row in genos:
