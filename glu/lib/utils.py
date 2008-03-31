@@ -342,7 +342,7 @@ def izip_exact(*iterables):
     n = len(first)
     if all( len(i)==n for i in rest ):
       return izip(*iterables)
-  except TypeError:
+  except (TypeError,AttributeError):
     pass
 
   # Must use sentinel objects to enforce length equality
