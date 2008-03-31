@@ -849,6 +849,98 @@ def minor_allele_from_genos(model,genos):
   counts = count_alleles_from_genocounts(model,count_genotypes(model,genos))
   return minor_allele_from_allelecounts(model, counts)
 
+
+def major_allele_from_allelecounts(model,allelecounts):
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def alleles_from_genos(nn,aa,ab,bb):
+  ...   return count_alleles_from_genocounts(model,count_genotypes(model,[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(0,1,2,1))
+  ('A', 0.5)
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(0,1000,2000,1000))
+  ('A', 0.5)
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(10000,1000,2000,1000))
+  ('A', 0.5)
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(10000,0,2000,2000))
+  ('B', 0.75)
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(10000,2000,2000,0))
+  ('A', 0.75)
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(0,1000,0,0))
+  ('A', 1.0)
+  >>> major_allele_from_allelecounts(model, alleles_from_genos(1000,0,0,0))
+  (None, 0.0)
+  '''
+  n = len(allelecounts)
+  if len(model.alleles) != n:
+    raise ValueError('allele counts to not match model alleles')
+  elif not n:
+    raise ValueError('major allele not defined for empty model')
+  elif n < 2:
+    return None,0.0
+
+  informative = allelecounts[1:]
+
+  m = sum(informative)
+
+  if not m:
+    return None,0.0
+
+  f = max(informative)
+  i = informative.index(f)+1
+  return model.alleles[i],f/m
+
+
+def major_allele_from_genocounts(model,counts):
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def mkgenos(nn,aa,ab,bb):
+  ...   g =[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
+  ...   return count_genotypes(model,g)
+  >>> major_allele_from_genocounts(model,mkgenos(0,1,2,1))
+  ('A', 0.5)
+  >>> major_allele_from_genocounts(model,mkgenos(0,1000,2000,1000))
+  ('A', 0.5)
+  >>> major_allele_from_genocounts(model,mkgenos(10000,1000,2000,1000))
+  ('A', 0.5)
+  >>> major_allele_from_genocounts(model,mkgenos(10000,0,2000,2000))
+  ('B', 0.75)
+  >>> major_allele_from_genocounts(model,mkgenos(10000,2000,2000,0))
+  ('A', 0.75)
+  >>> major_allele_from_genocounts(model,mkgenos(0,1000,0,0))
+  ('A', 1.0)
+  >>> major_allele_from_genocounts(model,mkgenos(1000,0,0,0))
+  (None, 0.0)
+  '''
+  counts = count_alleles_from_genocounts(model,counts)
+  return major_allele_from_allelecounts(model, counts)
+
+
+def major_allele_from_genos(model,genos):
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def mkgenos(nn,aa,ab,bb):
+  ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
+  >>> major_allele_from_genos(model,mkgenos(0,1,2,1))
+  ('A', 0.5)
+  >>> major_allele_from_genos(model,mkgenos(0,1000,2000,1000))
+  ('A', 0.5)
+  >>> major_allele_from_genos(model,mkgenos(10000,1000,2000,1000))
+  ('A', 0.5)
+  >>> major_allele_from_genos(model,mkgenos(10000,0,2000,2000))
+  ('B', 0.75)
+  >>> major_allele_from_genos(model,mkgenos(10000,2000,2000,0))
+  ('A', 0.75)
+  >>> major_allele_from_genos(model,mkgenos(0,1000,0,0))
+  ('A', 1.0)
+  >>> major_allele_from_genos(model,mkgenos(1000,0,0,0))
+  (None, 0.0)
+  '''
+  counts = count_alleles_from_genocounts(model,count_genotypes(model,genos))
+  return major_allele_from_allelecounts(model, counts)
+
 ##################################################################################
 
 def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
