@@ -880,7 +880,7 @@ def load_models_v2(gfile,loci):
   alleles         = map(str,gfile.root.model_alleles[:])
   alleles[0]      = None
   mods            = list(gfile.root.models[:])
-  chrs            = map(str,gfile.root.chromosomes[:])
+  chrs            = [ str(c) or None for c in gfile.root.chromosomes[:] ]
   model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
                            for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
 
