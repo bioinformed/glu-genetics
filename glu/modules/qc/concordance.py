@@ -37,7 +37,7 @@ from   glu.lib.genolib.transform import load_rename_alleles_file
 
 
 SAMPLE_HEADER = ['REFKEY','COMPKEY','CONCORD','DISCORD_HET_HET','DISCORD_HET_HOM','DISCORD_HOM_HET',
-                 'DISCORD_HOM_HOM','CONCORDANT_RATE']
+                 'DISCORD_HOM_HOM','CONCORDANCE_RATE']
 
 LOCUS_HEADER  = SAMPLE_HEADER + ['REF_HWP','COMP_HWP','CONCORD_GENO_PAIR','DISCORD_GENO_PAIR',
                                  'ALLELE_MAP_CATEGORY','ALLELE_MAPS']
@@ -188,18 +188,13 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
 
 
 def load_reference_genotypes(filename, format, locusset, sampleset):
-  data = load_genostream(filename,format=format,genorepr=snp)
-  data = data.transformed(include_samples=sampleset, include_loci=locusset).as_ldat()
-
-  samples = dict( (s,i) for i,s in enumerate(data.samples) )
-  loci,genos = zip(*data)
-  loci = dict( (l,i) for i,l in enumerate(loci))
-
-  return genos,samples,loci
+  genos = load_genostream(filename,format=format)
+  genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
+  return genos
 
 
 def load_comparison_genotypes(filename, format, locusset, sampleset, lmapfile, smapfile):
-  genos = load_genostream(filename,format=format,genorepr=snp)
+  genos = load_genostream(filename,format=format)
   genos = genos.transformed(rename_samples=smapfile, include_samples=smapfile,
                             rename_loci=lmapfile,    include_loci=lmapfile)
   genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
@@ -213,36 +208,77 @@ def invert_dict(d):
   return dict(r)
 
 
-def concordance(refgenos,samples,loci,compgenos,sampleeq,locuseq,sampleconcord,locusconcord):
-   # Construct identity sample map if one is not specified
-   if sampleeq is None:
-     sampleeq = dict( (s,[s]) for s in samples )
+def fix_eqsets(refgenos,sampleeq,locuseq):
+  # Construct identity sample map if one is not specified
+  if sampleeq is None:
+    sampleeq = dict( (s,[s]) for s in refgenos.samples )
+  else:
+    # Otherwise filter equivalence set to include only samples that exist
+    samples = set(refgenos.samples)
+    for refsample,eqsamples in sampleeq.items():
+      eqsamples = [ s for s in sampleeq[refsample] if s in samples ]
+      if eqsamples:
+        sampleeq[refsample] = eqsamples
+      else:
+        del sampleeq[refsample]
 
-   # Construct identity locus map if one is not specified
-   if locuseq is None:
-     locuseq = dict( (l,[l]) for l in loci )
+  # Construct identity locus map if one is not specified
+  if locuseq is None:
+    locuseq = dict( (l,[l]) for l in refgenos.loci )
+  else:
+    # Otherwise filter equivalence set to include only loci that exist
+    loci = set(refgenos.loci)
+    for reflocus,eqloci in locuseq.items():
+      eqloci = [ l for l in eqloci if l in loci ]
+      if eqloci:
+        locuseq[reflocus] = eqloci
+      else:
+        del locuseq[reflocus]
 
-   for refsample in sampleeq:
-     sampleeq[refsample] = [ s for s in sampleeq[refsample] if s in samples ]
+  return sampleeq,locuseq
 
-   for reflocus in locuseq:
-     locuseq[reflocus] = [ l for l in locuseq[reflocus] if l in loci ]
 
-   # Assumes missing genotypes are prefiltered
-   for sample,locus,compgeno in compgenos:
-     if sample not in sampleeq or locus not in locuseq:
-       continue
+def concordance(refgenos,compgenos,sampleeq,locuseq,sampleconcord,locusconcord):
+  if refgenos.format not in ('sdat','ldat'):
+    refgenos = genos.as_ldat()
 
-     for refsample in sampleeq[sample]:
-       for reflocus in locuseq[locus]:
-         i = loci[reflocus]
-         j = samples[refsample]
+  refgenos = refgenos.materialize()
 
-         refgeno = refgenos[i][j]
+  sampleeq,locuseq = fix_eqsets(refgenos,sampleeq,locuseq)
 
-         if refgeno:
-           sampleconcord.update(refgeno, refsample, compgeno, sample)
-           locusconcord.update(refgeno, reflocus,  compgeno, locus)
+  if refgenos.format == 'ldat':
+    samples = dict( (s,i) for i,s in enumerate(refgenos.samples) )
+    loci    = dict(refgenos)
+
+    # Assumes missing genotypes are prefiltered
+    for sample,locus,compgeno in compgenos:
+      if sample not in sampleeq or locus not in locuseq:
+        continue
+
+      for refsample in sampleeq[sample]:
+        for reflocus in locuseq[locus]:
+          refgeno = loci[reflocus][samples[refsample]]
+
+          if refgeno:
+            sampleconcord.update(refgeno, refsample, compgeno, sample)
+            locusconcord.update(refgeno, reflocus,  compgeno, locus)
+
+  elif refgenos.format == 'sdat':
+    loci    = dict( (l,i) for i,l in enumerate(genos.loci) )
+    samples = dict(refgenos)
+
+    # Assumes missing genotypes are prefiltered
+    for sample,locus,compgeno in compgenos:
+      if sample not in sampleeq or locus not in locuseq:
+        continue
+
+      for refsample in sampleeq[sample]:
+        for reflocus in locuseq[locus]:
+          refgeno = samples[refsample][loci[reflocus]]
+
+          if refgeno:
+            sampleconcord.update(refgeno, refsample, compgeno, sample)
+            locusconcord.update(refgeno, reflocus,  compgeno, locus)
 
 
 def compute_allele_maps(locusconcord):
@@ -284,9 +320,9 @@ def option_parser():
   parser.add_option('-a', '--allelemap', dest='allelemap', metavar='FILE',
                      help='A list of loci to remap the comparison data alleles to the reference data alleles')
   parser.add_option('-o',           dest='sampleout', metavar='FILE',
-                     help='Output the concordant statistics by sample to FILE')
+                     help='Output the concordance statistics by sample to FILE')
   parser.add_option('-O',           dest='locusout',  metavar='FILE',
-                     help='Output the concordant statistics by locus to FILE')
+                     help='Output the concordance statistics by locus to FILE')
   parser.add_option('--samplemap',  dest='samplemap', metavar='FILE',
                      help='Map the sample ids for the comparison data to the set of ids in the sample equivalence map')
   parser.add_option('--locusmap',   dest='locusmap',  metavar='FILE',
@@ -327,7 +363,7 @@ def main():
     sampleeq = load_map(options.sampleeq)
     eqsample = invert_dict(sampleeq)
 
-  refgenos,samples,loci = load_reference_genotypes(args[0],options.refformat,locuseq,sampleeq)
+  refgenos  = load_reference_genotypes(args[0],options.refformat,locuseq,sampleeq)
 
   compgenos = [ load_comparison_genotypes(arg, options.compformat, eqlocus, eqsample,
                 options.locusmap, options.samplemap) for arg in args[1:] ]
@@ -342,7 +378,7 @@ def main():
   sampleconcord = SampleConcordStat()
   locusconcord  = LocusConcordStat()
 
-  concordance(refgenos,samples,loci,compgenos,eqsample,eqlocus,sampleconcord,locusconcord)
+  concordance(refgenos,compgenos,eqsample,eqlocus,sampleconcord,locusconcord)
 
   if options.remap:
     print >> sys.stderr, 'Computing best allele mappings...',
