@@ -163,6 +163,8 @@ def genotriple_multiplexer(triples, samplegroups, locusgroups, sampledefault, lo
 
 
 def getWriter(filename,format,genome=None,phenome=None,header=None,genorepr=None,maxrows=None):
+  # FIXME: This routine needs to be generic and universal, since there are
+  # many new formats not currently supported.
   if maxrows:
     return RollingWriter(filename,format,genome,phenome,maxrows,header,genorepr)
   elif format in ('ldat','sdat'):
@@ -176,7 +178,7 @@ def getWriter(filename,format,genome=None,phenome=None,header=None,genorepr=None
   elif format == 'tbat':
     return BinaryGenotripleWriter(filename,genome,phenome)
   else:
-    raise ValueError('Unknown format')
+    raise ValueError('Unknown format or format not supported by glu.split')
 
 
 class RollingWriter(object):
