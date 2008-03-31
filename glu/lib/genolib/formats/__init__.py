@@ -23,3 +23,4 @@ from   glu.lib.genolib.formats.merlin     import *
 from   glu.lib.genolib.formats.structure  import *
 from   glu.lib.genolib.formats.phase      import *
 from   glu.lib.genolib.formats.wtccc      import *
+from   glu.lib.genolib.formats.eigensoft  import *
