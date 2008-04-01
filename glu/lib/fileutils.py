@@ -245,13 +245,19 @@ def guess_format(filename, formats):
   'sdat'
   >>> guess_format('../subjects.sdat.gz', f)
   'sdat'
+  >>> guess_format('../subjects.sdat.gz:format=ldat', f)
+  'ldat'
   '''
 
   if not isstr(filename):
     return None
 
   # Parse to remove augmented arguments
-  filename = parse_augmented_filename(filename,{})
+  args = {}
+  filename = parse_augmented_filename(filename,args)
+
+  if 'format' in args:
+    return args['format']
 
   parts = os.path.basename(filename).split('.')
 
