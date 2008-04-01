@@ -339,7 +339,13 @@ class EigensoftSmartPCAWriter(object):
       other = other[0]
     else:
       # Monomorphic, pick a default representation that does not conflict with major
-      other = 'X' if major!='X' else 'N'
+      other = [ a for a,n in izip(model.alleles[1:],allelecounts[1:]) if a!=major ]
+      if other:
+        other = other[0]
+      elif major!='X':
+        other = 'X'
+      else:
+        other = 'N'
 
     gmap = { model[major,major]:'0',
              model[other,major]:'1',
