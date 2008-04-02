@@ -24,10 +24,10 @@ import csv
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.fileutils         import autofile,namefile,tryint,parse_augmented_filename,get_arg,get_csv_dialect
+from   glu.lib.fileutils         import autofile,namefile,tryint,trybool,\
+                                        parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
-from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.reprs     import get_genorepr,snp
 
@@ -378,7 +378,7 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
 
   genorepr = get_arg(args, ['genorepr']) or 'snp'
   unique   = trybool(get_arg(args, ['unique'], False))
-  order    = trybool(get_arg(args, ['order']))
+  order    = get_arg(args, ['order'])
   dialect  = get_csv_dialect(args)
   samples  = get_arg(args, ['samples'])
   loci     = get_arg(args, ['loci'])
