@@ -16,7 +16,6 @@ Revision:      $Id$
 from collections               import defaultdict
 
 from glu.lib.fileutils         import namefile,load_table,get_arg,tryint,parse_augmented_filename
-from glu.lib.genolib.genoarray import model_from_alleles
 
 
 SEX_UNKNOWN,SEX_MALE,SEX_FEMALE = None,0,1
