@@ -23,6 +23,7 @@ from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import namefile, guess_format, parse_augmented_filename, get_arg
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
+from   glu.lib.genolib.transform import GenoTransform
 from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.locus     import load_genome, Genome
 from   glu.lib.genolib.reprs     import get_genorepr
@@ -173,6 +174,15 @@ def load_genostream(filename, extra_args=None, **kwargs):
     raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
+
+  # Apply any requested transformations
+  # FIXME: The length checking code is there because transformed may not be
+  #        smart enough to handle null transformations as a matter of
+  #        course.  This can be relaxed once that path is rechecked.
+  transform_args = len(args)
+  transform = GenoTransform.from_kwargs(args)
+  if len(args) != transform_args:
+    genos = genos.transformed(transform)
 
   # Kludge until extra_args is smarter about default values.
   #   This is needed in the short term for genorepr=None for formats that do

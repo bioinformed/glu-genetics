@@ -21,7 +21,7 @@ from   types             import NoneType
 from   collections       import defaultdict
 from   itertools         import izip
 
-from   glu.lib.fileutils import load_list,load_map,load_table
+from   glu.lib.fileutils import get_arg,trybool,load_list,load_map,load_table
 
 
 list_type = (NoneType,set,dict,list,tuple)
@@ -148,28 +148,34 @@ class GenoTransform(object):
                          rename_alleles=options.renamealleles, filter_missing=options.filtermissing)
 
   @staticmethod
-  def from_kwargs(**kwargs):
+  def from_kwargs(extra_args=None,**kwargs):
     '''
     Create a new GenoTransform object from key word arguments
 
     @return: transformed genotriple stream
     @rtype : GenotripleStream
     '''
-    transform = GenoTransform(include_samples=kwargs.pop('include_samples',None),
-                              exclude_samples=kwargs.pop('exclude_samples',None),
-                               rename_samples=kwargs.pop('rename_samples', None),
-                                order_samples=kwargs.pop('order_samples',  None),
-                                 include_loci=kwargs.pop('include_loci',   None),
-                                 exclude_loci=kwargs.pop('exclude_loci',   None),
-                                  rename_loci=kwargs.pop('rename_loci',    None),
-                                   order_loci=kwargs.pop('order_loci',     None),
-                                recode_models=kwargs.pop('recode_models',  None),
-                               rename_alleles=kwargs.pop('rename_alleles', None),
-                                       repack=kwargs.pop('repack',         False),
-                               filter_missing=kwargs.pop('filter_missing', False))
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
 
-    if kwargs:
-      raise TypeError("'%s' is an invalid keyword argument for this function" % kwargs.popitem()[0])
+    transform = GenoTransform(include_samples=get_arg(args,['include_samples','includesamples']),
+                              exclude_samples=get_arg(args,['exclude_samples','excludesamples']),
+                               rename_samples=get_arg(args,['rename_samples', 'renamesamples' ]),
+                                order_samples=get_arg(args,['order_samples',  'ordersamples'  ]),
+                                 include_loci=get_arg(args,['include_loci',   'includeloci'   ]),
+                                 exclude_loci=get_arg(args,['exclude_loci',   'excludeloci'   ]),
+                                  rename_loci=get_arg(args,['rename_loci',    'renameloci'    ]),
+                                   order_loci=get_arg(args,['order_loci',     'orderloci'     ]),
+                                recode_models=get_arg(args,['recode_models',  'recodemodels'  ]),
+                               rename_alleles=get_arg(args,['rename_alleles', 'renamealleles' ]),
+                                       repack=trybool(get_arg(args,['repack'])),
+                               filter_missing=trybool(get_arg(args,['filter_missing','filtermissing'])))
+
+    if extra_args is None and args:
+      raise ValueError("'%s' is an invalid keyword argument for this function" % kwargs.popitem()[0])
 
     return transform
 
