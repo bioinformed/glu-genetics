@@ -11,7 +11,7 @@ Requires:      Python 2.5, glu
 
 Revision:      $Id$
 
-Copyright (c) 2007 Science Applications International Corporation ("SAIC")
+Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.
 See GLU license for terms by running: glu license
 */
 
