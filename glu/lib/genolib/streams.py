@@ -4669,17 +4669,18 @@ def rename_genomatrixstream_row(genos,rowmap):
   if genos.format=='ldat':
     genome = Genome()
 
+    recode = [False]
     def _rename():
       for locus,row in genos:
         new_locus = rowmap.get(locus,locus)
-        _genome_merge_loci(genos.genome, locus, genome, new_locus)
+        recode[0] |= _genome_merge_loci(genos.genome, locus, genome, new_locus)
 
         yield new_locus,row
 
     new_genos = genos.clone(_rename(),loci=rows,genome=genome,materialized=False)
 
-    # FIXME: Must assume recoding is necessary, I think
-    new_genos = new_genos.transformed(recode_models=Genome())
+    if recode[0]:
+      new_genos = new_genos.transformed(recode_models=Genome())
 
   else:
     phenome = Phenome()
