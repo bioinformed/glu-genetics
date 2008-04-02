@@ -27,8 +27,8 @@ from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filena
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
 from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_genocounts, \
-                                        major_allele_from_allelecounts, model_from_alleles, \
-                                        GenotypeArrayDescriptor, GenotypeArray
+                                        major_allele_from_allelecounts, \
+                                        GenotypeArrayDescriptor, GenotypeArray, UnphasedMarkerModel
 from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
 
@@ -82,7 +82,13 @@ def load_eigensoft_snps(filename,genome):
 
     model = modelcache.get(alleles)
     if model is None:
-      model = modelcache[alleles] = model_from_alleles(alleles)
+      model = modelcache[alleles] = UnphasedMarkerModel(max_alleles=2)
+
+      # Assign genotypes in the appropriate order
+      a,b = alleles
+      model.add_genotype( (a,a) )
+      model.add_genotype( (a,b) )
+      model.add_genotype( (b,b) )
 
     loci.append(lname)
     models.append(model)
