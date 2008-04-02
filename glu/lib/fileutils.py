@@ -402,9 +402,9 @@ def tryint(s):
 def trybool(s):
   if isinstance(s,str):
     s = s.lower()
-    if s in ('t','true','y','1'):
+    if s in ('t','true','y','yes','1'):
       s = True
-    elif s in ('f','false','n','0'):
+    elif s in ('f','false','n','no','0'):
       s = False
   return bool(s)
 
