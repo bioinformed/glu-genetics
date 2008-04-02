@@ -81,7 +81,7 @@ def load_genomatrix_text(filename,format,genome=None,extra_args=None,**kwargs):
   filename = parse_augmented_filename(filename,args)
 
   genorepr = get_arg(args, ['genorepr']) or 'snp'
-  unique   = get_arg(args, ['unique'], True)
+  unique   = trybool(get_arg(args, ['unique'], True))
 
   if isinstance(genorepr,basestring):
     genorepr = get_genorepr(genorepr)
@@ -377,7 +377,14 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
   filename = parse_augmented_filename(filename,args)
 
   genorepr = get_arg(args, ['genorepr']) or 'snp'
-  unique   = get_arg(args, ['unique'], False)
+  unique   = trybool(get_arg(args, ['unique'], False))
+  order    = trybool(get_arg(args, ['order']))
+  dialect  = get_csv_dialect(args)
+  samples  = get_arg(args, ['samples'])
+  loci     = get_arg(args, ['loci'])
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   if isinstance(genorepr,basestring):
     genorepr = get_genorepr(genorepr)
@@ -385,10 +392,13 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
   if genorepr is None:
     raise ValueError('genotype representation must be specified when reading a text format')
 
-  if extra_args is None and args:
-    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+  if samples:
+    samples = set(load_list(samples,**dialect))
 
-  rows = csv.reader(autofile(filename),dialect='tsv')
+  if loci:
+    loci = set(load_list(loci,**dialect))
+
+  rows = csv.reader(autofile(filename),**dialect)
 
   def _load():
     # Micro-optimization
@@ -408,7 +418,7 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),genome=genome,unique=unique)
+  return GenotripleStream.from_tuples(_load(),genome=genome,samples=samples,loci=loci,unique=unique,order=order)
 
 
 class TextGenotripleWriter(object):

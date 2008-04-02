@@ -23,7 +23,8 @@ import re
 
 from   itertools                 import islice
 
-from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg
+from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg, \
+                                        get_csv_dialect,trybool,load_list
 
 from   glu.lib.genolib.streams   import GenotripleStream
 
@@ -61,10 +62,20 @@ def load_prettybase(filename,genome=None,extra_args=None,**kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  unique   = get_arg(args, ['unique'], False)
+  unique   = trybool(get_arg(args, ['unique'], False))
+  order    = get_arg(args, ['order'])
+  samples  = get_arg(args, ['samples'])
+  loci     = get_arg(args, ['loci'])
+  dialect  = get_csv_dialect(args)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if samples:
+    samples = set(load_list(samples,**dialect))
+
+  if loci:
+    loci = set(load_list(loci,**dialect))
 
   re_spaces = re.compile('[\t ,]+')
   gfile = autofile(filename)
@@ -90,7 +101,7 @@ def load_prettybase(filename,genome=None,extra_args=None,**kwargs):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),genome=genome, unique=unique)
+  return GenotripleStream.from_tuples(_load(),genome=genome,samples=samples,loci=loci,unique=unique,order=order)
 
 
 class PrettybaseWriter(object):
