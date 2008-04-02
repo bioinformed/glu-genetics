@@ -399,6 +399,16 @@ def tryint(s):
     return s
 
 
+def trybool(s):
+  if isinstance(s,str):
+    s = s.lower()
+    if s in ('t','true','y','1'):
+      s = True
+    elif s in ('f','false','n','0'):
+      s = False
+  return bool(s)
+
+
 def get_csv_dialect(args,default_dialect='tsv'):
   '''
   Retrieve the standardized csv argument list
@@ -429,14 +439,7 @@ def get_csv_dialect(args,default_dialect='tsv'):
   # Parse truth values
   for tf in ('skipinitialspace','doublequote'):
     if tf in dargs:
-      s = dargs[tf].lower()
-      if s in ('t','true','y','1'):
-        s = True
-      elif s in ('f','false','n','0'):
-        s = False
-      else:
-        raise ValueError
-      dargs[tf] = s
+      dargs[tf] = trybool(dargs[tf])
 
   return dargs
 
