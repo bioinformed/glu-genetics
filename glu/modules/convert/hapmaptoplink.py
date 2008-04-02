@@ -39,7 +39,7 @@ def load_hapmap_genotypes(file_or_name):
   header = gfile.next()
 
   if not any(header.startswith(h) for h in HAPMAP_HEADERS):
-    raise ValueError, "Input file '%s' does not appear to be in HapMap format." % namefile(file_or_name)
+    raise ValueError("Input file '%s' does not appear to be in HapMap format." % namefile(file_or_name))
 
   header = list(islice(header.split(),11,None))
   n = len(header)

@@ -60,7 +60,7 @@ class SectionWriter(object):
 
   def checkout(self,header):
     if self.header is not None:
-      raise SectionInUseError, "Section '%s' is already checked out" % self.header
+      raise SectionInUseError("Section '%s' is already checked out" % self.header)
 
     self.header = header
     self.writer.writerow(['[%s]' % header])
@@ -68,7 +68,7 @@ class SectionWriter(object):
 
   def checkin(self,header):
     if self.header is None:
-      raise SectionNotInUseError, "Invalid check-in attempted on section '%s'" % header
+      raise SectionNotInUseError("Invalid check-in attempted on section '%s'" % header)
     self.header = None
 
 

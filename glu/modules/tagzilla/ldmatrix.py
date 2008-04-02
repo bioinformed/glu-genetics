@@ -65,7 +65,7 @@ def main():
   elif options.measure.lower() == "d'":
     col = 3
   else:
-    raise ValueError, 'Unknown or unsupported LD measure specified: %s' % options.measure
+    raise ValueError('Unknown or unsupported LD measure specified: %s' % options.measure)
 
   columns,rows,data = xtab(datain,itemgetter(1),itemgetter(0),itemgetter(col),merge)
   out.writerow(['']+columns)

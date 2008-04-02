@@ -169,7 +169,7 @@ class GenoTransform(object):
                                filter_missing=kwargs.pop('filter_missing', False))
 
     if kwargs:
-      raise TypeError, "'%s' is an invalid keyword argument for this function" % kwargs.popitem()[0]
+      raise TypeError("'%s' is an invalid keyword argument for this function" % kwargs.popitem()[0])
 
     return transform
 

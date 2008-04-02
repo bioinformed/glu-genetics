@@ -179,7 +179,7 @@ def main():
 
   else:
     if options.options.includesamples or options.excludesamples:
-      raise ValueError,'Cannot specify a sample filter for count input'
+      raise ValueError('Cannot specify a sample filter for count input')
 
     counts = read_counts(args[0])
 

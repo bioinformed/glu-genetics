@@ -76,7 +76,7 @@ def load_sample_phenos(file,phenos):
   pos = [i for (i,it) in enumerate(header) if it.lower() in phenos]
 
   if len(pos) != len(phenos):
-    raise ValueError,'One or more sample phenotypes not found in %s, please check.' % file
+    raise ValueError('One or more sample phenotypes not found in %s, please check.' % file)
 
   return dict([('phenos',tuple(pick(header,pos)))]+[(row[0],tuple(pick(row,pos))) for row in rows])
 
@@ -296,7 +296,7 @@ def write_duplicate_pairs(out,dups,sample_phenos=None,pairformat='long'):
         ind = '  %8.2f%%  %8d / %8d  ' % (p,m,n)
         write_pairs_long(out,ind,(s1,s2),sample_phenos)
     else:
-      raise NotImplementedError,'The pair-format: %s is not supported!' % pairformat
+      raise NotImplementedError('The pair-format: %s is not supported!' % pairformat)
 
 
 def option_parser():

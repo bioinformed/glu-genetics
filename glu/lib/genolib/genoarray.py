@@ -779,11 +779,11 @@ def minor_allele_from_allelecounts(model,allelecounts):
   '''
   n = len(allelecounts)
   if len(model.alleles) != n:
-    raise ValueError,'allele counts to not match model alleles'
+    raise ValueError('allele counts to not match model alleles')
   elif n > 3:
-    raise ValueError,'minor allele frequency is defined only for biallelic loci'
+    raise ValueError('minor allele frequency is defined only for biallelic loci')
   elif not n:
-    raise ValueError,'minor allele not defined for empty model'
+    raise ValueError('minor allele not defined for empty model')
   elif n < 3:
     return None,0.0
 

@@ -45,7 +45,7 @@ def mean(seq):
     total += v
 
   if i is None:
-    raise ValueError, 'Input sequence may not be empty'
+    raise ValueError('Input sequence may not be empty')
 
   return float(total)/(i+1)
 
@@ -89,13 +89,13 @@ def quantile(data, k, presorted=False):
   >>> assert sum( abs(o-e) for o,e in zip(observed,expected) ) < 10e-20
   '''
   if not (0 <= k <= 1):
-    raise ValueError, 'Quantile value %f out of range [0..1]' % k
+    raise ValueError('Quantile value %f out of range [0..1]' % k)
 
   if not presorted:
     data = sorted(data)
 
   if not data:
-    raise ValueError, 'Input sequence may not be empty'
+    raise ValueError('Input sequence may not be empty')
 
   n = len(data) - 1
   f,w = modf(n*k)

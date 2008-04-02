@@ -93,7 +93,7 @@ def slow_count_haplotypes(genos1, genos2):
        dh  - double heterozygote haplotypes (uninformative)
   '''
   if len(genos1) != len(genos2):
-    raise ValueError, 'genos1 and genos2 must be of same length'
+    raise ValueError('genos1 and genos2 must be of same length')
   diplo_counts = count_diplotypes(genos1, genos2)
 
   het1,het2 = find_heterozygotes(diplo_counts)
@@ -151,7 +151,7 @@ def find_hetz(alleles):
   '''Return the heterozygote genotype for the given alleles'''
   het = ''.join(sorted(alleles)).replace(' ','')
   if len(het) > 2:
-    raise ValueError, 'Only biallelic loci are allowed'
+    raise ValueError('Only biallelic loci are allowed')
   while len(het) < 2:
     het += '\0'
   return het
@@ -290,7 +290,7 @@ def slow_estimate_maf(genos):
 
   maf = 0
   if len(f) > 2:
-    raise ValueError, 'invalid genotypes: locus may have no more than 2 alleles'
+    raise ValueError('invalid genotypes: locus may have no more than 2 alleles')
   elif len(f) == 2:
     maf = float(min(f.itervalues()))/n
 
@@ -308,7 +308,7 @@ except ImportError:
 
 def OSGzipFile(filename, mode):
   if "'" in filename or '"' in filename or '\\' in filename:
-    raise ValueError, 'Invalid characters in filename'
+    raise ValueError('Invalid characters in filename')
 
   if 'w' in mode:
     f = os.popen('/bin/gzip -c > "%s"' % filename, 'w', 10240)
@@ -571,7 +571,7 @@ def median(seq):
   seq.sort()
   n = len(seq)
   if not n:
-    raise ValueError, 'Input sequence cannot be empty'
+    raise ValueError('Input sequence cannot be empty')
   if n % 2 == 1:
     return seq[n//2]
   else:
@@ -587,7 +587,7 @@ def average(seq):
   @return: the average for the sequence and return 0 if the sequence is empty
   '''
   if not len(seq):
-    raise ValueError, 'Input sequence cannot be empty '
+    raise ValueError('Input sequence cannot be empty ')
   return float(sum(seq))/len(seq)
 
 
@@ -790,7 +790,7 @@ def filter_loci_by_range(loci, rangestring):
         start,stop = stop,start
 
     except (ValueError,TypeError):
-      raise TagZillaError,'ERROR: Invalid genomic range: %s' % range
+      raise TagZillaError('ERROR: Invalid genomic range: %s' % range)
 
     ranges.append( (start,stop) )
 
@@ -1219,7 +1219,7 @@ def locus_result_sequence(filename, locusmap, exclude):
     version = 2
     grouper = lambda row: (row[4],row[2])
   else:
-    raise TagZillaError, 'ERROR: Invalid input format for file %s.' % filename
+    raise TagZillaError('ERROR: Invalid input format for file %s.' % filename)
 
 
   for binnum,(_,loci) in enumerate(groupby(locusfile,grouper)):
@@ -1945,7 +1945,7 @@ def generate_ldpairs_vector(args, include, subset, ldsubset, options):
   regions = len(args) // pops
 
   if len(args) % pops != 0:
-    raise TagZillaError, 'ERROR: The number of input files must be a multiple of the number of populations'
+    raise TagZillaError('ERROR: The number of input files must be a multiple of the number of populations')
 
   for i in xrange(regions):
     ldpairs = []
@@ -2138,7 +2138,7 @@ def load_hapmap_genotypes(filename, nonfounders):
   if not any(header.startswith(h) for h in HAPMAP_HEADERS):
     if filename == '-':
       filename = '<stdin>'
-    raise TagZillaError, "ERROR: HapMap Input file '%s' does not seem to be a HapMap data file." % filename
+    raise TagZillaError("ERROR: HapMap Input file '%s' does not seem to be a HapMap data file." % filename)
 
   header = header.strip().split(' ')
 
@@ -2172,10 +2172,10 @@ def read_locus_file(filename):
       if len(fields) == 2:
         locus_info.append( (fields[0], int(fields[1])) )
       else:
-        raise ValueError, 'Invalid locus file'
+        raise ValueError('Invalid locus file')
 
   except (ValueError,IndexError):
-    raise TagZillaError, 'ERROR: Invalid line %d in locus file "%s".' % (i+1,filename)
+    raise TagZillaError('ERROR: Invalid line %d in locus file "%s".' % (i+1,filename))
 
   return locus_info
 
@@ -2249,7 +2249,7 @@ def load_raw_genotypes(filename, nonfounders=None):
   if not header.startswith(GENO_HEADER):
     if filename == '-':
       filename = '<stdin>'
-    raise TagZillaError, "ERROR: Genotype input file '%s' does not seem to be in the right format." % filename
+    raise TagZillaError("ERROR: Genotype input file '%s' does not seem to be in the right format." % filename)
 
   header = header.strip().split('\t')
 
@@ -2498,7 +2498,7 @@ class TagSelector(object):
     func = locals().get(method.lower(),None)
 
     if not callable(func):
-      raise InternalError,'Invalid tag information criterion specified'
+      raise InternalError('Invalid tag information criterion specified')
 
     w = {}
     for lname1,lname2,r2,dprime in bin.ld:
@@ -2552,7 +2552,7 @@ def read_illumina_design_score(filename):
 def load_genotypes(filename, options):
   options.format = options.format.lower()
   if options.format not in ('','hapmap','raw','ldat','linkage','hapmapld','festa','prettybase'):
-    raise TagZillaError, 'ERROR: Unknown genotype/ld data format specified: "%s"' % options.format
+    raise TagZillaError('ERROR: Unknown genotype/ld data format specified: "%s"' % options.format)
 
   if options.format == '':
     if options.loci:
@@ -2576,7 +2576,7 @@ def load_genotypes(filename, options):
       for pedfile in options.pedfile:
         read_linkage_nonfounders(pedfile, nonfounders)
     else:
-      raise TagZillaError, 'ERROR: Unsupported pedigree file format specified: %s' % options.format
+      raise TagZillaError('ERROR: Unsupported pedigree file format specified: %s' % options.format)
 
   locus_info = None
   if options.loci:
@@ -2595,14 +2595,14 @@ def load_genotypes(filename, options):
     loci = load_prettybase_genotypes(filename, nonfounders)
   elif options.format == 'ldat':
     if not locus_info:
-      raise TagZillaError, 'ERROR: Cannot load ldat format data since no loci are defined.'
+      raise TagZillaError('ERROR: Cannot load ldat format data since no loci are defined.')
     loci = load_ldat_genotypes(filename, locus_info, nonfounders)
   elif options.format == 'linkage':
     if not locus_info:
-      raise TagZillaError, 'ERROR: Cannot load Linkage format data since no loci are defined.'
+      raise TagZillaError('ERROR: Cannot load Linkage format data since no loci are defined.')
     loci = load_linkage_genotypes(filename, locus_info)
   else:
-    raise TagZillaError, 'ERROR: Cannot load genotype data in %s format' % options.format
+    raise TagZillaError('ERROR: Cannot load genotype data in %s format' % options.format)
 
   if options.limit:
     loci = islice(loci,options.limit)
@@ -2690,7 +2690,7 @@ def update_locus_map(locusmap, loci):
   addloci = dict( (locus.name,locus) for locus in loci )
   overlap = set(addloci).intersection(locusmap)
   if overlap:
-    raise TagZillaError, 'ERROR: Genotype files may not contain overlapping loci'
+    raise TagZillaError('ERROR: Genotype files may not contain overlapping loci')
   locusmap.update(addloci)
 
 
@@ -2738,7 +2738,7 @@ def generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options):
   # FIXME: This can be easily corrected
   formats = set(file_options.format.lower() for file_options,filename in args)
   if formats.intersection( ('festa','hapmapld') ):
-    raise TagZillaError, 'ERROR: Multipopulation binning algoritm cannot currently accept data in LD/FESTA format.'
+    raise TagZillaError('ERROR: Multipopulation binning algoritm cannot currently accept data in LD/FESTA format.')
 
   method = options.multimethod.lower()
   labels = get_populations(options.multipopulation)
@@ -2746,7 +2746,7 @@ def generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options):
   regions = len(args) // pops
 
   if len(args) % pops != 0:
-    raise TagZillaError, 'ERROR: The number of input files must be a multiple of the number of populations'
+    raise TagZillaError('ERROR: The number of input files must be a multiple of the number of populations')
 
   for i in xrange(regions):
     multi_loci = []
@@ -2782,7 +2782,7 @@ def generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options):
       ldpairs = scan_ldpairs(loci, options.maxdist*1000, options.r, options.d)
 
     else:
-      raise TagZillaError, 'ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod
+      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
 
     yield ldpairs
 
@@ -2793,10 +2793,10 @@ def generate_ldpairs(args, locusmap, include, subset, ldsubset, options):
     method = (options.multimethod or '').lower()
 
     if pops <= 1 or not method:
-      raise TagZillaError, 'ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod'
+      raise TagZillaError('ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod')
 
     if method not in MULTI_METHODS_S:
-      raise TagZillaError, 'ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod
+      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
 
     ldpairs = generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options)
 
@@ -3008,7 +3008,7 @@ def build_output(options, exclude):
   sumfile = autofile(options.sumfile, 'w', hyphen=sys.stdout)
 
   if [pairinfofile,locusinfofile,infofile,sumfile].count(sys.stdout) > 1:
-    raise TagZillaError, 'ERROR: More than one output file directed to standard out.'
+    raise TagZillaError('ERROR: More than one output file directed to standard out.')
 
   return pairinfo,locusinfo,bininfo,sumfile
 
@@ -3035,10 +3035,10 @@ def tagzilla(options,args):
     method = (options.multimethod or '').lower()
 
     if pops <= 1 or not method:
-      raise TagZillaError, 'ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod'
+      raise TagZillaError('ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod')
 
     if method not in MULTI_METHODS:
-      raise TagZillaError, 'ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod
+      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
 
     if method in MULTI_METHODS_M:
       return tagzilla_multi(options,args)
@@ -3286,7 +3286,7 @@ def run_profile(progmain,options,args):
       stats.print_stats(25)
 
   else:
-    raise TagZillaError, 'ERROR: Unknown profiling option provided "%s"' % options.profile
+    raise TagZillaError('ERROR: Unknown profiling option provided "%s"' % options.profile)
 
 
 def format_elapsed_time(t):

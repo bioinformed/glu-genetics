@@ -98,7 +98,7 @@ class Unique(object):
       else:
         return UNAMBIGUOUS,geno
     else:
-      raise NonUniqueGenotypeError, 'Non-unique genotype found'
+      raise NonUniqueGenotypeError('Non-unique genotype found')
 
 
 class Vote(object):
@@ -420,7 +420,7 @@ def get_genomerger(mergername):
   parts = mergername.split(':')
 
   if not parts:
-    raise ValueError, 'Missing merge algorithm specified'
+    raise ValueError('Missing merge algorithm specified')
 
   name = parts[0].lower()
 
@@ -431,7 +431,7 @@ def get_genomerger(mergername):
   elif name == 'ordered':
     merger = OrderedMerger
   else:
-    raise ValueError, 'Unknown merge algorithm specified'
+    raise ValueError('Unknown merge algorithm specified')
 
   if len(parts) == 2:
     threshold=float(parts[1])

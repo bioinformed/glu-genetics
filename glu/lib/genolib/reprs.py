@@ -315,7 +315,7 @@ def get_genorepr(reprname):
   try:
     return reprs[reprname]
   except KeyError:
-    raise ValueError, 'Unknown genotype representation: %s' % reprname
+    raise ValueError('Unknown genotype representation: %s' % reprname)
 
 
 def main():

@@ -74,7 +74,7 @@ class GenotypeStream(object):
     @rtype :  sequence of sample, locus, and genotype
     '''
     if self.used_stream():
-      raise RuntimeError, 'Genotriple stream already used'
+      raise RuntimeError('Genotriple stream already used')
 
     if not self.materialized:
       self.__private_stream_do_not_touch,genos = None,self.__private_stream_do_not_touch
@@ -463,7 +463,7 @@ class GenotripleStream(GenotypeStream):
     ('s2', 'l1', ('G', 'T'))
     '''
     if transform is not None and kwargs:
-      raise ValueError, 'specification of both a transform object and keyword arguments is not supported'
+      raise ValueError('specification of both a transform object and keyword arguments is not supported')
     elif kwargs:
       transform = GenoTransform.from_kwargs(**kwargs)
 
@@ -877,7 +877,7 @@ class GenomatrixStream(GenotypeStream):
     ('s3', [('T', 'T'), ('A', 'T')])
     '''
     if format not in ('sdat','ldat'):
-      raise ValueError, "Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format
+      raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
 
     formats  = set(g.format for g in genos)
     informat = formats.pop() if len(formats)==1 else None
@@ -1172,7 +1172,7 @@ class GenomatrixStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T')])
     '''
     if transform is not None and kwargs:
-      raise ValueError, 'specification of both a transform object and keyword arguments is not supported'
+      raise ValueError('specification of both a transform object and keyword arguments is not supported')
     elif kwargs:
       transform = GenoTransform.from_kwargs(**kwargs)
 
@@ -2710,7 +2710,7 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   elif order == 'locus':
     keyfunc = keyfunctor(1, locusorder,  0, sampleorder)
   else:
-    raise ValueError, "Unknown ordering specified: '%s'" % order
+    raise ValueError("Unknown ordering specified: '%s'" % order)
 
   # In memory sort should eventually be augmented by an offline multiphase
   # merge sort for very large sets.
@@ -2753,7 +2753,7 @@ def combine_unsorted_genotriple_list(triplelist):
     triplelist = list(triplelist)
 
   if not triplelist:
-    raise TypeError, 'cannot combine a single genotriple stream'
+    raise TypeError('cannot combine a single genotriple stream')
   elif len(triplelist) == 1:
     return triplelist[0]
 
@@ -2825,7 +2825,7 @@ def combine_sorted_genotriple_list(triplelist):
     triplelist = list(triplelist)
 
   if not triplelist:
-    raise TypeError, 'cannot combine a single genotriple stream'
+    raise TypeError('cannot combine a single genotriple stream')
   elif len(triplelist) == 1:
     return triplelist[0]
 
@@ -2860,7 +2860,7 @@ def combine_sorted_genotriple_list(triplelist):
   order = set(order)
 
   if len(order) != 1:
-    raise ValueError, 'Cannot merge triplestreams in disparate orders'
+    raise ValueError('Cannot merge triplestreams in disparate orders')
 
   order = order.pop()
 
@@ -2869,7 +2869,7 @@ def combine_sorted_genotriple_list(triplelist):
   elif order == 'locus':
     key = itemgetter(1,0)
   else:
-    raise ValueError, 'Invalid order specified'
+    raise ValueError('Invalid order specified')
 
   # Perform merge
   triples = imerge(triplelist,key=key)
@@ -3666,7 +3666,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
       return mergefunc(sample,locus,genome.get_model(locus),genos)
 
   else:
-    raise NotImplementedError,'triple to %s format conversion is not supported' % format
+    raise NotImplementedError('triple to %s format conversion is not supported' % format)
 
   order = triples.order
   if format == 'sdat' and order != 'sample':
@@ -4526,7 +4526,7 @@ def reorder_genomatrixstream_columns(genos,labels):
   try:
     indices = [ remap.pop(l) for l in order ]
   except KeyError:
-    raise ValueError, 'Duplicated column label: %s' % l
+    raise ValueError('Duplicated column label: %s' % l)
 
   new_columns = pick(genos.columns,indices)
   rows = iter(genos)
@@ -4601,7 +4601,7 @@ def reorder_genomatrixstream_rows(genos, labels):
   try:
     indices = [ remap.pop(l) for l in order ]
   except KeyError:
-    raise ValueError, 'Duplicated row label: %s' % l
+    raise ValueError('Duplicated row label: %s' % l)
 
   def _reorder():
     data = genos.use_stream()

@@ -98,7 +98,7 @@ def load_genomatrix_text(filename,format,genome=None,extra_args=None,**kwargs):
   try:
     columns = iter(rows.next())
   except StopIteration:
-    raise ValueError, 'Input file "%s" is empty' % namefile(filename)
+    raise ValueError('Input file "%s" is empty' % namefile(filename))
 
   format_found = columns.next()
 
@@ -107,8 +107,8 @@ def load_genomatrix_text(filename,format,genome=None,extra_args=None,**kwargs):
     format_found = ''
 
   if format is not None and format_found not in ('',format):
-    raise ValueError, 'Input file "%s" does not appear to be in %s format.  Found %s.' \
-                        % (namefile(filename),format,format_found)
+    raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
+                        % (namefile(filename),format,format_found))
 
   columns = tuple(intern(h.strip()) for h in columns)
   format = format_found or format

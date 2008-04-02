@@ -282,7 +282,7 @@ def find_index(header,headings):
       return header.index(h)
     except ValueError:
       pass
-  raise ValueError,'Cannot find heading index'
+  raise ValueError('Cannot find heading index')
 
 
 def extract_illumina_snps(manifest):

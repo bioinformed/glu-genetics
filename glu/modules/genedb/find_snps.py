@@ -68,7 +68,7 @@ def feature_margin(start,end,strand,mup,mdown):
   elif strand == '-':
     return start-mdown,end+mup
   else:
-    raise ValueError, 'Unknown feature orientation!'
+    raise ValueError('Unknown feature orientation')
 
 
 def process_results(results,start,end,strand,nup,ndown):

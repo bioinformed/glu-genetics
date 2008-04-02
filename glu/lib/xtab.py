@@ -87,7 +87,7 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
   colkeys = dict( (colkey,j) for j,colkey in enumerate(columns))
 
   if len(colkeys) != len(columns):
-    raise ValueError, 'Column values must be unique'
+    raise ValueError('Column values must be unique')
 
   def _rowsby():
     # Build and yield result rows

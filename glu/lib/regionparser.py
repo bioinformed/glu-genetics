@@ -147,7 +147,7 @@ def parse_header(rows):
   '''
   rows = list(rows)
   if len(rows) != 1 or len(rows[0]) != 1:
-    raise RegionParserError, 'Format Error: only one row and one column is allowed for specifying the region name'
+    raise RegionParserError('Format Error: only one row and one column is allowed for specifying the region name')
   return rows[0][0]
 
 
@@ -160,7 +160,7 @@ def parse_list(rows):
   rows = list(rows)
   for row in rows:
     if len(row) != 1:
-      raise RegionParserError, 'Format Error: only one sample or loci per row'
+      raise RegionParserError('Format Error: only one sample or loci per row')
     aset.add(row[0])
   return aset
 
@@ -196,12 +196,12 @@ def new_state(dfa,state,heading):
   'region'
   '''
   if heading=='data':
-    raise RegionParserError, 'Parsing Error: The section file has no header'
+    raise RegionParserError('Parsing Error: The section file has no header')
 
   new_state = dfa.get( (state,heading),'error' )
 
   if new_state == 'error':
-    raise RegionParserError, build_error_msg(dfa,state,heading)
+    raise RegionParserError(build_error_msg(dfa,state,heading))
 
   return new_state
 
@@ -229,7 +229,7 @@ def load_regions(filename):
       yield rname,samples,loci
 
   if state not in endstates:
-    raise RegionParserError, build_error_msg(dfa,state,heading)
+    raise RegionParserError(build_error_msg(dfa,state,heading))
 
 
 class testRegion(unittest.TestCase):

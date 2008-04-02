@@ -57,9 +57,9 @@ def query_genes_by_name(con,gene):
 def query_gene_by_name(con,gene):
   genes = query_genes_by_name(con,gene)
   if not genes:
-    raise KeyError,'Cannot find gene "%s"' % gene
+    raise KeyError('Cannot find gene "%s"' % gene)
   elif len(genes) > 1:
-    raise KeyError,'Gene not unique "%s"' % gene
+    raise KeyError('Gene not unique "%s"' % gene)
   return genes[0]
 
 
@@ -86,7 +86,7 @@ def gene_margin(gene, upstream=20000, downstream=10000):
   elif gene[5] == '-':
     return gene[-3]-downstream,gene[-2]+upstream
   else:
-    raise ValueError, 'Unknown gene orientation for %s=%s' % (gene[0],gene[5])
+    raise ValueError('Unknown gene orientation for %s=%s' % (gene[0],gene[5]))
 
 
 def get_snps(con, chromosome, start, stop):

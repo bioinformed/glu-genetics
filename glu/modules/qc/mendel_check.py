@@ -36,7 +36,7 @@ def genorepr(g):
   elif len(g) == 2:
     a1,a2 = g
   else:
-    raise ValueError, 'Invalid genotype: %s' % g
+    raise ValueError('Invalid genotype: %s' % g)
 
   if a1>a2:
     a1,a2 = a2,a1

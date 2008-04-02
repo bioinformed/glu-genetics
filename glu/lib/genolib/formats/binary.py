@@ -1208,7 +1208,7 @@ def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs)
   compat_version = _get_v_attr(gfile,['GLU_COMPAT_VERSION'],version)
 
   if format not in ('ldat','sdat'):
-    raise ValueError, 'Unknown format: %s' % format
+    raise ValueError('Unknown format: %s' % format)
 
   if compat_version > GENOMATRIX_VERSION:
     raise ValueError('Unknown Genomatrix file version: %s' % version)
