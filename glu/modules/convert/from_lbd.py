@@ -115,23 +115,24 @@ def load_illumina_manifest(filename):
   ifile = csv.reader(autofile(filename),dialect='excel')
   sections = read_sections(ifile)
 
-  heading,contents = sections.next()
-
-  # OPA manifest
-  if heading == 'data':
+  while 1:
     heading,contents = sections.next()
-    assert heading == 'Heading'
+    attrs = dict(c[:2] for c in islice(contents,10) if len(c) > 1)
+    if 'Assay Format' in attrs:
+      break
 
-    headings = dict(c[:2] for c in islice(contents,10) if len(c) > 1)
-    assert headings['Assay Format'] == 'Golden Gate'
+  format = attrs['Assay Format']
+  # OPA manifest
+  if format == 'Golden Gate':
+    pass
 
-  # Infinium manifest
-  elif heading == 'Heading':
-    contents = dict(c[:2] for c in contents if len(c) > 1)
-    assert contents['Assay Format'] in ('Infinium','Infinium II','Infinium 2')
-
+  # Infinium
+  # Known formats: Infinium,Infinium II,Infinium 2,Infinium HD Super
+  elif format.startswith('Infinium'):
     heading,contents = sections.next()
     assert heading == 'Assay'
+  else:
+    raise ValueError('Unknown manifest format: %s' % format)
 
   return contents
 
