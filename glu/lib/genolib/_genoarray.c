@@ -82,6 +82,9 @@ static PyTypeObject GenotypeType;
 #define Genotype_CheckExact(op)                ((op)->ob_type == &GenotypeType)
 #define GenotypeArrayDescriptor_CheckExact(op) ((op)->ob_type == &GenotypeArrayDescriptorType)
 
+/* Exceptions */
+static PyObject *GenotypeLookupError;
+static PyObject *GenotypeRepresentationError;
 
 static int
 genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
@@ -629,7 +632,7 @@ genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 
 	if(allele != Py_None && !PyString_Check(allele))
 	{
-		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
+		PyErr_SetString(GenotypeRepresentationError,"alleles must be None or strings");
 		return NULL;
 	}
 
@@ -638,7 +641,7 @@ genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 	if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
 	{
 		PyErr_Clear();
-		PyErr_SetObject(PyExc_KeyError, allele);
+		PyErr_SetObject(GenotypeLookupError, allele);
 	}
 	return index;
 }
@@ -653,7 +656,7 @@ genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 
 	if(allele != Py_None && !PyString_Check(allele))
 	{
-		PyErr_SetString(PyExc_ValueError,"alleles must be None or strings");
+		PyErr_SetString(GenotypeRepresentationError,"alleles must be None or strings");
 		return -1;
 	}
 
@@ -671,7 +674,7 @@ genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 
 		if(n > self->max_alleles)
 		{
-			PyErr_SetString(PyExc_ValueError,"genotype model cannot accomodate additional alleles");
+			PyErr_SetString(GenotypeRepresentationError,"genotype model cannot accomodate additional alleles");
 			return -1;
 		}
 
@@ -725,7 +728,7 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 
 	if(!PyTuple_CheckExact(geno) || PyTuple_GET_SIZE(geno) != 2)
 	{
-		PyErr_SetString(PyExc_ValueError,"genotype must be specified as a 2-tuple");
+		PyErr_SetString(GenotypeRepresentationError,"genotype must be specified as a 2-tuple");
 		return NULL;
 	}
 
@@ -743,7 +746,7 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 
 	if( !self->allow_hemizygote && ((allele1 == Py_None) ^ (allele2 == Py_None)) )
 	{
-		PyErr_SetString(PyExc_ValueError,"model does not allow hemizgote genotypes");
+		PyErr_SetString(GenotypeRepresentationError,"model does not allow hemizgote genotypes");
 		return NULL;
 	}
 
@@ -840,7 +843,7 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self,  PyObject *geno)
 
 	if(!PyTuple_CheckExact(geno) || PyTuple_GET_SIZE(geno) != 2)
 	{
-		PyErr_SetString(PyExc_ValueError,"genotype must be specified as a 2-tuple");
+		PyErr_SetString(GenotypeRepresentationError,"genotype must be specified as a 2-tuple");
 		return NULL;
 	}
 
@@ -860,7 +863,7 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self,  PyObject *geno)
 		/* Do not implicitly try to add hemizygotes if they are not allowed */
 		if( !self->allow_hemizygote && ((allele1 == Py_None) ^ (allele2 == Py_None)) )
 		{
-			PyErr_SetObject(PyExc_KeyError, geno);
+			PyErr_SetObject(GenotypeLookupError, geno);
 			return NULL;
 		}
 
@@ -878,7 +881,7 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self,  PyObject *geno)
 
 	if(!g)
 	{
-		PyErr_SetObject(PyExc_KeyError, geno);
+		PyErr_SetObject(GenotypeLookupError, geno);
 		return NULL;
 	}
 
@@ -1767,13 +1770,13 @@ genoarray_concordance_8bit(PyObject *self, PyObject *args)
 
 	if(genos1->descriptor != genos2->descriptor)
 	{
-		PyErr_SetString(PyExc_ValueError,"genos1 and genos2 must share the same descriptor");
+		PyErr_SetString(GenotypeRepresentationError,"genos1 and genos2 must share the same descriptor");
 		return NULL;
 	}
 
 	if(genos1->descriptor->homogeneous != 8)
 	{
-		PyErr_SetString(PyExc_ValueError, "genotype arrays must have homogeneous 8 bit width");
+		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 8 bit width");
 		return NULL;
 	}
 
@@ -1784,7 +1787,7 @@ genoarray_concordance_8bit(PyObject *self, PyObject *args)
 
 	if(offsets[0] != 0)
 	{
-		PyErr_SetString(PyExc_ValueError, "genotype array data must begin with zero offset");
+		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
 		return NULL;
 	}
 
@@ -1802,7 +1805,7 @@ genoarray_concordance_8bit(PyObject *self, PyObject *args)
 
 	if (len1 != len2 || len>len1)
 	{
-		PyErr_Format(PyExc_ValueError, "genotype array sizes do not match: %zd != %zd",
+		PyErr_Format(GenotypeRepresentationError, "genotype array sizes do not match: %zd != %zd",
 			     len1, len2);
 		return NULL;
 	}
@@ -1848,13 +1851,13 @@ genoarray_concordance_4bit(PyObject *self, PyObject *args)
 
 	if(genos1->descriptor != genos2->descriptor)
 	{
-		PyErr_SetString(PyExc_ValueError,"genos1 and genos2 must share the same descriptor");
+		PyErr_SetString(GenotypeRepresentationError,"genos1 and genos2 must share the same descriptor");
 		return NULL;
 	}
 
 	if(genos1->descriptor->homogeneous != 4)
 	{
-		PyErr_SetString(PyExc_ValueError, "genotype arrays must have homogeneous 8 bit width");
+		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 4 bit width");
 		return NULL;
 	}
 
@@ -1865,7 +1868,7 @@ genoarray_concordance_4bit(PyObject *self, PyObject *args)
 
 	if(offsets[0] != 0)
 	{
-		PyErr_SetString(PyExc_ValueError, "genotype array data must begin with zero offset");
+		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
 		return NULL;
 	}
 
@@ -1883,7 +1886,7 @@ genoarray_concordance_4bit(PyObject *self, PyObject *args)
 
 	if (len1 != len2 || len/2>len1)
 	{
-		PyErr_Format(PyExc_ValueError, "genotype array sizes do not match: %zd != %zd",
+		PyErr_Format(GenotypeRepresentationError, "genotype array sizes do not match: %zd != %zd",
 			     len1, len2);
 		return NULL;
 	}
@@ -1955,13 +1958,13 @@ genoarray_concordance_2bit(PyObject *self, PyObject *args)
 
 	if(genos1->descriptor != genos2->descriptor)
 	{
-		PyErr_SetString(PyExc_ValueError,"genos1 and genos2 must share the same descriptor");
+		PyErr_SetString(GenotypeRepresentationError,"genos1 and genos2 must share the same descriptor");
 		return NULL;
 	}
 
 	if(genos1->descriptor->homogeneous != 2)
 	{
-		PyErr_SetString(PyExc_ValueError, "genotype arrays must have homogeneous 8 bit width");
+		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 2 bit width");
 		return NULL;
 	}
 
@@ -1972,7 +1975,7 @@ genoarray_concordance_2bit(PyObject *self, PyObject *args)
 
 	if(offsets[0] != 0)
 	{
-		PyErr_SetString(PyExc_ValueError, "genotype array data must begin with zero offset");
+		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
 		return NULL;
 	}
 
@@ -1990,7 +1993,7 @@ genoarray_concordance_2bit(PyObject *self, PyObject *args)
 
 	if (len1 != len2 || len/4>len1)
 	{
-		PyErr_Format(PyExc_ValueError, "genotype array sizes do not match: %zd != %zd",
+		PyErr_Format(GenotypeRepresentationError, "genotype array sizes do not match: %zd != %zd",
 			     len1, len2);
 		return NULL;
 	}
@@ -2107,7 +2110,7 @@ genoarray_concordance(PyObject *self, PyObject *args)
 	len2 = PySequence_Fast_GET_SIZE(genos2);
 
 	if (len1 != len2) {
-		PyErr_Format(PyExc_ValueError,"genotype array sizes do not match: %zd != %zd",
+		PyErr_Format(GenotypeRepresentationError,"genotype array sizes do not match: %zd != %zd",
 			     len1, len2);
 		goto error;
 	}
@@ -2123,14 +2126,14 @@ genoarray_concordance(PyObject *self, PyObject *args)
 
 		if(!a || !Genotype_CheckExact(a))
 		{
-			PyErr_Format(PyExc_ValueError,
+			PyErr_Format(GenotypeRepresentationError,
 		             "invalid genotype object in genos1 at index %zd", i);
 			goto error;
 		}
 
 		if(!b || !Genotype_CheckExact(b))
 		{
-			PyErr_Format(PyExc_ValueError,
+			PyErr_Format(GenotypeRepresentationError,
 		             "invalid genotype object in genos2 at index %zd", i);
 			goto error;
 		}
@@ -2189,11 +2192,29 @@ init_genoarray(void)
 	m = Py_InitModule3("_genoarray", genoarraymodule_methods,
 		"Genotype array module");
 
+	GenotypeLookupError = PyErr_NewException("_genoarray.GenotypeLookupError",
+		PyExc_KeyError, NULL);
+
+	if (GenotypeLookupError == NULL)
+		return;
+
+	GenotypeRepresentationError = PyErr_NewException("_genoarray.GenotypeRepresentationError",
+		PyExc_ValueError, NULL);
+
+	if (GenotypeRepresentationError == NULL)
+		return;
+
+	Py_INCREF(GenotypeLookupError);
+	Py_INCREF(GenotypeRepresentationError);
+	Py_INCREF(&GenotypeArrayDescriptorType);
+	Py_INCREF(&UnphasedMarkerModelType);
 	Py_INCREF(&GenotypeArrayType);
-	PyModule_AddObject(m, "GenotypeArrayDescriptor",
-	                       (PyObject *)&GenotypeArrayDescriptorType);
-	PyModule_AddObject(m, "UnphasedMarkerModel",
-	                       (PyObject *)&UnphasedMarkerModelType);
-	PyModule_AddObject(m, "GenotypeArray", (PyObject *)&GenotypeArrayType);
-	PyModule_AddObject(m, "Genotype",      (PyObject *)&GenotypeType);
+	Py_INCREF(&GenotypeType);
+
+	PyModule_AddObject(m, "GenotypeLookupError",        GenotypeLookupError);
+	PyModule_AddObject(m, "GenotypeRepresentationError",GenotypeRepresentationError);
+	PyModule_AddObject(m, "GenotypeArrayDescriptor",    (PyObject *)&GenotypeArrayDescriptorType);
+	PyModule_AddObject(m, "UnphasedMarkerModel",        (PyObject *)&UnphasedMarkerModelType);
+	PyModule_AddObject(m, "GenotypeArray",              (PyObject *)&GenotypeArrayType);
+	PyModule_AddObject(m, "Genotype",                   (PyObject *)&GenotypeType);
 }

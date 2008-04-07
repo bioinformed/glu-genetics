@@ -19,20 +19,19 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-__all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeError','GenotypeArrayDescriptor']
+__all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeArrayDescriptor',
+           'GenotypeLookupError','GenotypeRepresentationError']
 
 
 from  itertools     import izip
 from  glu.lib.utils import izip_exact
 
 
-class GenotypeError(ValueError): pass
-
-
 try:
   #raise ImportError    # Uncomment to test pure-Python implementation
   from   glu.lib.genolib._genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor,
-                                            UnphasedMarkerModel, genoarray_concordance)
+                                            UnphasedMarkerModel, genoarray_concordance,
+                                            GenotypeLookupError, GenotypeRepresentationError)
 
 except ImportError:
   from   array     import array
@@ -45,6 +44,10 @@ except ImportError:
 
   def _hemi(geno):
     return (geno[0] is None) ^ (geno[1] is None)
+
+
+  class GenotypeLookupError(KeyError): pass
+  class GenotypeRepresentationError(ValueError): pass
 
 
   class Genotype(object):
@@ -90,7 +93,7 @@ except ImportError:
         self.gclass = HOMOZYGOTE
       else:
         if allele1 == allele2:
-          raise GenotypeError('Attempt to add non-singleton alleles')
+          raise GenotypeRepresentationError('Attempt to add non-singleton alleles')
         self.gclass = HETEROZYGOTE
 
     def alleles(self):
@@ -383,7 +386,7 @@ except ImportError:
       elif isinstance(geno,tuple) and len(geno) == 2:
         geno = descr.models[i][geno]
       elif not isinstance(geno,Genotype):
-        raise GenotypeError('Invalid genotype: %s' % geno)
+        raise GenotypeRepresentationError('Invalid genotype: %s' % geno)
 
       model    = descr.models[i]
       startbit = descr.offsets[i]
@@ -436,19 +439,22 @@ except ImportError:
     def get_allele(self, allele):
       '''
       Return the representation for a given allele.  If the specified allele
-      does not belong to this model, a ValueError is raised.
+      does not belong to this model, a GenotypeLookupError is raised.
 
       @param allele: allele object
       @type  allele: object, usually str
       @return      : allele representation
       @rtype       : int
       '''
-      return self.alleles.index(allele)
+      try:
+        return self.alleles.index(allele)
+      except ValueError:
+        raise GenotypeLookupError,allele
 
     def add_allele(self, allele):
       '''
       Return the representation for a given allele.  If the specified
-      allele does not belong to this model it will be added. A GenotypeError
+      allele does not belong to this model it will be added. A GenotypeRepresentationError
       is raised if there is not sufficient space within the model.
 
       @param allele: allele object
@@ -462,7 +468,7 @@ except ImportError:
       n = len(self.alleles)
       new_width = genotype_bit_size(n,self.allow_hemizygote)
       if new_width > self.bit_size:
-        raise GenotypeError('Allele cannot be added to model due to fixed bit width')
+        raise GenotypeRepresentationError('Allele cannot be added to model due to fixed bit width')
       self.alleles.append(allele)
 
       return n
@@ -470,7 +476,7 @@ except ImportError:
     def get_genotype(self, geno):
       '''
       Return the representation for a given genotype tuple.  If the
-      specified genotype tuple does not belong to this model, a KeyError is
+      specified genotype tuple does not belong to this model, a GenotypeLookupError is
       raised.
 
       @param geno: genotype tuple
@@ -489,7 +495,7 @@ except ImportError:
         if (geno[0] in self.alleles and geno[1] in self.alleles and
            (self.allow_hemizygote or not _hemi(geno))):
           return self.add_genotype(geno)
-        raise
+        raise GenotypeLookupError,geno
 
     __getitem__ = get_genotype
 
@@ -526,7 +532,7 @@ except ImportError:
       g = Genotype(self, allele1, allele2, len(self.genotypes))
 
       if not self.allow_hemizygote and g.hemizygote():
-        raise GenotypeError('Genotype model does not allow hemizygous genotypes')
+        raise GenotypeRepresentationError('Genotype model does not allow hemizygous genotypes')
 
       self.genotypes.append(g)
       self.genomap[allele1,allele2] = g
@@ -1022,7 +1028,7 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
     hemi = any(hemi(g) for g in genoset)
 
     if allow_hemizygote is not None and hemi:
-      raise GenotypeError('Genotype model does not allow hemizygous genotypes')
+      raise GenotypeRepresentationError('Genotype model does not allow hemizygous genotypes')
 
     allow_hemizygote = hemi
 
@@ -1031,7 +1037,7 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
   if not max_alleles:
     max_alleles = n
   elif n > max_alleles:
-    raise GenotypeError('Genotype model supports at most %d alleles, %d specified' % (max_alleles,n))
+    raise GenotypeRepresentationError('Genotype model supports at most %d alleles, %d specified' % (max_alleles,n))
 
   model = UnphasedMarkerModel(allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)
 
