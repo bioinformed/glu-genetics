@@ -382,6 +382,7 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
   dialect  = get_csv_dialect(args)
   samples  = get_arg(args, ['samples'])
   loci     = get_arg(args, ['loci'])
+  skip     = int(get_arg(args, ['skip'],0))
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -399,6 +400,10 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
     loci = set(load_list(loci,**dialect))
 
   rows = csv.reader(autofile(filename),**dialect)
+
+  if skip and skip>0:
+    for i in xrange(skip):
+      rows.next()
 
   def _load():
     # Micro-optimization
