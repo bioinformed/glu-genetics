@@ -21,14 +21,13 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
 import sys
 
 from   operator                  import itemgetter
 from   itertools                 import islice, chain
 from   collections               import defaultdict
 
-from   glu.lib.fileutils         import autofile, load_map
+from   glu.lib.fileutils         import load_map, table_writer
 from   glu.lib.remap             import remap_alleles, remap_category
 from   glu.lib.hwp               import hwp_exact_biallelic
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
@@ -84,8 +83,7 @@ def generate_sample_output(sampleconcord):
 
 
 def output_sample_concordstat(filename, sampleconcord):
-
-  f = csv.writer(autofile(filename, 'w'), dialect='excel-tab')
+  f = table_writer(filename)
   f.writerow(SAMPLE_HEADER)
   samplestats = generate_sample_output(sampleconcord)
   totals = [ sum(samplestat[i] for samplestat in samplestats) for i in xrange(2,7) ]
@@ -169,7 +167,7 @@ def generate_locus_output(locusconcord,allelemaps):
 
 
 def output_locus_concordstat(filename, locusconcord, allelemaps):
-  f = csv.writer(autofile(filename, 'w'), dialect='excel-tab')
+  f = table_writer(filename)
   f.writerow(LOCUS_HEADER)
   locusstats = generate_locus_output(locusconcord,allelemaps)
 
@@ -288,7 +286,7 @@ def compute_allele_maps(locusconcord):
 
 
 def output_allele_maps(amap,mapfile):
-  w = csv.writer(autofile(mapfile,'w'), dialect='excel-tab')
+  w = table_writer(mapfile)
   for locus,map in amap:
     if any(1 for a,b in map.iteritems() if a!=b):
       old,new = zip(*map.iteritems())

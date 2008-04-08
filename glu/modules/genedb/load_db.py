@@ -22,7 +22,7 @@ import sqlite3
 
 from   itertools         import islice,chain
 
-from   glu.lib.fileutils import autofile
+from   glu.lib.fileutils import autofile, load_table
 from   glu.lib.sections  import read_sections
 
 
@@ -45,7 +45,7 @@ def get_aliases(con,filename):
   cur.execute(sql)
   geneids = dict( (int(geneid),symbol) for geneid,symbol in cur.fetchall() )
 
-  aliasfile = csv.reader(autofile(filename), dialect='excel-tab')
+  aliasfile = load_table(filename,want_header=True)
   aliasfile.next()
 
   updates = []
@@ -71,7 +71,7 @@ def get_aliases(con,filename):
     if symbol != symbol.upper():
       yield symbol.upper(),geneid,symbol.upper()
 
-  aliasfile = csv.reader(autofile(filename), dialect='excel-tab')
+  aliasfile = load_table(filename,want_header=True)
   aliasfile.next()
 
   for record in aliasfile:
@@ -107,7 +107,7 @@ def filter_aliases(aliases):
 
 
 def get_genes(filename):
-  genes = csv.reader(autofile(filename),dialect='excel-tab')
+  genes  = load_table(filename,want_header=True)
   header = genes.next()
 
   for taxid,chromosome,chrStart,chrEnd,orientation,contig,cnt_start,     \

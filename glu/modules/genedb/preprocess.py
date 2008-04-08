@@ -20,12 +20,11 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 import sqlite3
 
 from itertools        import chain,islice
 
-from glu.lib.fileutils    import autofile,hyphen,load_list
+from glu.lib.fileutils    import autofile,hyphen,load_list,load_table,table_writer
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
@@ -52,7 +51,7 @@ def option_parser():
 
 
 def load_features(filename,limit=None):
-  return islice(csv.reader(autofile(filename),dialect='excel-tab'),1,limit)
+  return islice(load_table(filename,want_header=True),1,limit)
 
 
 def resolve_features(con,features,options):
@@ -134,8 +133,7 @@ def main():
     return
 
   con = sqlite3.connect(args[0])
-  out = hyphen(options.outfile,sys.stdout)
-  out = csv.writer(autofile(out,'w'),dialect='excel-tab')
+  out = table_writer(options.outfile,hyphen=sys.stdout)
   out.writerow(HEADER)
 
   for infile in args[1:]:

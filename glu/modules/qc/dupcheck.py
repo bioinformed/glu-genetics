@@ -29,7 +29,7 @@ from   textwrap                  import fill
 from   collections               import defaultdict
 
 from   glu.lib.utils             import percent, pair_generator
-from   glu.lib.fileutils         import autofile, hyphen, load_map
+from   glu.lib.fileutils         import autofile, hyphen, load_map, table_writer
 from   glu.lib.union_find        import union_find
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
@@ -160,7 +160,7 @@ def duplicate_output_details(out,data):
 
 
 def write_dupsets(filename, dupsets):
-  out = csv.writer(autofile(filename, 'w'),dialect='excel-tab')
+  out = table_writer(filename)
   for dset in dupsets.sets():
     out.writerow( list(dset) )
 
@@ -188,7 +188,7 @@ def option_parser():
                     help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
                          'Values=vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=vote:1')
   parser.add_option('-e', '--duplicates', dest='duplicates', metavar='FILE',
-                    help='A csv file containing expected duplicates')
+                    help='A delimited file containing expected duplicates')
   parser.add_option('-d', '--dupout', dest='dupout', metavar='FILE',
                     help='Output of duplicate sets')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -222,7 +222,7 @@ def main():
 
   if options.duplicates:
     print >> sys.stderr, 'Loading expected duplicate data...',
-    for dupset in csv.reader(autofile(options.duplicates), 'excel-tab'):
+    for dupset in csv.reader(autofile(options.duplicates), dialect='excel-tab'):
       for dup in dupset:
         expected_dupset.union(dupset[0],dup)
     print >> sys.stderr, 'Done.'

@@ -19,12 +19,11 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-import re
 import csv
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.fileutils         import autofile,namefile,tryint,trybool,\
+from   glu.lib.fileutils         import autofile,table_writer,namefile,tryint,trybool,\
                                         parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
@@ -213,7 +212,7 @@ class TextGenomatrixWriter(object):
     if genorepr is None:
       raise ValueError('genotype representation must be specified when reading a text genotype format')
 
-    self.out       = csv.writer(autofile(filename,'w'), **dialect)
+    self.out       = table_writer(filename, **dialect)
     self.header    = header
     self.headerlen = len(header)
     self.genorepr  = genorepr
@@ -485,7 +484,7 @@ class TextGenotripleWriter(object):
     if genorepr is None:
       raise ValueError('genotype representation must be specified when reading a text genotype format')
 
-    self.out      = csv.writer(autofile(filename,'w'),**dialect)
+    self.out      = table_writer(filename,**dialect)
     self.genorepr = genorepr
 
   def writerow(self, sample, locus, geno):

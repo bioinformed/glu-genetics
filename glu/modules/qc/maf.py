@@ -17,12 +17,11 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   operator                  import itemgetter
 from   itertools                 import izip
 
-from   glu.lib.fileutils         import autofile,hyphen
+from   glu.lib.fileutils         import table_writer
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.genolib.genoarray import count_alleles_from_genos
 
@@ -106,8 +105,7 @@ def main():
                           include_samples=options.includesamples,
                           exclude_samples=options.excludesamples)
 
-  outfile = autofile(hyphen(options.output,sys.stdout),'w')
-  out     = csv.writer(outfile,dialect='excel-tab')
+  out = table_writer(options.output,hyphen=sys.stdout)
 
   out.writerow(['Locus','Missing','Major allele','frequency','...'])
 

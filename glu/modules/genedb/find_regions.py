@@ -20,14 +20,11 @@ __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import sqlite3
-import time
-import csv
 import os
+import time
+import sqlite3
 
-import seq_comp
-
-from tagzilla import *
+from   glu.lib.fileutils import load_table,table_writer
 
 HAPMAP_PATH= '/home/jacobske/projects/CGEMS/hapmap'
 GENOTYPES  = os.path.join(HAPMAP_PATH,'build20','non-redundant')
@@ -116,7 +113,7 @@ def extend(s,n):
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genofile...'
+  usage = 'usage: %prog [options] genome genofile...'
   parser = optparse.OptionParser(usage=usage, add_help_option=False)
 
   parser.add_option('-h', '--help', dest='help', action='store_true',
@@ -127,13 +124,13 @@ def option_parser():
 
 
 def find_regions(options,args):
-  con = sqlite3.connect('genome35_v3.db')
+  con = sqlite3.connect(args[0])
 
-  out = csv.writer(sys.stdout,dialect='excel-tab')
+  out = table_writer(sys.stdout)
   out.writerow( ['GENE','CHROMOSOME','GENE START','GENE END','LOCUS','LOCATION'] )
 
-  for arg in args:
-    genefile = csv.reader(autofile(arg),dialect='excel-tab')
+  for arg in args[1:]:
+    genefile = load_table(arg,want_header=True)
     header= genefile.next()
     genes = [ line[0] for line in genefile if line and line[0] ]
 
@@ -156,7 +153,14 @@ def find_regions(options,args):
 
 
 def main():
-  launcher(find_regions, option_parser, **globals())
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if len(args)<2:
+    parser.print_help(sys.stderr)
+    return
+
+  find_regions(options,args)
 
 
 if __name__ == '__main__':

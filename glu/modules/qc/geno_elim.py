@@ -18,13 +18,12 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
 import sys
 
 from   itertools         import izip,chain
 from   operator          import itemgetter
 
-from   glu.lib.fileutils import autofile,hyphen
+from   glu.lib.fileutils import autofile,hyphen,load_table,table_writer
 from   glu.lib.genolib   import load_genostream,snp
 
 
@@ -134,7 +133,7 @@ def build_nuclear_families(pedfile,individuals):
   for individual in individuals:
     typed[individual] = 1
 
-  peds = csv.reader(autofile(pedfile),dialect='excel-tab')
+  peds = load_table(pedfile)
 
   nfam = {}
   famset = set()
@@ -630,11 +629,9 @@ def emit_errbyind(ind,errbyped1,errbyped2):
   return rowd,rows
 
 
-def open_filehandle(file,*headers):
-  out = autofile(hyphen(file,sys.stdout),'w')
-  out = csv.writer(out,dialect='excel-tab')
-  for header in headers:
-    out.writerow(header)
+def output_file(filename,*headers):
+  out = table_writer(filename,hyphen=sys.stdout)
+  out.writerows(headers),
   return out
 
 
@@ -650,7 +647,7 @@ def main():
   individuals = genos.next()
 
   if options.errdetails:
-    outdetails = open_filehandle(options.errdetails,['']+individuals)
+    outdetails = output_file(options.errdetails,['']+individuals)
 
   nfams,numoffams = build_nuclear_families(options.pedfile,individuals)
 
@@ -662,8 +659,8 @@ def main():
 
   # Output genotype errorw by locus
   if options.errbylocdet and options.errbylocsum:
-    outd = open_filehandle(options.errbylocdet,errbylochead1,errbylochead2)
-    outs = open_filehandle(options.errbylocsum,errbylochead1,errbylochead2)
+    outd = output_file(options.errbylocdet,errbylochead1,errbylochead2)
+    outs = output_file(options.errbylocsum,errbylochead1,errbylochead2)
     for locus in sorted(set(chain(errbyloc1,errbyloc2,errbyloc3))):
       rowd,rows=emit_errbyloc(locus,errbyloc1,errbylocf1,errbyloc2,errbylocf2,errbyloc3)
       outd.writerow(rowd)
@@ -678,8 +675,8 @@ def main():
 
   # Output genotype errors by pedigree
   if options.errbypeddet and options.errbypedsum:
-    outd = open_filehandle(options.errbypeddet,errbypedhead)
-    outs = open_filehandle(options.errbypedsum,errbypedhead)
+    outd = output_file(options.errbypeddet,errbypedhead)
+    outs = output_file(options.errbypedsum,errbypedhead)
 
     famdict={}
     for ind in sorted(set(chain(errbyped1,errbyped2))):

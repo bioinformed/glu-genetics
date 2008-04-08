@@ -23,11 +23,10 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 import sys
-import csv
 
 from   itertools              import chain
 
-from   glu.lib.fileutils      import autofile, namefile, hyphen
+from   glu.lib.fileutils      import table_writer,autofile,namefile,hyphen
 
 from   glu.lib.genolib.io     import load_genostream
 from   glu.lib.genolib.phenos import SEX_UNKNOWN,SEX_MALE,SEX_FEMALE, \
@@ -35,8 +34,7 @@ from   glu.lib.genolib.phenos import SEX_UNKNOWN,SEX_MALE,SEX_FEMALE, \
 
 
 def emit(filename,rows):
-  outfile = autofile(hyphen(filename,sys.stdout),'w')
-  csv.writer(outfile,dialect='tsv').writerows(rows)
+  table_writer(filename,hyphen=sys.stdout).writerows(rows)
 
 
 def option_parser():

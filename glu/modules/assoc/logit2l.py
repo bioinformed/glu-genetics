@@ -16,13 +16,12 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
 import sys
 
 from   numpy               import isfinite
 from   scipy               import stats
 
-from   glu.lib.fileutils   import autofile,hyphen
+from   glu.lib.fileutils   import autofile,hyphen,load_table,table_writer
 from   glu.lib.glm         import GLogit
 
 from   glu.lib.association import build_models,print_results,get_term,format_pvalue,NULL,GENO,TREND
@@ -88,7 +87,7 @@ def main():
     if details is out:
       raise ValueError('Cannot send summary and detailed output to stdout')
 
-  pairs  = csv.reader(autofile(args[0]),'excel-tab')
+  pairs  = load_table(args[0])
   pairs  = [ p[:2] for p in pairs if len(p) > 1 ]
   subset = set(p[0] for p in pairs) | set(p[1] for p in pairs)
 
@@ -167,7 +166,7 @@ def main():
       continue
 
     if 0:
-      f = csv.writer(file('%s.csv' % lname,'w'))
+      f = table_writer('%s.csv' % lname,dialect='csv')
       f.writerow(model.vars)
       f.writerows(model.X.tolist())
 

@@ -17,14 +17,13 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   operator                  import itemgetter
 from   itertools                 import izip,starmap,dropwhile,repeat
 from   collections               import defaultdict
 
 from   glu.lib.utils             import tally
-from   glu.lib.fileutils         import autofile,hyphen
+from   glu.lib.fileutils         import table_writer
 
 from   glu.lib.genolib.genoarray import model_from_alleles
 
@@ -487,12 +486,12 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   l2  2       1       0       1       0.500000        0       0.250000
   '''
   if samplefile is not None:
-    f = csv.writer(autofile(samplefile,'w'), dialect='tsv')
+    f = table_writer(samplefile,dialect='tsv')
     f.writerow(SAMPLE_CONCORDANCE_HEADER)
     f.writerows(sorted(build_concordance_output(mergefunc.samplestats),key=itemgetter(5,0)))
 
   if locusfile is not None:
-    fl = csv.writer(autofile(locusfile,'w'), dialect='tsv')
+    fl = table_writer(locusfile,dialect='tsv')
     fl.writerow(LOCUS_CONCORDANCE_HEADER)
     fl.writerows(sorted(build_concordance_output(mergefunc.locusstats),key=itemgetter(5,0)))
 

@@ -21,12 +21,11 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 import sys
-import csv
 import sqlite3
 
 from   itertools         import chain,islice
 
-from   glu.lib.fileutils import autofile,hyphen,load_table
+from   glu.lib.fileutils import hyphen,load_table,table_writer
 
 
 HEADER = ['CHROMOSOME','LOCATION','GENE NEIGHBORHOOD']
@@ -116,8 +115,7 @@ def main():
     return
 
   con = sqlite3.connect(args[0])
-  out = hyphen(options.outfile,sys.stdout)
-  out = csv.writer(autofile(out,'w'),dialect='excel-tab')
+  out = table_writer(options.outfile,hyphen=sys.stdout)
 
   rows = load_table(hyphen(args[1],sys.stdin),want_header=True)
   header = rows.next() or ['']

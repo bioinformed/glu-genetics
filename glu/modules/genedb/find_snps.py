@@ -21,12 +21,11 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 import sys
-import csv
 import sqlite3
 
 from   itertools         import islice
 
-from   glu.lib.fileutils import autofile,hyphen
+from   glu.lib.fileutils import hyphen,table_writer
 from   preprocess        import load_features
 
 
@@ -118,8 +117,7 @@ def main():
     parser.print_help(sys.stderr)
     return
 
-  out = hyphen(options.outfile,sys.stdout)
-  out = csv.writer(autofile(out,'w'),dialect='excel-tab')
+  out = table_writer(options.outfile,hyphen=sys.stdout)
   out.writerow(HEADER)
 
   for infile in args[1:]:

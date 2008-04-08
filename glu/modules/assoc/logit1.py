@@ -17,12 +17,11 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   numpy               import isfinite
 from   scipy               import stats
 
-from   glu.lib.fileutils   import autofile,hyphen
+from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import GLogit,LinAlgError
 
 from   glu.lib.association import build_models,print_results,get_term,format_pvalue,NULL
@@ -168,7 +167,7 @@ def main():
       continue
 
     if 0:
-      f = csv.writer(file('%s.csv' % lname,'w'))
+      f = table_writer('%s.csv' % lname,dialect='csv')
       f.writerow(model.vars)
       f.writerows(model.X.tolist())
 

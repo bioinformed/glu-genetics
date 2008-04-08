@@ -27,7 +27,7 @@ from   itertools                 import islice,chain,izip,groupby
 from   numpy                     import array,zeros
 
 from   glu.lib.utils             import izip_exact
-from   glu.lib.fileutils         import autofile,hyphen
+from   glu.lib.fileutils         import autofile,hyphen,load_table,table_writer
 from   glu.lib.sections          import read_sections
 from   glu.lib.sequence          import norm_snp_seq,complement_base
 
@@ -74,7 +74,7 @@ def load_lbd_file(filename):
 
       yield sampleid,genos,scores
 
-  data = csv.reader(autofile(filename), dialect='excel')
+  data = csv.reader(autofile(filename), dialect='csv')
 
   skiprows(11)
   gentrain = parse_gentrain()
@@ -93,11 +93,7 @@ def load_abmap(file_or_name,skip=0):
   Creates a dictionary representing a mapping from A and B probes for each
   locus to allele names.
   '''
-  lfile = autofile(file_or_name)
-  f = csv.reader(lfile, dialect='excel-tab')
-
-  if skip:
-    f = islice(f,skip,None)
+  f = load_table(file_or_name,skip=skip)
 
   for row in f:
     if len(row) < 3 or '' in row[:3]:
@@ -112,7 +108,7 @@ def load_illumina_manifest(filename):
   '''
   Load an Illumina assay manifest file, parsing out the various sections
   '''
-  ifile = csv.reader(autofile(filename),dialect='excel')
+  ifile = csv.reader(autofile(filename),dialect='csv')
   sections = read_sections(ifile)
 
   while 1:
@@ -438,13 +434,13 @@ def main():
   save_genostream(options.output,genos,format=options.outformat,genorepr=options.outgenorepr,hyphen=sys.stdout)
 
   if options.samplestats:
-    out = csv.writer(autofile(options.samplestats,'w'),dialect='tsv')
+    out = table_writer(options.samplestats)
     out.writerow(['SAMPLE','GC_MEAN','GC_STDDEV'])
     out.writerows( [ (s,'%.4f' % gc, '%.4f' % dev)
                       for s,gc,dev in summary.samplestats ] )
 
   if options.locusstats:
-    out = csv.writer(autofile(options.locusstats,'w'),dialect='tsv')
+    out = table_writer(options.locusstats)
     out.writerow(['LOCUS','GENTRAIN','GC_MEAN','GC_STDDEV'])
     out.writerows( [ (l,'%.4f' % gt, '%.4f' % gc, '%.4f' % dev)
                       for (l,gc,dev),gt in izip_exact(summary.locusstats,gentrain) ] )

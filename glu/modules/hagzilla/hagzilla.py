@@ -22,7 +22,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import os
 import sys
-import csv
 import time
 import select
 import fcntl
@@ -32,7 +31,7 @@ import sqlite3
 from   itertools                      import groupby,chain
 from   operator                       import itemgetter
 
-from   glu.lib.fileutils              import autofile,load_list
+from   glu.lib.fileutils              import load_list,load_table
 from   glu.modules.tagzilla.tagzilla  import launcher,locus_result_sequence
 
 
@@ -192,7 +191,7 @@ def get_sequences_from_genewindow(snps):
     snpfile.close()
     args = '%s %s sequence/sublist.txt sequence/oblig.txt %s 2>/dev/null' % (command,snpname,sequencename)
     subprocess.Popen(args, shell=True).communicate()
-    return csv.reader(file(sequencename),dialect='excel-tab')
+    return load_table(sequencename)
   finally:
     os.unlink(snpname)
     try:
@@ -495,7 +494,7 @@ def main():
   if not os.path.isdir(outdir):
     sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % outdir)
 
-  taskfile   = csv.reader(autofile(args[1]),dialect='excel-tab')
+  taskfile   = load_table(args[1])
   header     = taskfile.next()
   tasks      = sorted( extend(strip(t),12) for t in taskfile )
   tasks      = sorted(clean_tasks(con,tasks,options))

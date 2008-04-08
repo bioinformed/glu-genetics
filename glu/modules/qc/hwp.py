@@ -115,7 +115,7 @@ def geno_counts(loci):
 
 
 def read_counts(filename):
-  loci = csv.reader(autofile(filename),dialect='excel-tab')
+  loci = table_reader(filename)
   for locus in loci:
     if len(locus) < 4 or not locus[0]:
       continue

@@ -17,13 +17,12 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   operator                  import itemgetter
 from   itertools                 import izip
 
 from   glu.lib.utils             import percent, izip_exact
-from   glu.lib.fileutils         import autofile, hyphen, load_list
+from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
@@ -107,7 +106,7 @@ def geno_counts(samples):
 
 
 def read_counts(filename):
-  loci = csv.reader(autofile(filename),dialect='excel-tab')
+  loci = load_table(filename)
   for sample in loci:
     if len(sample) < 3 or not sample[0]:
       continue

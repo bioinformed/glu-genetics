@@ -17,13 +17,12 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import  sys
-import  csv
 import  time
 import  os
 
 from    itertools           import groupby
 
-from    glu.lib.fileutils   import autofile
+from    glu.lib.fileutils   import table_writer
 
 
 class SectionInUseError(RuntimeError): pass
@@ -55,7 +54,7 @@ class SectionWriter(object):
   same section.
   '''
   def __init__(self, filename, dialect='tsv'):
-    self.writer = csv.writer(autofile(filename, 'w'),dialect=dialect)
+    self.writer = table_writer(filename,dialect=dialect)
     self.header = None
 
   def checkout(self,header):

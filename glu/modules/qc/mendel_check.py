@@ -15,11 +15,13 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
+# FIXME: THIS NEEDS TO BE INCORPORATED INTO GLU
+
 import sys
 import csv
 
-from operator  import itemgetter
-from itertools import repeat
+from   operator  import itemgetter
+from   itertools import repeat
 
 
 def percent(a,b):

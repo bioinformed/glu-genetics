@@ -20,19 +20,20 @@ __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import sqlite3
-import time
-import csv
+
 import os
+import time
+import sqlite3
 
-import seq_comp
 
-from tagzilla import *
+from   glu.lib.fileutils import load_table
+
 
 HAPMAP_PATH= '/home/jacobske/projects/CGEMS/hapmap'
 GENOTYPES  = os.path.join(HAPMAP_PATH,'build20/non-redundant')
 PEDIGREES  = os.path.join(HAPMAP_PATH,'pedigrees', 'peds')
 POPS       = ['CEU','YRI','JPT','CHB','JPT+CHB']
+
 
 def escape(s):
   return "'%s'" % s.replace("'","''")
@@ -84,7 +85,7 @@ def get_sequences_from_genewindow(snps):
     snpfile.close()
     args = '%s sequence/sublist.txt sequence/oblig.txt %s' % (snpname,sequencename)
     os.popen('%s %s 2>/dev/null' % (command,args)).read()
-    return csv.reader(open(sequencename),dialect='excel-tab')
+    return load_table(sequencename)
   finally:
     os.unlink(snpname)
     try:
@@ -105,7 +106,7 @@ def extend(s,n):
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genofile...'
+  usage = 'usage: %prog [options] genomedb genofile...'
   parser = optparse.OptionParser(usage=usage, add_help_option=False)
 
   parser.add_option('-h', '--help', dest='help', action='store_true',
@@ -116,11 +117,11 @@ def option_parser():
 
 
 def get_seq(options,args):
-  con = sqlite3.connect('genome35.db')
+  con = sqlite3.connect(args[0])
 
   snps = set()
-  for arg in args:
-    snps.update(row[0] for row in csv.reader(autofile(arg),dialect='excel-tab') if row)
+  for arg in args[1:]:
+    snps.update(row[0] for row in load_table(arg) if row)
 
   degenerate = set('wymkwsbdhvnx')
   dcount = 0
@@ -137,8 +138,16 @@ def get_seq(options,args):
 
   print 'Degenerate:',dcount
 
+
 def main():
-  launcher(get_seq, option_parser, **globals())
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if len(args) < 2:
+    parser.print_help()
+    return
+
+  get_seq(options,args)
 
 
 if __name__ == '__main__':

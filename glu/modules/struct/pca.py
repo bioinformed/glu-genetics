@@ -17,7 +17,6 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   itertools                 import izip,islice
 
@@ -28,7 +27,7 @@ try:
 except ImportError:
   cxvopt = None
 
-from   glu.lib.fileutils         import hyphen,autofile
+from   glu.lib.fileutils         import table_writer
 
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_genocounts, \
@@ -296,17 +295,13 @@ def main():
     n_eff   = n_eff[:n]
 
   if options.output:
-    out = autofile(hyphen(options.output,sys.stdout),'w')
-    out = csv.writer(out,dialect='excel-tab')
-
+    out = table_writer(options.output,hyphen=sys.stdout)
     out.writerow(['ID'] + [ 'EV%d' % (i+1) for i in range(len(values)) ])
     for i,sample in enumerate(genos.samples):
       out.writerow( [sample]+['%7.4f' % v for v in vectors[:,i]] )
 
   if options.vecout:
-    out = autofile(options.vecout,'w')
-    out = csv.writer(out,dialect='excel-tab')
-    out = csv.writer(autofile(options.vecout,'w'),dialect='excel-tab')
+    out = table_writer(options.vecout)
     out.writerow(['N', 'EV','TW_STAT','N_EFF'])
     for i in xrange(len(values)):
       out.writerow(['%d' % (i+1), '%.4f' % values[i],

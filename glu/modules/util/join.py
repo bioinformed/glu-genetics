@@ -17,9 +17,8 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
-from   glu.lib.fileutils import load_table,load_list,tryint,autofile,hyphen
+from   glu.lib.fileutils import load_table,tryint,table_writer
 
 
 def option_parser():
@@ -44,9 +43,9 @@ def strip(seq):
 
 
 def load(filename,key):
-  table = load_table(hyphen(filename,sys.stdin),want_header=True)
+  table  = load_table(filename,hyphen=sys.stdin,want_header=True)
   header = table.next()
-  table = list(table)
+  table  = list(table)
 
   key = tryint(key or 0)
   if isinstance(key, basestring):
@@ -69,6 +68,7 @@ def main():
   lheader,ltable,key1 = load(args[0],options.key1)
   rheader,rtable,key2 = load(args[1],options.key2)
 
+  # FIXME: Check hash-join is unique or handle non-unique!!!
   n = len(rheader)
   if not options.skipkey:
     rmap = dict( (row[key2].strip(),row) for row in rtable )
@@ -77,9 +77,9 @@ def main():
     rheader = rheader[:key2]+rheader[key2+1:]
     n -= 1
 
-  out = csv.writer(autofile(hyphen(options.output,sys.stdout),'w'),dialect='excel-tab')
-  out.writerow(lheader + rheader)
+  out = table_writer(options.output,hyphen=sys.stdout)
 
+  out.writerow(lheader + rheader)
 
   blank = ['']*n
 

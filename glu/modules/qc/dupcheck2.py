@@ -28,7 +28,7 @@ from   operator                  import itemgetter
 from   collections               import defaultdict
 
 from   glu.lib.utils             import percent, pair_generator, pick
-from   glu.lib.fileutils         import autofile, hyphen, load_map
+from   glu.lib.fileutils         import autofile, hyphen, load_map, load_table, table_writer
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream
@@ -63,7 +63,7 @@ Output:
 
 
 def write_dupsets(filename, dupsets):
-  out = csv.writer(autofile(filename, 'w'),dialect='excel-tab')
+  out = table_writer(filename)
   for dset in dupsets.sets():
     out.writerow( list(dset) )
 
@@ -71,7 +71,7 @@ def write_dupsets(filename, dupsets):
 def load_sample_phenos(file,phenos):
   phenos = [it.lower() for it in phenos.split(',')]
 
-  rows = csv.reader(autofile(file), 'excel-tab')
+  rows = load_table(file,want_header=True)
   header = rows.next()
   pos = [i for (i,it) in enumerate(header) if it.lower() in phenos]
 
@@ -84,7 +84,7 @@ def load_sample_phenos(file,phenos):
 def load_expected_dupsets(file):
   expected_dupset = union_find()
 
-  for dupset in csv.reader(autofile(file), 'excel-tab'):
+  for dupset in csv.reader(autofile(file), dialect='excel-tab'):
     dupset = [ d for d in dupset if d ]
     for dup in dupset:
       expected_dupset.union(dupset[0],dup)
