@@ -156,7 +156,15 @@ class UnphasedMarkerRepresentation(object):
     if rep == (None,None):
       if self.missing_geno_str is not Nothing:
         return self.missing_geno_str
-    gstr = strcache[rep] = self.delimiter.join(self.allelerep.setdefault(a,a) for a in rep)
+
+    alleles = [ self.allelerep.setdefault(a,a) for a in rep ]
+
+    if not self.delimiter:
+      for a in alleles:
+        if len(a) > 1:
+         raise ValueError('Invalid genotype representation')
+
+    gstr = strcache[rep] = self.delimiter.join(alleles)
     return gstr
 
   def to_strings(self,reps):
