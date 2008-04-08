@@ -106,7 +106,7 @@ def OSGzipFile_subprocess(filename, mode):
   return f
 
 
-def hyphen(filename,defaultfile):
+def hyphen(filename,defaultfile,args=None):
   '''
   Return the default if input is '-', otherwise itself
 
@@ -114,13 +114,21 @@ def hyphen(filename,defaultfile):
   @type   defaultfile: str or file object
   @param     filename: file name or file object
   @type      filename: str or file object
+  @param         args: augmented argument output dictionary or None
+  @type          args: dict or None
   @return            : file name or file object to read from or write to
   @rtype             : str or file object
   '''
-  if filename == '-':
-    return defaultfile
-  else:
+  if not isstr(filename):
     return filename
+
+  if args is None:
+    args = {}
+
+  if parse_augmented_filename(filename,args) == '-':
+    return defaultfile
+
+  return filename
 
 
 def isstr(s):
@@ -518,6 +526,9 @@ def load_list(filename, extra_args=None, **kwargs):
 
   @param         filename: file name, file object, or literal string
   @type          filename: str or file object
+  @param           hyphen: if the input filename is '-', then use this file
+                           object instead
+  @type            hyphen: file object
   @param             skip: number of header lines to skip
   @type              skip: int
   @param            index: index of field to select or name of header.
@@ -582,11 +593,13 @@ def load_list(filename, extra_args=None, **kwargs):
   dialect   = get_csv_dialect(args, 'tsv')
   skip      = int(get_arg(args,     ['skip', 's'], 0))
   index     = tryint(get_arg(args,  ['index','i'], 0))
+  hyin      = get_arg(args, ['hyphen'])
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  lines = csv.reader(autofile(name),**dialect)
+  lfile = autofile(name) if name!='-' else hyin
+  lines = csv.reader(lfile,**dialect)
 
   if skip:
     lines = islice(lines,skip,None)
@@ -691,6 +704,9 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
 
   @param     filename: file name or file object
   @type      filename: str or file object
+  @param       hyphen: if the input filename is '-', then use this file
+                       object instead
+  @type        hyphen: file object
   @param       unique: require key value pairs to be unique and consistent
   @type        unique: bool
   @param         skip: number of initial lines to be skipped (defaults to 0)
@@ -761,14 +777,15 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
 
   else:
     name        = parse_augmented_filename(filename,args)
+    hyin        = get_arg(args, ['hyphen'])
     dialect     = get_csv_dialect(args,'tsv')
     skip        = int(get_arg(args, ['s','skip'], 0))
     default     = get_arg(args, ['d','def','default'], _nothing)
     key_index   = tryint(get_arg(args, ['k','key',  'key_index'  ], 0))
     value_index = tryint(get_arg(args, ['v','value','value_index'], 1))
 
-    lfile = autofile(name)
-    lines = csv.reader(lfile, **dialect)
+    lfile = autofile(name) if name!='-' else hyin
+    lines = csv.reader(lfile,**dialect)
 
     if skip:
       lines = islice(lines,skip,None)
@@ -984,6 +1001,9 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
 
   @param     filename: file name or file object
   @type      filename: str or file object
+  @param       hyphen: if the input filename is '-', then use this file
+                       object instead
+  @type        hyphen: file object
   @param  want_header: flag to request header to be returned (if present)
   @type   want_header: bool
   @param         skip: number of initial lines to be skipped (defaults to 0)
@@ -1043,12 +1063,13 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   dialect = get_csv_dialect(args,'tsv')
   skip    = int(get_arg(args, ['s','skip'], 0))
   columns = get_arg_columns(args)
+  hyin    = get_arg(args, ['hyphen'])
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  lfile = autofile(name)
-  lines = csv.reader(lfile, **dialect)
+  lfile = autofile(name) if name!='-' else hyin
+  lines = csv.reader(lfile,**dialect)
 
   if skip:
     lines = islice(lines,skip,None)
@@ -1101,6 +1122,88 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
     if header is not None:
       result += ['']*(n-len(result))
     yield result
+
+
+def table_writer(filename,extra_args=None,**kwargs):
+  '''
+  Return an object that can write a table of data to a delimited file based
+  on several parameters.
+
+  Output will be composed of standard ASCII lines of text with tab or
+  other delimited fields.
+
+  The dialect argument can be used to specify a Python csv module dialect
+  name or Dialect object.  In addition, the following Python csv module
+  options can be specified by appending information to the specified
+  filename: dialect, delimiter, doublequote, escapechar, lineterminator,
+  quotechar, and quoting.  The syntax is ':option=value', appended to the
+  end of the filename.
+
+  The following parameters and aliases are accepted as part of the augmented
+  filename:
+        dialect: csv module dialect name ('csv' or 'tsv')
+      delimiter: single field delimiter character
+    doublequote: one-character string used to quote fields containing
+                 special characters, such as the delimiter or quotechar, or
+                 which contain new-line characters.
+    doublequote: one-character string used to quote fields containing
+                 special characters, such as the delimiter or quotechar, or
+                 which contain new-line characters.
+     escapechar: one-character string that removes any special meaning
+                 from the following character.
+      quotechar: one-character string used to quote fields containing
+                 special characters, such as the delimiter or quotechar, or
+                 which contain new-line characters.
+        quoting: Controls when quotes characters are recognised.  It can
+                 take on any of the cav QUOTE_ constants (without the QUOTE_
+                 prefix).
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param      dialect: csv module dialect name or dialect object
+  @type       dialect: str or csv.Dialect
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
+  @return            : sequence of rows containing the columns requested
+  @rtype             : generator
+
+  >>> from StringIO import StringIO
+  >>> o=StringIO()
+  >>> w=table_writer(o,dialect='csv')
+  >>> w.writerow(['1','2','3'])
+  >>> w.writerow(['a','b','c'])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  1,2,3
+  a,b,c
+
+  >>> o=StringIO()
+  >>> w=table_writer(o,delimiter='|')
+  >>> w.writerow(['1','2','3'])
+  >>> w.writerow(['a','b','c'])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  1|2|3
+  a|b|c
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  name    = parse_augmented_filename(filename,args)
+  dialect = get_csv_dialect(args,'tsv')
+  hyout   = get_arg(args,['hyphen'])
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if name == '-':
+    outfile = hyout
+  else:
+    outfile = autofile(name,'w')
+
+  return csv.writer(outfile, **dialect)
 
 
 def _test():
