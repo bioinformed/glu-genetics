@@ -43,8 +43,7 @@ def main():
   table = load_table(args[0],hyphen=sys.stdin,want_header=True)
   out   = table_writer(options.output,hyphen=sys.stdout)
 
-  for row in table:
-    out.writerow(row)
+  out.writerows(table)
 
 
 if __name__=='__main__':
