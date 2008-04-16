@@ -1697,6 +1697,11 @@ def recode_genomatrixstream(genos, genome):
   >>> for locus,model in genos2.model_pairs:
   ...   assert genome.get_model(locus) is model
   '''
+  # Fastpath for null recoding
+  if genos.genome is genome:
+    return genos
+
+  # Slowpath
   models = []
 
   # All loci and models are known
@@ -3379,9 +3384,21 @@ def merge_genomatrixstream_list(genos, mergefunc):
     1) share the same orientation (either sdat or ldat)
     2) share the same genotype representation
 
-  The algorithm used requires a full materialization of the genomatrix
-  streams, since row labels must be known.  Results are in an unpacked list
+  Unless all row labels are known and all columns are homogeneous, the
+  current implementation requires a full materialization of all input
+  genomatrix streams.
+
+  Depending on the code path chosen, results may be in an unpacked list
   representation that may need to be repacked.
+
+  Pending optimizations yet to be implemented:
+
+    * The requirement that columns be homogeneous in order to avoid full
+      materialization can be relaxed.  This will result in significant
+      performance improvements.
+
+    * the case of disjoint input columns with known and unknown rows can be
+      optimized to varying degrees
 
   @param      genos: genomatrix streams
   @type       genos: sequence
@@ -3452,6 +3469,27 @@ def merge_genomatrixstream_list(genos, mergefunc):
   ('s1', [('G', 'G'), ('A', 'A'), ('A', 'A')])
   ('s2', [(None, None), ('T', 'T'), (None, None)])
   ('s3', [(None, None), ('A', 'T'), ('A', 'T')])
+
+  Test really fast-path for homogeneous schema and disjoint rows:
+
+  >>> samples =          ('s1',         's2',        's3')
+  >>> rows1 = [('l1',[ ('G', 'G'),   ('G', 'T'),  ('T', 'T')]),
+  ...          ('l2',[ ('A', 'A'),   ('T', 'T'),  ('A', 'T')])]
+  >>> rows2 = [('l3',[(None, None),  ('T', 'T'),  ('G', 'G')]),
+  ...          ('l4',[ ('A', 'A'),  (None, None), ('A', 'T')])]
+  >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples).materialize()
+  >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples).materialize()
+
+  >>> genos = [genos1,genos2]
+  >>> genos = merge_genomatrixstream_list(genos,VoteMerger())
+  >>> genos.samples
+  ('s1', 's2', 's3')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('G', 'G'), ('G', 'T'), ('T', 'T')])
+  ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])
+  ('l3', [(None, None), ('T', 'T'), ('G', 'G')])
+  ('l4', [('A', 'A'), (None, None), ('A', 'T')])
   '''
   assert mergefunc is not None
 
@@ -3476,10 +3514,23 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
   columns = [ g.columns for g in genos ]
   if all(columns[0]==c for c in columns):
-    # Pass-through from merge_genomatrix
-    # FIXME: We may actually know all of the rows
+    # Detect if rows constitute a known disjoint partition
+    rowset  = set()
+    rowlist = []
+    unique  = True
+    for g in genos:
+      rows = set(g.rows) if g.rows is not None else None
+      if rows is None or len(rows)!=len(g.rows) or (rowset&rows):
+        rowlist = None
+        unique  = False
+        break
+      rowset |= rows
+      rowlist.extend(g.rows)
+
+    # Pass-through to merge_genomatrixsteam
     if format=='sdat':
-      genos = genos[0].clone(chain(*genos),genome=genome,samples=None,unique=False,materialized=False)
+      genos = genos[0].clone(chain(*genos),genome=genome,samples=rowlist,unique=unique,
+                             materialized=False)
     else:
       models = []
       def _combine(genos):
@@ -3488,10 +3539,13 @@ def merge_genomatrixstream_list(genos, mergefunc):
             models.append(model)
             yield labelrow
 
-      genos = genos[0].clone(_combine(genos),models=models,genome=genome,loci=None,
-                             unique=False,materialized=False)
+      genos = genos[0].clone(_combine(genos),models=models,genome=genome,loci=rowlist,
+                             unique=unique,materialized=False)
 
-    return merge_genomatrixstream(genos, mergefunc)
+    # Merge if not unique
+    genos = genos.merged(mergefunc)
+
+    return genos
 
   # Slow path to handle heterogeneous columns
   new_rows      = {}
