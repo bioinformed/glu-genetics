@@ -219,16 +219,18 @@ def groups(sequence, keyfunc=None):
 
 def unique(sequence, keyfunc=None):
   '''
-  Returns an iterator to the first occurance of each item in a sequence.  If
-  keyfunc is specified, then the first occurance of each keyfunc(item) is
-  returned.
+  Generator to produce the unique first occurance of each item in a
+  sequence.  If keyfunc is specified, then the first occurance of each
+  keyfunc(item) is returned, otherwise the entire item is taken as a key.
+  Ordering is stable, since result elements will always appear in the order
+  they first first appear in the input sequence.  Keys must be hashable.
 
   @param  sequence: input sequence
   @type   sequence: sequence
-  @param   keyfunc: converting function
-  @type    keyfunc: function
+  @param   keyfunc: key function function
+  @type    keyfunc: callable
   @return         : new sequence
-  @rtype          : sequence
+  @rtype          : generator
 
   >>> list(unique( [1,1,2,2,3,3,1] ))
   [1, 2, 3]
