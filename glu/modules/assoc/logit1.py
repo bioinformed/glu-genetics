@@ -116,7 +116,7 @@ def main():
   if extra:
     raise ValueError('Unknown test(s) specified: %s' % ','.join(sorted(extra)))
 
-  headers = ['Locus', 'Alleles', 'MAF', 'Subjects']
+  headers = ['Locus', 'Alleles', 'MAF', 'Geno Counts', 'Subjects']
 
   or_headers = []
   if len(null.categories) > 2:
@@ -182,7 +182,9 @@ def main():
                       for i in model_term.indices() ]
 
     m = model.model_loci[lname]
-    out.write('\t'.join([lname, ','.join(m.alleles), '%.3f' % m.maf ]))
+    out.write('\t'.join([lname, ','.join(m.alleles),
+                                '%.3f' % m.maf,
+                                ','.join(map(str,m.counts))]))
     out.write('\t')
 
     counts = [ str((g.y==cat).sum()) for cat in g.categories]

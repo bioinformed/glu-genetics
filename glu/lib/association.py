@@ -991,7 +991,7 @@ class BiallelicLocusModel(object):
     self.genocounts   = tally(genos)
     self.genocount    = len([ 1 for g,n in self.genocounts.iteritems() if g and n ])
     self.maf          = estimate_maf(self.genocounts)
-    self.alleles      = map(itemgetter(0),sorted(self.allelecounts.iteritems(),key=itemgetter(1), reverse=True))
+    self.alleles      = map(itemgetter(0),sorted(self.allelecounts.iteritems(),key=itemgetter(1),reverse=True))
 
     if len(self.alleles) != 2:
       return
@@ -1010,6 +1010,7 @@ class BiallelicLocusModel(object):
     self.tests   = [ model.add_genotype( (a1,a1) ),
                      model.add_genotype( (a1,a2) ),
                      model.add_genotype( (a2,a2) ) ]
+    self.counts  = [ self.genocounts.get(g,0) for g in self.tests ]
     self.genomap = dict( (g,i) for i,g in enumerate(self.tests) )
 
 

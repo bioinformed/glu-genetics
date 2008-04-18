@@ -104,7 +104,7 @@ def main():
   if extra:
     raise ValueError('Unknown test(s) specified: %s' % ','.join(sorted(extra)))
 
-  headers = ['Locus', 'Alleles', 'MAF', 'Subjects']
+  headers = ['Locus', 'Alleles', 'MAF', 'Geno Counts', 'Subjects']
 
   if 'score' in tests:
     headers += ['score X2', 'score p-value']
@@ -153,8 +153,10 @@ def main():
       continue
 
     m = model.model_loci[lname]
-    out.write('\t'.join([lname, ','.join(m.alleles), '%.3f' % m.maf ]))
-    out.write('\t%d' % n)
+    out.write('\t'.join([lname, ','.join(m.alleles),
+                                '%.3f' % m.maf,
+                                ','.join(map(str,m.counts)),
+                                str(n)]))
 
     sp = wp = lp = 1
     if 'score' in tests:
