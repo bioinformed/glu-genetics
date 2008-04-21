@@ -82,10 +82,10 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output of tests for deviation from Hardy-Weinberg proportions')
+                    help='Output tests for deviation from Hardy-Weinberg proportions')
   parser.add_option('-f', '--format', dest='format', metavar='F',
-                    help='Input data format, ldat, sdat, trip, or counts')
-  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REP',
+                    help='Input format for genotype or count data')
+  parser.add_option('-g', '--genorepr',        dest='genorepr',      metavar='REP',
                     help='Input genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
@@ -103,8 +103,6 @@ def option_parser():
                     help='Exclude loci with genotype completion rate less than N (default=0 for no no exclusion)')
   parser.add_option('--minmaf', dest='minmaf', metavar='N', default=0, type='float',
                     help='Exclude loci with minor allele frequency less than N (default=0 for no exclusion)')
-  parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
-                    help='Generate machine readable tabular output of results')
   return parser
 
 

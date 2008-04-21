@@ -60,8 +60,8 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
   parser.add_option('-f', '--format', dest='format',
-                    help='Input data format, either hapmap,ldat,sdat or counts')
-  parser.add_option('-g', '--genorepr',        dest='genorepr',        metavar='REP',
+                    help='Input format for genotype or count data')
+  parser.add_option('-g', '--genorepr',        dest='genorepr',      metavar='REP',
                     help='Input genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
@@ -76,9 +76,7 @@ def option_parser():
   parser.add_option('-m','--mingenos', '--mincount', dest='mingenos', metavar='N',default=50, type='int',
                     help='Exclude samples with less than N non-missing genotypes')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output of duplicate check report')
-  parser.add_option('--tablularoutput', dest='tablularoutput', metavar='FILE',
-                    help='Generate machine readable tabular output of results')
+                    help='Output heterozygosity report')
   return parser
 
 
