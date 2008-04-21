@@ -24,7 +24,7 @@ from   itertools import islice
 
 __all__ = ['autofile','namefile','hyphen',
            'guess_format','related_file','guess_related_file',
-           'load_list','load_map','load_table']
+           'load_list','load_map','load_table','table_writer']
 
 
 COMPRESSED_SUFFIXES = set(['gz','Z'])
@@ -233,7 +233,7 @@ def autofile(filename, mode='r'):
   return f
 
 
-def guess_format(filename, formats):
+def guess_format(filename, formats, args=None):
   '''
   Return the guessed format indicated by the filename itself
 
@@ -261,7 +261,9 @@ def guess_format(filename, formats):
     return None
 
   # Parse to remove augmented arguments
-  args = {}
+  if args is None:
+    args = {}
+
   filename = parse_augmented_filename(filename,args)
 
   if 'format' in args:
@@ -401,10 +403,73 @@ def unescape(s):
 
 
 def tryint(s):
+  '''
+  Try to coerce an arbitrary object to an integer, otherwise return the
+  original value
+
+  @param s: arbitrary item
+  @type  s: object
+  @return : integer coerced value or the orginal value
+  @rtype  : int or object
+
+  >>> tryint(1)
+  1
+  >>> tryint(1L)
+  1
+  >>> tryint(None)
+  >>> tryint('1')
+  1
+  >>> tryint(' 1 ')
+  1
+  >>> tryint([1,2,3])
+  [1, 2, 3]
+  '''
   try:
     return int(s)
-  except ValueError:
+  except (ValueError,TypeError):
     return s
+
+
+def tryint1(s):
+  '''
+  Try to coerce an arbitrary object to an integer, otherwise return the
+  original value.  Values provided as strings are assumed to be from a
+  1-based indexing scheme, so they are decremented by one upon return.
+
+  @param s: arbitrary item
+  @type  s: object
+  @return : integer coerced value or the orginal value
+  @rtype  : int or object
+
+  >>> tryint1(1)
+  1
+  >>> tryint1(1L)
+  1
+  >>> tryint1(None)
+  >>> tryint1('1')
+  0
+  >>> tryint1(' 1 ')
+  0
+  >>> tryint1([1,2,3])
+  [1, 2, 3]
+  >>> tryint1(0)
+  0
+  >>> tryint1('0')
+  Traceback (most recent call last):
+     ...
+  ValueError: Invalid zero string index used where 1-based index is required
+  '''
+  try:
+    ss = int(s)
+  except (ValueError,TypeError):
+    return s
+
+  if isinstance(s, basestring):
+    if ss==0:
+      raise ValueError('Invalid zero string index used where 1-based index is required')
+    ss -= 1
+
+  return ss
 
 
 def trybool(s):
@@ -475,7 +540,7 @@ def get_arg(args, names, default=None):
   return default
 
 
-def load_list(filename, extra_args=None, **kwargs):
+def load_list(filename,want_header=False,extra_args=None, **kwargs):
   '''
   Load list of values from a file or literal list. By default, the specified
   file is interpreted as a tab-delimited file with only the first field
@@ -556,24 +621,32 @@ def load_list(filename, extra_args=None, **kwargs):
   >>> f.flush()
   >>> load_list(f.name + ':skip=1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':skip=1:index=0')
+  >>> load_list(f.name + ':skip=1:index=1')
   ['v11', 'v21']
   >>> load_list(f.name + ':delimiter=\\t:index=H1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':dialect=excel-tab:skip=1:index=1')
+  >>> load_list(f.name + ':dialect=excel-tab:skip=1:index=2')
   ['v12', 'v32']
   >>> load_list(f.name + ':index=H2')
   ['v12', 'v32']
+  >>> load_list(f.name + ':c=H2')
+  ['v12', 'v32']
+  >>> load_list(f.name + ':c=2:skip=1')
+  ['v12', 'v32']
+  >>> load_list(f.name + ':i=2:c=1:skip=1')
+  Traceback (most recent call last):
+     ...
+  ValueError: Invalid specification of both index and columns
   >>> f = tempfile.NamedTemporaryFile()
   >>> f.write('H1,H2\\nv11,v12\\nv21\\n,v32')
   >>> f.flush()
   >>> load_list(f.name + ':delimiter=,:skip=1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':delimiter=,:skip=1:index=0')
+  >>> load_list(f.name + ':delimiter=,:skip=1:index=1')
   ['v11', 'v21']
   >>> load_list(f.name + ':delimiter=,:index=H1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':dialect=excel:skip=1:index=1')
+  >>> load_list(f.name + ':dialect=excel:skip=1:index=2')
   ['v12', 'v32']
   >>> load_list(f.name + ':dialect=excel:index=H2')
   ['v12', 'v32']
@@ -592,17 +665,31 @@ def load_list(filename, extra_args=None, **kwargs):
   name      = parse_augmented_filename(filename,args)
   dialect   = get_csv_dialect(args, 'tsv')
   skip      = int(get_arg(args,     ['skip', 's'], 0))
-  index     = tryint(get_arg(args,  ['index','i'], 0))
+  columns   = get_arg_columns(args)
+  index     = tryint1(get_arg(args,  ['index','i']))
   hyin      = get_arg(args, ['hyphen'])
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if index is not None and columns is not None:
+    raise ValueError('Invalid specification of both index and columns')
+
+  if columns is not None:
+    if len(columns) > 1:
+      raise ValueError('Only a single column may be specified')
+    index = columns[0]
+
+  if index is None:
+    index = 0
 
   lfile = autofile(name) if name!='-' else hyin
   lines = csv.reader(lfile,**dialect)
 
   if skip:
     lines = islice(lines,skip,None)
+
+  results = []
 
   # Resolve column heading name into indicex
   if isstr(index):
@@ -616,14 +703,18 @@ def load_list(filename, extra_args=None, **kwargs):
     except ValueError:
       raise ValueError("Cannot find header '%s'" % index)
 
+    if want_header:
+      results.append(header[index])
+
   values = (intern(l[index].strip()) for l in lines if len(l)>index)
-  return [ v for v in values if v ]
+  results.extend(v for v in values if v)
+  return results
 
 
 # Anonymous object
 _nothing = object()
 
-def load_map(filename,unique=True,extra_args=None,**kwargs):
+def load_map(filename,unique=True,want_header=False,extra_args=None,**kwargs):
   '''
   Creates a dictionary representing a list or mapping from a text file.
   Valid files should be composed of standard ASCII lines of text with tab
@@ -736,6 +827,10 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
   Traceback (most recent call last):
        ...
   ValueError: Found 1 non-unique mapping in <StringIO.StringIO instance at ...>. The first is "loc1" -> "loc1" and "foo"
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[0,1])
+  [('loc1', 'loc1'), ('loc2', 'loc2')]
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[1,0])
+  [('loc1', 'loc1')]
   >>> test(StringIO("loc1\\tloc1\\nloc2"),default='missing')
   [('loc1', 'loc1'), ('loc2', 'missing')]
   >>> test(':loc1,loc2')
@@ -748,9 +843,9 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
   >>> f.flush()
   >>> test(f.name + ':skip=1')
   [('v11', 'v12'), ('v21', 'v21')]
-  >>> test(f.name + ':skip=1:key=0:value=1')
+  >>> test(f.name + ':skip=1:key=1:value=2')
   [('v11', 'v12'), ('v21', 'v21')]
-  >>> test(f.name + ':skip=1:key=0')
+  >>> test(f.name + ':skip=1:key=1')
   [('v11', 'v12'), ('v21', 'v21')]
   >>> test(f.name + ':key=H1:v=H2')
   [('v11', 'v12'), ('v21', 'v21')]
@@ -758,9 +853,11 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
   [('v11', 'v12'), ('v21', 'v21')]
   >>> test(f.name + ':k=H1')
   [('v11', 'v12'), ('v21', 'v21')]
-  >>> test(f.name + ':skip=1:key=1:value=0')
+  >>> test(f.name + ':skip=1:key=2:value=1')
   [('v12', 'v11'), ('v32', 'v32')]
   >>> test(f.name + ':key=H2:value=H1')
+  [('v12', 'v11'), ('v32', 'v32')]
+  >>> test(f.name + ':c=H2,H1')
   [('v12', 'v11'), ('v32', 'v32')]
   '''
   if extra_args is None:
@@ -781,8 +878,23 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
     dialect     = get_csv_dialect(args,'tsv')
     skip        = int(get_arg(args, ['s','skip'], 0))
     default     = get_arg(args, ['d','def','default'], _nothing)
-    key_index   = tryint(get_arg(args, ['k','key',  'key_index'  ], 0))
-    value_index = tryint(get_arg(args, ['v','value','value_index'], 1))
+    key_index   = tryint1(get_arg(args, ['k','key',  'key_index'  ]))
+    value_index = tryint1(get_arg(args, ['v','value','value_index']))
+    columns   = get_arg_columns(args)
+
+    if (key_index is not None or value_index is not None) and columns is not None:
+      raise ValueError('Invalid specification of both key/value and columns')
+
+    if columns is not None:
+      if len(columns) != 2:
+        raise ValueError('Mapping requires two columns to be specified')
+      key_index,value_index = columns
+
+    if key_index is None:
+      key_index = 0
+
+    if value_index is None:
+      value_index = 1
 
     lfile = autofile(name) if name!='-' else hyin
     lines = csv.reader(lfile,**dialect)
@@ -866,11 +978,11 @@ def get_arg_columns(args):
   for c in cols:
     c = c.strip()
     if '-' in c:
-      c = tuple(tryint(f.strip()) for f in c.split('-'))
+      c = tuple(tryint1(f.strip()) for f in c.split('-'))
       if len(c) != 2 or '' in c:
         raise ValueError('Invalid range specified: %s' % str(c))
     else:
-      c = tryint(c)
+      c = tryint1(c)
     columns.append(c)
 
   return columns
@@ -897,11 +1009,11 @@ def headers_needed(columns):
 
 def resolve_column_headers(header,columns):
   '''
+  @param       header: header line of the input file
+  @type        header: sequence of strs
   @param      columns: indices, names, or ranges of columns to select, comma
                        delimited
   @type       columns: list of strings, integers, or 2-tuples for ranges
-  @param       header: header line of the input file
-  @type        header: sequence of strs
   @return            : resolved header line
   @rtype             : sequence of strs
   '''
@@ -1041,15 +1153,15 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   >>> f.flush()
   >>> test(f.name + ':skip=1')
   [['v11', 'v12'], ['v21', ''], ['', 'v32']]
-  >>> test(f.name + ':skip=1:columns=0,1')
+  >>> test(f.name + ':skip=1:columns=1,2')
   [['v11', 'v12'], ['v21', ''], ['', 'v32']]
-  >>> test(f.name + ':skip=1:columns=0-1')
+  >>> test(f.name + ':skip=1:columns=1-2')
   [['v11', 'v12'], ['v21', ''], ['', 'v32']]
   >>> test(f.name + ':columns=H1,H2')
   [['v11', 'v12'], ['v21', ''], ['', 'v32']]
   >>> test(f.name + ':columns=H1-H2')
   [['v11', 'v12'], ['v21', ''], ['', 'v32']]
-  >>> test(f.name + ':columns=H1-H2,H2,0,0-1')
+  >>> test(f.name + ':columns=H1-H2,H2,1,1-2')
   [['v11', 'v12', 'v12', 'v11', 'v11', 'v12'], ['v21', '', '', 'v21', 'v21', ''], ['', 'v32', 'v32', '', '', 'v32']]
   >>> del f
   '''

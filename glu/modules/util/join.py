@@ -22,7 +22,7 @@ import sys
 from   collections       import defaultdict
 
 from   glu.lib.utils     import pick,unique
-from   glu.lib.fileutils import load_table,tryint,table_writer,resolve_column_headers
+from   glu.lib.fileutils import load_table,tryint1,table_writer,resolve_column_headers
 
 
 def option_parser():
@@ -60,7 +60,7 @@ def _parse_header(table,key):
     return [],[],None
 
   if isinstance(key, str):
-    key = [ tryint(k) for k in key.split(',') ]
+    key = [ tryint1(k) for k in key.split(',') ]
   elif isinstance(key, int):
     key = [ key ]
 
