@@ -155,7 +155,7 @@ def main():
     m = model.model_loci[lname]
     out.write('\t'.join([lname, ','.join(m.alleles),
                                 '%.3f' % m.maf,
-                                ','.join(map(str,m.counts)),
+                                '|'.join(map(str,m.counts)),
                                 str(n)]))
 
     sp = wp = lp = 1
