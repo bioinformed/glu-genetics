@@ -1104,6 +1104,76 @@ class GenomatrixStream(GenotypeStream):
 
   model_pairs = property(_model_pairs)
 
+  def __len__(self):
+    '''
+    Return the number of rows of a GenotypematrixStream, if known.
+    Otherwise a TypeError is raised.
+
+    @return: number of rows
+    @rtype : int
+
+    >>> samples = ('s1','s2','s3')
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
+    >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
+    >>> len(genos)
+    Traceback (most recent call last):
+       ...
+    TypeError: Unknown GenomatrixStream length
+
+    >>> genos = genos.materialize()
+    >>> len(genos)
+    2
+    >>> len(genos.transposed())
+    3
+    '''
+    if self.materialized:
+      # Does not invalidate stream since we are materialized
+      assert len(self.rows) == len(self.use_stream())
+      return len(self.use_stream())
+    elif self.rows is not None:
+      return len(self.rows)
+
+    raise TypeError('Unknown GenomatrixStream length')
+
+  def __getitem__(self, index):
+    '''
+    Return one or more rows of a materialized GenotypematrixStream.  If
+    index is an integer, the corresponding row label and genotype data are
+    returned using Python index semantics.  Similarly if a slice is
+    specified, a sequence of row labels and genotype data are returned.
+
+    @param index: requested index or slice
+    @type  index: integer or slice object
+    @return     : integer index: a tuple of row label and genotype array
+                  slice: a list of row label and genotype array tuples
+
+    >>> samples = ('s1','s2','s3')
+    >>> rows = [('l1', [ ('G', 'G'),   ('G', 'T'),   ('T', 'T') ]),
+    ...         ('l2', [ ('A', 'A'),   ('T', 'T'),   ('A', 'T') ])]
+    >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
+
+    >>> genos[1]
+    Traceback (most recent call last):
+       ...
+    IndexError: Random access required a materialized GenomatrixStream
+
+    >>> genos = genos.materialize()
+    >>> genos[1]
+    ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])
+    >>> genos[-1]
+    ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])
+    >>> genos[:1]
+    [('l1', [('G', 'G'), ('G', 'T'), ('T', 'T')])]
+    >>> genos[1:]
+    [('l2', [('A', 'A'), ('T', 'T'), ('A', 'T')])]
+    '''
+    if not self.materialized:
+      raise IndexError('Random access required a materialized GenomatrixStream')
+
+    # Does not invalidate stream since we are materialized
+    return self.use_stream()[index]
+
   def materialize(self):
     '''
     Returns a materialized genomatrix stream.
