@@ -39,6 +39,10 @@ def option_parser():
                          'default to common headers')
   parser.add_option('-2', '--key2', dest='key2',
                     help='Table 2 key column numbers or names')
+  parser.add_option('--prefix1', dest='prefix1', metavar='P1',
+                    help='prefix to prepend to each non-key header name in table1')
+  parser.add_option('--prefix2', dest='prefix2',  metavar='P2',
+                    help='prefix to prepend to each non-key header name in table2')
   parser.add_option('-u', '--unique', dest='unique', action='store_true',
                     help='Require that rows with valid keys from table2 are unique')
   parser.add_option('-j', '--join', dest='join', default='left',
@@ -66,7 +70,8 @@ def _parse_header(table,key):
   return header,table,key
 
 
-def left_join(table1,table2,key1=None,key2=None,unique=False,inner=False,null=''):
+def left_join(table1,table2,key1=None,key2=None,unique=False,inner=False,
+              null='',prefix1=None,prefix2=None):
   '''
   A generator that performs a relational join on two tables streams based on
   key equality (see http://en.wikipedia.org/wiki/Join_(SQL) ).  Both input
@@ -179,6 +184,12 @@ def left_join(table1,table2,key1=None,key2=None,unique=False,inner=False,null=''
   len1,len2 = len(header1),len(header2)
   max1,max2 = max(index1),max(index2)
 
+  if prefix1:
+    header1 = [ prefix1+h if i not in index1 else h for i,h in enumerate(header1) ]
+
+  if prefix2:
+    header2 = [ prefix2+h for h in header2 ]
+
   # Compute the left hash-join
 
   # Step 1: Extract keys and hash all rows in table2
@@ -241,7 +252,8 @@ def main():
   table2 = load_table(args[1],hyphen=sys.stdin,want_header=True)
 
   table  = left_join(table1,table2,key1=options.key1,key2=options.key2,
-                    unique=options.unique,inner=(join_type=='inner'))
+                    unique=options.unique,inner=(join_type=='inner'),
+                    prefix1=options.prefix1,prefix2=options.prefix2)
   out    = table_writer(options.output,hyphen=sys.stdout)
 
   out.writerows(table)
