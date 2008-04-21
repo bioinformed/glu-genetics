@@ -583,7 +583,6 @@ def count_genotypes2(model1,genos1,model2,genos2):
   @return      : count of each genotype
   @rtype       : sequence of two-locus genotype and integer count
 
-  >>> import random
   >>> model = model_from_alleles('AB')
   >>> descr = GenotypeArrayDescriptor([model]*1400)
   >>> model.genotypes

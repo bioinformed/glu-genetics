@@ -18,7 +18,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from collections               import defaultdict
 
-from glu.lib.fileutils         import namefile,load_table,get_arg,tryint,parse_augmented_filename
+from glu.lib.fileutils         import namefile,load_table,get_arg,parse_augmented_filename
 
 
 SEX_UNKNOWN,SEX_MALE,SEX_FEMALE = None,0,1

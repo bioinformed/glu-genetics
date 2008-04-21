@@ -23,7 +23,7 @@ import csv
 
 from   itertools                 import islice,dropwhile
 
-from   glu.lib.fileutils         import autofile,table_writer,namefile,tryint,trybool,\
+from   glu.lib.fileutils         import autofile,table_writer,namefile,trybool,\
                                         parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
