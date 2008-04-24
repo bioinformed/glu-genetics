@@ -77,6 +77,8 @@ def option_parser():
                     help='Exclude samples with less than N non-missing genotypes')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output heterozygosity report')
+  parser.add_option('--tabularoutput', dest='tablularoutput', metavar='FILE',
+                    help='Generate machine readable tabular output of results')
   return parser
 
 
@@ -161,8 +163,8 @@ def main():
 
   het_output(out,counts)
 
-  if options.tablularoutput:
-    sw = SectionWriter(options.tablularoutput)
+  if options.tabularoutput:
+    sw = SectionWriter(options.tabularoutput)
     save_metadata_section(sw, analysis='het', analysis_version='0.1')
     save_results(sw, results)
 
