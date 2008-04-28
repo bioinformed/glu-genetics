@@ -1633,7 +1633,7 @@ static Py_ssize_t
 genoarray_getwritebuf(GenotypeArrayObject *self, Py_ssize_t index, const void **ptr)
 {
 	PyErr_SetString(PyExc_TypeError,
-			"Cannot use string as modifiable buffer");
+			"Cannot use genoarray as modifiable buffer");
 	return -1;
 }
 
