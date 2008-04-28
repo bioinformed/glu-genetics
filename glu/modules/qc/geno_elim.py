@@ -24,7 +24,7 @@ from   itertools         import izip,chain
 from   collections       import defaultdict
 
 from   glu.lib.fileutils import autofile,hyphen,load_table,table_writer
-from   glu.lib.genolib   import load_genostream,
+from   glu.lib.genolib   import load_genostream
 
 
 errbylochead1 = ['','LEVEL_1_ERRORS','','LEVEL_2_ERRORS','','LEVEL_3_ERRORS']
