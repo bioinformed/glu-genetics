@@ -166,10 +166,34 @@ def main():
       # Otherwise, skip the locus
       continue
 
+    # Desgin matrix debugging output
     if 0:
       f = table_writer('%s.csv' % lname,dialect='csv')
       f.writerow(model.vars)
       f.writerows(model.X.tolist())
+
+    # R model verfication debugging code
+    if 0:
+      import rpy
+      from   rpy   import r
+      from   numpy import array,allclose,diag,abs
+
+      vars = [ v.replace(':','.').replace('+','p').replace('-','m').replace('_','.') for v in model.vars[1:] ]
+      frame = dict( (v,model.X[:,i+1].A.reshape(-1)) for i,v in enumerate(vars) )
+      frame['y'] = model.y.A.reshape(-1)
+      formula = 'y ~ ' + ' + '.join(v.replace(':','.') for v in vars)
+
+      rpy.set_default_mode(rpy.NO_CONVERSION)
+      mod = r.glm(r(formula),data=r.data_frame(**frame),family=r.binomial('logit'))
+      rpy.set_default_mode(rpy.BASIC_CONVERSION)
+      pmod = mod.as_py()
+
+      coef = r.coefficients(mod)
+      coef=array([coef['(Intercept)']] + [ coef[v] for v in vars ],dtype=float)
+      coef2 = g.beta.A.reshape(-1)
+
+      #assert allclose(coef,g.beta.A.reshape(-1),atol=1e-6)
+      #assert allclose(r.vcov(mod),g.W,atol=1e-6)
 
     assert len(null.categories) >= len(g.categories)
 
