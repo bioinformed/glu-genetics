@@ -23,11 +23,13 @@ import sqlite3
 from   itertools         import islice,chain
 
 from   glu.lib.fileutils import autofile, load_table
-from   glu.lib.sections  import read_sections
+
+from   glu.modules.convert.from_lbd import load_illumina_manifest
 
 
-HAPMAP='/usr/local/share/hapmap/build22/rs_strand/non-redundant/geno*'
-MANIFEST='/usr/local/share/manifests/HumanHap550_11218540_C.csv'
+HAPMAP='/usr/local/share/hapmap/build23/rs_strand/non-redundant/geno*'
+MANIFESTS=['/usr/local/share/manifests/Human1Mv1_C.csv',
+           '/usr/local/share/manifests/Human610-Quadv1_B.csv']
 
 
 def clean_alias(a):
@@ -203,7 +205,7 @@ def load_aliases(con, aliases):
   con.commit()
 
 
-def get_snps(filename):
+def get_hapmap_snps(filename):
   filenames = glob.glob(filename)
   for filename in filenames:
     print filename
@@ -252,30 +254,6 @@ def load_snps(con, snps):
   con.commit()
 
 
-def load_illumina_manifest(filename):
-  ifile = csv.reader(autofile(filename),dialect='excel')
-  sections = read_sections(ifile)
-
-  heading,contents = sections.next()
-
-  # OPA manifest
-  if heading == 'data':
-    heading,contents = sections.next()
-    assert heading == 'Heading'
-
-    headings = dict(islice(contents,10))
-    assert headings['Assay Format'] == 'Golden Gate'
-
-  elif heading == 'Heading':
-    contents = dict(contents)
-    assert contents['Assay Format'] == 'Infinium II'
-
-    heading,contents = sections.next()
-    assert heading == 'Assay'
-
-  return contents
-
-
 def find_index(header,headings):
   for h in headings:
     try:
@@ -300,15 +278,16 @@ def extract_illumina_snps(manifest):
     rs         = assay[name_idx]
     chromosome = assay[chr_idx]
     position   = int(assay[loc_idx])
-    strand     = strandmap[assay[assayid_idx].split('_')[2]]
+    strand     = strandmap[assay[assayid_idx].split('_')[-2]]
+
     yield rs,chromosome,position,strand
 
 
 def main():
-  con = sqlite3.connect('genome36-1.db')
+  con = sqlite3.connect('genome36.3.db')
 
-  if 0:
-    genes = list(get_genes('data/seq_gene.md.b35.1.gz'))
+  if 1:
+    genes = list(get_genes('data/seq_gene.md.b36.3.gz'))
     load_genes(con,genes)
 
   if 1:
@@ -316,12 +295,13 @@ def main():
     aliases = list(filter_aliases(aliases))
     load_aliases(con,aliases)
 
-  if 0:
-    hapmap_snps   = get_snps(HAPMAP)
-    #illumina_snps = extract_illumina_snps(load_illumina_manifest(MANIFEST))
-    illumina_snps = []
+  if 1:
+    streams = []
+    streams += [ extract_illumina_snps(load_illumina_manifest(m))
+                   for m in MANIFESTS ]
+    streams += [ get_hapmap_snps(HAPMAP) ]
 
-    snps = chain(hapmap_snps,illumina_snps)
+    snps = chain(*streams)
     snps = squash_dups(snps)
     load_snps(con,snps)
 
