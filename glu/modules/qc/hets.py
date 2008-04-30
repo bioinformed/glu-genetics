@@ -77,7 +77,7 @@ def option_parser():
                     help='Exclude samples with less than N non-missing genotypes')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output heterozygosity report')
-  parser.add_option('--tabularoutput', dest='tablularoutput', metavar='FILE',
+  parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
   return parser
 

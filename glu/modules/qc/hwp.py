@@ -103,7 +103,7 @@ def option_parser():
                     help='Exclude loci with genotype completion rate less than N (default=0 for no no exclusion)')
   parser.add_option('--minmaf', dest='minmaf', metavar='N', default=0, type='float',
                     help='Exclude loci with minor allele frequency less than N (default=0 for no exclusion)')
-  parser.add_option('--tabularoutput', dest='tablularoutput', metavar='FILE',
+  parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
                     help='Generate machine readable tabular output of results')
   return parser
 
@@ -201,7 +201,7 @@ def main():
   hwp_output(out,results)
 
   if options.tabularoutput:
-    sw = SectionWriter(options.tablularoutput)
+    sw = SectionWriter(options.tabularoutput)
     save_metadata_section(sw, analysis='hwp', analysis_version='0.1')
     save_results(sw, results)
 
