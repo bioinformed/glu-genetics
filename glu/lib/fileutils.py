@@ -17,10 +17,13 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import os
-import sys
 import csv
 
-from   itertools import islice
+from   itertools     import islice,chain
+from   operator      import itemgetter
+
+from   glu.lib.utils import peekfirst
+
 
 __all__ = ['autofile','namefile','hyphen',
            'guess_format','related_file','guess_related_file',
@@ -151,6 +154,7 @@ def namefile(filething):
   @type   filething: file object or string
   @return:           human-comprehensible file name
 
+  >>> import sys
   >>> namefile(file('/dev/null'))
   '/dev/null'
   >>> namefile(sys.stdin)
@@ -394,10 +398,14 @@ DIALECT_KWARGS = ['dialect','delimiter','doublequote','escapechar','lineterminat
                   'quotechar','quoting','skipinitialspace','strict']
 
 
-_unescape_chars = [('\\r','\r'),('\\t','\t'),('\\n','\n'),('\\\\','\\')]
+_unescape_literal_chars = [('\\r','\r'),('\\t','\t'),('\\n','\n'),('\\\\','\\')]
 
-def unescape(s):
-  for e,c in _unescape_chars:
+def unescape_literal(s):
+  '''
+  Evaluate C/Python character literals \r, \t, \n, and \\ into the
+  respective single-character ASCII representation
+  '''
+  for e,c in _unescape_literal_chars:
     s = s.replace(e,c)
   return s
 
@@ -503,7 +511,7 @@ def get_csv_dialect(args,default_dialect='tsv'):
   dargs = {'dialect':default_dialect}
   for darg in DIALECT_KWARGS:
     if darg in args:
-      dargs[darg] = unescape(args.pop(darg))
+      dargs[darg] = unescape_literal(args.pop(darg))
 
   if 'quoting' in dargs:
     q = 'QUOTE_' + dargs['quoting'].upper()
@@ -540,41 +548,34 @@ def get_arg(args, names, default=None):
   return default
 
 
-def load_list(filename,want_header=False,extra_args=None, **kwargs):
+def load_list(filename,extra_args=None,**kwargs):
   '''
-  Load list of values from a file or literal list. By default, the specified
-  file is interpreted as a tab-delimited file with only the first field
-  considered.  Blank lines are skipped, whitespace is stripped from the
-  beginning and end of each field selected.  These settings can be modified
-  via function arguments or by appending additional options to the filename.
+  Load list of values from a file or literal list.
 
-  The dialect argument can be used to specify a Python csv module dialect
-  name or Dialect object.  In addition, the following Python csv module
-  options can be specified by appending information to the specified
-  filename: dialect, delimiter, doublequote, escapechar, lineterminator,
-  quotechar, and quoting.  The syntax is
-  ':option=value', appended to the end of the filename.
+  By default, a file is interpreted as a tab-delimited file with only the
+  first field considered.  Blank lines are skipped, whitespace is stripped
+  from the beginning and end of each field selected.  These settings can be
+  modified via function arguments or by appending additional options to the
+  filename.  File loading is delegated to the load_table function, so refer
+  to load_table for details on supported arguments.
 
-  A skip parameter can be specified is used to ignore a certain number of
-  lines (e.g., headers) at the beginning of the file.  It can be specified
-  as either a function argument or by appending ':skip=n', where n is an
-  integer, to the filename.
-
-  The index of the element to be considered can be overridden with the index
-  parameter (0 based) or by appending ':index=i' to the end of the filename
-  (the latter having higher precedence).  Simple parsing of column headers
-  is supported.  If i is not an integer then is assumed to be a column
-  heading name in the first row of data (after skipping rows) No escaping or
-  quoting is allowed.
+  The column number or name may be specified as per the load_table function.
+  However, for backward compatibility the 'index' parameter is also
+  supported as a synonym to 'columns'.
 
   If the filename is a string that begins with ':', it is interpreted as a
-  literal list of comma separated values, ignoring the skip and index
-  parameters.  No escaping or quoting is allowed.
+  literal list of comma separated values, ignoring all other parameters
+  (including skip!).  No escaping or quoting is allowed.
 
   The following parameters and aliases are accepted as part of the augmented
-  filename:
+  filename (all but the first from load_table):
+
+  [by load_list]
+       index, i: column index or header name
+
+  [by load_table]
+     columns, c: indices, names, or ranges of columns to select, comma delimited
        skip,  s: number of header lines to skip
-       index, i: index of field to select or name of header
         dialect: csv module dialect name (typically 'csv' or 'tsv')
       delimiter: single field delimiter character
     doublequote: one-character string used to quote fields containing
@@ -586,7 +587,7 @@ def load_list(filename,want_header=False,extra_args=None, **kwargs):
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
         quoting: Controls when quotes characters are recognised.  It can
-                 take on any of the cav QUOTE_ constants (without the QUOTE_
+                 take on any of the csv QUOTE_ constants (without the QUOTE_
                  prefix).
 
   @param         filename: file name, file object, or literal string
@@ -651,109 +652,78 @@ def load_list(filename,want_header=False,extra_args=None, **kwargs):
   >>> load_list(f.name + ':dialect=excel:index=H2')
   ['v12', 'v32']
   '''
-  # Process literal syntax
-  if _literal_list(filename):
-    return [ intern(l.strip()) for l in filename[1:].split(',') if l ]
-
   if extra_args is None:
     args = kwargs
   else:
     args = extra_args
     args.update(kwargs)
 
-  # Otherwise, handle file name or file object cases
-  name      = parse_augmented_filename(filename,args)
-  dialect   = get_csv_dialect(args, 'tsv')
-  skip      = int(get_arg(args,     ['skip', 's'], 0))
-  columns   = get_arg_columns(args)
-  index     = tryint1(get_arg(args,  ['index','i']))
-  hyin      = get_arg(args, ['hyphen'])
+  # Process literal syntax
+  if _literal_list(filename):
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  if extra_args is None and args:
-    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+    return [ intern(l.strip()) for l in filename[1:].split(',') if l ]
+
+  # Otherwise, handle file name or file object cases
+  name    = parse_augmented_filename(filename,args)
+  columns = get_arg(args, ['c','cols','columns'])
+  index   = tryint1(get_arg(args, ['index','i']))
 
   if index is not None and columns is not None:
     raise ValueError('Invalid specification of both index and columns')
 
-  if columns is not None:
-    if len(columns) > 1:
-      raise ValueError('Only a single column may be specified')
-    index = columns[0]
-
-  if index is None:
+  if index is None and columns is None:
     index = 0
+  elif index is None:
+    index = columns
 
-  lfile = autofile(name) if name!='-' else hyin
-  lines = csv.reader(lfile,**dialect)
+  items = load_table(name, columns=[index], extra_args=args)
 
-  if skip:
-    lines = islice(lines,skip,None)
+  # Needed to trigger arg processing since generators do not start until the
+  # first item is requested
+  items = chain([items.next()],items)
 
-  results = []
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  # Resolve column heading name into indicex
-  if isstr(index):
-    try:
-      header = map(str.strip,lines.next())
-    except StopIteration:
-      return []
-
-    try:
-      index = header.index(index)
-    except ValueError:
-      raise ValueError("Cannot find header '%s'" % index)
-
-    if want_header:
-      results.append(header[index])
-
-  values = (intern(l[index].strip()) for l in lines if len(l)>index)
-  results.extend(v for v in values if v)
-  return results
+  return [ intern(i[0]) for i in items if i and i[0] ]
 
 
 # Anonymous object
 _nothing = object()
 
-def load_map(filename,unique=True,want_header=False,extra_args=None,**kwargs):
+
+def load_map(filename,unique=True,extra_args=None,**kwargs):
   '''
   Creates a dictionary representing a list or mapping from a text file.
-  Valid files should be composed of standard ASCII lines of text with tab
-  delimited fields.  Only the first and second fields of each line are
-  considered. Whitespace is stripped from the beginning and end of every
+
+  By default, valid files should be composed of standard ASCII lines of text
+  with tab delimited fields.  Only the first and second fields of each line
+  are considered. Whitespace is stripped from the beginning and end of every
   field considered.  If the skip parameter is used to ignore a certain
   number of lines (e.g., headers) at the beginning of the file.  A default
   parameter may be specified to assign values to keys with empty or
   non-existant value fields.  Otherwise, the value will be set equal to the
-  key.
+  key.  File loading is delegated to the load_table function, so refer
+  to load_table for details on supported arguments.
 
-  If the file or filename is a string that begins with ':', it is
-  interpreted as a literal list of comma separated values, ignoring the skip
-  and index parameters.  No escaping or quoting is allowed.
+  The key and value column number or name may be specified as per the
+  load_table function using the 'columns' argument.  The first and second
+  columns returned are taken as keys and values, respectively.  This is the
+  recommended mode of operation.  For backward compatibility, the the index
+  or name of key and value columns can be overridden with the key_index and
+  value_index parameters (0 based indices or column names) or by appending
+  ':key=i' and/or ':value=j' to the end of the filename (1 based indices or
+  column names).  No escaping or quoting is allowed.
 
-  The dialect argument can be used to specify a Python csv module dialect
-  name or Dialect object.  In addition, the following Python csv module
-  options can be specified by appending information to the specified
-  filename: dialect, delimiter, doublequote, escapechar, lineterminator,
-  quotechar, and quoting.  The syntax is ':option=value', appended to the
-  end of the filename.
-
-  A skip parameter can be specified is used to ignore a certain number of
-  lines (e.g., headers) at the beginning of the file.  It can be specified
-  as either a function argument or by appending ':skip=n', where n is an
-  integer, to the filename.
-
-  The index of the key and value elements can be overridden with the
-  key_index and value_index parameters (0 based) or by appending ':key=i'
-  and/or ':value=j' to the end of the filename.  Simple parsing of column
-  headers is supported.  If either key or value is not an integer then it is
-  assumed to be a column heading name in the first row of data (after
-  skipping rows). No escaping or quoting is allowed.
+  #FIXME: Document literal syntax
 
   The default behavior (unique=True) requires that all mappings are unique
   and consistent in the sense that every key must map to exactly one value,
-  though that mapping may appear more than once in the input.  Otherwise a
-  ValueError is raised.  If unique=False, then a dictionary of key to list
-  of values is returned.
+  though that mapping may appear redundantly in the input.  Otherwise a
+  ValueError is raised.  If unique=False, then a dictionary of each key to a
+  list of unique values is returned.
 
   Each line is mapped to key,value pairs that are returned in a dictionary
   and treated as follows:
@@ -775,23 +745,28 @@ def load_map(filename,unique=True,want_header=False,extra_args=None,**kwargs):
 
   The following parameters and aliases are accepted as part of the augmented
   filename:
-       skip,  s: number of header lines to skip
-   key_index, i: index of field to select or name of header for keys
- value_index, v: index of field to select or name of header for values
-  default,def,d: default value for keys with no or empty value
-        dialect: csv module dialect name ('csv' or 'tsv')
-      delimiter: single field delimiter character
-    doublequote: one-character string used to quote fields containing
-                 special characters, such as the delimiter or quotechar, or
-                 which contain new-line characters.
-     escapechar: one-character string that removes any special meaning
-                 from the following character.
-      quotechar: one-character string used to quote fields containing
-                 special characters, such as the delimiter or quotechar, or
-                 which contain new-line characters.
-        quoting: Controls when quotes characters are recognised.  It can
-                 take on any of the cav QUOTE_ constants (without the QUOTE_
-                 prefix).
+
+  [by load_map]
+      key_index, i: index of field to select or name of header for keys
+    value_index, v: index of field to select or name of header for values
+     default,def,d: default value for keys with no or empty value
+
+  [by load_table]
+        columns, c: indices, names, or ranges of columns to select, comma delimited
+          skip,  s: number of header lines to skip
+           dialect: csv module dialect name ('csv' or 'tsv')
+         delimiter: single field delimiter character
+       doublequote: one-character string used to quote fields containing
+                    special characters, such as the delimiter or quotechar, or
+                    which contain new-line characters.
+        escapechar: one-character string that removes any special meaning
+                    from the following character.
+         quotechar: one-character string used to quote fields containing
+                    special characters, such as the delimiter or quotechar, or
+                    which contain new-line characters.
+           quoting: Controls when quotes characters are recognised.  It can
+                    take on any of the csv QUOTE_ constants (without the QUOTE_
+                    prefix).
 
   @param     filename: file name or file object
   @type      filename: str or file object
@@ -868,27 +843,18 @@ def load_map(filename,unique=True,want_header=False,extra_args=None,**kwargs):
 
   # Handle :literal syntax
   if _literal_list(filename):
-    key_index,value_index = 0,1
-    lines = (kv.split('=') for kv in filename[1:].split(',') if kv)
+    items = (kv.split('=') for kv in filename[1:].split(',') if kv)
     default = get_arg(args, ['default'], _nothing)
 
   else:
     name        = parse_augmented_filename(filename,args)
-    hyin        = get_arg(args, ['hyphen'])
-    dialect     = get_csv_dialect(args,'tsv')
-    skip        = int(get_arg(args, ['s','skip'], 0))
     default     = get_arg(args, ['d','def','default'], _nothing)
     key_index   = tryint1(get_arg(args, ['k','key',  'key_index'  ]))
     value_index = tryint1(get_arg(args, ['v','value','value_index']))
-    columns   = get_arg_columns(args)
+    columns     = get_arg(args, ['c','cols','columns'])
 
     if (key_index is not None or value_index is not None) and columns is not None:
       raise ValueError('Invalid specification of both key/value and columns')
-
-    if columns is not None:
-      if len(columns) != 2:
-        raise ValueError('Mapping requires two columns to be specified')
-      key_index,value_index = columns
 
     if key_index is None:
       key_index = 0
@@ -896,45 +862,29 @@ def load_map(filename,unique=True,want_header=False,extra_args=None,**kwargs):
     if value_index is None:
       value_index = 1
 
-    lfile = autofile(name) if name!='-' else hyin
-    lines = csv.reader(lfile,**dialect)
+    if columns is None:
+      columns = [key_index,value_index]
 
-    if skip:
-      lines = islice(lines,skip,None)
+    items = load_table(name,columns=columns,extra_args=args)
+
+    # Needed to trigger arg processing since generators do not start until the
+    # first item is requested
+    items = chain([items.next()],items)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  # Resolve column heading names into indices
-  if isstr(key_index) or isstr(value_index):
-    try:
-      header = map(str.strip,lines.next())
-    except StopIteration:
-      return {}
-
-    if isstr(key_index):
-      try:
-        key_index = header.index(key_index)
-      except ValueError:
-        raise ValueError("Cannot find key header '%s'" % key_index)
-
-    if isstr(value_index):
-      try:
-        value_index = header.index(value_index)
-      except ValueError:
-        raise ValueError("Cannot find value header '%s'" % value_index)
-
   # Parse the data file
   def _load_map_generator():
-    for row in lines:
+    for row in items:
       n = len(row)
 
-      key = intern(row[key_index].strip()) if key_index<n else None
+      key = intern(row[0].strip()) if n else None
 
       if not key:
         continue
 
-      value = intern(row[value_index].strip()) if value_index<n else None
+      value = intern(row[1].strip()) if n>1 else None
 
       if not value:
         if default is not _nothing:
@@ -967,44 +917,128 @@ def load_map(filename,unique=True,want_header=False,extra_args=None,**kwargs):
   return m
 
 
-def get_arg_columns(args):
-  cols = get_arg(args, ['c','cols','columns'])
-
-  if not cols or isinstance(cols,list):
-    return cols
-
-  cols = cols.split(',')
-  columns = []
-  for c in cols:
-    c = c.strip()
-    if '-' in c:
-      c = tuple(tryint1(f.strip()) for f in c.split('-'))
-      if len(c) != 2 or '' in c:
-        raise ValueError('Invalid range specified: %s' % str(c))
-    else:
-      c = tryint1(c)
-    columns.append(c)
-
-  return columns
-
-
-def headers_needed(columns):
+def resolve_column_header_atom(header,column):
   '''
-  Return whether headers are needed
+  Resolve an atomic column header into a column index.  Atoms can be header
+  names, string indices (1-based), or integer indices (0-based). Raises
+  ValueError if the column index could not be resolved.
 
-  @param      columns: indices, names, or ranges of columns to select, comma
-                       delimited
-  @type       columns: list of strings, integers, or 2-tuples for ranges
-  @return            : whether headers are needed
-  @rtype             : bool
+  @param header: optional schema header
+  @type  header: list or None
+  @param column: column name, index string (1-based), or index number (0-based)
+  @type  column: int or str
+  @return      : column index
+  @rtype       : int
+
+  >>> resolve_column_header_atom(['H1','H2'],0)
+  0
+  >>> resolve_column_header_atom(['H1','H2'],1)
+  1
+  >>> resolve_column_header_atom(['H1','H2'],'1')
+  0
+  >>> resolve_column_header_atom(['H1','H2'],'2')
+  1
+  >>> resolve_column_header_atom(['H1','H2'],'H1')
+  0
+  >>> resolve_column_header_atom(['H1','H2'],'H2')
+  1
   '''
-  for col in columns:
-    if isinstance(col,tuple):
-      if isstr(col[0]) or isstr(col[1]):
-        return True
-    elif isstr(col):
-      return True
-  return False
+  if header is not None:
+    try:
+      return header.index(column)
+    except ValueError:
+      pass
+
+  col = tryint1(column)
+
+  if isinstance(col,int):
+    if col < 0:
+      raise ValueError('Invalid negative column index')
+
+    return col
+
+  raise ValueError("Cannot find header '%s'" % (column,))
+
+
+def resolve_column_header(header,column):
+  '''
+  Resolve a complex column header into a column index.  Complex columns can
+  be atoms, range tuples, or range strings.  Range tuples are 2-tuples of
+  atoms.  Range strings are hyphen delimited atoms.  Raises ValueError if
+  the column index could not be resolved.
+
+  @param header: optional schema header
+  @type  header: list or None
+  @param column: atom, range tuple, or range string
+  @type  column: int, str, 2-tuple of atoms
+  @return      : column index
+  @rtype       : int
+
+  >>> resolve_column_header(['H1','H2'],0)
+  0
+  >>> resolve_column_header(['H1','H2'],1)
+  1
+  >>> resolve_column_header(['H1','H2'],'1')
+  0
+  >>> resolve_column_header(['H1','H2'],'2')
+  1
+  >>> resolve_column_header(['H1','H2'],'H1')
+  0
+  >>> resolve_column_header(['H1','H2'],'H2')
+  1
+  >>> resolve_column_header(['H1','H2'],'1-1')
+  (0, 0)
+  >>> resolve_column_header(['H1','H2'],'1-2')
+  (0, 1)
+  >>> resolve_column_header(['H1','H2'],'H1-H1')
+  (0, 0)
+  >>> resolve_column_header(['H1','H2'],'H1-H2')
+  (0, 1)
+  >>> resolve_column_header(['H1','H2'],'-H1')
+  (0, 0)
+  >>> resolve_column_header(['H1','H2'],'H2-')
+  (1, 1)
+  '''
+  try:
+    return resolve_column_header_atom(header,column)
+  except ValueError:
+    pass
+
+  if isinstance(column,tuple):
+    assert len(column)==2
+    try:
+      r1 = resolve_column_header_atom(header,column[0])
+      r2 = resolve_column_header_atom(header,column[1])
+      return r1,r2
+    except ValueError:
+      pass
+
+  if isstr(column):
+    hyphens = column.count('-')
+    if hyphens:
+      start = 0
+      for i in range(hyphens):
+        r = column.find('-',start)
+        r1,r2 = column[:r].strip(),column[r+1:].strip()
+        start = r+1
+
+        if not r1:
+          r1 = 0
+        if not r2:
+          if header is None:
+            raise ValueError('Unbounded ranges require headers to be specified')
+          r2 = max(0,len(header)-1)
+
+        try:
+          r1 = resolve_column_header_atom(header,r1)
+          r2 = resolve_column_header_atom(header,r2)
+          return min(r1,r2),max(r1,r2)
+          break
+        except ValueError:
+          pass
+
+  # Reraise last error
+  raise
 
 
 def resolve_column_headers(header,columns):
@@ -1017,35 +1051,19 @@ def resolve_column_headers(header,columns):
   @return            : resolved header line
   @rtype             : sequence of strs
   '''
+  if isinstance(columns,int):
+    columns = [columns]
+  elif isinstance(columns,str):
+    columns = columns.split(',')
 
-  for i,col in enumerate(columns):
-    if isstr(col):
-      try:
-        yield header.index(col)
-      except ValueError:
-        raise ValueError("Cannot find header '%s'" % col)
-    elif isinstance(col,tuple):
-      assert len(col) == 2
-
-      if isstr(col[0]):
-        try:
-          c1 = header.index(col[0])
-        except ValueError:
-          raise ValueError("Cannot find header '%s'" % col[0])
-      else:
-        c1 = col[0]
-
-      if isstr(col[1]):
-        try:
-          c2 = header.index(col[1])
-        except ValueError:
-          raise ValueError("Cannot find header '%s'" % col[1])
-      else:
-        c2 = col[1]
-
-      yield (c1,c2)
+  indices = []
+  for column in columns:
+    col = resolve_column_header(header,column)
+    if isinstance(col,tuple):
+      indices.extend( xrange(col[0],col[1]+1) )
     else:
-      yield col
+      indices.append(col)
+  return indices
 
 
 def load_table(filename,want_header=False,extra_args=None,**kwargs):
@@ -1092,8 +1110,8 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
 
   The following parameters and aliases are accepted as part of the augmented
   filename:
-        skip, s: number of header lines to skip
      columns, c: indices, names, or ranges of columns to select, comma delimited
+        skip, s: number of header lines to skip
         dialect: csv module dialect name ('csv' or 'tsv')
       delimiter: single field delimiter character
     doublequote: one-character string used to quote fields containing
@@ -1108,7 +1126,7 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
         quoting: Controls when quotes characters are recognised.  It can
-                 take on any of the cav QUOTE_ constants (without the QUOTE_
+                 take on any of the csv QUOTE_ constants (without the QUOTE_
                  prefix).
 
   @param     filename: file name or file object
@@ -1145,6 +1163,10 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
   >>> test(StringIO("c1\\tc2\\nloc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[('c1','c2')])
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> test(StringIO("c1\\tc2\\nloc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[(0,'c2')])
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> test(StringIO("c1\\tc2\\nloc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[('1','c2')])
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
   >>> test(StringIO("c1\\tc2\\nloc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=['c2','c1'])
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
   >>> import tempfile
@@ -1173,8 +1195,8 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
 
   name    = parse_augmented_filename(filename,args)
   dialect = get_csv_dialect(args,'tsv')
-  skip    = int(get_arg(args, ['s','skip'], 0))
-  columns = get_arg_columns(args)
+  skip    = int(get_arg(args, ['skip','s'], 0))
+  columns = get_arg(args, ['c','cols','columns'])
   hyin    = get_arg(args, ['hyphen'])
 
   if extra_args is None and args:
@@ -1193,6 +1215,7 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
     except StopIteration:
       return
 
+    # Process row 1 (may or may not be a header)
     row = map(str.strip,row)
     yield row
 
@@ -1206,21 +1229,16 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
 
   # Otherwise, resolve column heading names into indices
   header = None
-  if headers_needed(columns):
+  try:
+    indices = resolve_column_headers(None,columns)
+  except ValueError:
+    # Need headers
     try:
       header = map(str.strip,lines.next())
     except StopIteration:
       return
 
-    columns = list(resolve_column_headers(header,columns))
-
-  # Build indices
-  indices = []
-  for col in columns:
-    if isinstance(col,tuple):
-      indices.extend( xrange(col[0],col[1]+1) )
-    else:
-      indices.append(col)
+    indices = resolve_column_headers(header,columns)
 
   if want_header and header is not None:
     yield [ header[j] for j in indices ]
@@ -1234,6 +1252,49 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
     if header is not None:
       result += ['']*(n-len(result))
     yield result
+
+
+class TableWriter(object):
+  '''
+  Write selected columns to a lower-level tabular data writer object
+  '''
+  def __init__(self, writer, columns):
+    self.writer  = writer
+    self.columns = columns
+
+    # Try to resolve column headings without a header row
+    try:
+      self.indices = resolve_column_headers(None,columns)
+    except ValueError:
+      self.indices = None
+
+  def writerows(self, rows):
+    indices = self.indices
+
+    if indices is None:
+      # Infer indices from the first row if needed
+      try:
+        row,rows = peekfirst(rows)
+      except IndexError:
+        return
+
+      self.indices = indices = resolve_column_headers(row,self.columns)
+
+    for row in rows:
+      m = len(row)
+      row = [ (row[j] if j<m else '') for j in indices ]
+      self.writer.writerow(row)
+
+  def writerow(self, row):
+    indices = self.indices
+
+    # First row and indices require header information
+    if indices is None:
+      self.indices = indices = resolve_column_headers(row,self.columns)
+
+    m = len(row)
+    row = [ (row[j] if j<m else '') for j in indices ]
+    self.writer.writerow(row)
 
 
 def table_writer(filename,extra_args=None,**kwargs):
@@ -1267,7 +1328,7 @@ def table_writer(filename,extra_args=None,**kwargs):
                  special characters, such as the delimiter or quotechar, or
                  which contain new-line characters.
         quoting: Controls when quotes characters are recognised.  It can
-                 take on any of the cav QUOTE_ constants (without the QUOTE_
+                 take on any of the csv QUOTE_ constants (without the QUOTE_
                  prefix).
 
   @param     filename: file name or file object
@@ -1296,6 +1357,36 @@ def table_writer(filename,extra_args=None,**kwargs):
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   1|2|3
   a|b|c
+
+  >>> o=StringIO()
+  >>> w=table_writer(o,delimiter='|',columns=0)
+  >>> w.writerow(['H1','H2','H3'])
+  >>> w.writerow(['1','2','3'])
+  >>> w.writerow(['a','b','c'])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  H1
+  1
+  a
+
+  >>> o=StringIO()
+  >>> w=table_writer(o,columns='1-2')
+  >>> w.writerow(['H1','H2','H3'])
+  >>> w.writerow(['1','2','3'])
+  >>> w.writerow(['a','b','c'])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  H1	H2
+  1	2
+  a	b
+
+  >>> o=StringIO()
+  >>> w=table_writer(o,columns='2-H3')
+  >>> w.writerows([['H1','H2','H3'],
+  ...              ['1','2','3'],
+  ...              ['a','b','c']])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  H2  H3
+  2   3
+  b   c
   '''
   if extra_args is None:
     args = kwargs
@@ -1304,6 +1395,7 @@ def table_writer(filename,extra_args=None,**kwargs):
     args.update(kwargs)
 
   name    = parse_augmented_filename(filename,args)
+  columns = get_arg(args, ['c','cols','columns'])
   dialect = get_csv_dialect(args,'tsv')
   hyout   = get_arg(args,['hyphen'])
 
@@ -1315,7 +1407,12 @@ def table_writer(filename,extra_args=None,**kwargs):
   else:
     outfile = autofile(name,'w')
 
-  return csv.writer(outfile, **dialect)
+  writer = csv.writer(outfile, **dialect)
+
+  if columns is not None:
+    writer = TableWriter(writer, columns)
+
+  return writer
 
 
 def _test():
