@@ -39,42 +39,7 @@ csv.register_dialect('csv', csv.get_dialect('excel'))
 csv.register_dialect('tsv', csv.get_dialect('excel-tab'))
 
 
-def OSGzipFile_popen(filename, mode):
-  '''
-  Spawn gzip process and connect to input/output pipes
-
-  @param  filename: file name or file object
-  @type   filename: str or file object
-  @param      mode: determine whether the file objects should be opened for input or output,
-                    either 'w' or 'r'
-  @type       mode: str
-  @return         : file object to read from or write to
-  @rtype          : file object
-
-  '''
-  if os.environ.get('GLU_NOSPAWN'):
-    raise OSError('Spawning external processes disabled by GLU_NOSPAWN')
-
-  # Shell escaping is out of the scope of this function, so ensure that no
-  # illegal characters appear
-  if set('\'"\\') & set(filename):
-    raise OSError('Invalid characters in filename for this method')
-
-  gzipexe = os.environ.get('GLU_GZIP','gzip')
-
-  #FIXME: Add additional sanity checks to the executable name
-  if set('\'"\\;') & set(gzipexe):
-    raise OSError('Invalid characters in gzip executable')
-
-  if 'w' in mode:
-    f = os.popen("%s -c > '%s'" % (gzipexe,filename), 'w', 10240)
-  else:
-    f = os.popen("%s -d -c '%s'" % (gzipexe,filename), 'r', 10240)
-
-  return f
-
-
-def OSGzipFile_subprocess(filename, mode):
+def OSGzipFile(filename, mode, bufsize=-1):
   '''
   Spawn a subprocess to run gzip and connect to input/output pipes
 
@@ -83,10 +48,12 @@ def OSGzipFile_subprocess(filename, mode):
   @param      mode: determine whether the file objects should be opened for input or output,
                     either 'w' or 'r'
   @type       mode: str
+  @param   bufsize: buffering mode and size.  0=unbuffered, 1=linebuffered, >1 buffer size,
+                    -1 default buffering (default)
+  @type    bufsize: int
   @return         : file object to read from or write to
   @rtype          : file object
   '''
-
   from subprocess import Popen,PIPE
 
   if os.environ.get('GLU_NOSPAWN'):
@@ -94,17 +61,13 @@ def OSGzipFile_subprocess(filename, mode):
 
   gzipexe = os.environ.get('GLU_GZIP','gzip')
 
-  #FIXME: Add additional sanity checks to the executable name
-  if set('\'"\\;') & set(gzipexe):
-    raise OSError('Invalid characters in gzip executable')
-
   if 'w' in mode:
     out = file(filename,mode)
     cmd = [gzipexe,'-c']
-    f   = Popen(cmd, stdin=PIPE, stdout=out).stdin
+    f   = Popen(cmd, stdin=PIPE, stdout=out, bufsize=bufsize).stdin
   else:
     cmd = [gzipexe,'-d','-c',filename]
-    f   = Popen(cmd, stdout=PIPE, universal_newlines='U' in mode).stdout
+    f   = Popen(cmd, stdout=PIPE, universal_newlines='U' in mode, bufsize=bufsize).stdout
 
   return f
 
@@ -223,13 +186,10 @@ def autofile(filename, mode='r'):
   filename = os.path.expanduser(filename)
   if compressed_filename(filename):
     try:
-      f = OSGzipFile_popen(filename, mode)
+      f = OSGzipFile(filename, mode)
     except _autofile_errors:
-      try:
-        f = OSGzipFile_subprocess(filename, mode)
-      except _autofile_errors:
-        import gzip
-        f = gzip.GzipFile(filename, mode)
+      import gzip
+      f = gzip.GzipFile(filename, mode)
 
   else:
     f = file(filename, mode)
