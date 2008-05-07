@@ -19,7 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import os
 import csv
 
-from   itertools     import islice,chain
+from   itertools     import islice,chain,izip
 from   operator      import itemgetter
 
 from   glu.lib.utils import peekfirst
@@ -30,6 +30,7 @@ __all__ = ['autofile','namefile','hyphen',
            'load_list','load_map','load_table','table_writer']
 
 
+TABLE_FORMATS = set(['xls','csv'])
 COMPRESSED_SUFFIXES = set(['gz','Z'])
 
 
@@ -354,22 +355,6 @@ def parse_augmented_filename(filename,args):
   return filename
 
 
-DIALECT_KWARGS = ['dialect','delimiter','doublequote','escapechar','lineterminator',
-                  'quotechar','quoting','skipinitialspace','strict']
-
-
-_unescape_literal_chars = [('\\r','\r'),('\\t','\t'),('\\n','\n'),('\\\\','\\')]
-
-def unescape_literal(s):
-  '''
-  Evaluate C/Python character literals \r, \t, \n, and \\ into the
-  respective single-character ASCII representation
-  '''
-  for e,c in _unescape_literal_chars:
-    s = s.replace(e,c)
-  return s
-
-
 def tryint(s):
   '''
   Try to coerce an arbitrary object to an integer, otherwise return the
@@ -434,7 +419,7 @@ def tryint1(s):
 
   if isinstance(s, basestring):
     if ss==0:
-      raise ValueError('Invalid zero string index used where 1-based index is required')
+      raise ValueError('Index must be greater than zero')
     ss -= 1
 
   return ss
@@ -448,6 +433,23 @@ def trybool(s):
     elif s in ('f','false','n','no','0'):
       s = False
   return bool(s)
+
+
+DIALECT_KWARGS = ['dialect','delimiter','doublequote','escapechar','lineterminator',
+                  'quotechar','quoting','skipinitialspace','strict']
+
+
+_unescape_literal_chars = [('\\r','\r'),('\\t','\t'),('\\n','\n'),('\\\\','\\')]
+
+
+def unescape_literal(s):
+  '''
+  Evaluate C/Python character literals \r, \t, \n, and \\ into the
+  respective single-character ASCII representation
+  '''
+  for e,c in _unescape_literal_chars:
+    s = s.replace(e,c)
+  return s
 
 
 def get_csv_dialect(args,default_dialect='tsv'):
@@ -640,10 +642,6 @@ def load_list(filename,extra_args=None,**kwargs):
 
   items = load_table(name, columns=[index], extra_args=args)
 
-  # Needed to trigger arg processing since generators do not start until the
-  # first item is requested
-  items = chain([items.next()],items)
-
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
@@ -803,7 +801,7 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
 
   # Handle :literal syntax
   if _literal_list(filename):
-    items = (kv.split('=') for kv in filename[1:].split(',') if kv)
+    rows = (kv.split('=') for kv in filename[1:].split(',') if kv)
     default = get_arg(args, ['default'], _nothing)
 
   else:
@@ -825,18 +823,14 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
     if columns is None:
       columns = [key_index,value_index]
 
-    items = load_table(name,columns=columns,extra_args=args)
-
-    # Needed to trigger arg processing since generators do not start until the
-    # first item is requested
-    items = chain([items.next()],items)
+    rows = load_table(name,columns=columns,extra_args=args)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   # Parse the data file
-  def _load_map_generator():
-    for row in items:
+  def _load_map():
+    for row in rows:
       n = len(row)
 
       key = intern(row[0].strip()) if n else None
@@ -856,7 +850,7 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
 
   m = {}
   unique_fails = []
-  for key,value in _load_map_generator():
+  for key,value in _load_map():
     if unique:
       fail = m.get(key,value) != value
       if fail:
@@ -1154,38 +1148,43 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
     args.update(kwargs)
 
   name    = parse_augmented_filename(filename,args)
-  dialect = get_csv_dialect(args,'tsv')
   skip    = int(get_arg(args, ['skip','s'], 0))
+  format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
-  hyin    = get_arg(args, ['hyphen'])
+
+  format  = format.lower()
+  if format in ('xls','excel'):
+    rows = load_table_excel(name, extra_args=args)
+  elif format in ('delimited','tsv','csv'):
+    rows = load_table_delimited(name, extra_args=args)
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  lfile = autofile(name) if name!='-' else hyin
-  lines = csv.reader(lfile,**dialect)
-
   if skip:
-    lines = islice(lines,skip,None)
+    rows = islice(rows,skip,None)
 
   # All columns are to be returned
   if not columns:
-    try:
-      row = lines.next()
-    except StopIteration:
-      return
+    def _load_table_all(rows):
+      try:
+        row = rows.next()
+      except StopIteration:
+        return
 
-    # Process row 1 (may or may not be a header)
-    row = map(str.strip,row)
-    yield row
+      # Process row 1 (may or may not be a header)
+      row = map(str.strip,row)
+      yield row
 
-    n = len(row)
-    for row in lines:
-      result  = map(str.strip,row)
-      result += ['']*(n-len(result))
-      yield result
+      n = len(row)
+      for row in rows:
+        result  = map(str.strip,row)
+        result += ['']*(n-len(result))
+        yield result
 
-    return
+    return _load_table_all(rows)
 
   # Otherwise, resolve column heading names into indices
   header = None
@@ -1194,24 +1193,29 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   except ValueError:
     # Need headers
     try:
-      header = map(str.strip,lines.next())
+      header = map(str.strip,rows.next())
     except StopIteration:
       return
 
     indices = resolve_column_headers(header,columns)
 
-  if want_header and header is not None:
-    yield [ header[j] for j in indices ]
+    if not want_header:
+      header = None
 
-  n = len(indices)
-
-  # Build result rows
-  for row in lines:
-    m = len(row)
-    result = [ (row[j].strip() if j<m else '') for j in indices ]
+  def _load_table_columns(header, rows):
     if header is not None:
+      yield [ header[j] for j in indices ]
+
+    n = len(indices)
+
+    # Build result rows
+    for row in rows:
+      m = len(row)
+      result  = [ (row[j].strip() if j<m else '') for j in indices ]
       result += ['']*(n-len(result))
-    yield result
+      yield result
+
+  return _load_table_columns(header, rows)
 
 
 class TableWriter(object):
@@ -1355,24 +1359,302 @@ def table_writer(filename,extra_args=None,**kwargs):
     args.update(kwargs)
 
   name    = parse_augmented_filename(filename,args)
+  format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
-  dialect = get_csv_dialect(args,'tsv')
-  hyout   = get_arg(args,['hyphen'])
+
+  format  = format.lower()
+  if format in ('xls','excel'):
+    writer = ExcelWriter(name, extra_args=args)
+  elif format in ('delimited','tsv','csv'):
+    writer = delimited_table_writer(name, extra_args=args)
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
-
-  if name == '-':
-    outfile = hyout
-  else:
-    outfile = autofile(name,'w')
-
-  writer = csv.writer(outfile, **dialect)
 
   if columns is not None:
     writer = TableWriter(writer, columns)
 
   return writer
+
+
+def load_table_delimited(filename, extra_args=None, **kwargs):
+  '''
+  Return a configured delimited table reader
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  name    = parse_augmented_filename(filename,args)
+  dialect = get_csv_dialect(args, guess_format(name, ['csv']) or 'tsv')
+  hyin    = get_arg(args, ['hyphen'])
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  lfile = autofile(name) if name!='-' or hyin is None else hyin
+
+  return csv.reader(lfile,**dialect)
+
+
+def delimited_table_writer(filename, extra_args=None, **kwargs):
+  '''
+  Return a configured delimited table writer
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  name    = parse_augmented_filename(filename,args)
+  dialect = get_csv_dialect(args, guess_format(name, ['csv']) or 'tsv')
+  hyout   = get_arg(args, ['hyphen'])
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  lfile = autofile(name,'wb') if name!='-' or hyout is None else hyout
+
+  return csv.writer(lfile,**dialect)
+
+
+try:
+  from   datetime  import date,time,datetime
+
+  import xlrd
+
+  XLS_NULLDATE = (0,0,0)
+
+  def _xlate_xls_row_objects(book,values,types):
+    '''
+    Translate a sequence of native Excel values and types into Python objects
+    '''
+    row = []
+    t = set(types)
+    t -= set([xlrd.XL_CELL_NUMBER,xlrd.XL_CELL_DATE,xlrd.XL_CELL_BOOLEAN,xlrd.XL_CELL_ERROR])
+    for value,typ in izip(values,types):
+      if typ == xlrd.XL_CELL_NUMBER:
+        ivalue = int(value)
+        if ivalue == value:
+          value = ivalue
+      elif typ == xlrd.XL_CELL_DATE:
+        if value[:3] == XLS_NULLDATE:
+          value = time(*value[3:])
+        elif value[3:] == XLS_NULLDATE:
+          value = date(*value[:3])
+        else:
+          value = datetime(*value)
+      elif typ == xlrd.XL_CELL_BOOLEAN:
+        value = bool(value)
+      elif typ == xlrd.XL_CELL_ERROR:
+        value = xlrd.error_text_from_code[value]
+      elif isinstance(value,unicode):
+        value = value.encode('utf8')
+
+      row.append(value)
+
+    return row
+
+
+  def _xlate_xls_row_str(book,values,types):
+    '''
+    Translate a sequence of native Excel values and types into strings
+    '''
+    row = []
+    t = set(types)
+    t -= set([xlrd.XL_CELL_NUMBER,xlrd.XL_CELL_DATE,xlrd.XL_CELL_BOOLEAN,xlrd.XL_CELL_ERROR])
+    for value,typ in izip(values,types):
+      if typ == xlrd.XL_CELL_NUMBER:
+        ivalue = int(value)
+        if ivalue == value:
+          value = '%d' % value
+        else:
+          value = '%f' % value
+      elif typ == xlrd.XL_CELL_DATE:
+        value = xlrd.xldate_as_tuple(value,book.datemode)
+        if value[:3] == XLS_NULLDATE:
+          value = '%02d:%02d:%02d' % value[3:]
+        elif value[3:] == XLS_NULLDATE:
+          value = '%04d/%02d/%02d' % value[:3]
+        else:
+          value = '%04d/%02d/%02d %02d:%02d:%02d' % value
+      elif typ == xlrd.XL_CELL_BOOLEAN:
+        value = ['0','1'][value]
+      elif typ == xlrd.XL_CELL_ERROR:
+        value = xlrd.error_text_from_code[value]
+      elif isinstance(value,unicode):
+        value = value.encode('utf8')
+
+      row.append(value)
+
+    return row
+
+
+  def load_table_excel(filename,strdata=True,extra_args=None,**kwargs):
+    '''
+    Load rows from a Microsoft Excel (XLS) file using the xlrd module
+    '''
+    if extra_args is None:
+      args = kwargs
+    else:
+      args = extra_args
+      args.update(kwargs)
+
+    name  = parse_augmented_filename(filename,args)
+    sheet = get_arg(args, ['sheet'],0)
+    hyin  = get_arg(args, ['hyphen'])
+
+    if extra_args is None and args:
+      raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    if hyin is not None and name=='-':
+      raise IOError('Cannot read Excel file from stdin')
+
+    if compressed_filename(name):
+      raise IOError('Cannot read compressed Excel file')
+
+    book = xlrd.open_workbook(name)
+
+    try:
+      sheet = book.sheet_by_name(sheet)
+    except xlrd.XLRDError:
+      try:
+        sheet = book.sheet_by_index(tryint1(sheet or 0))
+      except (xlrd.XLRDError,TypeError,IndexError):
+        raise ValueError('Cannot open Excel sheet %s:%s' % (namefile(name),sheet))
+
+    def _load_table_excel(book,sheet,strdata):
+      if strdata:
+        rowfunc = _xlate_xls_row_str
+      else:
+        rowfunc = _xlate_xls_row_object
+
+      for i in xrange(sheet.nrows):
+        values = sheet.row_values(i)
+        types  = sheet.row_types(i)
+        yield rowfunc(book,values,types)
+
+    return _load_table_excel(book,sheet,strdata)
+
+
+except ImportError:
+  def load_table_excel(filename,strdata=True,extra_args=None,**kwargs):
+    raise ValueError('Missing xlrd module to read Microsoft Excel file')
+
+
+try:
+  import xlwt
+
+  class ExcelWriter(object):
+    '''
+    Write selected columns to a lower-level tabular data writer object
+    '''
+    def __init__(self, filename, extra_args=None, **kwargs):
+      '''
+      @param filename: file name or file object
+      @type  filename: str or file object
+      @param    sheet: sheet name
+      @type     sheet: str
+      '''
+      if extra_args is None:
+        args = kwargs
+      else:
+        args = extra_args
+        args.update(kwargs)
+
+      name  = parse_augmented_filename(filename,args)
+
+      sheet = get_arg(args, ['sheet'])
+      hyout = get_arg(args, ['hyphen'])
+
+      if extra_args is None and args:
+        raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+      self.filename = name if name!='-' or hyout is None else hyout
+      self.book     = xlwt.Workbook()
+      self.sheet    = self.book.add_sheet(sheet or 'Data')
+      self.rownum   = 0
+
+    def writerows(self, rows):
+      '''
+      Write a sequence of rows as rows in an Excel file
+
+      @param rows: rows to write to Excel
+      @type  rows: sequence of sequences of str
+      '''
+      if self.book is None:
+        raise IOError('Writer object already closed')
+
+      rownum = self.rownum
+      write  = self.sheet.write
+
+      for row in rows:
+        for i,value in enumerate(row):
+          write(rownum, i, value)
+        rownum += 1
+
+      self.row = rownum
+
+    def writerow(self, row):
+      '''
+      Write a sequence of strings to a row in an Excel file
+
+      @param row: row to write to Excel
+      @type  row: sequences of str
+      '''
+      if self.book is None:
+        raise IOError('Writer object already closed')
+
+      rownum = self.rownum
+      write  = self.sheet.write
+
+      for i,value in enumerate(row):
+        write(rownum, i, value)
+
+      self.rownum += 1
+
+    def close(self):
+      '''
+      Close the writer
+
+      A closed writer cannot be used for further I/O operations and will
+      result in an error if called more than once.
+      '''
+      if self.book is None:
+        raise IOError('Writer object already closed')
+
+      self.book,book = None,self.book
+
+      book.save(self.filename)
+
+    def __enter__(self):
+      '''
+      Context enter function
+      '''
+      return self
+
+    def __exit__(self, *exc_info):
+      '''
+      Context exit function that closes the writer upon exit
+      '''
+      self.close()
+
+    def __del__(self):
+      '''
+      Finish saving output when the writer is destroyed, if not already saved.
+      '''
+      if getattr(self,'book',None) is not None:
+        self.close()
+
+
+except ImportError:
+  def ExcelWriter(filename, sheet=None):
+    raise ValueError('Missing xlwt module to write Microsoft Excel file')
 
 
 def _test():
