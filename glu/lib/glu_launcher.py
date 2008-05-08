@@ -110,23 +110,22 @@ def module_info(name,module,out=sys.stderr):
   copyright = getattr(module,'__copyright__', None)
 
   if version:
-    sys.stderr.write('%s version %s\n' % (program,version))
+    out.write('%s version %s\n' % (program,version))
   else:
-    sys.stderr.write(program + '\n')
+    out.write(program + '\n')
 
   if authors:
-    sys.stderr.write('Written by %s\n' % authors[0])
+    out.write('Written by %s\n' % authors[0])
     for author in authors[1:]:
-      sys.stderr.write('      and %s\n' % author)
-    sys.stderr.write('\n')
+      out.write('      and %s\n' % author)
+    out.write('\n')
 
   if copyright:
-    sys.stderr.write(copyright)
-    sys.stderr.write('\n\n')
+    out.write(copyright)
+    out.write('\n\n')
 
 
-
-def main():
+def option_parser():
   usage = 'usage: %prog [options] [module] [args...]'
   parser = optparse.OptionParser(usage=usage, version='%%prog %s' % __version__, add_help_option=False)
   parser.disable_interspersed_args()
@@ -142,12 +141,11 @@ def main():
   parser.add_option('-p', '--profile', dest='profile', action='store_true', help=optparse.SUPPRESS_HELP)
   parser.add_option('--profiler', dest='profiler', metavar='P', default='python', help=optparse.SUPPRESS_HELP)
 
-  # options:
-  #   set module path
-  #   list modules
-  #   profile
-  #   verbose
+  return parser
 
+
+def main():
+  parser = option_parser()
   glu_options,args = parser.parse_args()
 
   if glu_options.path:
