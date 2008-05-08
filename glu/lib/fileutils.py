@@ -1498,6 +1498,9 @@ try:
   def load_table_excel(filename,strdata=True,extra_args=None,**kwargs):
     '''
     Load rows from a Microsoft Excel (XLS) file using the xlrd module
+
+    Supports Excel versions: 2003, 2002, XP, 2000, 97, 95, 5.0, 4.0, 3.0, but not
+    Excel 2007 XML (XLSX).
     '''
     if extra_args is None:
       args = kwargs
@@ -1553,6 +1556,9 @@ try:
   class ExcelWriter(object):
     '''
     Write selected columns to a lower-level tabular data writer object
+
+    Supports Excel versions: 2003, 2002, XP, 2000, 97, 95, 5.0, 4.0, 3.0, but not
+    Excel 2007 XML (XLSX).
     '''
     def __init__(self, filename, extra_args=None, **kwargs):
       '''
