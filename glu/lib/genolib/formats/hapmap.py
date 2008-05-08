@@ -16,6 +16,7 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
+import sys
 
 from   itertools                 import islice,dropwhile
 
@@ -84,14 +85,25 @@ def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
 
   def _load_hapmap():
     n = len(columns)
-    for line in gfile:
-      fields     = line.split()
+    for i,line in enumerate(gfile):
+      fields = [ f.strip() for f in line.split(' ') ]
+
+      # FIXME: Issue warning or raise error
+      if len(fields) < 11:
+        sys.stderr.write('Invalid HapMap data row at %s:%d.  Expected >11 records, found %d.' \
+                                      % (namefile(filename),i+1,len(fields)))
+        continue
+
       locus      = intern(fields[0].strip())
       alleles    = tuple(sorted(fields[1].split('/')))
       chromosome = fields[2].strip()
       position   = tryint(fields[3].strip())
       strand     = intern(fields[4].strip())
       genos      = fields[11:]
+
+      if len(genos) != n:
+        raise ValueError('Invalid genotype length in %s:%d for locus %s.  Expected %d genotypes, found %d.' \
+                              % (namefile(filename),i+1,locus,n,len(genos)))
 
       # Normalize 'chrXX' names to just 'XX'
       if chromosome.startswith('chr'):
@@ -104,7 +116,6 @@ def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
 
       # FIXME: Add error recovery and detection
       assert len(alleles)<=2
-      assert len(genos) == n
 
       model = genome.get_locus(locus).model
 
