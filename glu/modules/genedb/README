@@ -6,3 +6,6 @@ gene.q, seq_gene.md: NCBI Mapview
 	ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/README
 	ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/ARCHIVE/BUILD.35.1/mapview/gene.q.gz
 	ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/ARCHIVE/BUILD.35.1/mapview/seq_gene.md.gz
+
+Cytoband data:
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/cytoBand.txt.gz
