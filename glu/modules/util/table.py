@@ -23,7 +23,7 @@ from   glu.lib.fileutils import load_table,table_writer
 
 def option_parser():
   import optparse
-  usage = 'Usage: %prog [options] table list1 [list2]...'
+  usage = 'Usage: %prog [options] table'
 
   parser = optparse.OptionParser(usage=usage)
 
