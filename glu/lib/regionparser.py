@@ -25,7 +25,7 @@ import csv
 import unittest
 
 from   StringIO             import StringIO
-from   itertools            import chain,izip
+from   itertools            import izip
 
 from   glu.lib.sections     import SectionWriter,read_sections,save_section
 from   glu.lib.fileutils    import autofile

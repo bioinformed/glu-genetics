@@ -22,7 +22,6 @@ from   numpy               import isfinite
 from   scipy               import stats
 from   scipy.linalg        import LinAlgError
 
-from   glu.lib.utils       import pick,tally
 from   glu.lib.fileutils   import autofile,hyphen
 from   glu.lib.glm         import Linear
 from   glu.lib.association import build_models,get_term,NULL,print_results_linear,format_pvalue

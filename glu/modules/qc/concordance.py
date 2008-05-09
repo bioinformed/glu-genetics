@@ -24,7 +24,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 
 from   operator                  import itemgetter
-from   itertools                 import islice, chain
 from   collections               import defaultdict
 
 from   glu.lib.fileutils         import load_map, table_writer
@@ -238,7 +237,7 @@ def fix_eqsets(refgenos,sampleeq,locuseq):
 
 def concordance(refgenos,compgenos,sampleeq,locuseq,sampleconcord,locusconcord):
   if refgenos.format not in ('sdat','ldat'):
-    refgenos = genos.as_ldat()
+    refgenos = refgenos.as_ldat()
 
   refgenos = refgenos.materialize()
 
@@ -262,7 +261,7 @@ def concordance(refgenos,compgenos,sampleeq,locuseq,sampleconcord,locusconcord):
             locusconcord.update(refgeno, reflocus,  compgeno, locus)
 
   elif refgenos.format == 'sdat':
-    loci    = dict( (l,i) for i,l in enumerate(genos.loci) )
+    loci    = dict( (l,i) for i,l in enumerate(refgenos.loci) )
     samples = dict(refgenos)
 
     # Assumes missing genotypes are prefiltered

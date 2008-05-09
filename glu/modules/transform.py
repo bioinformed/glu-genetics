@@ -19,13 +19,12 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import sys
-import csv
 
-from   glu.lib.fileutils       import autofile,hyphen
+import sys
+
 from   glu.lib.genolib.merge   import get_genomerger, output_merge_statistics
 from   glu.lib.genolib.streams import GenoTransform
-from   glu.lib.genolib.io      import transform_files, save_genostream
+from   glu.lib.genolib.io      import transform_files
 
 
 def option_parser():

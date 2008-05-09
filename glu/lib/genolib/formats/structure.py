@@ -21,12 +21,10 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from   itertools                 import chain
 
-from   glu.lib.fileutils         import autofile,namefile,related_file,   \
-                                        parse_augmented_filename,get_arg, \
-                                        load_map
+from   glu.lib.fileutils         import autofile,related_file,load_map,   \
+                                        parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.locus     import Genome
 
 
 __all__ = ['StructureWriter', 'save_structure']

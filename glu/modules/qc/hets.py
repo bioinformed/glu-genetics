@@ -19,9 +19,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 
 from   operator                  import itemgetter
-from   itertools                 import izip
 
-from   glu.lib.utils             import percent, izip_exact
+from   glu.lib.utils             import percent
 from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
@@ -122,8 +121,6 @@ def filter_counts(counts,mingenos):
 
 
 def main():
-  import sys,time
-
   parser = option_parser()
   options,args = parser.parse_args()
 
@@ -166,7 +163,7 @@ def main():
   if options.tabularoutput:
     sw = SectionWriter(options.tabularoutput)
     save_metadata_section(sw, analysis='het', analysis_version='0.1')
-    save_results(sw, results)
+    save_results(sw, counts)
 
   print >> sys.stderr, 'Done.'
 

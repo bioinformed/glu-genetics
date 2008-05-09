@@ -17,7 +17,6 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   itertools         import izip
 from   textwrap          import fill

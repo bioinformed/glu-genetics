@@ -23,7 +23,7 @@ import sys
 from   itertools         import izip,chain
 from   collections       import defaultdict
 
-from   glu.lib.fileutils import autofile,hyphen,load_table,table_writer
+from   glu.lib.fileutils import load_table,table_writer
 from   glu.lib.genolib   import load_genostream
 
 
@@ -565,7 +565,7 @@ def make_errbyloc3(errbyloc,errbylocf1,errbylocf2):
   errbyloc3=errbyloc.copy()
   for key,vals in errbyloc3.iteritems():
     # FIXME: Is this guaranteed to be non-negative?
-    errbyloc3[key] -= errbyloc2.get(key,0) + errbylocf1.get(key,0)
+    errbyloc3[key] -= errbylocf2.get(key,0) + errbylocf1.get(key,0)
   return errbyloc3
 
 
@@ -654,11 +654,11 @@ def main():
                                   genome=options.loci).as_ldat()
 
   if options.errdetails:
-    outdetails = output_file(options.errdetails,['']+individuals)
+    outdetails = output_file(options.errdetails,['']+genos.samples)
 
-  nfams,numoffams = build_nuclear_families(options.pedfile,individuals)
+  nfams,numoffams = build_nuclear_families(options.pedfile,genos.samples)
 
-  errbyloc1,errbyloc2,errbyloc=genotype_elimination(nfams,genos,individuals,outdetails)
+  errbyloc1,errbyloc2,errbyloc=genotype_elimination(nfams,genos,genos.samples,outdetails)
   errbylocf1=count_by_family(errbyloc1)
   errbylocf2=count_by_family(errbyloc2)
 

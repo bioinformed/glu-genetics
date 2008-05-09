@@ -30,7 +30,7 @@ import sys
 from   collections               import defaultdict
 
 from   glu.lib.utils             import pick
-from   glu.lib.fileutils         import hyphen, load_map
+from   glu.lib.fileutils         import load_map
 from   glu.lib.genolib.io        import load_genostream, guess_outformat,               \
                                         TextGenomatrixWriter, TextGenotripleWriter,     \
                                         BinaryGenomatrixWriter, BinaryGenotripleWriter

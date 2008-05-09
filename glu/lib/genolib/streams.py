@@ -30,7 +30,7 @@ from   glu.lib.genolib.reprs     import snp
 from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.phenos    import Phenome
 from   glu.lib.genolib.transform import GenoTransform, prove_unique_transform
-from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger, mergefunc_transpose_adapter
+from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,Genotype,   \
                                         GenotypeLookupError, GenotypeRepresentationError, \
                                         model_from_alleles

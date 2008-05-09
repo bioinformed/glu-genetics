@@ -27,7 +27,7 @@ from   glu.lib.fileutils         import autofile,namefile,               \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.locus     import Genome, load_locus_records, populate_genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
 
 

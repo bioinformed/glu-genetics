@@ -17,10 +17,9 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   glu.lib.utils             import izip_exact
-from   glu.lib.fileutils         import autofile, hyphen, load_list
+from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table
 from   glu.lib.hwp               import hwp_exact_biallelic, hwp_chisq_biallelic, biallelic_counts, HWP_EXACT_THRESHOLD
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
@@ -115,7 +114,7 @@ def geno_counts(loci):
 
 
 def read_counts(filename):
-  loci = table_reader(filename)
+  loci = load_table(filename)
   for locus in loci:
     if len(locus) < 4 or not locus[0]:
       continue
@@ -155,8 +154,6 @@ def filter_counts(data, mingenos, minmaf, mincompletion):
 
 
 def main():
-  import sys,time
-
   parser = option_parser()
   options,args = parser.parse_args()
 

@@ -32,7 +32,7 @@ from   itertools                      import groupby,chain
 from   operator                       import itemgetter
 
 from   glu.lib.fileutils              import load_list,load_table
-from   glu.modules.tagzilla.tagzilla  import launcher,locus_result_sequence
+from   glu.modules.tagzilla.tagzilla  import locus_result_sequence
 
 
 POPS = {'CEU'    : 'hapmap',
@@ -148,7 +148,7 @@ def get_snps(con, population, chromosome, start, stop):
   return cur.fetchall()
 
 
-def escape(s):
+def escape_sql(s):
   return "'%s'" % s.replace("'","''")
 
 
@@ -165,7 +165,7 @@ def get_sequences(con,snps):
   FROM    snpsequence
   WHERE   lname IN (%s);
   '''
-  sqlsnps = ','.join(escape(snp) for snp in snps if snp)
+  sqlsnps = ','.join(escape_sql(snp) for snp in snps if snp)
   cur.execute(sql % sqlsnps)
   results  = cur.fetchall()
 
@@ -240,7 +240,7 @@ def get_genotypes(populations,chromosome):
   command = []
 
   populations = populations.split(',')
-  command.append(' -M %s' % escape(','.join(populations)))
+  command.append(' -M %s' % escape_spaces(','.join(populations)))
 
   if len(populations) > 1:
     command.append('--multimethod global')
@@ -250,15 +250,15 @@ def get_genotypes(populations,chromosome):
 
     if data == 'hapmap':
       command.append('-f hapmap')
-      command.append('-p %s' % escape(HAP_PEDIGREES))
-      command.append(escape(HAP_GENOTYPES % (chromosome,population)))
+      command.append('-p %s' % escape_spaces(HAP_PEDIGREES))
+      command.append(escape_spaces(HAP_GENOTYPES % (chromosome,population)))
     elif data == 'NHS':
       command.append('-f ldat')
-      command.append('-l %s' % escape(NHS_MAP))
+      command.append('-l %s' % escape_spaces(NHS_MAP))
       command.append(NHS_GENOTYPES % chromosome)
     elif data == 'PLCO':
       command.append('-f ldat')
-      command.append('-l %s' % escape(PLCO_MAP))
+      command.append('-l %s' % escape_spaces(PLCO_MAP))
       command.append(PLCO_GENOTYPES % chromosome)
     else:
       raise ValueError('Unknown population')
@@ -266,7 +266,7 @@ def get_genotypes(populations,chromosome):
   return ' '.join(command)
 
 
-def escape(s):
+def escape_spaces(s):
   return s.replace(' ','\\ ')
 
 
@@ -310,7 +310,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
       incs = (set(load_list(includefile)) | set(include)) & set(snps)
       file('include','w').write('\n'.join(sorted(incs)))
     elif includefile:
-      command.append('-i %s' % escape(includefile))
+      command.append('-i %s' % escape_spaces(includefile))
     elif include:
       command.append('-i include')
       file('include','w').write('\n'.join(include))
@@ -320,7 +320,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
       file('exclude','w').write('\n'.join(exclude))
 
     for d in designfiles or []:
-      command.append('-D %s' % escape(d))
+      command.append('-D %s' % escape_spaces(d))
 
     command.append('--designdefault=%f' % designdefault)
 

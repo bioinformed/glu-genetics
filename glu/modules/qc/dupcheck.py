@@ -22,20 +22,20 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 import sys
+import time
 import csv
 
 from   itertools                 import chain
 from   textwrap                  import fill
-from   collections               import defaultdict
 
 from   glu.lib.utils             import percent, pair_generator
-from   glu.lib.fileutils         import autofile, hyphen, load_map, table_writer
+from   glu.lib.fileutils         import autofile, hyphen, table_writer
 from   glu.lib.union_find        import union_find
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
 from   glu.lib.genolib.io        import load_genostream
 from   glu.lib.genolib.merge     import get_genomerger
-from   glu.lib.genolib.genoarray import genoarray_concordance, model_from_alleles
+from   glu.lib.genolib.genoarray import genoarray_concordance
 
 
 # Here for comparison purposes to experiment with unoptomized genotype
@@ -204,8 +204,6 @@ def option_parser():
 
 
 def main():
-  import sys,time
-
   parser = option_parser()
   options,args = parser.parse_args()
 

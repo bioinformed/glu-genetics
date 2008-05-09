@@ -15,7 +15,7 @@ import time
 from   itertools    import izip
 
 from   scipy        import c_, ones, dot, stats, diff
-from   scipy.linalg import inv, solve, det
+from   scipy.linalg import inv
 from   numpy        import log, pi, sqrt, square, diagonal
 from   numpy.random import randn, seed
 

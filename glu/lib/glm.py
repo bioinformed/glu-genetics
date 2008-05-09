@@ -21,7 +21,7 @@ from itertools    import izip
 
 # Import Python numerical libraries (from http://scipy.org/)
 from numpy        import array,matrix,asmatrix,asarray,asanyarray,atleast_2d,zeros,zeros_like,ones,\
-                         where,exp,log,vsplit,unique,bmat,inf,sum,dot,diag,sqrt,conjugate,eye
+                         exp,log,vsplit,unique,bmat,inf,sum,dot,diag,sqrt,conjugate,eye
 from scipy        import linalg
 from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
 

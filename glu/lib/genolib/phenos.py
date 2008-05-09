@@ -18,7 +18,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 from collections               import defaultdict
 
-from glu.lib.fileutils         import namefile,load_table,get_arg,parse_augmented_filename
+from glu.lib.fileutils         import namefile,load_table
 
 
 SEX_UNKNOWN,SEX_MALE,SEX_FEMALE = None,0,1
@@ -238,9 +238,9 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
       else:
         name = ind
 
-      yield name,family,individual,parent1,parent2,sex,phenoclass
+      yield name,family,individual,parent1,parent2,sex,pheno
 
-  return _pheno()
+  return _phenos()
 
 
 def load_phenome(filename,**kwargs):
@@ -250,7 +250,7 @@ def load_phenome(filename,**kwargs):
 
   FIXME: Add docstring and doctests
   '''
-  phenos = load_locus_records(filename,**kwargs)
+  phenos = load_phenome_records(filename,**kwargs)
 
   phenome = Phenome()
 

@@ -21,13 +21,10 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import csv
 
-from   itertools                 import islice,dropwhile
-
-from   glu.lib.fileutils         import autofile,table_writer,namefile,trybool,\
+from   glu.lib.fileutils         import autofile,load_list,table_writer,namefile,trybool,\
                                         parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
-from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.reprs     import get_genorepr,snp
 
 

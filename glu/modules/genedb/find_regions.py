@@ -21,7 +21,7 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import os
-import time
+import sys
 import sqlite3
 
 from   glu.lib.fileutils import load_table,table_writer

@@ -19,7 +19,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 import time
 import sys
 import csv
-import os
 import traceback
 
 from   glu.lib.sequence import *

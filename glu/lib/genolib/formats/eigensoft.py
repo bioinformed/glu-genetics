@@ -25,7 +25,7 @@ from   glu.lib.utils             import izip_exact
 from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg, \
                                         related_file,guess_related_file
 
-from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
+from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream,NonUniqueError
 from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_genocounts, \
                                         major_allele_from_allelecounts, \
                                         GenotypeArrayDescriptor, GenotypeArray, UnphasedMarkerModel

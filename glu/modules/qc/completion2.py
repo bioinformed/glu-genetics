@@ -72,7 +72,7 @@ from   collections          import defaultdict
 from   glu.lib.utils        import percent
 from   glu.lib.fileutils    import load_map,autofile,hyphen
 from   glu.lib.genolib      import load_genostream
-from   glu.lib.regionparser import load_regions,Regions
+from   glu.lib.regionparser import load_regions
 from   glu.lib.sections     import save_section, SectionWriter, save_metadata_section
 
 

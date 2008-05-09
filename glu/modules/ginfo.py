@@ -87,7 +87,7 @@ def main():
       def _samples():
         yield ['SAMPLE','FAMILY','INDIVIDUAL','PARENT1','PARENT2','SEX','PHENOCLASS']
 
-        phenome = genos.phenome or Phenome()
+        phenome = genos.phenome
 
         for sample in genos.samples:
           phenos = genos.phenome.get_phenos(sample)

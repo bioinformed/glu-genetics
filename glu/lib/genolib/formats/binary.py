@@ -24,7 +24,7 @@ __all__ = ['BinaryGenomatrixWriter', 'BinaryGenotripleWriter',
 
 
 from   operator                  import itemgetter
-from   itertools                 import izip,groupby,imap
+from   itertools                 import groupby,imap
 
 import tables
 
@@ -1380,7 +1380,6 @@ def main():
 
   from   glu.lib.utils         import ilen
 
-  from   glu.lib.genolib.reprs import snp
   from   glu.lib.genolib.io    import load_genostream, save_genostream
 
   if 0:
@@ -1499,7 +1498,7 @@ def main():
     test('Save   compressed   triple file random', 'data/g32.trip.gz',
            lambda f: save_genostream(f,triples), g)
     test('Save       binary   triple file random', 'data/g33.tbat',
-           lambda f: save_genostream_binary(f,triples), g)
+           lambda f: save_genostream(f,triples), g)
     test('Load uncompressed   triple file random', 'data/g32.trip',
            lambda f: ilen(load_genostream(f)), g)
     test('Load   compressed   triple file random', 'data/g32.trip.gz',

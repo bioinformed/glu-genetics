@@ -166,7 +166,7 @@ def main():
       continue
 
     if 0:
-      f = table_writer('%s.csv' % lname,dialect='csv')
+      f = table_writer('%s.csv' % lname1,dialect='csv')
       f.writerow(model.vars)
       f.writerows(model.X.tolist())
 

@@ -25,6 +25,7 @@ import os
 import time
 import sqlite3
 
+from   itertools         import chain
 
 from   glu.lib.fileutils import load_table
 

@@ -25,15 +25,14 @@ import time
 
 from   itertools                 import izip, groupby
 from   operator                  import itemgetter
-from   collections               import defaultdict
 
 from   glu.lib.utils             import percent, pair_generator, pick
-from   glu.lib.fileutils         import autofile, hyphen, load_map, load_table, table_writer
+from   glu.lib.fileutils         import autofile, hyphen, load_table, table_writer
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream
 from   glu.lib.genolib.merge     import get_genomerger
-from   glu.lib.genolib.genoarray import genoarray_concordance, model_from_alleles
+from   glu.lib.genolib.genoarray import genoarray_concordance
 
 
 def write_header(outfile,filename,threshold,mingenos):

@@ -19,8 +19,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 import os
 import csv
 
-from   itertools     import islice,chain,izip
-from   operator      import itemgetter
+from   itertools     import islice,izip
 
 from   glu.lib.utils import peekfirst
 
@@ -410,7 +409,7 @@ def tryint1(s):
   >>> tryint1('0')
   Traceback (most recent call last):
      ...
-  ValueError: Invalid zero string index used where 1-based index is required
+  ValueError: Index must be greater than zero
   '''
   try:
     ss = int(s)
@@ -1430,7 +1429,7 @@ try:
 
   XLS_NULLDATE = (0,0,0)
 
-  def _xlate_xls_row_objects(book,values,types):
+  def _xlate_xls_row_object(book,values,types):
     '''
     Translate a sequence of native Excel values and types into Python objects
     '''

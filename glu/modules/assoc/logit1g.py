@@ -16,14 +16,14 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
+
 import sys
 
-from   numpy               import abs,bmat,exp
+from   numpy               import exp
 from   scipy               import stats
 from   scipy.linalg        import LinAlgError
 
-from   glu.lib.fileutils   import autofile,hyphen,load_list
+from   glu.lib.fileutils   import autofile,hyphen
 from   glu.lib.glm         import GLogit
 
 from   glu.lib.association import print_results,build_models,format_pvalue, \

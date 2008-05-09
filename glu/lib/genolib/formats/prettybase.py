@@ -21,8 +21,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import re
 
-from   itertools                 import islice
-
 from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg, \
                                         get_csv_dialect,trybool,load_list
 

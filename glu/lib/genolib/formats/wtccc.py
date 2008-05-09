@@ -19,11 +19,9 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from   glu.lib.fileutils         import autofile,namefile,               \
-                                        parse_augmented_filename,get_arg
+from   glu.lib.fileutils         import autofile,parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.locus     import Genome
 
 
 __all__ = ['WTCCCWriter', 'save_wtccc']

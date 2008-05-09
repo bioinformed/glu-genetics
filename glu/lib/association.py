@@ -17,19 +17,18 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
-import csv
 
 from   math              import ceil,log
 from   itertools         import izip
 from   collections       import defaultdict
 from   operator          import itemgetter
 
-from   numpy             import array,matrix,asarray,asanyarray,zeros,zeros_like, \
+from   numpy             import array,matrix,asarray,asanyarray,zeros, \
                                 exp,nan,abs,arange,median,sqrt,inf
 from   scipy             import stats
 
 from   glu.lib.utils     import tally,pick
-from   glu.lib.fileutils import autofile,namefile,load_list,load_map,load_table
+from   glu.lib.fileutils import namefile,load_list,load_map,load_table
 from   glu.lib.genolib   import load_genostream
 
 
@@ -1152,7 +1151,7 @@ def print_results(out,locus_model,linear_model,verbose=1):
   p     = 2*stats.distributions.norm.sf(abs(z))
 
   vars = locus_model.vars or linear_model.vars or \
-         [ 'Covariate_%02d' % i for i in xrange(model.X.shape[1]) ]
+         [ 'Covariate_%02d' % i for i in xrange(linear_model.X.shape[1]) ]
 
   n = len(vars)
 
@@ -1204,7 +1203,7 @@ def print_results_linear(out,locus_model,linear_model,verbose=1):
   p     = 2*stats.distributions.t.sf(abs(t),n-m)
 
   vars = locus_model.vars or linear_model.vars or \
-         [ 'Covariate_%02d' % i for i in xrange(model.X.shape[1]) ]
+         [ 'Covariate_%02d' % i for i in xrange(linear_model.X.shape[1]) ]
 
   out.write('Linear (Gaussian) regression\n')
   out.write('Observations = %d\n' % n)

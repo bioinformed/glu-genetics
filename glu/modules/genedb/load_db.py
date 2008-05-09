@@ -16,11 +16,11 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
+
 import glob
 import sqlite3
 
-from   itertools         import islice,chain
+from   itertools         import chain
 
 from   glu.lib.fileutils import autofile, load_table
 

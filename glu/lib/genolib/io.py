@@ -19,7 +19,6 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import namefile, guess_format, parse_augmented_filename, get_arg
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream

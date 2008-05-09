@@ -118,8 +118,6 @@ def option_parser():
 
 
 def main():
-  import sys
-
   parser = option_parser()
   options,args = parser.parse_args()
 

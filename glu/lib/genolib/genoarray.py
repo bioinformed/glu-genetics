@@ -996,7 +996,7 @@ def model_from_genotypes(genotypes, allow_hemizygote=None, max_alleles=None):
   @return                 : model supporting the supplied genotypes
   @rtype                  : UnphasedMarkerModel
   '''
-  alleles = sorted(set(a for g in genoset for a in g if a is not None))
+  alleles = sorted(set(a for g in genotypes for a in g if a is not None))
   return model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote, max_alleles)
 
 

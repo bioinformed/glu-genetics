@@ -21,7 +21,7 @@ from   types             import NoneType
 from   collections       import defaultdict
 from   itertools         import izip
 
-from   glu.lib.fileutils import get_arg,trybool,load_list,load_map,load_table
+from   glu.lib.fileutils import namefile,get_arg,trybool,load_list,load_map,load_table
 
 
 list_type = (NoneType,set,dict,list,tuple)

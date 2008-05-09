@@ -23,8 +23,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import sqlite3
 
-from   itertools         import chain,islice
-
 from   glu.lib.fileutils import hyphen,load_table,table_writer
 
 

@@ -28,7 +28,7 @@ from   glu.lib.fileutils         import autofile,namefile,               \
 
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
-from   glu.lib.genolib.locus     import Genome
+from   glu.lib.genolib.locus     import Genome,load_locus_records,populate_genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN, \
                                         PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
 
@@ -432,7 +432,7 @@ def load_plink_tfam(filename,phenome):
     family,name,father,mother,sex,pheno = [ s.strip() for s in fields ]
 
     if name == '0':
-      raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
+      raise ValueError('Invalid record on line %d of %s' % (i+1,namefile(filename)))
 
     father  = PARENT_MAP.get(father,father)
     mother  = PARENT_MAP.get(mother,mother)
@@ -521,7 +521,7 @@ def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
         pdist = abs(int(fields[3])) if fields[3] else None
 
         if not lname:
-          raise ValueError('Invalid PLINK TPED record %d' % (i+1))
+          raise ValueError('Invalid PLINK TPED record %d' % (line_num+1))
 
         if chr == '0':
           chr = None
@@ -679,9 +679,10 @@ class PlinkTPedWriter(object):
 
     # FIXME: tfam file writer should be refactored
     if self.tfamfile:
+      phenome = self.phenome
       out = autofile(self.tfamfile,'wb')
       for sample in self.samples:
-        phenos     = self.phenome.get_phenos(sample)
+        phenos     = phenome.get_phenos(sample)
         family     = phenos.family
         individual = phenos.individual or sample
         parent1    = phenos.parent1
@@ -1235,9 +1236,10 @@ class PlinkBedWriter(object):
 
     # FIXME: fam file writer should be refactored
     if self.famfile:
+      phenome = self.phenome
       out = autofile(self.famfile,'wb')
       for sample in samples:
-        phenos     = self.phenome.get_phenos(sample)
+        phenos     = phenome.get_phenos(sample)
         family     = phenos.family
         individual = phenos.individual or sample
         parent1    = phenos.parent1

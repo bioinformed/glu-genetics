@@ -227,8 +227,6 @@ def do_pca(genos,n=None):
   else:
     return pca_sequence_numpy(genos,n)
 
-  return values,vectors
-
 
 def option_parser():
   import optparse

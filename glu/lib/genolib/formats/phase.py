@@ -19,14 +19,10 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from   itertools                 import islice
-
-from   glu.lib.utils             import gcdisabled
-from   glu.lib.fileutils         import autofile,namefile,compressed_filename,  \
+from   glu.lib.fileutils         import autofile,compressed_filename,  \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.locus     import Genome
 
 
 __all__ = ['PhaseWriter', 'save_phase']

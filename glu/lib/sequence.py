@@ -19,10 +19,8 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import sys
-import csv
 
-from   itertools             import izip
+from   itertools import izip
 
 comp  = {'A':'T','C':'G','T':'A','G':'C','-':'-','.':'.'}
 iupac = {'A':'A','C':'C','G':'G','T':'T','R':'AG','Y':'CT','S':'CG','W':'AT','K':'GT',

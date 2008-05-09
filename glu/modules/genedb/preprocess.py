@@ -22,9 +22,9 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import sqlite3
 
-from itertools        import chain,islice
+from itertools         import chain,islice
 
-from glu.lib.fileutils    import autofile,hyphen,load_list,load_table,table_writer
+from glu.lib.fileutils import hyphen,load_table,table_writer
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',

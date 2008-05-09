@@ -176,7 +176,7 @@ def main():
     if 0:
       import rpy
       from   rpy   import r
-      from   numpy import array,allclose,diag,abs
+      from   numpy import array,allclose
 
       vars = [ v.replace(':','.').replace('+','p').replace('-','m').replace('_','.') for v in model.vars[1:] ]
       frame = dict( (v,model.X[:,i+1].A.reshape(-1)) for i,v in enumerate(vars) )
