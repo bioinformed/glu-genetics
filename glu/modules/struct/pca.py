@@ -25,7 +25,7 @@ import numpy
 try:
   import cvxopt, cvxopt.blas, cvxopt.lapack
 except ImportError:
-  cxvopt = None
+  cvxopt = None
 
 from   glu.lib.fileutils         import table_writer
 
