@@ -428,6 +428,8 @@ def get_genomerger(mergername):
     merger = VoteMerger
   elif name == 'ordered':
     merger = OrderedMerger
+  elif name == 'none':
+    return None
   else:
     raise ValueError('Unknown merge algorithm specified')
 

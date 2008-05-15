@@ -200,20 +200,21 @@ class GenotripleStream(GenotypeStream):
     triples = [ g.as_genotriples() for g in genos ]
 
     if len(triples) == 1:
-      return triples[0]
-
-    if mergefunc is not None and order is None:
-      order = 'sample'
-
-    # FIXME: Incore sort is deadly
-    if order is not None:
-      triples = [ t.sorted(order) for t in triples ]
-
-    if order is None and mergefunc is None:
-      triples = combine_unsorted_genotriple_list(triples)
+      triples = triples[0]
 
     else:
-      triples = combine_sorted_genotriple_list(triples)
+      if mergefunc is not None and order is None:
+        order = 'sample'
+
+      # FIXME: Incore sort is deadly
+      if order is not None:
+        triples = [ t.sorted(order) for t in triples ]
+
+      if order is None and mergefunc is None:
+        triples = combine_unsorted_genotriple_list(triples)
+
+      else:
+        triples = combine_sorted_genotriple_list(triples)
 
     if mergefunc is not None:
       triples = triples.merged(mergefunc)
