@@ -19,17 +19,19 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 
 from   math              import ceil,log
-from   itertools         import izip
+from   itertools         import izip,chain
 from   collections       import defaultdict
 from   operator          import itemgetter
 
 from   numpy             import array,matrix,asarray,asanyarray,zeros, \
-                                exp,nan,abs,arange,median,sqrt,inf
+                                exp,nan,abs,arange,median,inf
 from   scipy             import stats
 
 from   glu.lib.utils     import tally,pick
-from   glu.lib.fileutils import namefile,load_list,load_map,load_table
+from   glu.lib.fileutils import namefile,load_list,load_map,load_table,tryint1
 from   glu.lib.genolib   import load_genostream
+from   glu.lib.formula   import get_term,INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
+                                NULL,TREND,GENO,FormulaParser
 
 
 LOGE_10 = log(10)
@@ -470,516 +472,6 @@ def estimate_maf(genocounts):
 
 ###################################################################
 
-
-class TERM(object):
-  def __init__(self, lname):
-    self.lname = lname
-    self.index = None
-
-  def loci(self):
-    if self.lname is None:
-      return []
-    return [self.lname]
-
-  def terms(self):
-    return [self]
-
-  def expand_terms(self):
-    return [self]
-
-  def __mul__(self, other):
-    t1 =  self.terms() if isinstance(self,  INTERACTION) else [self]
-    t2 = other.terms() if isinstance(other, INTERACTION) else [other]
-    return INTERACTION(t1 + t2)
-
-  def __add__(self, other):
-    t1 =  self.terms() if isinstance(self,  COMBINATION) else [self]
-    t2 = other.terms() if isinstance(other, COMBINATION) else [other]
-    return COMBINATION(t1 + t2)
-
-
-class NULL(TERM):
-  def __init__(self, lname=None):
-    self.lname = lname
-
-  def effects(self, loci, i):
-    if self.lname is None:
-      return []
-
-    lmodel = loci[self.lname]
-    if lmodel.genos[i] not in lmodel.genomap:
-      return [None]
-    return []
-
-  def names(self, loci):
-    return []
-
-  def __len__(self):
-    return 0
-
-
-class GENO(TERM):
-  def effects(self, loci, i):
-    lmodel  = loci[self.lname]
-    genomap = lmodel.genomap
-    geno    = lmodel.genos[i]
-
-    if geno not in genomap:
-      return [None]
-
-    genos = [0,0]
-    j = genomap[geno]
-    if j:
-      genos[j-1] = 1
-
-    return genos
-
-  def names(self, loci):
-    lmodel = loci[self.lname]
-    if lmodel.genocount < 3:
-      return []
-    return [ '%s:%s' % (self.lname,''.join(g)) for g in lmodel.tests[1:] ]
-
-  def indices(self):
-    return [self.index,self.index+1]
-
-  def estimates(self,p):
-    return p[self.index:self.index+2,0].A.flatten()
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i],c[i+1,i+1]]
-
-  def se(self,c):
-    return sqrt(self.var(c))
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1,p2 = self.estimates(p)
-    e1,e2 = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1)),
-            (exp(p2-a*e2),exp(p2+a*e2))]
-
-  def __len__(self):
-    return 2
-
-
-class ADOM(TERM):
-  def effects(self, loci, i):
-    lmodel  = loci[self.lname]
-    genomap = loci[self.lname].genomap
-    geno    = lmodel.genos[i]
-    if geno not in lmodel.genomap:
-      return [None]
-    return ([0,0],[1,1],[2,0])[lmodel.genomap[geno]]
-
-  def names(self, loci):
-    lmodel = loci[self.lname]
-    if lmodel.genocount < 3:
-      return []
-    return [ '%s:trend:-%s+%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]),
-             '%s:domdev:%s%s'  % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
-
-  def indices(self):
-    return [self.index,self.index+1]
-
-  def estimates(self,p):
-    return p[self.index:self.index+2,0].A.flatten()
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i],c[i+1,i+1]]
-
-  def se(self,c):
-    return sqrt(self.var(c))
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1,p2 = self.estimates(p)
-    e1,e2 = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1)),
-            (exp(p2-a*e2),exp(p2+a*e2))]
-
-  def __len__(self):
-    return 2
-
-
-class TREND(TERM):
-  def effects(self, loci, i):
-    lmodel = loci[self.lname]
-    return [ lmodel.genomap.get(lmodel.genos[i]) ]
-
-  def names(self, loci):
-    lmodel = loci[self.lname]
-    if lmodel.genocount < 2:
-      return []
-    return ['%s:trend:-%s+%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1])]
-
-  def indices(self):
-    return [self.index]
-
-  def estimates(self,p):
-    return [p[self.index,0],p[self.index,0]*2]
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i],4*c[i,i]]
-
-  def se(self,c):
-    return sqrt(self.var(c))
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1,p2 = self.estimates(p)
-    e1,e2 = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1)),
-            (exp(p2-a*e2),exp(p2+a*e2))]
-
-  def __len__(self):
-    return 1
-
-
-class DOM(TERM):
-  def effects(self, loci, i):
-    lmodel  = loci[self.lname]
-    genomap = lmodel.genomap
-    geno    = lmodel.genos[i]
-    if geno not in genomap:
-      return [None]
-    return [ int(genomap.get(geno)>0) ]
-
-  def names(self, loci):
-    lmodel = loci[self.lname]
-    if lmodel.genocount < 2:
-      return []
-    return ['%s:dom:%s<%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
-
-  def indices(self):
-    return [self.index]
-
-  def estimates(self,p):
-    return [p[self.index,0],p[self.index,0]]
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i],c[i,i]]
-
-  def se(self,c):
-    return sqrt(self.var(c))
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1,p2 = self.estimates(p)
-    e1,e2 = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1)),
-            (exp(p2-a*e2),exp(p2+a*e2))]
-
-  def __len__(self):
-    return 1
-
-
-class REC(TERM):
-  def effects(self, loci, i):
-    lmodel  = loci[self.lname]
-    genomap = lmodel.genomap
-    geno    = lmodel.genos[i]
-    if geno not in genomap:
-      return [None]
-    return [ int(genomap.get(geno)>1) ]
-
-  def names(self, loci):
-    lmodel = loci[self.lname]
-    if lmodel.genocount < 2:
-      return []
-    return ['%s:rec:%s>%s' % (self.lname,lmodel.alleles[0],lmodel.alleles[1]) ]
-
-  def indices(self):
-    return [self.index]
-
-  def estimates(self,p):
-    return [0,p[self.index,0]]
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [0,c[i,i]]
-
-  def se(self,c):
-    return sqrt(self.var(c))
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1,p2 = self.estimates(p)
-    e1,e2 = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1)),
-            (exp(p2-a*e2),exp(p2+a*e2))]
-
-  def __len__(self):
-    return 1
-
-
-class MISSING(TERM):
-  def effects(self, loci, i):
-    if loci[self.lname].genos[i]:
-      return [1]
-    else:
-      return [0]
-
-  def names(self, loci):
-    if not loci[self.lname].genocount:
-      return []
-    return ['%s:missing' % self.lname]
-
-  def indices(self):
-    return [self.index]
-
-  def estimates(self,p):
-    return [p[self.index,0]]
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i]]
-
-  def se(self,c):
-    return [sqrt(self.var(c))]
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1, = self.estimates(p)
-    e1, = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1))]
-
-  def __len__(self):
-    return 1
-
-
-class NOT_MISSING(TERM):
-  def effects(self, loci, i):
-    if loci[self.lname].genos[i]:
-      return [0]
-    else:
-      return [1]
-
-  def names(self, loci):
-    if not loci[self.lname].genocount:
-      return []
-    return ['%s:not_missing' % self.lname]
-
-  def indices(self):
-    return [self.index]
-
-  def estimates(self,p):
-    return [p[self.index,0]]
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i]]
-
-  def se(self,c):
-    return [sqrt(self.var(c))]
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    p1, = self.estimates(p)
-    e1, = self.se(c)
-    return [(exp(p1-a*e1),exp(p1+a*e1))]
-
-  def __len__(self):
-    return 1
-
-
-class INTERACTION(TERM):
-  def __init__(self, terms):
-    self.subterms = terms
-
-  def loci(self):
-    results = set()
-    for term in self.terms():
-      results.update(term.loci())
-    return sorted(results)
-
-  def terms(self):
-    return self.subterms
-
-  def expand_terms(self):
-    results = []
-    for term in self.terms():
-      results.extend(term.expand_terms())
-    return results
-
-  def indices(self):
-    return range(self.index,self.index+len(self))
-
-  def estimates(self,p):
-    return p[self.index:self.index+len(self),0].A.flatten()
-
-  def odds_ratios(self,p):
-    return exp(self.estimates(p))
-
-  def var(self,c):
-    return [c[i,i] for i in self.indices()]
-
-  def se(self,c):
-    return sqrt(self.var(c))
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    return [(exp(p-a*e),exp(p+a*e)) for p,e in zip(self.estimates(p),
-                                                   self.se(c)) ]
-
-  def effects(self, loci, i):
-    results = []
-    for term in self.terms():
-      effects = term.effects(loci,i)
-      if None in effects:
-        return [None]
-      if not results:
-        results = list(effects)
-      else:
-        results = [ t1*t2 for t1 in results for t2 in effects ]
-    return results
-
-  def names(self, loci):
-    results = []
-    for term in self.terms():
-      names = term.names(loci)
-
-      if not results:
-        results.extend(names)
-      else:
-        results = [ '%s x %s' % (t1,t2) for t1 in results for t2 in names ]
-
-    return results
-
-  def __len__(self):
-    if not self.terms():
-      return 0
-
-    l = 1
-    for term in self.terms():
-      l *= len(term)
-    return l
-
-
-class COMBINATION(TERM):
-  def __init__(self, terms):
-    self.subterms = terms
-
-  def loci(self):
-    results = set()
-    for term in self.terms():
-      results.update(term.loci())
-    return sorted(results)
-
-  def terms(self):
-    return self.subterms
-
-  def expand_terms(self):
-    results = []
-    for term in self.terms():
-      results.extend(term.expand_terms())
-    return results
-
-  def indices(self):
-    results = []
-    for term in self.terms():
-      results.extend(term.indices())
-    return results
-
-  def effects(self, loci, i):
-    results = []
-    for term in self.terms():
-      effects = term.effects(loci,i)
-      if None in effects:
-        return [None]
-      results.extend(effects)
-    return results
-
-  def names(self, loci):
-    results = []
-    for term in self.terms():
-      results.extend(term.names(loci))
-    return results
-
-  def estimates(self,p):
-    results = []
-    for term in self.terms():
-      results.extend(term.estimates(p))
-    return results
-
-  def odds_ratios(self,p):
-    results = []
-    for term in self.terms():
-      results.extend(term.odds_ratios(p))
-    return results
-
-  def var(self,c):
-    results = []
-    for term in self.terms():
-      results.extend(term.var(c))
-    return results
-
-  def se(self,c):
-    results = []
-    for term in self.terms():
-      results.extend(term.se(c))
-    return results
-
-  def odds_ratio_ci(self,p,c,alpha=0.95):
-    results = []
-    for term in self.terms():
-      results.extend(term.odds_ratio_ci(p,c,alpha))
-    return results
-
-  def __len__(self):
-    return sum(len(term) for term in self.terms())
-
-
-termmap = { 'GENO'           : GENO,
-            'GENOTYPE'       : GENO,
-            'ADDDOM'         : ADOM,
-            'ADOM'           : ADOM,
-            'TREND'          : TREND,
-            'MULTIPLICATIVE' : TREND,
-            'MULT'           : TREND,
-            'DOMINANT'       : DOM,
-            'DOM'            : DOM,
-            'RECESSIVE'      : REC,
-            'REC'            : REC,
-            'MISSING'        : MISSING,
-            'MISS'           : MISSING,
-            'NOT_MISSING'    : NOT_MISSING,
-            'NOT_MISS'       : NOT_MISSING,
-            'NULL'           : NULL,
-          }
-
-def get_term(name):
-  try:
-    return termmap[name.upper()]
-  except KeyError:
-    raise KeyError('Unknown genetic model term: %s' % name)
-
-
 # FIXME: Needs docs+tests
 class BiallelicLocusModel(object):
   def __init__(self, lname, genos, geno_indices, reference_allele=None):
@@ -1014,13 +506,15 @@ class BiallelicLocusModel(object):
 
 
 class LocusModel(object):
-  def __init__(self, y, X, pheno, vars, loci, model_loci):
+  def __init__(self, formula, y, X, pheno, vars, loci, model_loci):
+    self.formula    = formula
     self.y          = y
     self.X          = X
     self.pheno      = pheno
     self.vars       = vars
-    self.loci      = loci
+    self.loci       = loci
     self.model_loci = model_loci
+
 
 # FIXME: Needs docs+tests
 class LocusModelBuilder(object):
@@ -1044,6 +538,48 @@ class LocusModelBuilder(object):
     self.phenos       = [ p for p in phenos if p[0] in self.geno_indices ]
 
   def build_model(self,term,loci):
+    genoterms    = []
+    phenoterms   = []
+    interactions = []
+    intercept    = 0
+    no_intercept = 0
+
+    for t in term.terms():
+      if isinstance(t, INTERCEPT):
+        intercept += 1
+      elif isinstance(t, NO_INTERCEPT):
+        no_intercept += 1
+      elif isinstance(t, GENOTERM):
+        genoterms.append(t)
+      elif isinstance(t, PHENOTERM):
+        phenoterms.append(t)
+      else:
+        interactions.append(t)
+
+    term = COMBINATION()
+    if not no_intercept or intercept:
+      term += INTERCEPT()
+    for t in chain(genoterms,phenoterms,interactions):
+      term += t
+
+    index = 0
+    for t in term.terms():
+      n = len(t)
+      if n:
+        t.index = index
+        index += n
+
+    for t in term.expand_terms():
+      if isinstance(t,PHENOTERM):
+        try:
+          t.pindex = self.pheno_header.index(t.name)
+        except (ValueError,IndexError):
+          try:
+            t.pindex = tryint1(t.name)
+            t.name   = self.pheno_header[t.pindex]
+          except (ValueError,TypeError):
+            raise ValueError("Cannot find phenotype column '%s'" % t.name)
+
     model_names = []
     model_terms = []
     model_loci  = {}
@@ -1062,24 +598,19 @@ class LocusModelBuilder(object):
     if k != len(term):
       return None
 
-    index = 1
-    for t in term.terms():
-      t.index = index
-      index += len(t)
-
     X = []
     y = []
     for row in self.phenos:
       pid  = row[0]
       stat = row[1]
-      covs = row[2:]
+      #covs = row[2:]
 
-      geno_effects = term.effects(model_loci, self.geno_indices[pid])
-      if None in geno_effects:
+      effects = term.effects(model_loci, row, self.geno_indices[pid])
+      if None in effects:
         continue
 
       y.append([stat])
-      X.append( [1.0] + geno_effects + covs )
+      X.append(effects)
 
     y = matrix(y, dtype=float)
     X = matrix(X, dtype=float)
@@ -1088,13 +619,12 @@ class LocusModelBuilder(object):
     if len(set(y.A.ravel())) < 2:
       return None
 
-    colcounts = (X.A[:,1:k+1]!=0).sum(axis=0)
-    if k and colcounts.min() < self.mingenos:
-      return None
+    # FIXME: What does mingenos mean in a world with arbitrary formulae?
+    #colcounts = (X.A[:,1:k+1]!=0).sum(axis=0)
+    #if k and colcounts.min() < self.mingenos:
+    #  return None
 
-    vars = ['_mean'] + model_names + self.pheno_header[2:]
-
-    return LocusModel(y,X,self.pheno_header[1],vars,loci,model_loci)
+    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci)
 
 
 def variable_summary(out, x, categorical_limit=5, verbose=1):
