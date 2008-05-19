@@ -583,7 +583,7 @@ def save_genotriples_text(filename,genos,extra_args=None,**kwargs):
   if mergefunc:
     genos = genos.merged(mergefunc)
 
-  with TextGenotripleWriter(filename,extra_args=extra_args,**kwargs) as w:
+  with TextGenotripleWriter(filename,extra_args=args) as w:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
