@@ -249,12 +249,12 @@ class EigensoftSmartPCAWriter(object):
   ...   w.writerow(*genos.next())
   ...   w.writerows(genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  012
+  210
   919
   101
   >>> print s.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  l1 1 0 0 A G
-  l2 1 0 0 C G
+  l1 1 0 0 G A
+  l2 1 0 0 G C
   l3 1 0 0 C T
   >>> print i.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1 U UNKNOWN
@@ -321,8 +321,8 @@ class EigensoftSmartPCAWriter(object):
     if len(genos) != len(self.samples):
       raise ValueError('[ERROR] Internal error: Genotypes do not match header')
 
-    model = genos[0].model
-    genocounts   = count_genotypes(model,genos)
+    model        = genos[0].model
+    genocounts   = count_genotypes(genos)
     allelecounts = count_alleles_from_genocounts(model,genocounts)
 
     # FIXME: Finding major seems much more robust, since it is better defined
@@ -423,17 +423,17 @@ def save_eigensoft_smartpca(filename,genos,extra_args=None,**kwargs):
   >>> s = StringIO()
   >>> loci =              ('l1',     'l2',    'l3')
   >>> rows = [('s1', [('A','A'),(None,None),('C','T')]),
-  ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
-  ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
+  ...         ('s2', [('A','G'), ('C','G'), ('C','C')]),
+  ...         ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> save_eigensoft_smartpca(o,genos,ind=i,snp=s)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  012
+  210
   919
   101
   >>> print s.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  l1 1 0 0 A G
-  l2 1 0 0 C G
+  l1 1 0 0 G A
+  l2 1 0 0 G C
   l3 1 0 0 C T
   >>> print i.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1 U UNKNOWN

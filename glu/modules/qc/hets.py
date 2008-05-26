@@ -25,8 +25,6 @@ from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
-from   glu.lib.genolib.genoarray import count_genotypes
-
 
 def het_output(out,results):
 

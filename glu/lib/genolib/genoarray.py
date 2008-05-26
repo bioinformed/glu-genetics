@@ -20,26 +20,31 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeArrayDescriptor',
-           'GenotypeLookupError','GenotypeRepresentationError']
+           'GenotypeLookupError','GenotypeRepresentationError', 'model_from_alleles']
 
 
-from  itertools     import izip
-from  glu.lib.utils import izip_exact
+import numpy
+from   itertools     import izip
+from   glu.lib.utils import izip_exact
 
 
 try:
   #raise ImportError    # Uncomment to test pure-Python implementation
   from   glu.lib.genolib._genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor,
-                                            UnphasedMarkerModel, genoarray_concordance,
+                                            UnphasedMarkerModel, genotype_indices,
+                                            count_genotypes, genotype_categories,
+                                            locus_summary, sample_summary, genoarray_concordance,
                                             GenotypeLookupError, GenotypeRepresentationError)
 
 except ImportError:
-  from   array     import array
+  import sys
   from   math      import log, ceil
 
   from   bitarray  import getbits,setbits
 
-  MISSING,HEMIZYGOTE,HETEROZYGOTE,HOMOZYGOTE=range(4)
+  print >> sys.stderr, "WARNING: Using slow Python genoarray"
+
+  MISSING,HEMIZYGOTE,HOMOZYGOTE,HETEROZYGOTE=range(4)
 
 
   def _hemi(geno):
@@ -58,7 +63,7 @@ except ImportError:
     possible genotype within a model.
     '''
 
-    __slots__ = ('model','allele1','allele2','allele1_index','allele2_index','index','gclass')
+    __slots__ = ('model','allele1','allele2','allele1_index','allele2_index','index','category')
 
     def __init__(self, model, allele1, allele2, index):
       '''
@@ -86,15 +91,15 @@ except ImportError:
       missing2 = allele2 is None
 
       if missing1 and missing2:
-        self.gclass = MISSING
+        self.category = MISSING
       elif missing1 or missing2:
-        self.gclass = HEMIZYGOTE
+        self.category = HEMIZYGOTE
       elif allele1 is allele2:
-        self.gclass = HOMOZYGOTE
+        self.category = HOMOZYGOTE
       else:
         if allele1 == allele2:
           raise GenotypeRepresentationError('Attempt to add non-singleton alleles')
-        self.gclass = HETEROZYGOTE
+        self.category = HETEROZYGOTE
 
     def alleles(self):
       '''
@@ -106,31 +111,31 @@ except ImportError:
       '''
       Return whether this genotype is heterozygous
       '''
-      return self.gclass == HETEROZYGOTE
+      return self.category == HETEROZYGOTE
 
     def homozygote(self):
       '''
       Return whether this genotype is homozygous
       '''
-      return self.gclass == HOMOZYGOTE
+      return self.category == HOMOZYGOTE
 
     def hemizygote(self):
       '''
       Return whether this genotype is hemizygous
       '''
-      return self.gclass == HEMIZYGOTE
+      return self.category == HEMIZYGOTE
 
     def missing(self):
       '''
       Return whether this genotype is the missing genotype
       '''
-      return self.gclass == MISSING
+      return self.category == MISSING
 
     def __nonzero__(self):
       '''
       Return whether this genotype is not the missing genotype
       '''
-      return self.gclass != MISSING
+      return self.category != MISSING
 
     def __getitem__(self,i):
       '''
@@ -276,7 +281,7 @@ except ImportError:
 
 
   class GenotypeArrayDescriptor(object):
-    __slots__ = ('models','offsets','byte_size','bit_size','homogeneous')
+    __slots__ = ('models','offsets','byte_size','bit_size','max_bit_size','homogeneous')
 
     def __init__(self, models, initial_offset=0):
       '''
@@ -289,16 +294,19 @@ except ImportError:
       offsets = [0]*(n+1)
 
       offsets[0] = initial_offset
+      max_bit_size = 0
       for i,m in enumerate(models):
         offsets[i+1] = offsets[i] + m.bit_size
+        max_bit_size = max(max_bit_size,m.bit_size)
         if m.bit_size != homogeneous:
           homogeneous = 0
 
-      self.models      = models
-      self.offsets     = offsets
-      self.bit_size    = offsets[-1]
-      self.byte_size   = byte_array_size(self.bit_size)
-      self.homogeneous = homogeneous
+      self.models       = models
+      self.offsets      = offsets
+      self.bit_size     = offsets[-1]
+      self.byte_size    = byte_array_size(self.bit_size)
+      self.max_bit_size = max_bit_size
+      self.homogeneous  = homogeneous
 
     def __len__(self):
       return len(self.models)
@@ -322,7 +330,7 @@ except ImportError:
       elif isinstance(descriptor, GenotypeArray):
         self.descriptor = descriptor.descriptor
 
-      self.data = array('B', [0]*self.descriptor.byte_size)
+      self.data = numpy.zeros(self.descriptor.byte_size, dtype=numpy.ubyte)
 
       if genos is not None:
         self[:] = genos
@@ -374,15 +382,19 @@ except ImportError:
       if isinstance(i,slice):
         x = xrange(*i.indices(len(descr.models)))
         try:
-          n = len(geno)
+          n    = len(geno)
         except TypeError:
           geno = list(geno)
-          n = len(geno)
+          n    = len(geno)
+
         if len(x) != n:
           raise IndexError('Invalid slice')
-        for i,j in enumerate(x):
-          self[j] = geno[i]
+
+        for g,j in izip(geno,x):
+          self[j] = g
+
         return
+
       elif isinstance(geno,tuple) and len(geno) == 2:
         geno = descr.models[i][geno]
       elif not isinstance(geno,Genotype):
@@ -402,6 +414,33 @@ except ImportError:
 
     def __repr__(self):
       return repr(list(self))
+
+    def indices(self):
+      '''
+      Return an array of integer genotype indices
+      '''
+      data    = self.data
+      offsets = self.descriptor.offsets
+      inds    = [ getbits(data, offsets[i], offsets[i+1]-offsets[i]) for i in xrange(len(self)) ]
+      return numpy.asarray(inds,dtype=int)
+
+    def counts(self,counts=None,model=None):
+      '''
+      Return an array of genotype counts by index
+      '''
+      return count_genotypes(self,counts,model)
+
+    def categories(self,counts=None):
+      '''
+      Count the number of occurances of each genotypes category
+      '''
+      return genotype_categories(self,counts)
+
+    def tolist(self):
+      '''
+      Return a list of genotypes
+      '''
+      return self[:]
 
 
   class UnphasedMarkerModel(object):
@@ -557,6 +596,8 @@ except ImportError:
 
     concordant = comparisons = 0
     for a,b in izip(genos1,genos2):
+      if a.model is not b.model:
+        raise GenotypeRepresentationError('genotype models do not match')
       if a and b:
         if a is b:
           concordant += 1
@@ -565,7 +606,245 @@ except ImportError:
     return concordant,comparisons
 
 
-def count_genotypes2(model1,genos1,model2,genos2):
+  def genotype_indices(genos):
+    '''
+    Return an array of integer genotype indices
+    '''
+    if isinstance(genos, GenotypeArray):
+      return genos.indices()
+    return [ g.index for g in genos ]
+
+
+  def count_genotypes(genos,counts=None,model=None):
+    '''
+    Count the number of occurances of each genotypes belonging to a single
+    model given a sequence of genotypes.  Counts are returned as a list of
+    integers corresponding to the number of each genotype in model.genotype
+    observed.
+
+    @param model: model for all genotypes
+    @type  model: UnphasedMarkerModel
+    @param genos: sequence of genotype objects belonging to model
+    @type  genos: sequence of Genotype instances
+    @return     : count of each genotype
+    @rtype      : list of integers
+
+    >>> import random
+    >>> model = model_from_alleles('AB')
+    >>> descr = GenotypeArrayDescriptor([model]*1400)
+    >>> model.genotypes
+    [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+    >>> genos = model.genotypes*200+model.genotypes[1:]*200
+    >>> random.shuffle(genos)
+
+    >>> count_genotypes(genos)
+    array([200, 400, 400, 400])
+    >>> count_genotypes(GenotypeArray(descr,genos))
+    array([200, 400, 400, 400])
+
+    >>> c=count_genotypes(genos)
+    >>> count_genotypes(genos,counts=c)
+    array([400, 800, 800, 800])
+    >>> count_genotypes(genos,counts=c)
+    array([ 600, 1200, 1200, 1200])
+    '''
+    if not genos and not model:
+      raise GenotypeRepresentationError('empty genotype sequence with unknown model')
+
+    if not model:
+      model = genos[0].model
+
+    if counts is None:
+      counts = [0]*len(model.genotypes)
+    else:
+      if len(counts) != len(model.genotypes):
+        raise ValueError('invalid count array')
+
+    for geno in genos:
+      if geno.model is not model:
+        raise GenotypeRepresentationError('genotype models do not match')
+      counts[geno.index] += 1
+
+    return numpy.asarray(counts,dtype=int)
+
+
+  def genotype_categories(genos,counts=None):
+    '''
+    Count the number of occurances of each genotypes category given a
+    sequence of genotypes.  Counts are returned as a list of integers
+    corresponding to the number of missing, hemizygote, homozygote, and
+    heterozygote genotype oberved.
+
+    @param genos: sequence of genotype objects belonging to model
+    @type  genos: sequence of Genotype instances
+    @return     : missing, hemizygote, heterozygote, and homozygote counts
+    @rtype      : list of integers
+
+    >>> import random
+    >>> model = model_from_alleles('AB')
+    >>> descr = GenotypeArrayDescriptor([model]*1400)
+    >>> model.genotypes
+    [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+    >>> genos = model.genotypes*200+model.genotypes[1:]*200
+    >>> random.shuffle(genos)
+
+    >>> genotype_categories(genos)
+    array([200,   0, 800, 400])
+    >>> genotype_categories(GenotypeArray(descr,genos))
+    array([200,   0, 800, 400])
+    '''
+    if counts is None:
+      counts = [0]*4
+    elif len(counts) != 4:
+      raise ValueError('invalid count array')
+
+    for geno in genos:
+      counts[geno.category] += 1
+    return numpy.array(counts,dtype=int)
+
+
+  def locus_summary(genos,sample_counts=None,locus_counts=None,model=None):
+    '''
+    Count the number of occurances of each n genotypes for a given locus and
+    the category for each sample given a sequence of genotypes at a locus.
+    Genotype counts are returned as a list of integers counts corresponding
+    to genotype index.  Sample category counts are returned as an n x 4 array
+    with the number of missing, hemizygote, homozygote, and heterozygote
+    genotypes oberved for each sample.
+
+    @param         genos: genotypes belonging to a single model
+    @type          genos: sequence
+    @param sample_counts: optional array of category counts to accumulate
+    @type  sample_counts: same type as numpy.zeros( (len(genos),4), dtype=int)
+    @param  locus_counts: optional array of genotype counts to accumulate
+    @type   locus_counts: same type as numpy.zeros(len(genos), dtype=int)
+    @return             : 2-tuple of locus_counts and sample_counts
+    @rtype              : tuple of numpy.array
+
+    >>> model = model_from_alleles('AB')
+    >>> descr = GenotypeArrayDescriptor([model]*4)
+    >>> model.genotypes
+    [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+    >>> genos = model.genotypes
+
+    >>> l,s = locus_summary(genos)
+    >>> l
+    array([1, 1, 1, 1])
+    >>> s
+    array([[1, 0, 0, 0],
+           [0, 0, 1, 0],
+           [0, 0, 0, 1],
+           [0, 0, 1, 0]])
+    >>> l,s=locus_summary(GenotypeArray(descr,reversed(genos)),s,l)
+    >>> l
+    array([2, 2, 2, 2])
+    >>> s
+    array([[1, 0, 1, 0],
+           [0, 0, 1, 1],
+           [0, 0, 1, 1],
+           [1, 0, 1, 0]])
+    '''
+    if not genos and not model:
+      raise GenotypeRepresentationError('empty genotype sequence with unknown model')
+
+    if not model:
+      model = genos[0].model
+
+    n = len(genos)
+
+    if locus_counts is None:
+      locus_counts = [0]*len(model.genotypes)
+    elif len(locus_counts) != len(model.genotypes):
+      raise ValueError('invalid locus count array')
+
+    if sample_counts is None:
+      sample_counts = numpy.zeros((n,4), dtype=int)
+    elif sample_counts.shape != (n,4):
+      raise ValueError('invalid sample count array')
+
+    for i,geno in enumerate(genos):
+      if geno.model is not model:
+        raise GenotypeRepresentationError('genotype models do not match')
+      locus_counts[geno.index]       += 1
+      sample_counts[i,geno.category] += 1
+
+    locus_counts = numpy.asarray(locus_counts,dtype=int)
+
+    return locus_counts,sample_counts
+
+
+  def sample_summary(genos,locus_counts=None,sample_counts=None):
+    '''
+    Count the number of occurances of each genotype category and the of
+    occurances of each of n genotypes for a given sample.  Genotype category
+    counts are returned as a list of integers counts corresponding to
+    genotype index.  Per-locus genotype counts are returned as an n x
+    max(genos) array with the number of missing, hemizygote, homozygote, and
+    heterozygote genotypes oberved for each sample.
+
+    @param         genos: genotypes belonging to a single model
+    @type          genos: sequence
+    @param  locus_counts: optional array of genotype counts to accumulate
+    @type   locus_counts: same type as numpy.zeros(len(genos), dtype=int)
+    @param sample_counts: optional array of category counts to accumulate
+    @type  sample_counts: same type as numpy.zeros( (len(genos),max(genosize), dtype=int)
+    @return             : 2-tuple of  sample_counts and locus_counts
+    @rtype              : tuple of numpy.array
+
+    >>> model = model_from_alleles('AB')
+    >>> descr = GenotypeArrayDescriptor([model]*4)
+    >>> model.genotypes
+    [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+    >>> genos = model.genotypes
+
+    >>> s,l = sample_summary(genos)
+    >>> s
+    array([1, 0, 2, 1])
+    >>> l
+    array([[1, 0, 0, 0],
+           [0, 1, 0, 0],
+           [0, 0, 1, 0],
+           [0, 0, 0, 1]])
+    >>> s,l=sample_summary(GenotypeArray(descr,reversed(genos)),l,s)
+    >>> s
+    array([2, 0, 4, 2])
+    >>> l
+    array([[1, 0, 0, 1],
+           [0, 1, 1, 0],
+           [0, 1, 1, 0],
+           [1, 0, 0, 1]])
+    '''
+    n = len(genos)
+
+    if sample_counts is None:
+      sample_counts = [0]*4
+    elif len(sample_counts) != 4:
+      raise ValueError('invalid sample count array')
+
+    if locus_counts is None:
+      if isinstance(genos,GenotypeArray):
+        max_bits = genos.descriptor.max_bit_size
+      else:
+        max_bits = max(g.model.bit_size for g in genos) if n else 0
+
+      locus_counts = numpy.zeros((n,1<<max_bits), dtype=int)
+
+    elif locus_counts.shape[0] != n:
+      raise ValueError('invalid locus count array')
+
+    for i,geno in enumerate(genos):
+      sample_counts[geno.category] += 1
+      locus_counts[i,geno.index]   += 1
+
+    sample_counts = numpy.asarray(sample_counts,dtype=int)
+
+    return sample_counts,locus_counts
+
+
+###############################################################################
+
+
+def count_genotypes2(genos1,genos2):
   '''
   Count the two-locus genotypes belonging to the two specified models and
   genotype sequences.  Counts are returned as a list of integers m*n
@@ -590,7 +869,7 @@ def count_genotypes2(model1,genos1,model2,genos2):
   >>> genos1 = model.genotypes*350
   >>> genos2 = model.genotypes*200+model.genotypes[1:]*200
 
-  >>> for (g1,g2),n in count_genotypes2(model,genos1,model,genos2):
+  >>> for (g1,g2),n in count_genotypes2(genos1,genos2):
   ...   print g1,g2,n
   (None, None) (None, None) 200
   (None, None) ('A', 'A') 50
@@ -611,7 +890,7 @@ def count_genotypes2(model1,genos1,model2,genos2):
 
   >>> genos1 = GenotypeArray(descr,genos1)
   >>> genos2 = GenotypeArray(descr,genos2)
-  >>> for (g1,g2),n in count_genotypes2(model,genos1,model,genos2):
+  >>> for (g1,g2),n in count_genotypes2(genos1,genos2):
   ...   print g1,g2,n
   (None, None) (None, None) 200
   (None, None) ('A', 'A') 50
@@ -630,8 +909,14 @@ def count_genotypes2(model1,genos1,model2,genos2):
   ('B', 'B') ('A', 'B') 50
   ('B', 'B') ('B', 'B') 250
   '''
+  if not genos1 or not genos2:
+    return []
+
   if len(genos1) != len(genos2):
     raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
+
+  model1 = genos1[0].model
+  model2 = genos2[0].model
 
   n,m = len(model1.genotypes),len(model2.genotypes)
   counts = [0]*n*m
@@ -640,39 +925,6 @@ def count_genotypes2(model1,genos1,model2,genos2):
   genos = ( (g1,g2) for g1 in model1.genotypes
                     for g2 in model2.genotypes )
   return zip(genos,counts)
-
-
-def count_genotypes(model,genos):
-  '''
-  Count the number of occurances of each genotypes belonging to the
-  specified model given a sequence of genotypes.  Counts are returned as a
-  list of integers corresponding to the number of each genotype in
-  model.genotype oberved.
-
-  @param model: model for all genotypes
-  @type  model: UnphasedMarkerModel
-  @param genos: sequence of genotype objects belonging to model
-  @type  genos: sequence of Genotype instances
-  @return     : count of each genotype
-  @rtype      : list of integers
-
-  >>> import random
-  >>> model = model_from_alleles('AB')
-  >>> descr = GenotypeArrayDescriptor([model]*1400)
-  >>> model.genotypes
-  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
-  >>> genos = model.genotypes*200+model.genotypes[1:]*200
-  >>> random.shuffle(genos)
-
-  >>> count_genotypes(model,genos)
-  [200, 400, 400, 400]
-  >>> count_genotypes(model,GenotypeArray(descr,genos))
-  [200, 400, 400, 400]
-  '''
-  counts = [0]*len(model.genotypes)
-  for geno in genos:
-    counts[geno.index] += 1
-  return counts
 
 
 def locus_genotype_completion_rate(genocounts):
@@ -724,7 +976,7 @@ def count_alleles_from_genocounts(model,genocounts):
   >>> genos = model.genotypes*200+model.genotypes[2:]*200
   >>> random.shuffle(genos)
 
-  >>> count_alleles_from_genocounts(model,count_genotypes(model,genos))
+  >>> count_alleles_from_genocounts(model,count_genotypes(genos))
   [400, 800, 1200]
   '''
   counts = [0]*len(model.alleles)
@@ -758,7 +1010,7 @@ def count_alleles_from_genos(model,genos):
   >>> count_alleles_from_genos(model,genos)
   [400, 800, 1200]
   '''
-  return count_alleles_from_genocounts(model,count_genotypes(model,genos))
+  return count_alleles_from_genocounts(model,count_genotypes(genos))
 
 
 def minor_allele_from_allelecounts(model,allelecounts):
@@ -766,7 +1018,7 @@ def minor_allele_from_allelecounts(model,allelecounts):
   >>> model = model_from_alleles('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def alleles_from_genos(nn,aa,ab,bb):
-  ...   return count_alleles_from_genocounts(model,count_genotypes(model,[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
+  ...   return count_alleles_from_genocounts(model,count_genotypes([NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
   >>> minor_allele_from_allelecounts(model, alleles_from_genos(0,1,2,1))
   ('A', 0.5)
   >>> minor_allele_from_allelecounts(model, alleles_from_genos(0,1000,2000,1000))
@@ -782,26 +1034,29 @@ def minor_allele_from_allelecounts(model,allelecounts):
   >>> minor_allele_from_allelecounts(model, alleles_from_genos(1000,0,0,0))
   (None, 0.0)
   '''
-  n = len(allelecounts)
-  if len(model.alleles) != n:
+  if len(model.alleles) != len(allelecounts):
     raise ValueError('allele counts to not match model alleles')
-  elif n > 3:
+
+  allelecounts = [ (n,a) for a,n in izip(model.alleles[1:],allelecounts[1:]) if n ]
+  n = len(allelecounts)
+
+  if n > 3:
     raise ValueError('minor allele frequency is defined only for biallelic loci')
   elif not n:
-    raise ValueError('minor allele not defined for empty model')
-  elif n < 3:
     return None,0.0
+  elif n==1:
+    b = None
+    if len(model.alleles)==3:
+      a = allelecounts[0][1]
+      if a==model.alleles[1]:
+        b = model.alleles[2]
+      else:
+        b = model.alleles[1]
+    return b,0.0
 
-  informative = allelecounts[1:]
-
-  m = sum(informative)
-
-  if not m:
-    return None,0.0
-
-  f = min(informative)
-  i = informative.index(f)+1
-  return model.alleles[i],f/m
+  m = sum(n for n,a in allelecounts)
+  f,a = min(allelecounts)
+  return a,f/m
 
 
 def minor_allele_from_genocounts(model,counts):
@@ -810,7 +1065,7 @@ def minor_allele_from_genocounts(model,counts):
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   g =[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
-  ...   return count_genotypes(model,g)
+  ...   return count_genotypes(g)
   >>> minor_allele_from_genocounts(model,mkgenos(0,1,2,1))
   ('A', 0.5)
   >>> minor_allele_from_genocounts(model,mkgenos(0,1000,2000,1000))
@@ -851,7 +1106,7 @@ def minor_allele_from_genos(model,genos):
   >>> minor_allele_from_genos(model,mkgenos(1000,0,0,0))
   (None, 0.0)
   '''
-  counts = count_alleles_from_genocounts(model,count_genotypes(model,genos))
+  counts = count_alleles_from_genocounts(model,count_genotypes(genos))
   return minor_allele_from_allelecounts(model, counts)
 
 
@@ -860,13 +1115,13 @@ def major_allele_from_allelecounts(model,allelecounts):
   >>> model = model_from_alleles('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def alleles_from_genos(nn,aa,ab,bb):
-  ...   return count_alleles_from_genocounts(model,count_genotypes(model,[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
+  ...   return count_alleles_from_genocounts(model,count_genotypes([NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
   >>> major_allele_from_allelecounts(model, alleles_from_genos(0,1,2,1))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_allelecounts(model, alleles_from_genos(0,1000,2000,1000))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_allelecounts(model, alleles_from_genos(10000,1000,2000,1000))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_allelecounts(model, alleles_from_genos(10000,0,2000,2000))
   ('B', 0.75)
   >>> major_allele_from_allelecounts(model, alleles_from_genos(10000,2000,2000,0))
@@ -876,24 +1131,20 @@ def major_allele_from_allelecounts(model,allelecounts):
   >>> major_allele_from_allelecounts(model, alleles_from_genos(1000,0,0,0))
   (None, 0.0)
   '''
-  n = len(allelecounts)
-  if len(model.alleles) != n:
+  if len(model.alleles) != len(allelecounts):
     raise ValueError('allele counts to not match model alleles')
+
+  allelecounts = [ (n,a) for a,n in izip(model.alleles[1:],allelecounts[1:]) if n ]
+  n = len(allelecounts)
+
+  if n > 3:
+    raise ValueError('minor allele frequency is defined only for biallelic loci')
   elif not n:
-    raise ValueError('major allele not defined for empty model')
-  elif n < 2:
     return None,0.0
 
-  informative = allelecounts[1:]
-
-  m = sum(informative)
-
-  if not m:
-    return None,0.0
-
-  f = max(informative)
-  i = informative.index(f)+1
-  return model.alleles[i],f/m
+  m = sum(n for n,a in allelecounts)
+  f,a = max(allelecounts)
+  return a,f/m
 
 
 def major_allele_from_genocounts(model,counts):
@@ -902,13 +1153,13 @@ def major_allele_from_genocounts(model,counts):
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   g =[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
-  ...   return count_genotypes(model,g)
+  ...   return count_genotypes(g)
   >>> major_allele_from_genocounts(model,mkgenos(0,1,2,1))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_genocounts(model,mkgenos(0,1000,2000,1000))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_genocounts(model,mkgenos(10000,1000,2000,1000))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_genocounts(model,mkgenos(10000,0,2000,2000))
   ('B', 0.75)
   >>> major_allele_from_genocounts(model,mkgenos(10000,2000,2000,0))
@@ -929,11 +1180,11 @@ def major_allele_from_genos(model,genos):
   >>> def mkgenos(nn,aa,ab,bb):
   ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
   >>> major_allele_from_genos(model,mkgenos(0,1,2,1))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_genos(model,mkgenos(0,1000,2000,1000))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_genos(model,mkgenos(10000,1000,2000,1000))
-  ('A', 0.5)
+  ('B', 0.5)
   >>> major_allele_from_genos(model,mkgenos(10000,0,2000,2000))
   ('B', 0.75)
   >>> major_allele_from_genos(model,mkgenos(10000,2000,2000,0))
@@ -943,7 +1194,7 @@ def major_allele_from_genos(model,genos):
   >>> major_allele_from_genos(model,mkgenos(1000,0,0,0))
   (None, 0.0)
   '''
-  counts = count_alleles_from_genocounts(model,count_genotypes(model,genos))
+  counts = count_alleles_from_genocounts(model,count_genotypes(genos))
   return major_allele_from_allelecounts(model, counts)
 
 ##################################################################################
@@ -1088,6 +1339,241 @@ def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygo
   return model
 
 
+def test_genotypes():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> model.alleles
+  [None, 'A', 'B']
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> [ int(g.index)    for g in model.genotypes ]
+  [0, 1, 2, 3]
+  >>> [ g.category for g in model.genotypes ]
+  [0, 2, 3, 2]
+
+  >>> model = model_from_alleles('AB',allow_hemizygote=True)
+  >>> model.alleles
+  [None, 'A', 'B']
+  >>> model.genotypes
+  [(None, None), (None, 'A'), (None, 'B'), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> [ int(g.index)    for g in model.genotypes ]
+  [0, 1, 2, 3, 4, 5]
+  >>> [ g.category for g in model.genotypes ]
+  [0, 1, 1, 2, 3, 2]
+  '''
+
+def test_tolist():
+  '''
+  >>> def g(genos):
+  ...   descr = GenotypeArrayDescriptor([model]*len(genos))
+  ...   return GenotypeArray(descr,genos)
+
+  Test 2 bit:
+
+  >>> model = model_from_alleles('AB')
+  >>> int(model.bit_size)
+  2
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> genos = g([NN,AA,AB,AB,BB,NN])
+  >>> g(genos).tolist()
+  [(None, None), ('A', 'A'), ('A', 'B'), ('A', 'B'), ('B', 'B'), (None, None)]
+
+  Test 4 bit:
+
+  >>> model = model_from_alleles('AB',max_alleles=5)
+  >>> int(model.bit_size)
+  4
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> genos = g([NN,AA,AB,AB,BB,NN])
+  >>> g(genos).tolist()
+  [(None, None), ('A', 'A'), ('A', 'B'), ('A', 'B'), ('B', 'B'), (None, None)]
+
+  >>> model = model_from_alleles('AB',max_alleles=16)
+  >>> int(model.bit_size)
+  8
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> genos = g([NN,AA,AB,AB,BB,NN])
+  >>> g(genos).tolist()
+  [(None, None), ('A', 'A'), ('A', 'B'), ('A', 'B'), ('B', 'B'), (None, None)]
+  '''
+
+
+def test_indices():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)
+
+  >>> genos = g([NN,AA,AB,AB,BB,NN])
+  >>> len(genos)
+  6
+  >>> int(genos.descriptor.homogeneous)
+  2
+  >>> list(genos.descriptor.offsets)
+  [0, 2, 4, 6, 8, 10, 12]
+  >>> len(genos.data)
+  2
+  >>> list(g([NN,AA,AB,AB,BB,NN]).indices())
+  [0, 1, 2, 2, 3, 0]
+
+  >>> print [ int(geno.index) for geno in g([NN,AA,AB,AB,BB,NN]) ]
+  [0, 1, 2, 2, 3, 0]
+  '''
+
+
+def test_count_genotypes():
+  '''
+  >>> import random
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*1400)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes*200+model.genotypes[1:]*200
+  >>> random.shuffle(genos)
+  >>> genos = GenotypeArray(descr,genos)
+
+  Test 2 bit:
+
+  >>> int(model.bit_size)
+  2
+  >>> genos.counts()
+  array([200, 400, 400, 400])
+  >>> count_genotypes(genos)
+  array([200, 400, 400, 400])
+  >>> count_genotypes(genos[:])
+  array([200, 400, 400, 400])
+
+  Test 2 bit with tail:
+
+  >>> descr = GenotypeArrayDescriptor([model]*1403)
+  >>> genos = genos[:]+model.genotypes[1:]
+  >>> random.shuffle(genos)
+  >>> genos = GenotypeArray(descr,genos)
+
+  >>> genos.counts()
+  array([200, 401, 401, 401])
+  >>> count_genotypes(genos)
+  array([200, 401, 401, 401])
+  >>> count_genotypes(genos[:])
+  array([200, 401, 401, 401])
+  '''
+
+
+def test_categories():
+  '''
+  >>> import random
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*1400)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes*200+model.genotypes[1:]*200
+  >>> random.shuffle(genos)
+
+  >>> genotype_categories(genos)
+  array([200,   0, 800, 400])
+  >>> genotype_categories(GenotypeArray(descr,genos))
+  array([200,   0, 800, 400])
+  >>> GenotypeArray(descr,genos).categories()
+  array([200,   0, 800, 400])
+  '''
+
+
+def test_locus_summary():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*4)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes
+
+  >>> l,s = locus_summary(genos)
+  >>> l
+  array([1, 1, 1, 1])
+  >>> s
+  array([[1, 0, 0, 0],
+         [0, 0, 1, 0],
+         [0, 0, 0, 1],
+         [0, 0, 1, 0]])
+  >>> l,s=locus_summary(GenotypeArray(descr,reversed(genos)),s,l)
+  >>> l
+  array([2, 2, 2, 2])
+  >>> s
+  array([[1, 0, 1, 0],
+         [0, 0, 1, 1],
+         [0, 0, 1, 1],
+         [1, 0, 1, 0]])
+  '''
+
+
+def test_sample_summary():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*4)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes
+
+  >>> s,l = sample_summary(genos)
+  >>> s
+  array([1, 0, 2, 1])
+  >>> l
+  array([[1, 0, 0, 0],
+         [0, 1, 0, 0],
+         [0, 0, 1, 0],
+         [0, 0, 0, 1]])
+  >>> s,l=sample_summary(GenotypeArray(descr,reversed(genos)),l,s)
+  >>> s
+  array([2, 0, 4, 2])
+  >>> l
+  array([[1, 0, 0, 1],
+         [0, 1, 1, 0],
+         [0, 1, 1, 0],
+         [1, 0, 0, 1]])
+  '''
+
+
+def test_count_genotypes_4bit():
+  '''
+  >>> model = model_from_alleles('AB',max_alleles=5)
+  >>> int(model.bit_size)
+  4
+
+  Test even number of genotypes
+
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)
+
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> genos = g([NN,AA,AB,AB,BB,NN])
+  >>> genos.counts()
+  array([2, 1, 2, 1])
+  >>> count_genotypes(genos)
+  array([2, 1, 2, 1])
+  >>> count_genotypes(genos[:])
+  array([2, 1, 2, 1])
+
+  Test odd number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*7)
+  >>> genos = g([NN,AA,AB,AB,BB,NN,AB])
+  >>> genos.counts()
+  array([2, 1, 3, 1])
+  >>> count_genotypes(genos)
+  array([2, 1, 3, 1])
+  >>> count_genotypes(genos[:])
+  array([2, 1, 3, 1])
+  '''
+
+
 def test_concordance_generic():
   '''
   >>> model = model_from_alleles('AB')
@@ -1108,6 +1594,7 @@ def test_concordance_generic():
   >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
   (1, 3)
   '''
+
 
 def test_concordance_4bit():
   '''
@@ -1146,6 +1633,7 @@ def test_concordance_4bit():
   >>> genoarray_concordance(g([AA,AB,AB,BB,NN,BB,AB]),g([NN,AA,AB,AB,BB,NN,BB]))
   (1, 4)
   '''
+
 
 def test_concordance_2bit():
   '''
@@ -1203,6 +1691,154 @@ def test_concordance_2bit():
   >>> genoarray_concordance(g([AA,AB,BB,AA,AA]),g([AA,BB,AA,BB,AA]))
   (2, 5)
   '''
+
+
+def bench_locus_summary():
+  import time
+
+  m = 1000000
+  n = 100 # 5000
+
+  def bench(genos):
+
+    genoslist = genos.tolist()
+
+    sample_counts1 = numpy.zeros((len(genos),4), dtype=int)
+    print sample_counts1.shape
+    sample_counts2 = numpy.zeros((len(genos),4), dtype=int)
+
+    t1 = time.clock()
+
+    for i in xrange(n):
+      locus_summary(genos,sample_counts1)
+
+    t2 = time.clock()
+
+    for i in xrange(n):
+      locus_summary(genoslist,sample_counts2)
+
+    t3 = time.clock()
+
+    assert (sample_counts1==sample_counts2).all()
+
+    print 'b=%d locus summary(g) = %f' % (descr.homogeneous,t2-t1)
+    print 'b=%d locus summary(l) = %f' % (descr.homogeneous,t3-t2)
+    print
+
+  genos = [('A','A'),('A','C'),('C','C'),('A','A'),(None,None),(None,'A'),('C',None)]*(m//7)
+  model = model_from_alleles('ACGT',allow_hemizygote=True)
+  descr = GenotypeArrayDescriptor( [model]*len(genos) )
+  genos = GenotypeArray(descr, genos)
+  bench(genos)
+
+  model = model_from_alleles('AB')
+  genos = model.genotypes*(m//len(model.genotypes))
+  descr = GenotypeArrayDescriptor( [model]*len(genos) )
+  genos = GenotypeArray(descr, genos)
+  bench(genos)
+
+
+def bench_sample_summary():
+  import time
+
+  m = 1000000
+  n = 100 # 5000
+
+  def bench(genos):
+
+    genoslist = genos.tolist()
+
+    locus_counts1 = numpy.zeros((len(genos),1<<genos.descriptor.max_bit_size), dtype=int)
+    print locus_counts1.shape
+    locus_counts2 = numpy.zeros((len(genos),1<<genos.descriptor.max_bit_size), dtype=int)
+
+    t1 = time.clock()
+
+    for i in xrange(n):
+      sample_summary(genos,locus_counts1)
+
+    t2 = time.clock()
+
+    for i in xrange(n):
+      sample_summary(genoslist,locus_counts2)
+
+    t3 = time.clock()
+
+    assert (locus_counts1==locus_counts2).all()
+
+    print 'b=%d sample summary(g) = %f' % (descr.homogeneous,t2-t1)
+    print 'b=%d sample summary(l) = %f' % (descr.homogeneous,t3-t2)
+    print
+
+  genos = [('A','A'),('A','C'),('C','C'),('A','A'),(None,None),(None,'A'),('C',None)]*(m//7)
+  model = model_from_alleles('ACGT',allow_hemizygote=True)
+  descr = GenotypeArrayDescriptor( [model]*len(genos) )
+  genos = GenotypeArray(descr, genos)
+  bench(genos)
+
+  model = model_from_alleles('AB')
+  genos = model.genotypes*(m//len(model.genotypes))
+  descr = GenotypeArrayDescriptor( [model]*len(genos) )
+  genos = GenotypeArray(descr, genos)
+  bench(genos)
+
+
+def bench_categories():
+  import time
+
+  m = 10000
+  n = 1000
+
+  def bench(genos):
+
+    genoslist = genos.tolist()
+
+    t1 = time.clock()
+
+    for i in xrange(n):
+      genos.categories()
+
+    t2 = time.clock()
+
+    for i in xrange(n):
+      genotype_categories(genos)
+
+    t3 = time.clock()
+
+    for i in xrange(n):
+      genotype_categories(genoslist)
+
+    t4 = time.clock()
+
+    #for i in xrange(n):
+    #  genotype_categories2(genos)
+
+    t5 = time.clock()
+
+    #for i in xrange(n):
+    #  genotype_categories2(genoslist)
+
+    t6 = time.clock()
+
+    print 'b=%d .counts    = %f' % (descr.homogeneous,t2-t1)
+    print 'b=%d counts(g)  = %f' % (descr.homogeneous,t3-t2)
+    print 'b=%d counts(l)  = %f' % (descr.homogeneous,t4-t3)
+    #print 'b=%d counts2(g) = %f' % (descr.homogeneous,t5-t4)
+    #print 'b=%d counts2(l) = %f' % (descr.homogeneous,t6-t5)
+    print
+
+  genos = [('A','A'),('A','C'),('C','C'),('A','A'),(None,None),(None,'A'),('C',None)]*m
+  model = model_from_alleles('ACGT',allow_hemizygote=True)
+  descr = GenotypeArrayDescriptor( [model]*len(genos) )
+  genos = GenotypeArray(descr, genos)
+  bench(genos)
+
+  model = model_from_alleles('AB')
+  genos = model.genotypes*m*2
+  descr = GenotypeArrayDescriptor( [model]*len(genos) )
+  genos = GenotypeArray(descr, genos)
+  bench(genos)
+
 
 
 def main():
@@ -1329,6 +1965,9 @@ def test():
 
 if __name__ == '__main__':
   test()
+  #bench_categories()
+  #bench_locus_summary()
+  #bench_sample_summary()
 
   if 0:
     if 0:

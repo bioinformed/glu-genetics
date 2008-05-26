@@ -109,7 +109,7 @@ def option_parser():
 
 def geno_counts(loci):
   for (lname,genos),model in izip_exact(loci,loci.models):
-    counts = count_genotypes(model,genos)
+    counts = count_genotypes(genos)
     yield lname,counts,biallelic_counts(model,counts)
 
 

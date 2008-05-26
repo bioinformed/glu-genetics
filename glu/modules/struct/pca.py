@@ -38,7 +38,7 @@ def encode_loci(genos):
   genos = genos.as_ldat()
 
   for (locus,geno),model in izip(genos,genos.models):
-    genocounts   = count_genotypes(model,geno)
+    genocounts   = count_genotypes(geno)
     allelecounts = count_alleles_from_genocounts(model,genocounts)
 
     try:
