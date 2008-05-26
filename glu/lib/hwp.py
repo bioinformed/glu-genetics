@@ -145,33 +145,37 @@ def biallelic_counts(model,counts):
   Convert genotype counts (derived from genolib.genoarray.count_genotypes)
   into a tuple of homozygote1, heterozygote, and homozygote2 counts.
   '''
-  if len(model.alleles) > 3:
-    raise ValueError('Biallelic locus required')
-
   # Set to uninformative values
-  homs = [0,0]
-  hets = [0]
+  alleles = set()
+  homs    = [0,0]
+  hets    = [0]
 
   for g,c in izip_exact(model.genotypes,counts):
     # Ignore hemizygotes and missing
     if g.homozygote():
+      alleles.update(g)
       homs.append(c)
     elif g.heterozygote():
+      alleles.update(g)
       hets.append(c)
+
+  if len(alleles) > 2:
+    raise ValueError('Biallelic locus required')
 
   # Take final counts from the ends of each list
   hom1_count,hom2_count = min(homs[-2],homs[-1]),max(homs[-2],homs[-1])
   return hom1_count,hets[-1],hom2_count
 
 
-def hwp_biallelic(model,counts):
+def hwp_biallelic(model,counts,exact_threshold=None):
   '''
   @param   genos: genotypes
   @type    genos: sequence
   @return       : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
   @rtype        : float
   '''
-  return hwp_biallelic_counts(*hwp_biallelic_counts(model,counts))
+  return hwp_biallelic_counts(*biallelic_counts(model,counts),
+                              **{'exact_threshold':exact_threshold})
 
 
 def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=None):
