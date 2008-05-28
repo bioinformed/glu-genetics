@@ -24,7 +24,7 @@ from   collections       import defaultdict
 from   operator          import itemgetter
 
 from   numpy             import array,matrix,asarray,asanyarray,zeros, \
-                                exp,nan,abs,arange,median,inf
+                                exp,nan,abs,arange,median,inf,minimum
 from   scipy             import stats
 
 from   glu.lib.utils     import tally,pick
@@ -563,10 +563,13 @@ class LocusModelBuilder(object):
       term += t
 
     index = 0
+    geno_indices = []
     for t in term.terms():
       n = len(t)
       if n:
         t.index = index
+        if t.loci():
+          geno_indices.extend( range(index,index+n) )
         index += n
 
     for t in term.expand_terms():
@@ -591,7 +594,7 @@ class LocusModelBuilder(object):
         return None
       model_loci[lname] = lmodel
 
-    model_names = term.names(model_loci)
+    model_names = term.term_names(model_loci)
     k = len(model_names)
 
     # Reject models without all terms
@@ -620,9 +623,12 @@ class LocusModelBuilder(object):
       return None
 
     # FIXME: What does mingenos mean in a world with arbitrary formulae?
-    #colcounts = (X.A[:,1:k+1]!=0).sum(axis=0)
-    #if k and colcounts.min() < self.mingenos:
-    #  return None
+    if geno_indices and self.mingenos:
+      colcounts0 = (X.A[:,geno_indices]==0).sum(axis=0)
+      colcounts1 = (X.A[:,geno_indices]!=0).sum(axis=0)
+      colcounts  = minimum(colcounts0, colcounts1)
+      if colcounts.min() < self.mingenos:
+        return None
 
     return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci)
 

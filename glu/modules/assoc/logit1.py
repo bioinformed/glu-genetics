@@ -182,7 +182,7 @@ def summary_header(options,null):
   # FIXME: SEs are optional
   if len(null.categories) > 2:
     for i in range(1,len(null.categories)):
-      for name in options.display.names():
+      for name in options.display.effect_names():
         if name.startswith('locus:'):
           name = name[6:]
         header.append( '%s%d OR' % (name,i) )
@@ -190,7 +190,7 @@ def summary_header(options,null):
           header += [ '%s%d OR %d%% CI_l' % (name,i,ci),
                       '%s%d OR %d%% CI_u' % (name,i,ci) ]
   else:
-    for name in options.display.names():
+    for name in options.display.effect_names():
       if name.startswith('locus:'):
         name = name[6:]
       header.append('%s OR' % name)

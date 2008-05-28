@@ -56,7 +56,10 @@ class TERM(object):
     return COMBINATION(t1 + t2)
 
   def formula(self, loci=None):
-    return ' + '.join(self.names(loci))
+    return ' + '.join(self.term_names(loci))
+
+  def effect_names(self, loci=None):
+    return self.term_names(loci)
 
   def signature(self):
     return (type(self),self.name)
@@ -99,15 +102,12 @@ class TERM(object):
     return exp(self.estimate_ci(p,c,alpha=alpha))
 
 
-class GENOTERM(TERM):
-  pass
-
 
 class PHENOTERM(TERM):
   def effects(self, loci, phenos, i):
     return [phenos[self.pindex]]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     return [self.name]
 
   def __len__(self):
@@ -134,7 +134,7 @@ class INTERCEPT(TERM):
   def effects(self, loci, phenos, i):
     return [1]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     return ['_intercept']
 
   def __len__(self):
@@ -158,11 +158,23 @@ class NO_INTERCEPT(TERM):
   def effects(self, loci, phenos, i):
     return []
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     return []
 
   def __len__(self):
     return 0
+
+
+class GENOTERM(TERM):
+  def effect_names(self, loci=None):
+    if loci is None:
+      return ['%s:het' % self.name, '%s:hom' % self.name]
+
+    lmodel = loci[self.name]
+    if lmodel.genocount < 2:
+      return []
+    return [ '%s:%s%s' % (self.name,lmodel.alleles[0],lmodel.alleles[1]),
+             '%s:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1]) ]
 
 
 class NULL(GENOTERM):
@@ -178,7 +190,7 @@ class NULL(GENOTERM):
       return [None]
     return []
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     return []
 
   def __len__(self):
@@ -204,7 +216,7 @@ class GENO(GENOTERM):
 
     return genos
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if loci is None:
       return ['%s:het' % self.name, '%s:hom' % self.name]
 
@@ -236,7 +248,7 @@ class ADOM(GENOTERM):
       return [None]
     return ([0,0],[1,1],[2,0])[lmodel.genomap[geno]]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if loci is None:
       return ['%s:trend' % self.name, '%s:domdev' % self.name]
 
@@ -265,7 +277,7 @@ class TREND(GENOTERM):
     lmodel = loci[self.name]
     return [ lmodel.genomap.get(lmodel.genos[i]) ]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if loci is None:
       return ['%s:trend' % self.name]
     lmodel = loci[self.name]
@@ -296,7 +308,7 @@ class DOM(GENOTERM):
       return [None]
     return [ int(genomap.get(geno)>0) ]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if loci is None:
       return ['%s:dom' % self.name]
     lmodel = loci[self.name]
@@ -327,7 +339,7 @@ class REC(GENOTERM):
       return [None]
     return [ int(genomap.get(geno)>1) ]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if loci is None:
       return ['%s:rec' % self.name]
     lmodel = loci[self.name]
@@ -356,7 +368,7 @@ class MISSING(GENOTERM):
     else:
       return [0]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if loci is not None and not loci[self.name].genocount:
       return []
     return ['%s:missing' % self.name]
@@ -382,7 +394,7 @@ class NOT_MISSING(GENOTERM):
     else:
       return [1]
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     if self.loci is not None and not loci[self.name].genocount:
       return []
     return ['%s:not_missing' % self.name]
@@ -451,10 +463,22 @@ class INTERACTION(COMPOUNDTERM):
         results = [ t1*t2 for t1 in results for t2 in effects ]
     return results
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     results = []
     for term in self.subterms:
-      names = term.names(loci)
+      names = term.term_names(loci)
+
+      if not results:
+        results.extend(names)
+      else:
+        results = [ '%s*%s' % (t1,t2) for t1 in results for t2 in names ]
+
+    return results
+
+  def effect_names(self, loci=None):
+    results = []
+    for term in self.subterms:
+      names = term.effect_names(loci)
 
       if not results:
         results.extend(names)
@@ -492,10 +516,16 @@ class COMBINATION(COMPOUNDTERM):
       results.extend(effects)
     return results
 
-  def names(self, loci=None):
+  def term_names(self, loci=None):
     results = []
     for term in self.subterms:
-      results.extend(term.names(loci))
+      results.extend(term.term_names(loci))
+    return results
+
+  def effect_names(self, loci=None):
+    results = []
+    for term in self.subterms:
+      results.extend(term.effect_names(loci))
     return results
 
   def estimates(self,p):

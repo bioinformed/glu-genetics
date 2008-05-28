@@ -180,7 +180,7 @@ def summary_header(options):
     header += ['df']
 
   # FIXME: SEs are optional
-  for name in options.display.names():
+  for name in options.display.effect_names():
     if name.startswith('locus:'):
       name = name[6:]
     header += [ '%s' % name, '%s SE' % name ]
