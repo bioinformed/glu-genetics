@@ -236,17 +236,17 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
     format = guess_outformat(filename)
 
   if format == 'ldat':
-    save_genomatrix_text(filename, genos, extra_args=args)
+    save_genomatrix_text(filename, genos, format='ldat', extra_args=args)
   elif format == 'sdat':
-    save_genomatrix_text(filename, genos, extra_args=args)
+    save_genomatrix_text(filename, genos, format='sdat', extra_args=args)
   elif format in ('tdat','trip','genotriple'):
     save_genotriples_text(filename, genos, extra_args=args)
   elif format in ('pb','prettybase'):
     genos = save_prettybase(filename, genos, extra_args=args)
   elif format == 'lbat':
-    save_genomatrix_binary(filename, genos, extra_args=args)
+    save_genomatrix_binary(filename, genos, format='ldat', extra_args=args)
   elif format == 'sbat':
-    save_genomatrix_binary(filename, genos, extra_args=args)
+    save_genomatrix_binary(filename, genos, format='sdat', extra_args=args)
   elif format == 'tbat':
     save_genotriples_binary(filename, genos, extra_args=args)
   elif format in ('plink_ped','ped'):
