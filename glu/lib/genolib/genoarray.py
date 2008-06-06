@@ -1046,6 +1046,7 @@ def minor_allele_from_allelecounts(model,allelecounts):
     return None,0.0
   elif n==1:
     b = None
+    # If the model has only two possible alleles, choose the other one
     if len(model.alleles)==3:
       a = allelecounts[0][1]
       if a==model.alleles[1]:
