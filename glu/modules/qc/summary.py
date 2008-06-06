@@ -21,8 +21,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
 
-import numpy
-
 from   itertools                 import izip
 
 from   glu.lib.fileutils         import table_writer
@@ -32,22 +30,36 @@ from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
                                         count_alleles_from_genocounts
 
 
-LOCUS_HEADER  = ['Locus','chromosome','location','strand','alleles','allele counts','genotypes','genotype counts',
-                 'missing count', 'missing rate','hw pvalue']
-SAMPLE_HEADER = ['Sample','missing count','hemizygote count','homozygote count','heterozygote count',
-                 'missing rate', 'heterozygosity']
+LOCUS_HEADER  = ['Locus','chromosome','location','strand',
+                 'allele count','alleles','allele counts',
+                 'minor allele frequency',
+                 'genotype count','genotypes','genotype counts',
+                 'missing count', 'informative count', 'missing rate','hw pvalue']
+
+SAMPLE_HEADER = ['Sample','missing count','hemizygote count',
+                 'homozygote count','heterozygote count',
+                 'informative count', 'missing rate', 'heterozygosity']
 
 
 def locus_row(lname,locus,model,counts):
   acounts = izip(count_alleles_from_genocounts(model,counts),model.alleles)
   acounts = sorted(acounts,reverse=True)
-  alleles = [     a  for n,a in acounts if n if a and n ]
-  acounts = [ str(n) for n,a in acounts if n if a and n ]
+  alleles = [ a for n,a in acounts if n if a and n ]
+  acounts = [ n for n,a in acounts if n if a and n ]
 
-  alen    = max(len(a) for a in alleles)
+  if not alleles:
+    maf = ''
+  elif len(alleles) == 1:
+    maf = 0.0
+  elif len(alleles) == 2:
+    maf = acounts[-1]/sum(acounts)
+  else:
+    maf = ''
+
+  alen    = max(len(a) for a in alleles) if alleles else 0
   delim   = '/' if alen>1 else ''
   lgenos  = sorted(izip(counts[1:],model.genotypes[1:]),reverse=True)
-  lcounts = [ str(n) for n,g in lgenos if n ]
+  lcounts = [ n for n,g in lgenos if n ]
   lgenos  = [ (delim.join( [g[0] or '',g[1] or ''])) for n,g in lgenos if n ]
 
   n = counts.sum()
@@ -59,9 +71,16 @@ def locus_row(lname,locus,model,counts):
     hwp = ''
 
   return [lname,locus.chromosome or '', str(locus.location or ''), locus.strand or '',
-                str(len(alleles)),'|'.join(alleles),'|'.join(acounts),
-                str(len(lgenos)), '|'.join(lgenos), '|'.join(lcounts),
-                counts[0], missing_rate, hwp]
+                str(len(alleles)),'|'.join(alleles),'|'.join(str(n) for n in acounts),maf,
+                str(len(lgenos)), '|'.join(lgenos), '|'.join(str(n) for n in lcounts),
+                counts[0], sum(counts[1:]), missing_rate, hwp]
+
+
+def locus_total(counts):
+  n = counts.sum()
+  missing_rate = str(counts[0]/n) if n else ''
+
+  return ['*','','','','','','','','','','',counts[0],sum(counts[1:]),missing_rate,'']
 
 
 def sample_row(sample,counts):
@@ -71,7 +90,7 @@ def sample_row(sample,counts):
   n = counts[2]+counts[3]
   heterozygosity = str(counts[2]/(counts[2]+counts[3])) if n else ''
 
-  return [sample]+counts.tolist()+[missing_rate,heterozygosity]
+  return [sample]+counts.tolist()+[sum(counts[1:]),missing_rate,heterozygosity]
 
 
 def option_parser():
@@ -123,21 +142,23 @@ def main():
   sampleout = table_writer(options.sampleout,hyphen=sys.stdout)
 
   if genos.format == 'ldat':
-    locus_counts  = 0
     sample_counts = None
 
     locusout.writerow(LOCUS_HEADER)
-    for i,(lname,geno) in enumerate(genos):
-      model = genos.models[i]
+    for (lname,geno),model in izip(genos,genos.models):
       locus = genos.genome.get_locus(lname)
       locus_count,sample_counts = locus_summary(geno,sample_counts)
-      locus_counts += locus_count
 
       locusout.writerow(locus_row(lname,locus,model,locus_count))
+
+    sample_totals = sum(sample_counts)
+    locusout.writerow(locus_total(sample_totals))
 
     sampleout.writerow(SAMPLE_HEADER)
     for sample,count in izip(genos.samples,sample_counts):
       sampleout.writerow(sample_row(sample,count))
+
+    sampleout.writerow(sample_row('*',sample_totals))
 
   else:
     locus_counts  = None
@@ -149,10 +170,14 @@ def main():
       sample_counts += sample_count
       sampleout.writerow(sample_row(sample,sample_count))
 
+    sampleout.writerow(sample_row('*',sample_counts))
+
     locusout.writerow(LOCUS_HEADER)
     for lname,model,locus_count in izip(genos.loci,genos.models,locus_counts):
       locus = genos.genome.get_locus(lname)
       locusout.writerow(locus_row(lname,locus,model,locus_count))
+
+    locusout.writerow(locus_total(sample_counts))
 
 
 if __name__=='__main__':
