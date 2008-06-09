@@ -88,7 +88,7 @@ def sample_row(sample,counts):
   missing_rate = str(counts[0]/n) if n else ''
 
   n = counts[2]+counts[3]
-  heterozygosity = str(counts[2]/(counts[2]+counts[3])) if n else ''
+  heterozygosity = str(counts[3]/(counts[2]+counts[3])) if n else ''
 
   return [sample]+counts.tolist()+[sum(counts[1:]),missing_rate,heterozygosity]
 
