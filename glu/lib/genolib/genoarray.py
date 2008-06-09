@@ -28,6 +28,9 @@ from   itertools     import izip
 from   glu.lib.utils import izip_exact
 
 
+MISSING,HEMIZYGOTE,HOMOZYGOTE,HETEROZYGOTE=range(4)
+
+
 try:
   #raise ImportError    # Uncomment to test pure-Python implementation
   from   glu.lib.genolib._genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor,
@@ -43,8 +46,6 @@ except ImportError:
   from   bitarray  import getbits,setbits
 
   print >> sys.stderr, "WARNING: Using slow Python genoarray"
-
-  MISSING,HEMIZYGOTE,HOMOZYGOTE,HETEROZYGOTE=range(4)
 
 
   def _hemi(geno):
