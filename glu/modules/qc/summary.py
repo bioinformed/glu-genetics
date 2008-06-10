@@ -30,15 +30,14 @@ from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
                                         count_alleles_from_genocounts
 
 
-LOCUS_HEADER  = ['Locus','chromosome','location','strand',
-                 'allele count','alleles','allele counts',
-                 'minor allele frequency',
-                 'genotype count','genotypes','genotype counts',
-                 'missing count', 'informative count', 'missing rate','hw pvalue']
+LOCUS_HEADER  = ['LOCUS','CHROMOSOME','LOCATION','STRAND',
+                 'NUM_ALLELES','ALLELES','ALLELE_COUNTS', 'MAF',
+                 'NUM_GENOTYPES','GENOTYPES','GENOTYPE_COUNTS',
+                 'MISSING_COUNT', 'INFORMATIVE_COUNT', 'MISSING_RATE','HW_PVALUE']
 
-SAMPLE_HEADER = ['Sample','missing count','hemizygote count',
-                 'homozygote count','heterozygote count',
-                 'informative count', 'missing rate', 'heterozygosity']
+SAMPLE_HEADER = ['SAMPLE','MISSING_COUNT','HEMIZYGOTE_COUNT',
+                 'HOMOZYGOTE_COUNT','HETEROZYGOTE_COUNT',
+                 'INFORMATIVE_COUNT', 'MISSING_RATE', 'HETEROZYGOSITY']
 
 
 def locus_row(lname,locus,model,counts):
