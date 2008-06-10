@@ -379,16 +379,8 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
   return header,_phenos()
 
 
-def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
-  warn_msg = '[WARNING] Subject "%s" excluded from analysis\n'
-
-  verbose       = options.verbose
-  header,phenos = load_phenos(phenofile,deptype=deptype,allowdups=options.allowdups,verbose=verbose,errs=errs)
-  phenos        = list(phenos)
-  subjects      = set(p[0] for p in phenos)
-  keep          = subjects.copy()
-  phenocount1   = len(phenos)
-  loci          = load_genostream(genofile,format=options.format,genorepr=options.genorepr).as_ldat()
+def _load_loci(filename,options,keep):
+  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr).as_ldat()
 
   if options.includeloci or options.excludeloci:
     loci = loci.transformed(include_loci=options.includeloci,
@@ -403,7 +395,75 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   if loci.samples:
     keep &= set(loci.samples)
 
-  loci = loci.transformed(include_samples=keep)
+  return loci
+
+
+def parse_formulae(options,models):
+  if options.model is not None:
+    pheno,options.model = FormulaParser().parse(options.model)
+
+  if options.test is not None:
+    _,options.test = FormulaParser().parse(options.test)
+
+  if options.display is not None:
+    _,options.display = FormulaParser().parse(options.display)
+
+  if options.model and not options.test:
+    options.test = COMBINATION(t for t in options.model.terms() if not t.loci())
+
+  if not options.test:
+    options.test = GENO('locus')
+
+  if not options.model:
+    phenos = COMBINATION( PHENOTERM(pheno) for pheno in models.pheno_header[2:] )
+    options.model = options.test + phenos
+
+  if not options.display:
+    options.display = options.test
+
+  try:
+    options.test = options.model.find(options.test)
+  except KeyError:
+    raise ValueError('Formula does not contain all terms to be tested')
+
+  try:
+    options.display = options.model.find(options.display)
+  except KeyError:
+    raise ValueError('Formula does not contain all terms to display')
+
+  options.null = COMBINATION(t for t in options.model.terms()
+                                if t not in options.test and not t.loci())
+
+  if not any(t for t in options.test.terms() if t.loci()):
+    raise ValueError('Test does not contain any locus terms')
+
+  if any(t for t in options.null.terms() if t.loci()):
+    raise ValueError('Null model may not contain loci to be scanned')
+
+  options.stats = set(t.strip().lower() for t in options.stats.split(','))
+  options.stats.discard('')
+  extra = options.stats - set(['score','wald','lrt'])
+  if extra:
+    raise ValueError('Unknown test(s) specified: %s' % ','.join(sorted(extra)))
+
+
+def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
+  warn_msg = '[WARNING] Subject "%s" excluded from analysis\n'
+
+  verbose       = options.verbose
+  header,phenos = load_phenos(phenofile,deptype=deptype,allowdups=options.allowdups,verbose=verbose,errs=errs)
+  phenos        = list(phenos)
+  subjects      = set(p[0] for p in phenos)
+  keep          = subjects.copy()
+  phenocount1   = len(phenos)
+  loci          = _load_loci(genofile,options,keep)
+  fixedloci     = None
+
+  if options.fixedloci:
+    fixedloci   = _load_loci(options.fixedloci,options,keep)
+    fixedloci   = fixedloci.transformed(include_samples=keep,order_samples=loci.samples)
+
+  loci          = loci.transformed(include_samples=keep)
 
   if subjects != keep:
     phenos = [ p for p in phenos if p[0] in keep ]
@@ -420,7 +480,31 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
                              reference_alleles=reference_alleles,
                              minmaf=options.minmaf,mingenos=options.mingenos)
 
-  return loci,models
+  parse_formulae(options,models)
+
+  fixedloci = dict(fixedloci) if fixedloci is not None else {}
+
+  # Collect unbound genotype terms and check fixed loci
+  fixed = set()
+  gterms = []
+  for t in options.model.expand_terms():
+    if isinstance(t, GENOTERM):
+      if t.name=='locus':
+        gterms.append(t)
+      elif t.name not in fixedloci:
+        raise ValueError('Locus %s used in model, but not found in fixed loci' % t.name)
+      else:
+        fixed.add(t.name)
+
+  # Remove unused terms in fixed loci
+  for lname in list(fixedloci):
+    if lname not in fixed:
+      del fixedloci[lname]
+
+  if not gterms:
+    raise ValueError('No genotype terms to scan')
+
+  return loci,fixedloci,gterms,models
 
 
 def estimate_maf(genocounts):

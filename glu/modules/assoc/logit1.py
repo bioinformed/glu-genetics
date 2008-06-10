@@ -25,8 +25,8 @@ from   numpy               import isfinite
 from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import GLogit,LinAlgError
 
-from   glu.lib.association import build_models,print_results,format_pvalue, \
-                                  GENO,COMBINATION,PHENOTERM,GENOTERM,FormulaParser
+from   glu.lib.genolib     import load_genostream
+from   glu.lib.association import build_models,print_results,format_pvalue
 
 
 def option_parser():
@@ -49,6 +49,8 @@ def option_parser():
                     help='List of loci to include')
   input.add_option('-D', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='List of loci to exclude')
+  input.add_option('--fixedloci', dest='fixedloci', metavar='FILE',
+                    help='Genotypes for fixed loci that can be included in the model')
   input.add_option('--minmaf', dest='minmaf', metavar='N', default=0.01, type='float',
                     help='Minimum minor allele frequency filter')
   input.add_option('--mingenos', dest='mingenos', metavar='N', default=10, type='int',
@@ -116,55 +118,6 @@ def check_R(model,g):
   #assert allclose(r.vcov(mod),g.W,atol=1e-6)
 
 
-def parse_formulae(options,models):
-  if options.model is not None:
-    pheno,options.model = FormulaParser().parse(options.model)
-
-  if options.test is not None:
-    _,options.test = FormulaParser().parse(options.test)
-
-  if options.display is not None:
-    _,options.display = FormulaParser().parse(options.display)
-
-  if options.model and not options.test:
-    options.test = COMBINATION(t for t in options.model.terms() if not t.loci())
-
-  if not options.test:
-    options.test = GENO('locus')
-
-  if not options.model:
-    phenos = COMBINATION( PHENOTERM(pheno) for pheno in models.pheno_header[2:] )
-    options.model = options.test + phenos
-
-  if not options.display:
-    options.display = options.test
-
-  try:
-    options.test = options.model.find(options.test)
-  except KeyError:
-    raise ValueError('Formula does not contain all terms to be tested')
-
-  try:
-    options.display = options.model.find(options.display)
-  except KeyError:
-    raise ValueError('Formula does not contain all terms to display')
-
-  options.null = COMBINATION(t for t in options.model.terms()
-                                if t not in options.test and not t.loci())
-
-  if not any(t for t in options.test.terms() if t.loci()):
-    raise ValueError('Test does not contain any locus terms')
-
-  if any(t for t in options.null.terms() if t.loci()):
-    raise ValueError('Null model may not contain loci to be scanned')
-
-  options.stats = set(t.strip().lower() for t in options.stats.split(','))
-  options.stats.discard('')
-  extra = options.stats - set(['score','wald','lrt'])
-  if extra:
-    raise ValueError('Unknown test(s) specified: %s' % ','.join(sorted(extra)))
-
-
 def summary_header(options,null):
   ci = int(100*options.ci) if options.ci else None
 
@@ -218,11 +171,9 @@ def main():
     if details is out:
       raise ValueError('Cannot send summary and detailed output to stdout')
 
-  loci,models = build_models(args[0], args[1], options)
+  loci,fixedloci,gterms,models = build_models(args[0], args[1], options)
 
-  parse_formulae(options,models)
-
-  null_model = models.build_model(options.null,{})
+  null_model = models.build_model(options.null,fixedloci)
 
   if not null_model:
     raise ValueError('Cannot construct null model')
@@ -238,23 +189,20 @@ def main():
   header = summary_header(options,null)
   out.writerow(header)
 
-  gterms = []
-  for t in options.model.expand_terms():
-    if isinstance(t, GENOTERM) and t.name=='locus':
-      gterms.append(t)
-
-  if not gterms:
-    raise ValueError('No genotype terms to scan')
-
   # For each locus
-  for locus in loci:
-    lname = locus[0]
-    lmap  = dict([locus])
+  for lname,genos in loci:
+    # Skip fixed terms
+    if lname in fixedloci:
+      continue
+
+    lmap = fixedloci.copy()
+    lmap[lname] = genos
 
     for t in gterms:
       t.name = lname
 
     model = models.build_model(options.model,lmap)
+
     if not model:
       continue
 
@@ -266,7 +214,7 @@ def main():
       # FIXME: Output bad fit line
       continue
 
-    # Desgin matrix debugging output
+    # Design matrix debugging output
     if 0:
       f = table_writer('%s.csv' % lname,dialect='csv')
       f.writerow(model.vars)
@@ -333,6 +281,7 @@ def main():
     result.extend('%.4f' % orr if isfinite(orr) else '' for orr in ors)
 
     # FIXME: This does not align the categories -- just the blank headers
+    # FIXME: Wrong constant
     if len(null.categories) < len(g.categories):
       short = len(g.categories)-len(null.categories)
       result.extend( ['']*(short*6) )
