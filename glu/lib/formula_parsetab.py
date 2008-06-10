@@ -4,7 +4,7 @@
 
 _lr_method = 'LALR'
 
-_lr_signature = '\x15/t\xea\x88z\xc7\x82B6\xd2B}\xc0\x815'
+_lr_signature = '\x0ey9/\xcf\xdb\x80E9\xc0Z\x98dJ\xdfx'
 
 _lr_action_items = {'TERM':([0,3,11,12,13,],[1,1,1,1,1,]),'RPAREN':([2,6,9,10,14,15,17,18,19,],[-6,-5,-8,15,19,-7,-3,-4,-9,]),'EQUALS':([4,],[11,]),'ONE':([0,3,11,12,13,],[6,6,6,6,6,]),'ZERO':([0,3,11,12,13,],[2,2,2,2,2,]),'PLUS':([2,4,6,7,9,10,15,16,17,18,19,],[-6,-8,-5,12,-8,12,-7,12,-3,-4,-9,]),'LPAREN':([0,1,3,11,12,13,],[3,8,3,3,3,3,]),'VAR':([0,3,8,11,12,13,],[4,9,14,9,9,9,]),'TIMES':([2,4,6,7,9,10,15,16,17,18,19,],[-6,-8,-5,13,-8,13,-7,13,13,-4,-9,]),'$end':([2,4,5,6,7,9,15,16,17,18,19,],[-6,-8,0,-5,-2,-8,-7,-1,-3,-4,-9,]),}
 
@@ -25,13 +25,13 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S'",1,None,None,None),
-  ('formula',3,'p_formula','formula.py',693),
-  ('formula',1,'p_formula2','formula.py',700),
-  ('expression',3,'p_expression_binop','formula.py',707),
-  ('expression',3,'p_expression_binop','formula.py',708),
-  ('expression',1,'p_expression_one','formula.py',716),
-  ('expression',1,'p_expression_zero','formula.py',722),
-  ('expression',3,'p_expression_paren','formula.py',728),
-  ('expression',1,'p_expression_var','formula.py',734),
-  ('expression',4,'p_expression_func','formula.py',740),
+  ('formula',3,'p_formula','formula.py',616),
+  ('formula',1,'p_formula2','formula.py',622),
+  ('expression',3,'p_expression_binop','formula.py',628),
+  ('expression',3,'p_expression_binop','formula.py',629),
+  ('expression',1,'p_expression_one','formula.py',636),
+  ('expression',1,'p_expression_zero','formula.py',642),
+  ('expression',3,'p_expression_paren','formula.py',648),
+  ('expression',1,'p_expression_var','formula.py',654),
+  ('expression',4,'p_expression_func','formula.py',660),
 ]
