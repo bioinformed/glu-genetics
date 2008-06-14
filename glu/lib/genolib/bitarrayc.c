@@ -16,6 +16,7 @@ Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Se
 See GLU license for terms by running: glu license
 */
 #include <Python.h>
+#include "bitarrayc.h"
 
 /*
 def getbits(data, i, readlen):
@@ -58,49 +59,19 @@ def getbits(data, i, readlen):
 */
 
 unsigned long
-bitarray_getbits(const unsigned char *data, ssize_t buflen, ssize_t i, ssize_t readlen, char **status)
+_bitarray_getbits_slowpath(const unsigned char *data, ssize_t byte, ssize_t offset, ssize_t readlen, char **status)
 {
-	ssize_t byte, offset, n, tail;
+	ssize_t n, tail;
 	unsigned long result;
 	unsigned char b;
 
-	*status = NULL;
-
-	if(i < 0)
-		i += 8*buflen;
-
-	if(i < 0)
-	{
-		*status = "read index out of range";
-		return -1;
-	}
-
+	/* Slow path */
 	if(readlen <= 0 || readlen > 32)
 	{
 		*status = "read length must be between 1..32";
 		return -1;
 	}
 
-	if(buflen <= (i+readlen-1)>>3)
-	{
-		*status = "read length out of range";
-		return -1;
-	}
-
-	byte   = i>>3;
-	offset = i&7;
-
-	/* Fast path for common cases */
-	if(readlen == 1)
-		return (data[byte]>>(7-offset)) & 1;
-	else if(readlen == 2 && offset < 7)
-		return (data[byte]>>(6-offset)) & 3;
-	else if(readlen == 4 && offset < 5)
-		return (data[byte]>>(4-offset)) & 15;
-	else if(readlen == 8 && offset == 0)
-		return data[byte];
-
-	/* Slow path */
 	result = 0;
 	while(readlen)
 	{

@@ -25,6 +25,7 @@ __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeArrayDescri
 
 import numpy
 from   itertools     import izip
+
 from   glu.lib.utils import izip_exact
 
 
@@ -37,7 +38,8 @@ try:
                                             UnphasedMarkerModel, genotype_indices,
                                             count_genotypes, genotype_categories,
                                             locus_summary, sample_summary, genoarray_concordance,
-                                            GenotypeLookupError, GenotypeRepresentationError)
+                                            GenotypeLookupError, GenotypeRepresentationError,
+                                            pick, pick_column)
 
 except ImportError:
   import sys
@@ -347,12 +349,12 @@ except ImportError:
 
     def __getitem__(self, i):
       '''
-      Return the i'th genotype or slice
+      Return the i'th genotype or slice or list of genotypes by index
 
-      @param i: index or slice
-      @type  i: int or slice
+      @param i: index or slice or list of indexes
+      @type  i: int or slice or list of int
       @return : i'th genotype if an index is specified, sequence of
-                genotypes if a slice is specified
+                genotypes if a slice or list is specified
       @rtype  : Genotype object or sequence of Genotype objects
       '''
       descr = self.descriptor
@@ -360,6 +362,8 @@ except ImportError:
       if isinstance(i,slice):
         x = xrange(*i.indices(len(descr.models)))
         return [ self[i] for i in x ]
+      elif isinstance(i,(list,tuple)):
+        return [ self[j] for j in i ]
 
       model    = descr.models[i]
       startbit = descr.offsets[i]
@@ -840,6 +844,60 @@ except ImportError:
     sample_counts = numpy.asarray(sample_counts,dtype=int)
 
     return sample_counts,locus_counts
+
+
+  def pick(genos, indices):
+    '''
+    Pick a list of genotypes from a list of indices
+
+    @param    genos: genotype sequence
+    @type     genos: sequence
+    @param  indices: sequence of indices
+    @type   indices: sequence
+    @return        : sequence with elements from the specified indices
+    @rtype         : sequence
+
+    >>> model = model_from_alleles('AB')
+    >>> descr = GenotypeArrayDescriptor([model]*4)
+    >>> model.genotypes
+    [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+    >>> genos = model.genotypes
+
+    >>> pick(model.genotypes, [3,2,0])
+    [('B', 'B'), ('A', 'B'), (None, None)]
+
+    >>> pick(GenotypeArray(descr,model.genotypes),[3,2,0])
+    [('B', 'B'), ('A', 'B'), (None, None)]
+    '''
+    if isinstance(genos,GenotypeArray):
+      return genos[indices]
+    return [ genos[i] for i in indices ]
+
+
+  def pick_column(rows, index):
+    '''
+    Pick a list of genotypes from a list of indices
+
+    @param   rows: sequence of sequences
+    @type    rows: sequence
+    @param  index: index
+    @type   index: int
+    @return      : list of items from the index'th column
+    @rtype       : list
+
+    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],0)
+    [0, 3, 6]
+    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],1)
+    [1, 4, 7]
+    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],2)
+    [2, 5, 8]
+    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],[0,2])
+    [[0, 3, 6], [2, 5, 8]]
+    '''
+    if isinstance(index, int):
+      return [ row[index] for row in rows ]
+    else:
+      return [ [ row[i] for row in rows ] for i in index ]
 
 
 ###############################################################################
@@ -1694,6 +1752,38 @@ def test_concordance_2bit():
   (2, 5)
   '''
 
+def test_pick():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*4)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes
+
+  >>> pick(model.genotypes, [3,2,0])
+  [('B', 'B'), ('A', 'B'), (None, None)]
+
+  >>> pick(GenotypeArray(descr,model.genotypes),[3,2,0])
+  [('B', 'B'), ('A', 'B'), (None, None)]
+
+  >>> GenotypeArray(descr,model.genotypes)[ [3,2,0] ]
+  [('B', 'B'), ('A', 'B'), (None, None)]
+  '''
+
+
+def test_pick_column():
+  '''
+  >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],0)
+  [0, 3, 6]
+  >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],1)
+  [1, 4, 7]
+  >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],2)
+  [2, 5, 8]
+
+  #>>> #pick_column([[0,1,2],[3,4,5],[6,7,8]],[0,2])
+  #[[0, 3, 6], [2, 5, 8]]
+  '''
+
 
 def bench_locus_summary():
   import time
@@ -1840,7 +1930,6 @@ def bench_categories():
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
   bench(genos)
-
 
 
 def main():

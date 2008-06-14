@@ -18,6 +18,7 @@ See GLU license for terms by running: glu license
 #include "Python.h"
 #include "structmember.h"
 #include "numpy/arrayobject.h"
+#include "bitarrayc.h"
 
 #ifdef STDC_HEADERS
 #include <stddef.h>
@@ -26,13 +27,6 @@ See GLU license for terms by running: glu license
 #endif
 
 #include <math.h>
-
-/* Declarations from bitarray */
-extern unsigned long
-bitarray_getbits(const unsigned char *data, ssize_t buflen, ssize_t i, ssize_t readlen, char **status);
-
-extern void
-bitarray_setbits(unsigned char *data, ssize_t buflen, ssize_t i, unsigned long value, ssize_t writelen, char **status);
 
 /* Genotype Array objects declarations */
 
@@ -1172,7 +1166,7 @@ genoarray_nohash(PyObject *self)
 	return -1;
 }
 
-static PyObject *
+static inline PyObject *
 genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t datasize,
                     unsigned int *offsets, Py_ssize_t i)
 {
@@ -1204,12 +1198,12 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 	}
 
 	geno = PyList_GetItem(model->genotypes, k);
-	if(geno)
-		Py_INCREF(geno);
+	Py_XINCREF(geno);
+
 	return geno;
 }
 
-static int
+static inline int
 genoarray_checkstate(GenotypeArrayObject *self)
 {
 	if(!self->data || !self->descriptor
@@ -1225,23 +1219,20 @@ static PyObject *
 genoarray_item(GenotypeArrayObject *self, Py_ssize_t item)
 {
 	Py_ssize_t n, datasize;
-	PyObject *geno, *models;
+	PyObject *models;
 	unsigned int *offsets;
 
 	if( genoarray_checkstate(self) == -1 )
 		return NULL;
 
-	geno     = NULL;
-	datasize = self->descriptor->byte_size;
-
 	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
 	models   = self->descriptor->models;
-	if(!models || !offsets) goto done;
+	/* FIXME: Set error state */
 
 	if(!PyList_Check(models))
 	{
 		PyErr_SetString(PyExc_TypeError,"models must be a list");
-		goto done;
+		return NULL;
 	}
 
 	n = PyList_GET_SIZE(models);
@@ -1249,19 +1240,17 @@ genoarray_item(GenotypeArrayObject *self, Py_ssize_t item)
 	if( n+1 != PyArray_SIZE(self->descriptor->offsets) )
 	{
 		PyErr_SetString(PyExc_ValueError,"offsets and models sizes must agree");
-		goto done;
+		return NULL;
 	}
 
 	if(item < 0 || item >= n)
 	{
 		PyErr_SetString(PyExc_IndexError,"genotype index out of range");
-		goto done;
+		return NULL;
 	}
 
-	geno  = genoarray_inner_get(models, self->data, datasize, offsets, item);
-	if(!geno) goto done;
-done:
-	return geno;
+	datasize = self->descriptor->byte_size;
+	return genoarray_inner_get(models, self->data, datasize, offsets, item);
 }
 
 static PyObject *
@@ -1299,12 +1288,6 @@ genoarray_slice(GenotypeArrayObject *self, PySliceObject *slice)
 	if(PySlice_GetIndicesEx(slice, n, &start, &stop, &step, &slicelength) < 0)
 		goto done;
 
-	if(slicelength <= 0)
-	{
-		result = PyList_New(0);
-		goto done;
-	}
-
 	result = PyList_New(slicelength);
 	if(!result) goto done;
 
@@ -1325,9 +1308,76 @@ done:
 }
 
 static PyObject *
+genoarray_pick(GenotypeArrayObject *self, PyObject *indices)
+{
+	Py_ssize_t i, j, n, datasize, len;
+	PyObject *result=NULL, *models, *geno, *indseq=NULL;
+	unsigned int *offsets;
+	PyObject **indexitems;
+
+	if( genoarray_checkstate(self) == -1 )
+		return NULL;
+
+	datasize = self->descriptor->byte_size;
+	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
+	models   = self->descriptor->models;
+	if(!models || !offsets) goto error;
+
+	if(!PyList_Check(models))
+	{
+		PyErr_SetString(PyExc_TypeError,"models must be a list");
+		goto error;
+	}
+
+	n = PyList_GET_SIZE(models);
+
+	if( n+1 != PyArray_SIZE(self->descriptor->offsets) )
+	{
+		PyErr_SetString(PyExc_ValueError,"offsets and models sizes must agree");
+		goto error;
+	}
+
+	assert(indices);
+	indseq = PySequence_Fast(indices,"cannot convert indices into a sequence");
+	if(!indseq) goto error;
+
+	len = PySequence_Fast_GET_SIZE(indseq);
+        indexitems = PySequence_Fast_ITEMS(indseq);
+
+	result = PyList_New(len);
+	if(!result) goto error;
+
+	for (i=0; i<len; i++)
+	{
+		j = PyNumber_AsSsize_t(indexitems[i], PyExc_IndexError);
+
+		if(j==-1 && PyErr_Occurred()) goto error;
+		if(j<0 || j>=n)
+		{
+			PyErr_SetString(PyExc_IndexError,"genotype index out of range");
+			goto error;
+		}
+
+		geno = genoarray_inner_get(models, self->data, datasize, offsets, j);
+		if(!geno) goto error;
+
+		PyList_SET_ITEM(result, i, geno);
+	}
+
+	Py_DECREF(indseq);
+	return result;
+
+error:
+	Py_XDECREF(indseq);
+	Py_XDECREF(result);
+	return NULL;
+}
+
+static PyObject *
 genoarray_subscript(GenotypeArrayObject *self, PyObject *item)
 {
-	if(PyIndex_Check(item)) {
+	if(PyIndex_Check(item))
+	{
 		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
 		if(i == -1 && PyErr_Occurred())
 			return NULL;
@@ -1335,8 +1385,11 @@ genoarray_subscript(GenotypeArrayObject *self, PyObject *item)
 	}
 	else if(PySlice_Check(item))
 		return genoarray_slice(self, (PySliceObject *)item);
-	else {
-		PyErr_SetString(PyExc_TypeError, "indices must be integers");
+	else if(PySequence_Check(item))
+		return genoarray_pick(self, item);
+	else
+	{
+		PyErr_SetString(PyExc_TypeError, "indices must be integers, slices, or lists of integers");
 		return NULL;
 	}
 }
@@ -2208,6 +2261,7 @@ for_each_genotype(PyObject *genos, geno_foreach func, void *state)
 		if( func(i,geno,state) < 0) goto error;
 	}
 
+	Py_DECREF(genos);
 	return 0;
 
 error:
@@ -2851,6 +2905,178 @@ error:
 
 /******************************************************************************************************/
 
+static PyObject *
+pick(PyObject *self, PyObject *args)
+{
+	Py_ssize_t i, j, n, len;
+	PyObject *genos, *indices, *item;
+	PyObject *seq=NULL, *indseq=NULL, *result=NULL;
+	PyObject **seqitems, **indexitems;
+
+	if(!PyArg_ParseTuple(args, "OO", &genos, &indices))
+		return NULL;
+
+	if( GenotypeArray_Check(genos) )
+		return genoarray_pick( (GenotypeArrayObject *)genos, indices);
+
+	indseq = PySequence_Fast(indices,"cannot convert indices into a sequence");
+	if(!indseq) return NULL;
+
+	seq = PySequence_Fast(genos,"cannot convert genotypes into a sequence");
+	if(!seq) goto error;
+
+	n          = PySequence_Fast_GET_SIZE(seq);
+	seqitems   = PySequence_Fast_ITEMS(seq);
+	len        = PySequence_Fast_GET_SIZE(indseq);
+	indexitems = PySequence_Fast_ITEMS(indseq);
+
+	result = PyList_New(len);
+	if(!result) goto error;
+
+	for(i=0; i<len; i++)
+	{
+		j = PyNumber_AsSsize_t(indexitems[i], PyExc_IndexError);
+
+		if(j==-1 && PyErr_Occurred()) goto error;
+		if(j<0 || j>=n)
+		{
+			PyErr_SetString(PyExc_IndexError,"genotype index out of range");
+			goto error;
+		}
+		item = seqitems[j];
+
+		Py_INCREF(item);
+		PyList_SET_ITEM(result, i, item);
+	}
+
+	Py_DECREF(indseq);
+	Py_DECREF(seq);
+	return result;
+
+error:
+	Py_XDECREF(indseq);
+	Py_XDECREF(seq);
+	Py_XDECREF(result);
+	return NULL;
+}
+
+static PyObject *
+pick_column_single(PyObject *rows, Py_ssize_t index)
+{
+	Py_ssize_t i, len;
+	PyObject *item, *result=NULL;
+	PyObject **items;
+
+	rows = PySequence_Fast(rows,"cannot convert rows into a sequence");
+	if(!rows) goto error;
+
+	len   = PySequence_Fast_GET_SIZE(rows);
+        items = PySequence_Fast_ITEMS(rows);
+
+	result = PyList_New(len);
+	if(!result) goto error;
+
+	for(i=0; i<len; i++)
+	{
+		item = PySequence_GetItem(items[i], index);
+		if(!item) goto error;
+		PyList_SET_ITEM(result, i, item);
+	}
+
+	Py_DECREF(rows);
+	return result;
+
+error:
+	Py_XDECREF(rows);
+	Py_XDECREF(result);
+	return NULL;
+}
+
+static PyObject *
+pick_column_multiple(PyObject *rows, PyObject *indices)
+{
+	Py_ssize_t i, j, index, rowlen, indexlen;
+	Py_ssize_t *indexarray=NULL;
+	PyObject *item, *result=NULL;
+	PyObject **rowitems, **indexitems, **resultitems;
+
+	rows = PySequence_Fast(rows,"cannot convert rows into a sequence");
+	if(!rows) return NULL;
+
+	indices = PySequence_Fast(indices,"cannot convert indices into a sequence");
+	if(!indices) goto error;
+
+	rowlen     = PySequence_Fast_GET_SIZE(rows);
+        rowitems   = PySequence_Fast_ITEMS(rows);
+	indexlen   = PySequence_Fast_GET_SIZE(indices);
+        indexitems = PySequence_Fast_ITEMS(indices);
+
+        result = PyList_New(indexlen);
+	if(!result) goto error;
+
+        resultitems = PySequence_Fast_ITEMS(result);
+
+        indexarray = malloc( sizeof(Py_ssize_t)*indexlen );
+	if(!indexarray) goto error;
+
+	for(i=0; i<indexlen; ++i)
+	{
+		item = PyList_New(rowlen);
+		if(!item) goto error;
+		PyList_SET_ITEM(result, i, item);
+		index = PyNumber_AsSsize_t(indexitems[i], PyExc_IndexError);
+		if(index == -1 && PyErr_Occurred()) goto error;
+		indexarray[i] = index;
+	}
+
+	for(j=0; j<rowlen; j++)
+		for(i=0; i<indexlen; i++)
+		{
+			item = PySequence_GetItem(rowitems[j], indexarray[i]);
+			if(!item) goto error;
+			PyList_SET_ITEM(resultitems[i], j, item);
+		}
+
+	free(indexarray);
+	Py_DECREF(rows);
+	Py_DECREF(indices);
+	return result;
+
+error:
+	if(indexarray)
+		free(indexarray);
+	Py_XDECREF(rows);
+	Py_XDECREF(indices);
+	Py_XDECREF(result);
+	return NULL;
+}
+
+static PyObject *
+pick_column(PyObject *self, PyObject *args)
+{
+	PyObject *rows, *index;
+
+	if(!PyArg_ParseTuple(args, "OO", &rows, &index))
+		return NULL;
+
+	if(PyIndex_Check(index))
+	{
+		Py_ssize_t i = PyNumber_AsSsize_t(index, PyExc_IndexError);
+		if(i == -1 && PyErr_Occurred())
+			return NULL;
+		return pick_column_single(rows, i);
+	}
+	else if(PySequence_Check(index))
+		return pick_column_multiple(rows, index);
+	else
+	{
+		PyErr_SetString(PyExc_TypeError, "indices must be an integer or sequence");
+		return NULL;
+	}
+}
+
+/******************************************************************************************************/
+
 static PyMethodDef genoarraymodule_methods[] = {
 	{"genotype_indices",            (PyCFunction)genotype_indices_func,	METH_KEYWORDS,
 	 "Return an array of integer genotype indices"},
@@ -2870,6 +3096,10 @@ static PyMethodDef genoarraymodule_methods[] = {
 	 "Generate simple concordance statistics from two genotype arrays stored in 4-bit format"},
 	{"genoarray_concordance_2bit",	genoarray_concordance_2bit,	METH_VARARGS,
 	 "Generate simple concordance statistics from two genotype arrays stored in 2-bit format"},
+	{"pick",	pick,	METH_VARARGS,
+	 "Pick items from a sequence given indices"},
+	{"pick_column",	pick_column,	METH_VARARGS,
+	 "Pick elements of the i'th column of a two dimensional sequence"},
 	{NULL}  /* Sentinel */
 };
 

@@ -22,7 +22,7 @@ from   operator          import itemgetter, getitem
 from   collections       import defaultdict
 from   itertools         import izip,ifilter,imap,chain,groupby,repeat
 
-from   glu.lib.utils     import pick,tally,izip_exact
+from   glu.lib.utils     import tally,izip_exact
 from   glu.lib.imerge    import imerge
 from   glu.lib.xtab      import xtab,rowsby
 
@@ -33,7 +33,7 @@ from   glu.lib.genolib.transform import GenoTransform, prove_unique_transform
 from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,Genotype,   \
                                         GenotypeLookupError, GenotypeRepresentationError, \
-                                        model_from_alleles
+                                        model_from_alleles,pick,pick_column
 
 # Debugging flag
 DEBUG=False
@@ -3098,7 +3098,7 @@ def merge_genomatrixstream_columns(genos, mergefunc):
 
         rows_seen.add(locus)
 
-        merge_columns = ([row[j] for j in merge_indices[col_label]] for col_label in new_columns)
+        merge_columns = (pick(row, merge_indices[col_label]) for col_label in new_columns)
         new_row = list(imap(mergefunc,genos.columns,repeat(locus),
                                       repeat(genos.models[i]), merge_columns))
 
@@ -3122,7 +3122,7 @@ def merge_genomatrixstream_columns(genos, mergefunc):
 
         rows_seen.add(sample)
 
-        merge_columns = ([row[j] for j in merge_indices[col_label]] for col_label in new_columns)
+        merge_columns = (pick(row, merge_indices[col_label]) for col_label in new_columns)
         new_row = list(imap(mergefunc,repeat(sample), genos.columns, new_models, merge_columns))
 
         yield sample,new_row
@@ -3201,7 +3201,7 @@ def merge_genomatrixstream_rows(genos, mergefunc):
     new_models = []
 
     def _merger():
-      data = genos.use_stream()
+      data = map(itemgetter(1),genos)
       for locus in new_rows:
         indices = merge_rows.pop(locus)
 
@@ -3211,7 +3211,7 @@ def merge_genomatrixstream_rows(genos, mergefunc):
         model = mset.pop()
         new_models.append(model)
 
-        merge_columns = izip(*[ data[i][1] for i in indices ])
+        merge_columns = izip(*pick(data,indices))
         new_row = list(imap(mergefunc,genos.columns,repeat(locus),
                                       repeat(model),merge_columns))
         yield locus,new_row
@@ -3221,11 +3221,12 @@ def merge_genomatrixstream_rows(genos, mergefunc):
 
   else:
     def _merger():
-      data = genos.use_stream()
+      data = map(itemgetter(1),genos)
       models = genos.models
       for sample in new_rows:
         indices = merge_rows.pop(sample)
-        merge_columns = izip(*[ data[i][1] for i in indices ])
+
+        merge_columns = izip(*pick(data,indices))
         new_row = list(imap(mergefunc,repeat(sample),genos.columns,models,merge_columns))
         yield sample,new_row
 
@@ -3396,12 +3397,12 @@ def merge_genomatrixstream(genos, mergefunc):
 
     def _merger():
       # Apply fully general merge over duplicate rows and columns
-      data = genos.use_stream()
+      data = map(itemgetter(1),genos)
 
       for locus in new_rows:
         # Form list of all genotypes at each new column
         indices = merge_rows.pop(locus)
-        rows = [ data[i][1] for i in indices ]
+        rows = pick(data, indices)
 
         mset = set(pick(genos.models,indices))
         if len(mset) != 1:
@@ -3409,8 +3410,13 @@ def merge_genomatrixstream(genos, mergefunc):
         model = mset.pop()
         new_models.append(model)
 
+        # FIXME: Is this faster?
+        #merge_columns = (sum((pick(row,merge_indices[column]) for row in rows),[])
+        #                                  for column in new_columns)
+
         merge_columns = ([ row[i] for row in rows for i in merge_indices[column] ]
                                   for column in new_columns)
+
         new_row = list(imap(mergefunc,new_columns,repeat(locus),
                                       repeat(model),merge_columns))
         yield locus,new_row
@@ -3428,12 +3434,12 @@ def merge_genomatrixstream(genos, mergefunc):
 
     def _merger():
       # Apply fully general merge over duplicate rows and columns
-      data = genos.use_stream()
+      data = map(itemgetter(1),genos)
 
       for sample in new_rows:
         # Form list of all genotypes at each new column
         indices = merge_rows.pop(sample)
-        rows = [ data[i][1] for i in indices ]
+        rows = pick(data,indices)
         merge_columns = ([ row[i] for row in rows for i in merge_indices[column] ]
                                   for column in new_columns)
         new_row = list(imap(mergefunc,repeat(sample),new_columns,new_models,merge_columns))
@@ -3663,6 +3669,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
       # mappings, and append the relevant genotypes
       for i,rows in merge_rows.pop(label).iteritems():
         for j,k in merge_columns[i]:
+          # FIXME: += pick_column(rows, j)?
           new_row[k] += (row[j] for row in rows)
 
       # Merge genotypes
@@ -4559,21 +4566,18 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   '''
   columns = genos.columns
   if exclude:
-    columns = tuple((name,i) for i,name in enumerate(columns) if name not in colset)
+    columns = ((name,i) for i,name in enumerate(columns) if name not in colset)
   else:
-    columns = tuple((name,i) for i,name in enumerate(columns) if name     in colset)
+    columns = ((name,i) for i,name in enumerate(columns) if name     in colset)
 
-  if columns:
-    columns,indices = izip(*columns)
-  else:
-    indices = []
+  columns,indices = tuple(izip(*columns)) or ((),())
 
   if columns == genos.columns:
     return genos
 
   def _filter():
     for label,row in genos:
-      yield label,pick(row[:],indices)
+      yield label,pick(row,indices)
 
   if genos.format=='ldat':
     new_genos=genos.clone(_filter(),samples=columns,packed=False,materialized=False)
@@ -4655,7 +4659,7 @@ def reorder_genomatrixstream_columns(genos,labels):
   rows = iter(genos)
   def _reorder():
     for label,row in rows:
-      yield label,pick(row[:], indices)
+      yield label,pick(row, indices)
 
   models = genos.models
   if genos.format=='sdat' and models is not None:
@@ -4943,9 +4947,7 @@ def remap_genomatrixstream_row(genos,rowmap):
   return rename_genomatrixstream_row(genos,rowmap)
 
 
-# Does not need to support a genorepr, since only one row is
-# materialized at a time.
-def transpose_generator(columns, rows, missing=None):
+def transpose_generator(columns, rows, m=16):
   '''
   Transpose a matrix of row labels and row data generating one column of
   data at a time.  Return a generator of the columns of data stored in rows,
@@ -4958,8 +4960,6 @@ def transpose_generator(columns, rows, missing=None):
   @type   columns: sequence of strs
   @param     rows: genotype matrix data
   @type      rows: sequence
-  @param  missing: missing genotype representation
-  @type   missing: str or None
   @return        : tuple of column labels and generator of tuples of row labels and row data
   @rtype         : tuple
 
@@ -4976,19 +4976,24 @@ def transpose_generator(columns, rows, missing=None):
   c3 ['c', 'f', 'i']
   '''
   n = len(rows)
-  m = len(columns)
 
-  if not n or not m:
+  if not n or not columns:
     return [],[]
 
   rowlabels,rows = zip(*rows)
 
-  def _transpose_generator():
-    for j,column in enumerate(columns):
-      newrow = [missing]*n
-      for i in xrange(n):
-        newrow[i] = rows[i][j]
-      yield column,newrow
+  if m <= 1:
+    def _transpose_generator():
+      for j,column in enumerate(columns):
+        yield column,pick_column(rows,j)
+  else:
+    def _transpose_generator():
+      n = len(columns)
+      for i in xrange(n//m+bool(n%m)):
+        indices = range(m*i,min(n,m*(i+1)))
+        cols    = pick_column(rows,indices)
+        for j,col in izip(indices,cols):
+          yield columns[j],col
 
   return rowlabels,_transpose_generator()
 
