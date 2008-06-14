@@ -29,7 +29,7 @@ from   itertools                 import groupby,imap
 import tables
 
 from   glu.lib.utils             import izip_exact,gcdisabled
-from   glu.lib.fileutils         import parse_augmented_filename,get_arg,compressed_filename
+from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename
 
 from   glu.lib.genolib.locus     import Genome,Locus
 from   glu.lib.genolib.phenos    import Phenome,SEX_UNKNOWN,PHENO_UNKNOWN
@@ -607,6 +607,9 @@ def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
+  ignoreloci   = trybool(get_arg(args,['ignoreloci']))
+  ignorephenos = trybool(get_arg(args,['ignorephenos']))
+
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
@@ -631,8 +634,12 @@ def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
   samples = map(str,gfile.root.samples[:])
   loci    = map(str,gfile.root.loci[:])
 
-  file_genome,models = load_models(gfile,loci,version,compat_version)
-  phenome = load_phenos(gfile,samples,version,compat_version)
+  file_genome,models = load_models(gfile,loci,version,compat_version,ignoreloci)
+
+  if not ignorephenos:
+    phenome = load_phenos(gfile,samples,version,compat_version)
+  else:
+    phenome = Phenome()
 
   def _load():
     for row in gfile.root.genotypes:
@@ -803,7 +810,7 @@ def save_models(gfile, loci, genome, models, filters=None):
   save_strings(gfile,'model_alleles',alleles,filters=filters)
 
 
-def load_models(gfile,loci,version,compat_version):
+def load_models(gfile,loci,version,compat_version,ignoreloci):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -817,7 +824,7 @@ def load_models(gfile,loci,version,compat_version):
   @type  compat_version: int
   '''
   with gcdisabled:
-    if version == 1:
+    if version == 1 or ignoreloci:
       return load_models_v1(gfile,loci)
     elif version in (2,3) or compat_version in (2,3):
       return load_models_v2(gfile,loci)
@@ -1192,8 +1199,10 @@ def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs)
 
   filename = parse_augmented_filename(filename,args)
 
-  chunksize = int(get_arg(args,['chunksize'],4096))
-  scratch   = int(get_arg(args,['scratch'],32*1024*1024))
+  chunksize    = int(get_arg(args,['chunksize'],4096))
+  scratch      = int(get_arg(args,['scratch'],32*1024*1024))
+  ignoreloci   = trybool(get_arg(args,['ignoreloci']))
+  ignorephenos = trybool(get_arg(args,['ignorephenos']))
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -1228,8 +1237,12 @@ def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs)
 
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
-  file_genome,models = load_models(gfile,loci,version,compat_version)
-  phenome = load_phenos(gfile,samples,version,compat_version)
+  file_genome,models = load_models(gfile,loci,version,compat_version,ignoreloci)
+
+  if not ignorephenos:
+    phenome = load_phenos(gfile,samples,version,compat_version)
+  else:
+    phenome = Phenome()
 
   if format == format_found == 'sdat':
     def _load():
