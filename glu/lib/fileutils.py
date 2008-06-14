@@ -283,7 +283,7 @@ def guess_related_file(filename,extensions):
   @return          : new filename
   @rtype           : str
 
-  >>> guess_related_file('fileutils.dat',['py'])
+  >>> guess_related_file('fileutils.dat',['py']) # doctest:+SKIP
   'fileutils.py'
   '''
   if not isstr(filename):
