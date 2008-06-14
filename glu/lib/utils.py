@@ -127,11 +127,10 @@ def pick(sequence, indices):
 
   @param  sequence: input sequence
   @type   sequence: sequence
-  @param   indices: sequence of picked indices
-  @type    indices: sequence
-  @return         : sequence with elements from the specified indices
+  @param   indices: sequence of indices
+  @type    indices: sequence of int
+  @return         : sequence with elements at the specified indices
   @rtype          : sequence
-
 
   >>> pick([1,2,3], [0,2])
   [1, 3]
