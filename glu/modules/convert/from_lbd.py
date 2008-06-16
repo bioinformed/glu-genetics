@@ -184,6 +184,9 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
     topseq  = assay[topseq_idx]
     gstrand = assay[assayid_idx].split('_')[-2]
 
+    if chr=='Mt':
+      chr='M'
+
     if cstrand not in cstrand in ('top','bot','p','m'):
       errorhandler('Invalid customer strand %s for %s' % (cstrand,locus))
       continue
