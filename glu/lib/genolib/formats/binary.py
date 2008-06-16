@@ -623,7 +623,8 @@ def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
   compat_version = _get_v_attr(gfile,['GLU_COMPAT_VERSION'],version)
 
   if format != 'genotriple':
-    raise ValueError('Unknown format: %s' % format)
+    raise ValueError('Input file "%s" does not appear to be in triple format.  Found %s.' \
+                        % (namefile(filename),format))
 
   if compat_version > GENOTRIPLE_VERSION:
     raise ValueError('Unknown Genotriple file version: %s' % version)
@@ -1287,85 +1288,91 @@ def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs)
 
       gfile.close()
 
-  if format == 'ldat' and format_found == 'sdat':
-    def _load():
-      descr = GenotypeArrayDescriptor(models)
+  else:
+    raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
+                        % (namefile(filename),format,format_found))
 
-      chunkrows,chunkcols = gfile.root.genotypes.chunkshape
-      chunksize = max(1,int(scratch/(chunkcols*len(rows))))*chunkcols
-      chunkbits = chunksize*8
-      chunks    = int((gfile.root.genotypes.rowsize+chunksize-1)//chunksize)
-
-      stopbit = 0
-      stop    = 0
-      mods = iter(models)
-      for i in xrange(chunks):
-        start    = stop
-        startbit = stopbit
-
-        # Note: O(N) sequential search.  This could be done via binary search
-        while (stopbit-startbit) < chunkbits and stop < len(columns):
-          stop   += 1
-          stopbit = descr.offsets[stop]
-
-        labels     = columns[start:stop]
-        startbyte  = int(startbit//8)
-        stopbyte   = int((stopbit+7)//8)
-        offset     = int(startbit%8)
-        chunk      = gfile.root.genotypes[:,startbyte:stopbyte]
-        chunkdescr = GenotypeArrayDescriptor(models[start:stop],initial_offset=offset)
-
-        chunkgenos = []
-        for j in xrange(len(rows)):
-          g = GenotypeArray(chunkdescr)
-          g.data = chunk[j,:]
-          chunkgenos.append(g[:])
-
-        for j,label in enumerate(labels):
-          coldescr = GenotypeArrayDescriptor( [mods.next()]*len(rows) )
-          g = GenotypeArray(coldescr, imap(itemgetter(j), chunkgenos))
-          yield label,g
-
-      gfile.close()
-
-  elif format == 'sdat' and format_found == 'ldat':
-    def _load():
-      descr = GenotypeArrayDescriptor(models)
-
-      chunkrows,chunkcols = gfile.root.genotypes.chunkshape
-      chunksize = max(1,int(scratch/(chunkcols*len(rows))))*chunkcols
-      chunkbits = chunksize*8
-      chunks    = int((gfile.root.genotypes.rowsize+chunksize-1)//chunksize)
-
-      stopbit = 0
-      stop    = 0
-      for i in xrange(chunks):
-        start    = stop
-        startbit = stopbit
-
-        # Note: O(N) sequential search.  This could be done via binary search
-        while (stopbit-startbit) < chunkbits and stop < len(columns):
-          stop   += 1
-          stopbit = descr.offsets[stop]
-
-        labels     = columns[start:stop]
-        startbyte  = int(startbit//8)
-        stopbyte   = int((stopbit+7)//8)
-        offset     = int(startbit%8)
-        chunk      = gfile.root.genotypes[:,startbyte:stopbyte]
-
-        chunkgenos = []
-        for j in xrange(len(rows)):
-          chunkdescr = GenotypeArrayDescriptor([models[j]]*(stop-start),initial_offset=offset)
-          g = GenotypeArray(chunkdescr)
-          g.data = chunk[j,:]
-          chunkgenos.append(g[:])
-
-        for j,label in enumerate(labels):
-          g = GenotypeArray(descr, imap(itemgetter(j), chunkgenos))
-          yield label,g
-
-      gfile.close()
+  # FIXME: Broken for variable bit encoded data
+  #
+  #if format == 'ldat' and format_found == 'sdat':
+  #  def _load():
+  #    descr = GenotypeArrayDescriptor(models)
+  #
+  #    chunkrows,chunkcols = gfile.root.genotypes.chunkshape
+  #    chunksize = max(1,int(scratch/(chunkcols*len(rows))))*chunkcols
+  #    chunkbits = chunksize*8
+  #    chunks    = int((gfile.root.genotypes.rowsize+chunksize-1)//chunksize)
+  #
+  #    stopbit = 0
+  #    stop    = 0
+  #    mods = iter(models)
+  #    for i in xrange(chunks):
+  #      start    = stop
+  #      startbit = stopbit
+  #
+  #      # Note: O(N) sequential search.  This could be done via binary search
+  #      while (stopbit-startbit) < chunkbits and stop < len(columns):
+  #        stop   += 1
+  #        stopbit = descr.offsets[stop]
+  #
+  #      labels     = columns[start:stop]
+  #      startbyte  = int(startbit//8)
+  #      stopbyte   = int((stopbit+7)//8)
+  #      offset     = int(startbit%8)
+  #      chunk      = gfile.root.genotypes[:,startbyte:stopbyte]
+  #      chunkdescr = GenotypeArrayDescriptor(models[start:stop],initial_offset=offset)
+  #
+  #      chunkgenos = []
+  #      for j in xrange(len(rows)):
+  #        g = GenotypeArray(chunkdescr)
+  #        g.data = chunk[j,:]
+  #        chunkgenos.append(g[:])
+  #
+  #      for j,label in enumerate(labels):
+  #        coldescr = GenotypeArrayDescriptor( [mods.next()]*len(rows) )
+  #        g = GenotypeArray(coldescr, imap(itemgetter(j), chunkgenos))
+  #        yield label,g
+  #
+  #    gfile.close()
+  #
+  #elif format == 'sdat' and format_found == 'ldat':
+  #  def _load():
+  #    descr = GenotypeArrayDescriptor(models)
+  #
+  #    chunkrows,chunkcols = gfile.root.genotypes.chunkshape
+  #    chunksize = max(1,int(scratch/(chunkcols*len(rows))))*chunkcols
+  #    chunkbits = chunksize*8
+  #    chunks    = int((gfile.root.genotypes.rowsize+chunksize-1)//chunksize)
+  #
+  #    stopbit = 0
+  #    stop    = 0
+  #    for i in xrange(chunks):
+  #      start    = stop
+  #      startbit = stopbit
+  #
+  #      # Note: O(N) sequential search.  This could be done via binary search
+  #      while (stopbit-startbit) < chunkbits and stop < len(columns):
+  #        stop   += 1
+  #        stopbit = descr.offsets[stop]
+  #
+  #      labels     = columns[start:stop]
+  #      startbyte  = int(startbit//8)
+  #      stopbyte   = int((stopbit+7)//8)
+  #      offset     = int(startbit%8)
+  #      chunk      = gfile.root.genotypes[:,startbyte:stopbyte]
+  #
+  #      chunkgenos = []
+  #      for j in xrange(len(rows)):
+  #        chunkdescr = GenotypeArrayDescriptor([models[j]]*(stop-start),initial_offset=offset)
+  #        g = GenotypeArray(chunkdescr)
+  #        g.data = chunk[j,:]
+  #        chunkgenos.append(g[:])
+  #
+  #      for j,label in enumerate(labels):
+  #        g = GenotypeArray(descr, imap(itemgetter(j), chunkgenos))
+  #        yield label,g
+  #
+  #    gfile.close()
 
   genos = GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,genome=file_genome,
                                          phenome=phenome,unique=unique,packed=True)
