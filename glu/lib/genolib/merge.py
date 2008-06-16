@@ -18,13 +18,13 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 from   operator                  import itemgetter
-from   itertools                 import izip,starmap,dropwhile,repeat
+from   itertools                 import izip,starmap,dropwhile,repeat,imap
 from   collections               import defaultdict
 
 from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import table_writer
 
-from   glu.lib.genolib.genoarray import model_from_alleles
+from   glu.lib.genolib.genoarray import Genotype,model_from_alleles
 
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)
@@ -98,6 +98,162 @@ class Unique(object):
     else:
       raise NonUniqueGenotypeError('Non-unique genotype found')
 
+try:
+  from _genoarray import merge_unanimous as unanimous
+
+  def test_unanimous():
+    '''
+    >>> model = model_from_alleles('AB')
+    >>> missing = model[None,None]
+    >>> A,B='A','B'
+    >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
+    >>> unanimous(model,missing)
+    (4, (None, None))
+    >>> unanimous(model,None)
+    (4, (None, None))
+    >>> unanimous(model,[])
+    (4, (None, None))
+    >>> unanimous(model,AA)
+    (0, ('A', 'A'))
+    >>> unanimous(model,[AA])
+    (0, ('A', 'A'))
+    >>> unanimous(model,[missing,missing,missing])
+    (4, (None, None))
+    >>> unanimous(model,[AA,missing,missing,missing])
+    (0, ('A', 'A'))
+    >>> unanimous(model,[AA,AA,missing,AA,AA,AA])
+    (1, ('A', 'A'))
+    >>> unanimous(model,[AA,AA,missing,AA,AB,AA])
+    (3, (None, None))
+    '''
+
+  def test_genotype_merger():
+    '''
+    >>> model = model_from_alleles('AB')
+    >>> missing = model[None,None]
+    >>> A,B='A','B'
+    >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
+    >>> merger = GenotypeMerger(unanimous)
+    >>> merger.merge_geno('s1','l1',model,None)
+    (None, None)
+    >>> merger.merge_geno('s1','l1',model,[])
+    (None, None)
+    >>> merger.merge_geno('s1','l1',model,missing)
+    (None, None)
+    >>> merger.merge_geno('s1','l1',model,AA)
+    ('A', 'A')
+    >>> merger.merge_geno('s1','l1',model,[missing])
+    (None, None)
+    >>> merger.merge_geno('s1','l1',model,[AA])
+    ('A', 'A')
+    >>> merger.merge_geno('s1','l1',model,[AA,missing])
+    ('A', 'A')
+    >>> merger.merge_geno('s1','l1',model,[AA,missing,AA])
+    ('A', 'A')
+    >>> merger.merge_geno('s1','l1',model,[AA,AA])
+    ('A', 'A')
+    >>> merger.merge_geno('s1','l1',model,[AA,AA,AB])
+    (None, None)
+
+    >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+    [('l1', [3, 2, 0, 1, 4])]
+    >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+    [('s1', [3, 2, 0, 1, 4])]
+
+    >>> samples = ['s1','s2','s3','s4','s5','s6']
+    >>> locus   = 'l1'
+    >>> row     = [[AA,AA,missing,AA,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+    >>> merger = GenotypeMerger(unanimous)
+    >>> merger.merge_locus(samples, locus, model, row)
+    [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
+
+    >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+    [('l1', [1, 1, 0, 1, 3])]
+    >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+    [('s1', [0, 1, 0, 0, 0]), ('s2', [0, 0, 0, 0, 1]), ('s3', [0, 0, 0, 1, 0]), ('s4', [0, 0, 0, 0, 1]), ('s5', [0, 0, 0, 0, 1]), ('s6', [1, 0, 0, 0, 0])]
+
+    >>> sample = 's1'
+    >>> loci   = ['l1','l2','l3','l4','l5','l6']
+    >>> row    = [[AA,AA,missing,AA,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+    >>> merger = GenotypeMerger(unanimous)
+    >>> merger.merge_sample(sample, loci, [model]*6, row)
+    [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
+
+    >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+    [('l1', [0, 1, 0, 0, 0]), ('l2', [0, 0, 0, 0, 1]), ('l3', [0, 0, 0, 1, 0]), ('l4', [0, 0, 0, 0, 1]), ('l5', [0, 0, 0, 0, 1]), ('l6', [1, 0, 0, 0, 0])]
+    >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+    [('s1', [1, 1, 0, 1, 3])]
+    '''
+
+except ImportError:
+  def unanimous(model,genos):
+    '''
+    Determine a consensus genotype and a concordance class based on how that
+    genotype was chosen.  This method requires unanimous selection of
+    non-missing genotypes.
+
+    Classes:
+     0) unambiguous:  exactly one genotype and non-missing
+     1) concordant:   two or more concordant non-missing genotypes
+     2) consensus:    consensus of two or more non-missing genotypes determined by voting
+     3) discordant:   two or more non-missing genotypes that do not meet voting threshold
+     4) missing:      zero or more missing genotypes only
+
+    @param       model: new internal representation of genotypes
+    @type        model: UnphasedMarkerRepresentation or similar object
+    @param       genos: genotypes
+    @type        genos: sequence
+    @return           : concordance class, the consensus genotype
+    @rtype            : int,str
+
+    >>> model = model_from_alleles('AB')
+    >>> missing = model[None,None]
+    >>> A,B='A','B'
+    >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
+    >>> unanimous(model,missing)
+    (4, (None, None))
+    >>> unanimous(model,[AA])
+    (0, ('A', 'A'))
+    >>> unanimous(model,[missing,missing,missing])
+    (4, (None, None))
+    >>> unanimous(model,[AA,missing,missing,missing])
+    (0, ('A', 'A'))
+    >>> unanimous(model,[AA,AA,missing,AA,AA,AA])
+    (1, ('A', 'A'))
+    >>> unanimous(model,[AA,AA,missing,AA,AB,AA])
+    (3, (None, None))
+    '''
+    # Fast path
+    if not genos:
+      return MISSING,model[None,None]
+    elif isinstance(genos, Genotype):
+      return UNAMBIGUOUS,genos
+    elif len(genos)==1:
+      geno = genos[0]
+      if not geno:
+        return MISSING,geno
+      else:
+        return UNAMBIGUOUS,geno
+
+    # Slow path
+    genocounts = tally(g for g in genos if g)
+
+    if not genocounts:
+      return MISSING,model[None,None]
+    elif len(genocounts) == 1:
+      geno,n = genocounts.popitem()
+      if n == 1:
+        return UNAMBIGUOUS,geno
+      else:
+        return CONCORDANT,geno
+    else:
+      return DISCORDANT,model[None,None]
+
 
 class Vote(object):
   '''
@@ -162,6 +318,8 @@ class Vote(object):
     # Fast path
     if not genos:
       return MISSING,model[None,None]
+    elif isinstance(genos, Genotype):
+      return UNAMBIGUOUS,genos
     elif len(genos)==1:
       geno = genos[0]
       if not geno:
@@ -284,6 +442,8 @@ class Ordered(object):
     # Fast path
     if not genos:
       return MISSING,model[None,None]
+    elif isinstance(genos, Genotype):
+      return UNAMBIGUOUS,genos
     elif len(genos)==1:
       geno = genos[0]
       if not geno:
@@ -314,52 +474,11 @@ class Ordered(object):
       return DISCORDANT,model[None,None]
 
 
-class Merger(object):
-  '''
-  Object to form consensus/merged genotypes and track statistics on genotypes that
-  have been processed.
+try:
+  from _genoarray import GenotypeMerger
 
-  Two statistics objects are maintained, samplestats and locustats.  They
-  are dictionaries from sample and locus, respectively, to a five element
-  list contianing the following genotype counts:
-
-  0) unambiguous:  exactly one genotype and non-missing
-  1) concordant:   two or more concordant non-missing gentypes
-  2) consensus:    consensus of two or more non-missing genotypes determined by voting
-  3) discordant:   two or more non-missing genotypes that do not meet voting threshold
-  4) missing:      zero or more missing genotypes only
-  '''
-  def __init__(self, votefunc):
+  def test_merger():
     '''
-    Create a new Merger object
-    '''
-    self.votefunc = votefunc
-    self.clear()
-
-  def clear(self):
-    '''
-    Clear concordance statistics
-    '''
-    zeros = lambda: [0,0,0,0,0]
-    self.samplestats = defaultdict(zeros)
-    self.locusstats  = defaultdict(zeros)
-
-  def __call__(self,sample,locus,model,genos):
-    '''
-    Merge a group of genotypes into a consensus for a given sample and locus
-    and build merge statistics
-
-    @param sample: sample identifier
-    @type  sample: str
-    @param  locus: locus identifier
-    @type   locus: str
-    @param  model: new internal representation of genotypes
-    @type   model: UnphasedMarkerRepresentation or similar object
-    @param  genos: genotypes
-    @type   genos: sequence
-    @return      : consensus genotype
-    @rtype       : object
-
     >>> model = model_from_alleles('AB')
     >>> missing = model[None,None]
     >>> A,B='A','B'
@@ -369,41 +488,213 @@ class Merger(object):
     >>> loci     = ['l1','l2','l3','l1','l2','l3']
     >>> genosets = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-    >>> merger = Merger(Vote(threshold = 0.8))
-    >>> list(starmap(merger,izip(samples,loci,repeat(model),genosets)))
+    >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+    >>> list(starmap(merger.merge_geno,izip(samples,loci,repeat(model),genosets)))
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
-    >>> sorted(merger.samplestats.iteritems())
+    >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
     [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
-    >>> sorted(merger.locusstats.iteritems())
+    >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
     [('l1', [0, 0, 1, 0, 1]), ('l2', [0, 0, 0, 0, 2]), ('l3', [1, 0, 0, 1, 0])]
 
-    >>> merger = Merger(Vote(threshold = 0.8))
-    >>> merger_adapt = mergefunc_transpose_adapter(merger)
-    >>> list(starmap(merger_adapt,izip(loci,samples,repeat(model),genosets)))
+    >>> samples = ['s1','s2','s3','s4','s5','s6']
+    >>> locus   = 'l1'
+    >>> row     = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+    >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+    >>> merger.merge_locus(samples, locus, model, row)
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
-    >>> sorted(merger.samplestats.iteritems())
-    [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
-    >>> sorted(merger.locusstats.iteritems())
-    [('l1', [0, 0, 1, 0, 1]), ('l2', [0, 0, 0, 0, 2]), ('l3', [1, 0, 0, 1, 0])]
+    >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+    [('s1', [0, 0, 1, 0, 0]), ('s2', [0, 0, 0, 0, 1]), ('s3', [0, 0, 0, 1, 0]), ('s4', [0, 0, 0, 0, 1]), ('s5', [0, 0, 0, 0, 1]), ('s6', [1, 0, 0, 0, 0])]
+    >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+    [('l1', [1, 0, 1, 1, 3])]
+
+    >>> sample = 's1'
+    >>> loci   = ['l1','l2','l3','l4','l5','l6']
+    >>> row    = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+    >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+    >>> merger.merge_sample(sample, loci, [model]*6, row)
+    [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
+    >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+    [('s1', [1, 0, 1, 1, 3])]
+    >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+    [('l1', [0, 0, 1, 0, 0]), ('l2', [0, 0, 0, 0, 1]), ('l3', [0, 0, 0, 1, 0]), ('l4', [0, 0, 0, 0, 1]), ('l5', [0, 0, 0, 0, 1]), ('l6', [1, 0, 0, 0, 0])]
     '''
-    concordclass,geno = self.votefunc(model,genos)
 
-    self.samplestats[sample][concordclass] += 1
-    self.locusstats[locus][concordclass]   += 1
+except ImportError:
+  class GenotypeMerger(object):
+    '''
+    Object to form consensus/merged genotypes and track statistics on genotypes that
+    have been processed.
 
-    return geno
+    Two statistics objects are maintained, samplestats and locustats.  They
+    are dictionaries from sample and locus, respectively, to a five element
+    list contianing the following genotype counts:
+
+    0) unambiguous:  exactly one genotype and non-missing
+    1) concordant:   two or more concordant non-missing gentypes
+    2) consensus:    consensus of two or more non-missing genotypes determined by voting
+    3) discordant:   two or more non-missing genotypes that do not meet voting threshold
+    4) missing:      zero or more missing genotypes only
+    '''
+    def __init__(self, votefunc):
+      '''
+      Create a new GenotypeMerger object
+      '''
+      self.votefunc = votefunc
+      self.clear()
+
+    def clear(self):
+      '''
+      Clear concordance statistics
+      '''
+      zeros = lambda: [0,0,0,0,0]
+      self.samplestats = defaultdict(zeros)
+      self.locusstats  = defaultdict(zeros)
+
+    def merge_geno(self,sample,locus,model,genos):
+      '''
+      Merge a group of genotypes into a consensus for a given sample and locus
+      and build merge statistics
+
+      @param sample: sample identifier
+      @type  sample: str
+      @param  locus: locus identifier
+      @type   locus: str
+      @param  model: new internal representation of genotypes
+      @type   model: UnphasedMarkerRepresentation or similar object
+      @param  genos: genotypes
+      @type   genos: sequence
+      @return      : consensus genotype
+      @rtype       : object
+
+      >>> model = model_from_alleles('AB')
+      >>> missing = model[None,None]
+      >>> A,B='A','B'
+      >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
+      >>> samples  = ['s1','s1','s2','s2','s3','s3']
+      >>> loci     = ['l1','l2','l3','l1','l2','l3']
+      >>> genosets = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+      >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+      >>> list(starmap(merger.merge_geno,izip(samples,loci,repeat(model),genosets)))
+      [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
+      >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+      [('s1', [0, 0, 1, 0, 1]), ('s2', [0, 0, 0, 1, 1]), ('s3', [1, 0, 0, 0, 1])]
+      >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+      [('l1', [0, 0, 1, 0, 1]), ('l2', [0, 0, 0, 0, 2]), ('l3', [1, 0, 0, 1, 0])]
+      '''
+      concordclass,geno = self.votefunc(model,genos)
+
+      self.samplestats[sample][concordclass] += 1
+      self.locusstats[locus][concordclass]   += 1
+
+      return geno
+
+    def merge_locus(self, samples, locus, model, row):
+      '''
+      Merge a sequence of group of genotypes into a consensus for a list of
+      samples at a given locus and build merge statistics
+
+      @param samples: sequence of sample identifiers
+      @type  samples: list of str
+      @param   locus: locus identifier
+      @type    locus: str
+      @param   model: genotype model
+      @type    model: UnphasedMarkerRepresentation or similar object
+      @param     row: genotypes to merge
+      @type      row: sequence of genotype sequences
+      @return       : consensus genotypes
+      @rtype        : list of genotypes
+
+      >>> model = model_from_alleles('AB')
+      >>> missing = model[None,None]
+      >>> A,B='A','B'
+      >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
+      >>> samples = ['s1','s2','s3','s4','s5','s6']
+      >>> locus   = 'l1'
+      >>> row     = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+      >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+      >>> merger.merge_locus(samples, locus, model, row)
+      [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
+      >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+      [('s1', [0, 0, 1, 0, 0]), ('s2', [0, 0, 0, 0, 1]), ('s3', [0, 0, 0, 1, 0]), ('s4', [0, 0, 0, 0, 1]), ('s5', [0, 0, 0, 0, 1]), ('s6', [1, 0, 0, 0, 0])]
+      >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+      [('l1', [1, 0, 1, 1, 3])]
+      '''
+      status,new_row = zip(*imap(self.votefunc,repeat(model),row))
+
+      lstat = self.locusstats[locus]
+      sstat = self.samplestats
+      for sample,s in izip(samples,status):
+        lstat[s] += 1
+        sstat[sample][s] += 1
+
+      return list(new_row)
+
+    def merge_sample(self, sample, loci, models, row):
+      '''
+      Merge a sequence of group of genotypes into a consensus for a list of
+      loci for a given sample and build merge statistics
+
+      @param samples: sequence of sample identifiers
+      @type  samples: list of str
+      @param   locus: locus identifier
+      @type    locus: str
+      @param   model: genotype model
+      @type    model: UnphasedMarkerRepresentation or similar object
+      @param     row: genotypes to merge
+      @type      row: sequence of genotype sequences
+      @return       : consensus genotypes
+      @rtype        : list of genotypes
+
+      >>> model = model_from_alleles('AB')
+      >>> missing = model[None,None]
+      >>> A,B='A','B'
+      >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
+
+      >>> sample = 's1'
+      >>> loci   = ['l1','l2','l3','l4','l5','l6']
+      >>> row    = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
+
+      >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+      >>> merger.merge_sample(sample, loci, [model]*6, row)
+      [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
+      >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
+      [('s1', [1, 0, 1, 1, 3])]
+      >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
+      [('l1', [0, 0, 1, 0, 0]), ('l2', [0, 0, 0, 0, 1]), ('l3', [0, 0, 0, 1, 0]), ('l4', [0, 0, 0, 0, 1]), ('l5', [0, 0, 0, 0, 1]), ('l6', [1, 0, 0, 0, 0])]
+      '''
+      status,new_row = zip(*imap(self.votefunc,models,row))
+
+      lstat = self.locusstats
+      sstat = self.samplestats[sample]
+      for locus,s in izip(loci,status):
+        lstat[locus][s] += 1
+        sstat[s] += 1
+
+      return list(new_row)
 
 
 def UniqueMerger(threshold=None):
-  return Merger(Unique())
+  return GenotypeMerger(Unique())
+
+
+def UnanimousMerger(threshold=None):
+  return GenotypeMerger(unanimous)
 
 
 def VoteMerger(threshold=1.0):
-  return Merger(Vote(threshold=threshold))
+  if threshold>=1.0:
+    return UnanimousMerger()
+  return GenotypeMerger(Vote(threshold=threshold))
 
 
 def OrderedMerger(threshold=0.4999999):
-  return Merger(Ordered(threshold=threshold))
+  return GenotypeMerger(Ordered(threshold=threshold))
 
 
 def get_genomerger(mergername):
@@ -422,7 +713,9 @@ def get_genomerger(mergername):
 
   name = parts[0].lower()
 
-  if name == 'unique':
+  if name == 'unanimous':
+    merger = UnanimousMerger
+  elif name == 'unique':
     merger = UniqueMerger
   elif name == 'vote':
     merger = VoteMerger
@@ -464,8 +757,8 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   ...            [AB],[AA],[AA,AA,AA,AA,AB],[AB,AB],
   ...            [AA,AB,AB],[AA,AA],[AA,missing,missing,missing],[AA,AA,AA]]
 
-  >>> merger = Merger(Vote(threshold = 0.8))
-  >>> list(starmap(merger, izip(samples,loci,repeat(model),genosets))) # doctest: +NORMALIZE_WHITESPACE
+  >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+  >>> list(starmap(merger.merge_geno, izip(samples,loci,repeat(model),genosets))) # doctest: +NORMALIZE_WHITESPACE
   [('A', 'A'), (None, None), ('A', 'A'), (None, None), (None, None), ('A', 'A'),
    ('A', 'A'), (None, None), ('A', 'B'), ('A', 'A'), ('A', 'A'), ('A', 'B'),
    (None, None), ('A', 'A'), ('A', 'A'), ('A', 'A')]
@@ -514,18 +807,6 @@ def build_concordance_output(stats):
     # calculate the percentage of missing genotypes after mergerd
     missing_rate  = '%.6f' % (float(missing+discordant)/total)
     yield key,unambiguous,concordant,consensus,discordant,discord_rate,missing,missing_rate
-
-
-def mergefunc_transpose_adapter(mergefunc):
-  '''
-  Return a new mergefunc that transposes the calling convention for samples and loci
-
-  @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
-  @type   mergefunc: callable
-  '''
-  def _mergefunc_transpose_adapter(locus,sample,model,genos):
-    return mergefunc(sample,locus,model,genos)
-  return _mergefunc_transpose_adapter
 
 
 def _test():

@@ -39,7 +39,7 @@ try:
                                             count_genotypes, genotype_categories,
                                             locus_summary, sample_summary, genoarray_concordance,
                                             GenotypeLookupError, GenotypeRepresentationError,
-                                            pick, pick_column)
+                                            pick, pick_column, place, place_list)
 
 except ImportError:
   import sys
@@ -846,12 +846,12 @@ except ImportError:
     return sample_counts,locus_counts
 
 
-  def pick(genos, indices):
+  def pick(row, indices):
     '''
     Pick a list of genotypes from a list of indices
 
-    @param    genos: genotype sequence
-    @type     genos: sequence
+    @param      row: genotype sequence
+    @type       row: sequence
     @param  indices: sequence of indices
     @type   indices: sequence
     @return        : sequence with elements from the specified indices
@@ -869,9 +869,9 @@ except ImportError:
     >>> pick(GenotypeArray(descr,model.genotypes),[3,2,0])
     [('B', 'B'), ('A', 'B'), (None, None)]
     '''
-    if isinstance(genos,GenotypeArray):
-      return genos[indices]
-    return [ genos[i] for i in indices ]
+    if isinstance(row,GenotypeArray):
+      return row[indices]
+    return [ row[i] for i in indices ]
 
 
   def pick_column(rows, index):
@@ -898,6 +898,88 @@ except ImportError:
       return [ row[index] for row in rows ]
     else:
       return [ [ row[i] for row in rows ] for i in index ]
+
+
+  def place(dest, src, indices):
+    '''
+    Place items from a sequence at indices into a destination sequence
+
+    @param     dest: destination sequence
+    @type      dest: sequence
+    @param      src: source sequence
+    @type       src: sequence
+    @param  indices: sequence of indices
+    @type   indices: sequence
+    @return        : dest updated with elements of src
+    @rtype         : sequence
+
+    >>> model = model_from_alleles('AB')
+    >>> descr = GenotypeArrayDescriptor([model]*4)
+    >>> model.genotypes
+    [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+    >>> genos = model.genotypes
+
+    >>> place([None]*4, model.genotypes, [3,2,0,1])
+    [('A', 'B'), ('B', 'B'), ('A', 'A'), (None, None)]
+
+    >>> place([None]*4, GenotypeArray(descr,model.genotypes),[3,2,0,1])
+    [('A', 'B'), ('B', 'B'), ('A', 'A'), (None, None)]
+    '''
+    if len(src) != len(indices):
+      raise ValueError('source data and index length mismatch')
+
+    for v,i in izip(src,indices):
+      dest[i] = v
+
+    return dest
+
+
+  def place_list(dest, src, indices):
+    '''
+    Place items from a sequence at indices into a destination sequence
+    concatenating into lists if items are not None
+
+    @param     dest: destination sequence
+    @type      dest: sequence
+    @param      src: source sequence
+    @type       src: sequence
+    @param  indices: sequence of indices
+    @type   indices: sequence
+    @return        : dest updated with elements of src
+    @rtype         : sequence
+
+    >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
+    [None, 'A', ['A', 'A', 'B'], None]
+
+    >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
+    [None, 'A', ['A', 'A', 'B'], None]
+    '''
+    if len(src) != len(indices):
+      raise ValueError('source data and index length mismatch')
+
+    for s,i in izip(src,indices):
+      d = dest[i]
+
+      if s is None:
+        s = []
+      elif not isinstance(s,list):
+        s = [s]
+
+      if d is None:
+        d = []
+      elif not isinstance(d,list):
+        d = [d]
+
+      res = d+s
+
+      if not res:
+        res = None
+      elif len(res) == 1:
+        res = res[0]
+
+      dest[i] = res
+
+    return dest
 
 
 ###############################################################################
@@ -1782,6 +1864,32 @@ def test_pick_column():
 
   #>>> #pick_column([[0,1,2],[3,4,5],[6,7,8]],[0,2])
   #[[0, 3, 6], [2, 5, 8]]
+  '''
+
+
+def test_place():
+  '''
+  >>> model = model_from_alleles('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*4)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> genos = model.genotypes
+
+  >>> place([None]*4, model.genotypes, [3,2,0,1])
+  [('A', 'B'), ('B', 'B'), ('A', 'A'), (None, None)]
+
+  >>> place([None]*4, GenotypeArray(descr,model.genotypes),[3,2,0,1])
+  [('A', 'B'), ('B', 'B'), ('A', 'A'), (None, None)]
+  '''
+
+
+def test_place_list():
+  '''
+  >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
+  [None, 'A', ['A', 'B', 'A'], None]
+
+  >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
+  [None, 'A', ['A', 'B', 'A'], None]
   '''
 
 

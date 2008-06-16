@@ -19,6 +19,7 @@ See GLU license for terms by running: glu license
 #include "structmember.h"
 #include "numpy/arrayobject.h"
 #include "bitarrayc.h"
+#include "_genoarray.h"
 
 #ifdef STDC_HEADERS
 #include <stddef.h>
@@ -28,70 +29,22 @@ See GLU license for terms by running: glu license
 
 #include <math.h>
 
-/* Genotype Array objects declarations */
+#define MERGE_UNAMBIGUOUS 0
+#define MERGE_CONCORDANT  1
+#define MERGE_CONSENSUS   2
+#define MERGE_DISCORDANT  3
+#define MERGE_MISSING     4
 
-typedef struct {
-	PyObject_HEAD
-	PyObject      *models;
-	PyArrayObject *offsets;
-	unsigned int  bit_size;
-	unsigned int  max_bit_size;
-	unsigned int  byte_size;
-	unsigned int  homogeneous;
-} GenotypeArrayDescriptorObject;
-
-typedef struct {
-	PyObject_HEAD
-	GenotypeArrayDescriptorObject *descriptor;
-	unsigned char data[];
-} GenotypeArrayObject;
-
-typedef struct {
-	PyObject_HEAD
-	PyObject      *genomap;
-	PyObject      *genotypes;
-	PyObject      *genotuples;
-	PyObject      *alleles;
-	unsigned short max_alleles;
-	unsigned short allow_hemizygote;
-	unsigned short bit_size;
-} UnphasedMarkerModelObject;
-
-typedef struct {
-	PyObject_HEAD
-	UnphasedMarkerModelObject *model;
-	unsigned int   index;
-	unsigned int   allele1_index;
-	unsigned int   allele2_index;
-} GenotypeObject;
-
-/* Forward declaration */
-static PyTypeObject UnphasedMarkerModelType;
-static PyTypeObject GenotypeArrayType;
-static PyTypeObject GenotypeType;
-
-#define GenotypeArray_Check(op)                PyObject_TypeCheck(op, &GenotypeArrayType)
-#define GenotypeArray_CheckExact(op)           ((op)->ob_type == &GenotypeArrayType)
-#define UnphasedMarkerModel_Check(op)         (((op)->ob_type == &UnphasedMarkerModelType) || PyObject_TypeCheck(op, &UnphasedMarkerModelType))
-#define UnphasedMarkerModel_CheckExact(op)     ((op)->ob_type == &UnphasedMarkerModelType)
-#define Genotype_CheckExact(op)                ((op)->ob_type == &GenotypeType)
-#define GenotypeArrayDescriptor_CheckExact(op) ((op)->ob_type == &GenotypeArrayDescriptorType)
 #define CountArray_Check(op,len)               (PyArray_Check((op)) && PyArray_NDIM((op))== 1 && PyArray_DIMS((op))[0]==(len) \
-		                                && PyArray_TYPE((op))==PyArray_LONG)
+                                                && PyArray_TYPE((op))==PyArray_LONG)
 #define CountArray_Check2(op,len1,len2)        (PyArray_Check((op)) && PyArray_NDIM((op))== 2 && PyArray_DIMS((op))[0]==(len1) \
-		                                && PyArray_DIMS((op))[1]==(len2) && PyArray_TYPE((op))==PyArray_LONG)
-
-typedef int (*geno_foreach)(Py_ssize_t i, GenotypeObject *geno, void *state);
-
-static int
-for_each_genotype_genoarray(GenotypeArrayObject *genos, geno_foreach func, void *state);
-
-static int
-for_each_genotype(PyObject *genos, geno_foreach func, void *state);
+                                                && PyArray_DIMS((op))[1]==(len2) && PyArray_TYPE((op))==PyArray_LONG)
 
 /* Exceptions */
-static PyObject *GenotypeLookupError;
-static PyObject *GenotypeRepresentationError;
+PyObject *GenotypeLookupError;
+PyObject *GenotypeRepresentationError;
+
+/******************************************************************************************************/
 
 static int
 genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
@@ -167,11 +120,8 @@ genotype_traverse(GenotypeObject *self, visitproc visit, void *arg)
 static PyObject *
 genotype_allele1_get(GenotypeObject *self)
 {
-	PyObject *allele1;
-
-	allele1 = PyList_GetItem(self->model->alleles, self->allele1_index);
-	if(allele1)
-		Py_INCREF(allele1);
+	PyObject *allele1 = PyList_GetItem(self->model->alleles, self->allele1_index);
+	Py_XINCREF(allele1);
 	return allele1;
 
 }
@@ -179,11 +129,8 @@ genotype_allele1_get(GenotypeObject *self)
 static PyObject *
 genotype_allele2_get(GenotypeObject *self)
 {
-	PyObject *allele2;
-
-	allele2 = PyList_GetItem(self->model->alleles, self->allele2_index);
-	if(allele2)
-		Py_INCREF(allele2);
+	PyObject *allele2 = PyList_GetItem(self->model->alleles, self->allele2_index);
+	Py_XINCREF(allele2);
 	return allele2;
 }
 
@@ -191,8 +138,7 @@ static PyObject *
 genotype_alleles(GenotypeObject *self)
 {
 	PyObject *result = PyList_GetItem(self->model->genotuples, self->index);
-	if(result)
-		Py_INCREF(result);
+	Py_XINCREF(result);
 	return result;
 }
 
@@ -393,7 +339,7 @@ static PySequenceMethods genotype_as_sequence = {
 	0,					/* sq_inplace_repeat */
 };
 
-static PyTypeObject GenotypeType = {
+PyTypeObject GenotypeType = {
 	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size           */
 	"Genotype",				/* tp_name           */
@@ -435,6 +381,8 @@ static PyTypeObject GenotypeType = {
 	PyType_GenericNew,			/* tp_new            */
 	PyObject_Del,				/* tp_free           */
 };
+
+/******************************************************************************************************/
 
 static int
 descr_clear(GenotypeArrayDescriptorObject *self)
@@ -574,7 +522,7 @@ static PySequenceMethods descr_as_sequence = {
 	0,					/* sq_inplace_repeat */
 };
 
-static PyTypeObject GenotypeArrayDescriptorType = {
+PyTypeObject GenotypeArrayDescriptorType = {
 	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size           */
 	"GenotypeArrayDescriptor",		/* tp_name           */
@@ -989,7 +937,7 @@ static PyMemberDef genomodel_members[] = {
 PyDoc_STRVAR(genomodel_doc,
 "UnphasedMarkerModelObject(allow_hemizygote=False, max_alleles=2)\n");
 
-static PyTypeObject UnphasedMarkerModelType = {
+PyTypeObject UnphasedMarkerModelType = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size           */
 	"UnphasedMarkerModel",                  /* tp_name           */
@@ -1342,7 +1290,7 @@ genoarray_pick(GenotypeArrayObject *self, PyObject *indices)
 	if(!indseq) goto error;
 
 	len = PySequence_Fast_GET_SIZE(indseq);
-        indexitems = PySequence_Fast_ITEMS(indseq);
+	indexitems = PySequence_Fast_ITEMS(indseq);
 
 	result = PyList_New(len);
 	if(!result) goto error;
@@ -1541,7 +1489,7 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 
 		if(m != slicelength) {
 			PyErr_Format(PyExc_ValueError, "attempt to assign sequence of size %zd to slice of size %zd",
-				     m, slicelength);
+			             m, slicelength);
 			goto error;
 		}
 
@@ -1846,8 +1794,8 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 	{
 		if(!CountArray_Check(count_array,model_len))
 		{
-	                PyErr_SetString(PyExc_ValueError,"invalid count array");
-	                return NULL;
+			PyErr_SetString(PyExc_ValueError,"invalid count array");
+			return NULL;
 		}
 		Py_INCREF(count_array);
 	}
@@ -1949,8 +1897,8 @@ genotype_categories(PyObject *genos, PyObject *count_array)
 	{
 		if(!CountArray_Check(count_array,count_len))
 		{
-	                PyErr_SetString(PyExc_ValueError,"invalid count array");
-	                return NULL;
+			PyErr_SetString(PyExc_ValueError,"invalid count array");
+			return NULL;
 		}
 		Py_INCREF(count_array);
 	}
@@ -2053,7 +2001,7 @@ static PyMethodDef genoarray_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyTypeObject GenotypeArrayType = {
+PyTypeObject GenotypeArrayType = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size           */
 	"GenotypeArray",                        /* tp_name           */
@@ -2096,7 +2044,7 @@ static PyTypeObject GenotypeArrayType = {
 	PyObject_Del,				/* tp_free           */
 };
 
-static int
+int
 for_each_genotype_genoarray(GenotypeArrayObject *genos, geno_foreach func, void *state)
 {
 	UnphasedMarkerModelObject *model;
@@ -2232,7 +2180,7 @@ error:
 	return -1;
 }
 
-static int
+int
 for_each_genotype(PyObject *genos, geno_foreach func, void *state)
 {
 	PyObject **items;
@@ -2346,7 +2294,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 	{
 		if(!CountArray_Check(locus_counts,model_len))
 		{
-	                PyErr_SetString(PyExc_ValueError,"invalid locus count array");
+			PyErr_SetString(PyExc_ValueError,"invalid locus count array");
 			goto error;
 		}
 	}
@@ -2361,7 +2309,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 	{
 		if(!CountArray_Check2(sample_counts,len,4))
 		{
-	                PyErr_SetString(PyExc_ValueError,"invalid sample count array");
+			PyErr_SetString(PyExc_ValueError,"invalid sample count array");
 			goto error;
 		}
 	}
@@ -2445,8 +2393,8 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 	{
 		if(!CountArray_Check(sample_counts,4))
 		{
-	                PyErr_SetString(PyExc_ValueError,"invalid sample count array");
-	                goto error;
+			PyErr_SetString(PyExc_ValueError,"invalid sample count array");
+			goto error;
 		}
 	}
 	else
@@ -2460,8 +2408,8 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 	{
 		if(!CountArray_Check2(locus_counts,len,PyArray_DIMS(locus_counts)[1]))
 		{
-	                PyErr_SetString(PyExc_ValueError,"invalid locus count array");
-	                goto error;
+			PyErr_SetString(PyExc_ValueError,"invalid locus count array");
+			goto error;
 		}
 		state.max_genos = PyArray_DIMS(locus_counts)[1];
 	}
@@ -2971,7 +2919,7 @@ pick_column_single(PyObject *rows, Py_ssize_t index)
 	if(!rows) goto error;
 
 	len   = PySequence_Fast_GET_SIZE(rows);
-        items = PySequence_Fast_ITEMS(rows);
+	items = PySequence_Fast_ITEMS(rows);
 
 	result = PyList_New(len);
 	if(!result) goto error;
@@ -3007,16 +2955,16 @@ pick_column_multiple(PyObject *rows, PyObject *indices)
 	if(!indices) goto error;
 
 	rowlen     = PySequence_Fast_GET_SIZE(rows);
-        rowitems   = PySequence_Fast_ITEMS(rows);
+	rowitems   = PySequence_Fast_ITEMS(rows);
 	indexlen   = PySequence_Fast_GET_SIZE(indices);
-        indexitems = PySequence_Fast_ITEMS(indices);
+	indexitems = PySequence_Fast_ITEMS(indices);
 
-        result = PyList_New(indexlen);
+	result = PyList_New(indexlen);
 	if(!result) goto error;
 
-        resultitems = PySequence_Fast_ITEMS(result);
+	resultitems = PySequence_Fast_ITEMS(result);
 
-        indexarray = malloc( sizeof(Py_ssize_t)*indexlen );
+	indexarray = malloc( sizeof(Py_ssize_t)*indexlen );
 	if(!indexarray) goto error;
 
 	for(i=0; i<indexlen; ++i)
@@ -3077,6 +3025,667 @@ pick_column(PyObject *self, PyObject *args)
 
 /******************************************************************************************************/
 
+static PyObject *
+place(PyObject *self, PyObject *args)
+{
+	Py_ssize_t i, j, srclen, indexlen, destlen;
+	PyObject *dest, *src, *indices;
+	PyObject *srcseq=NULL, *indseq=NULL;
+	PyObject **srcitems, **indexitems;
+
+	if(!PyArg_ParseTuple(args, "OOO", &dest, &src, &indices))
+		return NULL;
+
+	destlen = PySequence_Size(dest);
+	if(destlen == -1) goto error;
+
+	srcseq = PySequence_Fast(src,"cannot convert source data into a sequence");
+	if(!srcseq) goto error;
+
+	indseq = PySequence_Fast(indices,"cannot convert indices into a sequence");
+	if(!indseq) goto error;
+
+	srclen   = PySequence_Fast_GET_SIZE(srcseq);
+	indexlen = PySequence_Fast_GET_SIZE(indseq);
+
+	if(srclen != indexlen)
+	{
+		PyErr_SetString(PyExc_ValueError,"source data and index length mismatch");
+		goto error;
+	}
+
+	srcitems   = PySequence_Fast_ITEMS(srcseq);
+	indexitems = PySequence_Fast_ITEMS(indseq);
+
+	for(i=0; i<indexlen; i++)
+	{
+		j = PyNumber_AsSsize_t(indexitems[i], PyExc_IndexError);
+		if(j==-1 && PyErr_Occurred()) goto error;
+
+		if( PySequence_SetItem(dest, j, srcitems[i]) < 0 ) goto error;
+	}
+
+	Py_DECREF(srcseq);
+	Py_DECREF(indseq);
+	Py_INCREF(dest);
+	return dest;
+
+error:
+	Py_XDECREF(srcseq);
+	Py_XDECREF(indseq);
+	return NULL;
+}
+
+/******************************************************************************************************/
+
+static PyObject *
+place_list(PyObject *self, PyObject *args)
+{
+	Py_ssize_t i, srclen, indexlen, destlen;
+	PyObject *dest, *src, *indices, *srcitem, *destitem;
+	PyObject *srcseq=NULL, *indseq=NULL;
+	PyObject **srcitems, **indexitems;
+
+	if(!PyArg_ParseTuple(args, "OOO", &dest, &src, &indices))
+		return NULL;
+
+	destlen = PySequence_Size(dest);
+	if(destlen == -1) goto error;
+
+	srcseq = PySequence_Fast(src,"cannot convert source data into a sequence");
+	if(!srcseq) goto error;
+
+	indseq = PySequence_Fast(indices,"cannot convert indices into a sequence");
+	if(!indseq) goto error;
+
+	srclen   = PySequence_Fast_GET_SIZE(srcseq);
+	indexlen = PySequence_Fast_GET_SIZE(indseq);
+
+	if(srclen != indexlen)
+	{
+		PyErr_SetString(PyExc_ValueError,"source data and index length mismatch");
+		goto error;
+	}
+
+	srcitems   = PySequence_Fast_ITEMS(srcseq);
+	indexitems = PySequence_Fast_ITEMS(indseq);
+
+	for(i=0; i<indexlen; i++)
+	{
+		int ret;
+		Py_ssize_t j = PyNumber_AsSsize_t(indexitems[i], PyExc_IndexError);
+
+		if(j==-1 && PyErr_Occurred()) goto error;
+
+		srcitem  = srcitems[i];
+		destitem = PySequence_GetItem(dest, j);
+
+		if(!destitem)
+		{
+			goto error;
+		}
+		else if(srcitem == Py_None)
+		{
+			/* pass */
+			Py_DECREF(destitem);
+		}
+		else if(destitem == Py_None)
+		{
+			Py_DECREF(destitem);
+			if(PyList_CheckExact(srcitem) && PyList_GET_SIZE(srcitem)==1)
+				srcitem = PyList_GET_ITEM(srcitem,0);
+			if( PySequence_SetItem(dest, j, srcitem) < 0) goto error;
+		}
+		else if(PyList_CheckExact(destitem) && PyList_CheckExact(srcitem))
+		{
+			PyObject *items = PySequence_InPlaceConcat(destitem, srcitem);
+			Py_DECREF(destitem);
+			if(!items || PySequence_SetItem(dest, j, items) < 0)
+			{
+				Py_XDECREF(items);
+				goto error;
+			}
+			Py_DECREF(items);
+		}
+		else if(PyList_CheckExact(destitem) && !PyList_CheckExact(srcitem))
+		{
+			int ret = PyList_Append(destitem, srcitem);
+			Py_DECREF(destitem);
+			if(ret < 0) goto error;
+		}
+		else if(!PyList_CheckExact(destitem) && PyList_CheckExact(srcitem))
+		{
+			ret = PyList_Append(srcitem, destitem);
+			Py_DECREF(destitem);
+			if(ret < 0 || PySequence_SetItem(dest, j, srcitem) < 0)
+				goto error;
+		}
+		else
+		{
+			PyObject *items = PyList_New(2);
+			if(!items)
+			{
+				Py_DECREF(destitem);
+				goto error;
+			}
+			PyList_SET_ITEM(items, 0, destitem);
+			PyList_SET_ITEM(items, 1, srcitem);
+			Py_INCREF(srcitem);
+
+			ret = PySequence_SetItem(dest, j, items);
+			Py_DECREF(items);
+
+			if(ret < 0) goto error;
+		}
+	}
+
+	Py_DECREF(srcseq);
+	Py_DECREF(indseq);
+	Py_INCREF(dest);
+	return dest;
+
+error:
+	Py_XDECREF(srcseq);
+	Py_XDECREF(indseq);
+	return NULL;
+}
+
+/******************************************************************************************************/
+
+static GenotypeObject *
+merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *status)
+{
+	Py_ssize_t i, len, found=0;
+	PyObject *genoseq=NULL;
+	GenotypeObject *genofound=NULL, *missing=NULL;
+	PyObject **items;
+
+	*status = MERGE_MISSING;
+
+	if(!UnphasedMarkerModel_Check(model))
+	{
+		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
+		goto error;
+	}
+
+	if(genos==Py_None)
+	{
+		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0);
+		Py_XINCREF(genofound);
+		return genofound;
+	}
+
+	if(Genotype_CheckExact(genos))
+	{
+		GenotypeObject *genofound = (GenotypeObject *)genos;
+		if(genofound->model != model)
+		{
+			PyErr_Format(GenotypeRepresentationError,
+		             "invalid genotype object in genos at index %zd", 0L);
+			goto error;
+		}
+		if(genofound->index != 0)
+			*status = MERGE_UNAMBIGUOUS;
+		Py_INCREF(genofound);
+		return genofound;
+	}
+
+	genoseq = PySequence_Fast(genos,"genos is not a genotype or a sequence");
+	if(!genoseq) goto error;
+
+	len   = PySequence_Fast_GET_SIZE(genoseq);
+	items = PySequence_Fast_ITEMS(genoseq);
+
+	for(i=0, found=0; i<len; ++i)
+	{
+		GenotypeObject *geno = (GenotypeObject *)items[i];
+
+		if(!geno || !Genotype_CheckExact(geno) || geno->model != model)
+		{
+			PyErr_Format(GenotypeRepresentationError,
+		             "invalid genotype object in genos at index %zd", i);
+			goto error;
+		}
+
+		if(geno->index == 0)
+		{
+			missing = geno;
+			continue;
+		}
+		else if(!genofound)
+			genofound = geno;
+		else if(genofound != geno)
+		{
+			*status = MERGE_DISCORDANT;
+			found = 0;
+			break;
+		}
+		found++;
+	}
+
+	if(!found)
+	{
+		if(missing)
+			genofound = missing;
+		else
+			genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0);
+	}
+	else if(found == 1)
+		*status = MERGE_UNAMBIGUOUS;
+	else
+		*status = MERGE_CONCORDANT;
+
+	Py_XDECREF(genoseq);
+	Py_XINCREF(genofound);
+	return genofound;
+
+error:
+	Py_XDECREF(genoseq);
+	return NULL;
+}
+
+static PyObject *
+merge_unanimous_func(PyObject *self, PyObject *args)
+{
+	Py_ssize_t status;
+	PyObject *genos, *geno, *result=NULL;
+	UnphasedMarkerModelObject *model;
+
+	if(!PyArg_ParseTuple(args, "OO", &model, &genos))
+		return NULL;
+
+	geno = (PyObject *)merge_unanimous(model, genos, &status);
+	if(!geno) return NULL;
+
+	result = PyTuple_Pack(2, PyInt_FromSsize_t(status), geno);
+	Py_DECREF(geno);
+
+	return result;
+}
+
+/******************************************************************************************************/
+
+static int
+genomerger_init(GenotypeMergerObject *self, PyObject *args, PyObject *kwds)
+{
+	static char *kwlist[] = {"mergefunc", "trackstats", NULL};
+
+	self->cmergefunc  = NULL;
+	self->pymergefunc = self->samplestats = self->locusstats = NULL;
+	self->trackstats  = 1;
+
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|i", kwlist,
+		&self->pymergefunc, &self->trackstats))
+		return -1;
+
+	if(PyCFunction_Check(self->pymergefunc) &&
+	   PyCFunction_GetFunction(self->pymergefunc) == merge_unanimous_func)
+	{
+		self->cmergefunc = merge_unanimous;
+	}
+
+	/* FIXME: Add error checking */
+	self->locusstats  = PyDict_New();
+	self->samplestats = PyDict_New();
+
+	Py_INCREF(self->pymergefunc);
+	return 0;
+}
+
+static int
+genomerger_clear(GenotypeMergerObject *self)
+{
+	Py_CLEAR(self->pymergefunc);
+	Py_CLEAR(self->samplestats);
+	Py_CLEAR(self->locusstats);
+	return 0;
+}
+
+static void
+genomerger_dealloc(GenotypeMergerObject *self)
+{
+	genomerger_clear(self);
+	self->ob_type->tp_free((PyObject *)self);
+}
+
+static int
+genomerger_traverse(GenotypeMergerObject *self, visitproc visit, void *arg)
+{
+	Py_VISIT(self->pymergefunc);
+	return 0;
+}
+
+static PyObject *
+genomerger_merge_genotype_py(GenotypeMergerObject *self, PyObject *model, PyObject *genos, Py_ssize_t *status)
+{
+	PyObject *result;
+	GenotypeObject *geno;
+
+	result = PyObject_CallFunction(self->pymergefunc, "(OO)", model, genos);
+	if(!result) return NULL;
+
+	if(!PyTuple_Check(result) || PyTuple_GET_SIZE(result) != 2
+	|| !Genotype_CheckExact(PyTuple_GET_ITEM(result,1)))
+	{
+		PyErr_SetString(PyExc_TypeError,"genotype merger must return a 2-tuple of status and genotype");
+		Py_DECREF(result);
+		return NULL;
+	}
+	*status = PyInt_AsSsize_t(PyTuple_GET_ITEM(result,0));
+	if(*status==-1 && PyErr_Occurred())
+	{
+		Py_DECREF(result);
+		return NULL;
+	}
+	geno = (GenotypeObject *)PyTuple_GET_ITEM(result,1);
+	Py_INCREF(geno);
+	Py_DECREF(result);
+	return (PyObject *)geno;
+}
+
+static inline PyObject *
+genomerger_merge_genotype(GenotypeMergerObject *self, PyObject *model, PyObject *genos, Py_ssize_t *status)
+{
+	if(self->cmergefunc)
+		return (PyObject *)self->cmergefunc( (UnphasedMarkerModelObject *)model, genos, status);
+	else
+		return genomerger_merge_genotype_py(self, model, genos, status);
+}
+
+static inline PyObject *
+genomerger_get_stats(PyObject *sdict, PyObject *key)
+{
+	PyObject *stats;
+
+	stats = PyDict_GetItem(sdict, key);
+
+	if(!stats && PyErr_Occurred()) return NULL;
+
+	if(!stats)
+	{
+		int dims = 5;
+
+		stats = PyArray_FromDims(1, &dims, PyArray_LONG);
+		if(!stats) return NULL;
+		PyArray_FILLWBYTE(stats, 0);
+
+		if(PyDict_SetItem(sdict, key, stats) < 0)
+		{
+			Py_DECREF(stats);
+			return NULL;
+		}
+		Py_DECREF(stats);
+	}
+	/* borrowed ref */
+	return stats;
+}
+
+static inline int
+genomerger_update_stats(PyObject *stats, Py_ssize_t status)
+{
+	Py_ssize_t *statarray;
+
+	if(!CountArray_Check(stats,5))
+	{
+		PyErr_SetString(PyExc_ValueError,"invalid statistics array");
+		return -1;
+	}
+
+	statarray = PyArray_DATA(stats);
+
+	if(status < 0 || status > 4)
+	{
+		PyErr_SetString(PyExc_IndexError,"invalid genotype merge status");
+		return -1;
+	}
+	statarray[status] += 1;
+	return 0;
+}
+
+static PyObject *
+genomerger_merge_geno(GenotypeMergerObject *self, PyObject *args)
+{
+	PyObject *sample, *locus, *model, *genos, *geno;
+	Py_ssize_t status;
+
+	if(!PyArg_ParseTuple(args, "OOOO", &sample, &locus, &model, &genos))
+		return NULL;
+
+	geno = genomerger_merge_genotype(self, model, genos, &status);
+
+	if(self->trackstats)
+	{
+		PyObject *stats;
+
+		/* borrowed ref: stats */
+		stats = genomerger_get_stats(self->samplestats, sample);
+		if(!stats) goto error;
+		if( genomerger_update_stats(stats, status)<0 ) goto error;
+
+		stats = genomerger_get_stats(self->locusstats, locus);
+		if(!stats) goto error;
+		if( genomerger_update_stats(stats, status)<0 ) goto error;
+	}
+
+	return geno;
+
+error:
+	Py_DECREF(geno);
+	return NULL;
+}
+
+static PyObject *
+genomerger_merge_sample(GenotypeMergerObject *self, PyObject *args)
+{
+	PyObject *sample, *loci, *models, *genos, *geno, *samplestats=NULL;
+	PyObject *locusseq=NULL, *modelseq=NULL, *genoseq=NULL, *result=NULL;
+	PyObject **locusitems, **modelitems, **genoitems;
+	Py_ssize_t locuslen, modellen, genolen, status, i;
+
+	if(!PyArg_ParseTuple(args, "OOOO", &sample, &loci, &models, &genos))
+		return NULL;
+
+	locusseq = PySequence_Fast(loci,"cannot convert loci into a sequence");
+	if(!locusseq) goto error;
+
+	modelseq = PySequence_Fast(models,"cannot convert models into a sequence");
+	if(!modelseq) goto error;
+
+	genoseq = PySequence_Fast(genos,"cannot convert genotypes into a sequence");
+	if(!genoseq) goto error;
+
+	locuslen = PySequence_Fast_GET_SIZE(locusseq);
+	modellen = PySequence_Fast_GET_SIZE(modelseq);
+	genolen  = PySequence_Fast_GET_SIZE(genoseq);
+
+	if(locuslen != modellen || modellen != genolen)
+	{
+		PyErr_SetString(PyExc_ValueError,"length mismatch among loci, models, and genotypes");
+		goto error;
+	}
+
+	locusitems = PySequence_Fast_ITEMS(locusseq);
+	modelitems = PySequence_Fast_ITEMS(modelseq);
+	genoitems  = PySequence_Fast_ITEMS(genoseq);
+
+	result = PyList_New(genolen);
+	if(!result) goto error;
+
+	/* borrowed ref: samplestats */
+	if(self->trackstats)
+	{
+		samplestats = genomerger_get_stats(self->samplestats, sample);
+		if(!samplestats) goto error;
+	}
+
+	for(i=0; i<genolen; ++i)
+	{
+		geno = genomerger_merge_genotype(self, modelitems[i], genoitems[i], &status);
+		if(!geno) goto error;
+		PyList_SET_ITEM(result, i, geno);
+
+		if(self->trackstats)
+		{
+			PyObject *locusstats;
+
+			if( genomerger_update_stats(samplestats, status)<0 ) goto error;
+
+			/* borrowed ref: locusstats */
+			locusstats = genomerger_get_stats(self->locusstats, locusitems[i]);
+			if(!locusstats) goto error;
+			if( genomerger_update_stats(locusstats, status)<0 ) goto error;
+		}
+	}
+
+	Py_DECREF(locusseq);
+	Py_DECREF(modelseq);
+	Py_DECREF(genoseq);
+
+	return result;
+
+error:
+	Py_XDECREF(locusseq);
+	Py_XDECREF(modelseq);
+	Py_XDECREF(genoseq);
+	Py_XDECREF(result);
+
+	return NULL;
+}
+
+static PyObject *
+genomerger_merge_locus(GenotypeMergerObject *self, PyObject *args)
+{
+	PyObject *samples, *locus, *model, *genos, *geno, *locusstats=NULL;
+	PyObject *sampleseq=NULL, *genoseq=NULL, *result=NULL;
+	PyObject **sampleitems, **genoitems;
+	Py_ssize_t samplelen, genolen, status, i;
+
+	if(!PyArg_ParseTuple(args, "OOOO", &samples, &locus, &model, &genos))
+		return NULL;
+
+	sampleseq = PySequence_Fast(samples,"cannot convert samples into a sequence");
+	if(!sampleseq) goto error;
+
+	genoseq = PySequence_Fast(genos,"cannot convert genotypes into a sequence");
+	if(!genoseq) goto error;
+
+	samplelen = PySequence_Fast_GET_SIZE(sampleseq);
+	genolen   = PySequence_Fast_GET_SIZE(genoseq);
+
+	if(samplelen != genolen)
+	{
+		PyErr_SetString(PyExc_ValueError,"length mismatch between samples and genotypes");
+		goto error;
+	}
+
+	sampleitems = PySequence_Fast_ITEMS(sampleseq);
+	genoitems   = PySequence_Fast_ITEMS(genoseq);
+
+	result = PyList_New(genolen);
+	if(!result) goto error;
+
+	if(self->trackstats)
+	{
+		/* borrowed ref: locusstats */
+		locusstats = genomerger_get_stats(self->locusstats, locus);
+		if(!locusstats) goto error;
+	}
+
+	for(i=0; i<genolen; ++i)
+	{
+		geno = genomerger_merge_genotype(self, model, genoitems[i], &status);
+		if(!geno) goto error;
+		PyList_SET_ITEM(result, i, geno);
+
+		if(self->trackstats)
+		{
+			PyObject *samplestats;
+
+			if( genomerger_update_stats(locusstats, status)<0 ) goto error;
+
+			/* borrowed ref: samplestats */
+			samplestats = genomerger_get_stats(self->samplestats, sampleitems[i]);
+			if(!samplestats) goto error;
+			if( genomerger_update_stats(samplestats, status)<0 ) goto error;
+		}
+	}
+
+	Py_DECREF(sampleseq);
+	Py_DECREF(genoseq);
+
+	return result;
+
+error:
+	Py_XDECREF(sampleseq);
+	Py_XDECREF(genoseq);
+	Py_XDECREF(result);
+
+	return NULL;
+}
+
+static PyMemberDef genomerger_members[] = {
+	{"mergefunc",   T_OBJECT_EX, offsetof(GenotypeMergerObject, pymergefunc),   RO, "Merge function"},
+	{"locusstats",	T_OBJECT_EX, offsetof(GenotypeMergerObject, locusstats),    RO, "Locus statistics"},
+	{"samplestats",	T_OBJECT_EX, offsetof(GenotypeMergerObject, samplestats),   RO, "Sample statistics"},
+	{"trackstats",  T_UINT,      offsetof(GenotypeMergerObject, trackstats),    RO, "Track statistics"},
+	{NULL}  /* Sentinel */
+};
+
+static PyMethodDef genomerger_methods[] = {
+	{"merge_geno",      (PyCFunction)genomerger_merge_geno, METH_VARARGS,
+		"Merge a single genotype"},
+	{"merge_sample", (PyCFunction)genomerger_merge_sample,  METH_VARARGS,
+		"Merge genotypes for a given sample"},
+	{"merge_locus",   (PyCFunction)genomerger_merge_locus,  METH_VARARGS,
+		"Merge genotypes for a given locus"},
+{NULL}  /* Sentinel */
+};
+
+PyTypeObject GenotypeMergerType = {
+	PyObject_HEAD_INIT(NULL)
+	0,					/* ob_size           */
+	"GenotypeMerger",			/* tp_name           */
+	sizeof(GenotypeMergerObject),		/* tp_basicsize      */
+	0,					/* tp_itemsize       */
+	(destructor)genomerger_dealloc,		/* tp_dealloc        */
+	0,					/* tp_print          */
+	0,					/* tp_getattr        */
+	0,					/* tp_setattr        */
+	0,					/* tp_compare        */
+	0,					/* tp_repr           */
+	0,					/* tp_as_number      */
+	0,					/* tp_as_sequence    */
+	0,					/* tp_as_mapping     */
+	0,					/* tp_hash           */
+	0,					/* tp_call           */
+	0,					/* tp_str            */
+	0,					/* tp_getattro       */
+	0,					/* tp_setattro       */
+	0,					/* tp_as_buffer      */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags          */
+	"Genotype Merger",			/* tp_doc            */
+	(traverseproc)genomerger_traverse,	/* tp_traverse       */
+	(inquiry)genomerger_clear,		/* tp_clear          */
+	0,					/* tp_richcompare    */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter           */
+	0,					/* tp_iternext       */
+	genomerger_methods,			/* tp_methods        */
+	genomerger_members,			/* tp_members        */
+	0,					/* tp_getset         */
+	0,					/* tp_base           */
+	0,					/* tp_dict           */
+	0,					/* tp_descr_get      */
+	0,					/* tp_descr_set      */
+	0,					/* tp_dictoffset     */
+	(initproc)genomerger_init,		/* tp_init           */
+	PyType_GenericAlloc,			/* tp_alloc          */
+	PyType_GenericNew,			/* tp_new            */
+	PyObject_Del,				/* tp_free           */
+};
+
+/******************************************************************************************************/
+
 static PyMethodDef genoarraymodule_methods[] = {
 	{"genotype_indices",            (PyCFunction)genotype_indices_func,	METH_KEYWORDS,
 	 "Return an array of integer genotype indices"},
@@ -3100,6 +3709,12 @@ static PyMethodDef genoarraymodule_methods[] = {
 	 "Pick items from a sequence given indices"},
 	{"pick_column",	pick_column,	METH_VARARGS,
 	 "Pick elements of the i'th column of a two dimensional sequence"},
+	{"place",	place,	METH_VARARGS,
+	 "Place items from a sequence at indices into a destination sequence"},
+	{"place_list",	place_list,	METH_VARARGS,
+	 "Place items from a sequence at indices into a destination sequence concatenating into lists if items are not None"},
+	{"merge_unanimous",	merge_unanimous_func,	METH_VARARGS,
+	 "Merge a list of genotypes requiring non-missing genotypes to be unanimous or they are setting to missing"},
 	{NULL}  /* Sentinel */
 };
 
@@ -3121,6 +3736,9 @@ init_genoarray(void)
 		return;
 
 	if(PyType_Ready(&GenotypeArrayDescriptorType) < 0)
+		return;
+
+	if(PyType_Ready(&GenotypeMergerType) < 0)
 		return;
 
 	m = Py_InitModule3("_genoarray", genoarraymodule_methods,
@@ -3151,4 +3769,5 @@ init_genoarray(void)
 	PyModule_AddObject(m, "UnphasedMarkerModel",        (PyObject *)&UnphasedMarkerModelType);
 	PyModule_AddObject(m, "GenotypeArray",              (PyObject *)&GenotypeArrayType);
 	PyModule_AddObject(m, "Genotype",                   (PyObject *)&GenotypeType);
+	PyModule_AddObject(m, "GenotypeMerger",              (PyObject *)&GenotypeMergerType);
 }
