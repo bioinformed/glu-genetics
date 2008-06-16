@@ -112,7 +112,26 @@ class UnphasedMarkerRepresentation(object):
     >>> marker.to_string( model[None,None])
     ''
     '''
-    return self.to_string_from_alleles(rep.alleles())
+    # Macro-optimized
+    #return self.to_string_from_alleles(rep.alleles())
+    rep = rep.alleles()
+    strcache = self.strcache
+    if rep in strcache:
+      return strcache[rep]
+
+    if rep == (None,None):
+      if self.missing_geno_str is not Nothing:
+        return self.missing_geno_str
+
+    alleles = [ self.allelerep.setdefault(a,a) for a in rep ]
+
+    if not self.delimiter:
+      for a in alleles:
+        if len(a) > 1:
+         raise ValueError('Invalid genotype representation')
+
+    gstr = strcache[rep] = self.delimiter.join(alleles)
+    return gstr
 
   def to_string_from_alleles(self,rep):
     '''
