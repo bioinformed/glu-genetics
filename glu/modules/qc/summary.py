@@ -70,7 +70,7 @@ def locus_row(lname,locus,model,counts,compute_hwp):
       hwp = str(hwp_biallelic(model,counts))
     except ValueError:
       pass
-  
+
   return [lname,locus.chromosome or '', str(locus.location or ''), locus.strand or '',
                 str(len(alleles)),'|'.join(alleles),'|'.join(str(n) for n in acounts),maf,
                 str(len(lgenos)), '|'.join(lgenos), '|'.join(str(n) for n in lcounts),
