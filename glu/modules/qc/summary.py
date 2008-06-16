@@ -40,7 +40,7 @@ SAMPLE_HEADER = ['SAMPLE','MISSING_COUNT','HEMIZYGOTE_COUNT',
                  'INFORMATIVE_COUNT', 'MISSING_RATE', 'HETEROZYGOSITY']
 
 
-def locus_row(lname,locus,model,counts):
+def locus_row(lname,locus,model,counts,compute_hwp):
   acounts = izip(count_alleles_from_genocounts(model,counts),model.alleles)
   acounts = sorted(acounts,reverse=True)
   alleles = [ a for n,a in acounts if n if a and n ]
@@ -64,11 +64,13 @@ def locus_row(lname,locus,model,counts):
   n = counts.sum()
   missing_rate = str(counts[0]/n) if n else ''
 
-  try:
-    hwp = str(hwp_biallelic(model,counts))
-  except ValueError:
-    hwp = ''
-
+  hwp = ''
+  if compute_hwp:
+    try:
+      hwp = str(hwp_biallelic(model,counts))
+    except ValueError:
+      pass
+  
   return [lname,locus.chromosome or '', str(locus.location or ''), locus.strand or '',
                 str(len(alleles)),'|'.join(alleles),'|'.join(str(n) for n in acounts),maf,
                 str(len(lgenos)), '|'.join(lgenos), '|'.join(str(n) for n in lcounts),
@@ -111,6 +113,8 @@ def option_parser():
                     help='Exclude a list of samples')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='Exclude a list of loci')
+  parser.add_option('--hwp', dest='hwp', action='store_true',
+                    help='Test for deviation from Hardy-Weinberg proportions')
   parser.add_option('-o', '--locusout', dest='locusout', metavar='FILE', default='-',
                     help='Locus output report')
   parser.add_option('-O', '--sampleout', dest='sampleout', metavar='FILE', default='-',
@@ -148,10 +152,11 @@ def main():
       locus = genos.genome.get_locus(lname)
       locus_count,sample_counts = locus_summary(geno,sample_counts)
 
-      locusout.writerow(locus_row(lname,locus,model,locus_count))
+      locusout.writerow(locus_row(lname,locus,model,locus_count,options.hwp))
 
     sample_totals = sum(sample_counts)
     locusout.writerow(locus_total(sample_totals))
+    del locusout
 
     sampleout.writerow(SAMPLE_HEADER)
     for sample,count in izip(genos.samples,sample_counts):
@@ -170,11 +175,12 @@ def main():
       sampleout.writerow(sample_row(sample,sample_count))
 
     sampleout.writerow(sample_row('*',sample_counts))
+    del sampleout
 
     locusout.writerow(LOCUS_HEADER)
     for lname,model,locus_count in izip(genos.loci,genos.models,locus_counts):
       locus = genos.genome.get_locus(lname)
-      locusout.writerow(locus_row(lname,locus,model,locus_count))
+      locusout.writerow(locus_row(lname,locus,model,locus_count,options.hwp))
 
     locusout.writerow(locus_total(sample_counts))
 
