@@ -29,12 +29,11 @@ import sys
 
 from   collections               import defaultdict
 
-from   glu.lib.utils             import pick
 from   glu.lib.fileutils         import load_map
 from   glu.lib.genolib.io        import load_genostream, guess_outformat,               \
                                         TextGenomatrixWriter, TextGenotripleWriter,     \
                                         BinaryGenomatrixWriter, BinaryGenotripleWriter
-from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor, GenotypeArray
+from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor, GenotypeArray, pick
 
 
 def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup, defaultlocusgroup):

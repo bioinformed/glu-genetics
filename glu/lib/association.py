@@ -27,9 +27,9 @@ from   numpy             import array,matrix,asarray,asanyarray,zeros, \
                                 exp,nan,abs,arange,median,inf,minimum
 from   scipy             import stats
 
-from   glu.lib.utils     import tally,pick
+from   glu.lib.utils     import tally
 from   glu.lib.fileutils import namefile,load_list,load_map,load_table,tryint1
-from   glu.lib.genolib   import load_genostream
+from   glu.lib.genolib   import load_genostream,pick
 from   glu.lib.formula   import get_term,INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
                                 NULL,TREND,GENO,FormulaParser
 
@@ -561,7 +561,7 @@ class BiallelicLocusModel(object):
   def __init__(self, lname, genos, geno_indices, reference_allele=None):
     self.lname        = lname
     self.genos        = genos
-    genos             = pick(genos[:], geno_indices.itervalues())
+    genos             = pick(genos, geno_indices.itervalues())
     self.allelecounts = tally(a for g in genos if g for a in g if a)
     self.genocounts   = tally(genos)
     self.genocount    = len([ 1 for g,n in self.genocounts.iteritems() if g and n ])
