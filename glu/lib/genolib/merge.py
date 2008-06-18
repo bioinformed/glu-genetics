@@ -679,25 +679,25 @@ except ImportError:
       return list(new_row)
 
 
-def UniqueMerger(threshold=None):
-  return GenotypeMerger(Unique())
+def UniqueMerger(threshold=None,trackstats=True):
+  return GenotypeMerger(Unique(),trackstats=trackstats)
 
 
-def UnanimousMerger(threshold=None):
-  return GenotypeMerger(unanimous)
+def UnanimousMerger(threshold=None,trackstats=True):
+  return GenotypeMerger(unanimous,trackstats=trackstats)
 
 
-def VoteMerger(threshold=1.0):
+def VoteMerger(threshold=1.0,trackstats=True):
   if threshold>=1.0:
-    return UnanimousMerger()
-  return GenotypeMerger(Vote(threshold=threshold))
+    return UnanimousMerger(trackstats=trackstats)
+  return GenotypeMerger(Vote(threshold=threshold),trackstats=trackstats)
 
 
-def OrderedMerger(threshold=0.4999999):
-  return GenotypeMerger(Ordered(threshold=threshold))
+def OrderedMerger(threshold=0.4999999,trackstats=True):
+  return GenotypeMerger(Ordered(threshold=threshold),trackstats=trackstats)
 
 
-def get_genomerger(mergername):
+def get_genomerger(mergername,trackstats=True):
   '''
   Retrieve the supported genotype merge algorithm. Otherwise raises an ValueError exception.
 
@@ -728,9 +728,9 @@ def get_genomerger(mergername):
 
   if len(parts) == 2:
     threshold=float(parts[1])
-    return merger(threshold=threshold)
+    return merger(threshold=threshold,trackstats=trackstats)
   else:
-    return merger()
+    return merger(trackstats=trackstats)
 
 
 def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):

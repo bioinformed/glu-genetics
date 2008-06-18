@@ -51,9 +51,9 @@ def option_parser():
 
   mopts = optparse.OptionGroup(parser, 'Genotype Merging and Reporting')
 
-  mopts.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',
+  mopts.add_option('--merge', dest='merge', metavar='METHOD:T', default='unanimous',
                     help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
-                         'Values=vote,ordered,unique.  Value may be optionally followed by a colon and a threshold.  Default=vote:1')
+                         'Values=unique,unanimous,vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=unanimous')
   mopts.add_option('--samplemerge', dest='samplemerge', metavar='FILE',
                     help='Per sample concordance statistics output to FILE (optional)')
   mopts.add_option('--locusmerge',  dest='locusmerge',  metavar='FILE',
@@ -112,7 +112,7 @@ def main():
     return
 
   infiles = sorted(set(args))
-  merger  = get_genomerger(options.merge)
+  merger  = get_genomerger(options.merge, bool(options.samplemerge or options.locusmerge))
 
   transform = GenoTransform.from_options(options)
 
