@@ -39,7 +39,7 @@ try:
                                             count_genotypes, genotype_categories,
                                             locus_summary, sample_summary, genoarray_concordance,
                                             GenotypeLookupError, GenotypeRepresentationError,
-                                            pick, pick_column, place, place_list)
+                                            pick, pick_columns, place, place_list)
 
 except ImportError:
   import sys
@@ -874,7 +874,7 @@ except ImportError:
     return [ row[i] for i in indices ]
 
 
-  def pick_column(rows, index):
+  def pick_columns(rows, index=None):
     '''
     Pick a list of genotypes from a list of indices
 
@@ -885,18 +885,32 @@ except ImportError:
     @return      : list of items from the index'th column
     @rtype       : list
 
-    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],0)
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],0)
     [0, 3, 6]
-    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],1)
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],1)
     [1, 4, 7]
-    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],2)
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],2)
     [2, 5, 8]
-    >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],[0,2])
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],[0,2])
+    [[0, 3, 6], [2, 5, 8]]
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]])
+    [[0, 3, 6], [1, 4, 7], [2, 5, 8]]
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],slice(2))
+    [[0, 3, 6], [1, 4, 7]]
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],slice(1,2))
+    [[1, 4, 7]]
+    >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],slice(0,3,2))
     [[0, 3, 6], [2, 5, 8]]
     '''
-    if isinstance(index, int):
+    if not rows:
+      return []
+    elif isinstance(index, int):
       return [ row[index] for row in rows ]
     else:
+      if index == None:
+        index = xrange(len(rows[0]))
+      elif isinstance(index, slice):
+        index = xrange(*index.indices(len(rows[0])))
       return [ [ row[i] for row in rows ] for i in index ]
 
 
@@ -1853,17 +1867,24 @@ def test_pick():
   '''
 
 
-def test_pick_column():
+def test_pick_columns():
   '''
-  >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],0)
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],0)
   [0, 3, 6]
-  >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],1)
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],1)
   [1, 4, 7]
-  >>> pick_column([[0,1,2],[3,4,5],[6,7,8]],2)
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],2)
   [2, 5, 8]
-
-  #>>> #pick_column([[0,1,2],[3,4,5],[6,7,8]],[0,2])
-  #[[0, 3, 6], [2, 5, 8]]
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],[0,2])
+  [[0, 3, 6], [2, 5, 8]]
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]])
+  [[0, 3, 6], [1, 4, 7], [2, 5, 8]]
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],slice(2))
+  [[0, 3, 6], [1, 4, 7]]
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],slice(1,2))
+  [[1, 4, 7]]
+  >>> pick_columns([[0,1,2],[3,4,5],[6,7,8]],slice(0,3,2))
+  [[0, 3, 6], [2, 5, 8]]
   '''
 
 

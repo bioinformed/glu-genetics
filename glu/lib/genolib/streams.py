@@ -33,7 +33,7 @@ from   glu.lib.genolib.transform import GenoTransform, prove_unique_transform
 from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,Genotype,   \
                                         GenotypeLookupError, GenotypeRepresentationError, \
-                                        model_from_alleles,pick,pick_column,place_list
+                                        model_from_alleles,pick,pick_columns,place_list
 
 # Debugging flag
 DEBUG=False
@@ -1800,8 +1800,12 @@ def recode_genomatrixstream(genos, genome):
       # Check to see if a full recoding or update is necessary
       if model is not old_model:
         recode = True
-        for g in old_model.genotypes[1:]:
-          model.add_genotype(g)
+        try:
+          for g in old_model.genotypes[1:]:
+            model.add_genotype(g)
+        except GenotypeRepresentationError:
+          raise GenotypeRepresentationError('Locus model %s cannot accommodate genotype %s (max_alleles=%d,alleles=%s)'
+                              % (locus,g,model.max_alleles,','.join(model.alleles[1:])))
 
       models.append(model)
 
@@ -2842,7 +2846,7 @@ def combine_unsorted_genotriple_list(triplelist):
     return triplelist[0]
 
   # Normalize all triples to the same models
-  genome = Genome()
+  genome = triplelist[0].genome
   triplelist = [ triples.transformed(recode_models=genome) for triples in triplelist ]
 
   # FIXME: !!! Merge phenome !!!
@@ -2914,7 +2918,7 @@ def combine_sorted_genotriple_list(triplelist):
     return triplelist[0]
 
   # Normalize all triples to the same models
-  genome = Genome()
+  genome = triplelist[0].genome
   triplelist = [ triples.transformed(recode_models=genome) for triples in triplelist ]
 
   # FIXME: !!! Merge phenome !!!
@@ -2998,249 +3002,6 @@ def merge_sorted_genotriples(triples,mergefunc):
       yield sample,locus,geno
 
   return triples.clone(_merge(),unique=True,materialized=False)
-
-
-def merge_genomatrixstream_columns(genos, mergefunc):
-  '''
-  Merge genotypes in columns with identical labels from a genomatrix stream
-  using the specified merge function.  Results are in an unpacked list
-  representation that may need to be repacked.
-
-  A ValueError will be raised if this function is applied to a genomatrix
-  with non-unique rows, since many merge algorithms and merge statistics
-  cannot be performed in a step-wise fashion (ie., on columns and rows
-  separately).
-
-  @param      genos: genomatrix stream
-  @type       genos: sequence
-  @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
-  @type   mergefunc: callable
-  @return          : merged unpacked genomatix stream
-  @rtype           : generator
-
-  >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'G') ]),
-  ...         ('s2',[(None, None), (None, None), (None, None)]),
-  ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
-  ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T') ])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> geons = merge_genomatrixstream_columns(genos,VoteMerger())
-  >>> genos.loci
-  ('l1', 'l2', 'l3')
-  >>> for row in genos:
-  ...   print row
-  ('s1', [('A', 'A'), (None, None), ('G', 'G')])
-  ('s2', [(None, None), (None, None), (None, None)])
-  ('s3', [('A', 'A'), (None, None), (None, None)])
-  ('s4', [('A', 'T'), (None, None), ('T', 'T')])
-
-  >>> loci = ('l1','l2','l1')
-  >>> rows = [('s1',[ ('A','A'), (None,None), ('G', 'G')]),
-  ...         ('s2',[(None,None), ('A','C'), (None,None)]),
-  ...         ('s3',[ ('A','A'),  ('A','A'), (None,None)]),
-  ...         ('s4',[ ('G','A'), (None,None), ('G','G') ])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> genos = merge_genomatrixstream_columns(genos,VoteMerger())
-  >>> genos.loci
-  ('l1', 'l2')
-  >>> for row in genos:
-  ...   print row
-  ('s1', [(None, None), (None, None)])
-  ('s2', [(None, None), ('A', 'C')])
-  ('s3', [('A', 'A'), ('A', 'A')])
-  ('s4', [(None, None), (None, None)])
-
-  >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'G') ]),
-  ...         ('s2',[(None, None), (None, None), (None, None)]),
-  ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
-  ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T') ])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).as_ldat()
-  >>> geons = merge_genomatrixstream_columns(genos,VoteMerger())
-  >>> genos.samples
-  ('s1', 's2', 's3', 's4')
-  >>> for row in genos:
-  ...   print row
-  ('l1', [('A', 'A'), (None, None), ('A', 'A'), ('A', 'T')])
-  ('l2', [(None, None), (None, None), (None, None), (None, None)])
-  ('l3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
-
-  >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[ ('A','A'), (None,None), ('G', 'G')]),
-  ...         ('s2',[(None,None), ('A','C'), (None,None)]),
-  ...         ('s1',[ ('A','A'),  ('A','A'), (None,None)]),
-  ...         ('s4',[ ('G','A'), (None,None), ('G','G') ])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).as_ldat()
-  >>> genos = merge_genomatrixstream_columns(genos,VoteMerger())
-  >>> genos.samples
-  ('s1', 's2', 's4')
-  >>> for row in genos:
-  ...   print row
-  ('l1', [('A', 'A'), (None, None), ('A', 'G')])
-  ('l2', [('A', 'A'), ('A', 'C'), (None, None)])
-  ('l3', [('G', 'G'), (None, None), ('G', 'G')])
-  '''
-  assert mergefunc is not None
-
-  merge_indices = defaultdict(list)
-  merge_models  = defaultdict(list)
-  new_columns   = []
-
-  for i,column in enumerate(genos.columns):
-    if column not in merge_indices:
-      new_columns.append(column)
-    merge_indices[column].append(i)
-  new_columns = tuple(new_columns)
-
-  # Trivial path: no merge is needed
-  if new_columns == genos.columns:
-    return genos
-
-  # Non-trivial path: one or more columns must be merged
-  if genos.format == 'ldat':
-    def _merger():
-      rows_seen = set()
-      for i,(locus,row) in enumerate(genos):
-        if locus in rows_seen:
-          raise ValueError('row labels required to be unique')
-
-        rows_seen.add(locus)
-
-        merge_columns = (pick(row, merge_indices[col_label]) for col_label in new_columns)
-        new_row = mergefunc.merge_locus(new_columns,locus,genos.models[i],merge_columns)
-
-        yield locus,new_row
-
-    new_genos = genos.clone(_merger(),samples=new_columns,packed=False,materialized=False,unique=True)
-
-  else:
-    new_models = []
-    for c in new_columns:
-      mset = set(genos.models[i] for i in merge_indices[c])
-      if len(mset) != 1:
-        raise GenotypeRepresentationError('Incompatible genotype models in merge')
-      new_models.append(mset.pop())
-
-    def _merger():
-      rows_seen = set()
-      for i,(sample,row) in enumerate(genos):
-        if sample in rows_seen:
-          raise GenotypeRepresentationError('row labels required to be unique')
-
-        rows_seen.add(sample)
-
-        merge_columns = (pick(row, merge_indices[col_label]) for col_label in new_columns)
-        new_row = mergefunc.merge_sample(sample,new_columns,new_models,merge_columns)
-
-        yield sample,new_row
-
-    new_genos = genos.clone(_merger(),loci=new_columns,models=new_models,
-                                      packed=False,materialized=False,unique=True)
-
-  return new_genos
-
-
-def merge_genomatrixstream_rows(genos, mergefunc):
-  '''
-  Merge genotypes in rows with identical labels from a genomatrix stream
-  using the specified merge function.  The algorithm used requires a full
-  materialization of the genomatrix stream, since row labels must be known.
-  Results are in an unpacked list representation that may need to be
-  repacked.
-
-  A ValueError will be raised if this function is applied to a genomatrix
-  with non-unique columns, since many merge algorithms and merge statistics
-  cannot be performed in a step-wise fashion (ie., on columns and rows
-  separately).
-
-  @param      genos: genomatrix stream
-  @type       genos: sequence
-  @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
-  @type   mergefunc: callable
-  @return          : merged unpacked genomatix stream
-  @rtype           : generator
-
-  >>> loci = ('l1','l2','l3')
-  >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'G')]),
-  ...         ('s2',[(None, None), (None, None), (None, None)]),
-  ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
-  ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T')])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> genos = merge_genomatrixstream_rows(genos,VoteMerger())
-  >>> genos.loci
-  ('l1', 'l2', 'l3')
-  >>> for row in genos:
-  ...   print row
-  ('s1', [('A', 'A'), (None, None), ('G', 'G')])
-  ('s2', [(None, None), (None, None), (None, None)])
-  ('s3', [('A', 'A'), (None, None), (None, None)])
-  ('s4', [('A', 'T'), (None, None), ('T', 'T')])
-
-  >>> rows = [('s1',[ ('A', 'A'),  (None, None),  ('G', 'T')]),
-  ...         ('s2',[(None, None),  ('A', 'C'),  (None, None)]),
-  ...         ('s1',[ ('A', 'A'),   ('A', 'A'),  (None, None)]),
-  ...         ('s1',[ ('A', 'T'),  (None, None),  ('G', 'T')])]
-  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> genos = merge_genomatrixstream_rows(genos,VoteMerger())
-  >>> genos.loci
-  ('l1', 'l2', 'l3')
-  >>> for row in genos:
-  ...   print row
-  ('s1', [(None, None), ('A', 'A'), ('G', 'T')])
-  ('s2', [(None, None), ('A', 'C'), (None, None)])
-  '''
-  assert mergefunc is not None
-
-  genos = genos.materialize()
-
-  if len(set(genos.columns)) != len(genos.columns):
-    raise ValueError('column labels required to be unique')
-
-  merge_rows = defaultdict(list)
-  new_rows   = []
-
-  for i,(row_label,row) in enumerate(genos):
-    if row_label not in merge_rows:
-      new_rows.append(row_label)
-    merge_rows[row_label].append(i)
-
-  if genos.format == 'ldat':
-    new_models = []
-
-    def _merger():
-      data = map(itemgetter(1),genos)
-      for locus in new_rows:
-        indices = merge_rows.pop(locus)
-
-        mset = set(pick(genos.models,indices))
-        if len(mset) != 1:
-          raise GenotypeRepresentationError('Incompatible genotype models in merge')
-        model = mset.pop()
-        new_models.append(model)
-
-        merge_columns = izip(*pick(data,indices))
-        new_row = mergefunc.merge_locus(genos.samples,locus,model,merge_columns)
-
-        yield locus,new_row
-
-    new_genos = genos.clone(_merger(),loci=new_rows,models=new_models,
-                            packed=False,materialized=False,unique=True)
-
-  else:
-    def _merger():
-      data = map(itemgetter(1),genos)
-      models = genos.models
-      for sample in new_rows:
-        indices = merge_rows.pop(sample)
-
-        merge_columns = izip(*pick(data,indices))
-        new_row = mergefunc.merge_sample(sample,genos.loci,models,merge_columns)
-
-        yield sample,new_row
-
-    new_genos = genos.clone(_merger(),samples=new_rows,packed=False,materialized=False,unique=True)
-
-  return new_genos
 
 
 def merge_genomatrixstream(genos, mergefunc):
@@ -3372,91 +3133,71 @@ def merge_genomatrixstream(genos, mergefunc):
 
   # FIXME: Does not update stats
   if not merge_rows and not merge_cols:
+    genos.uniqe = True
     return genos
 
-  if not merge_rows:
-    return merge_genomatrixstream_columns(genos, mergefunc)
-  elif not merge_cols:
-    return merge_genomatrixstream_rows(genos, mergefunc)
+  new_rows      = {}
+  new_columns   = {}
+  column_dest   = []
+  merge_columns = [],[]
 
-  columns = genos.columns
-  new_indices = []
-  merge_indices = defaultdict(list)
-  for i,column in enumerate(columns):
-    if column not in merge_indices:
-      new_indices.append(i)
-    merge_indices[column].append(i)
+  # We must materialize all streams, so ensure they are packed
+  genos = genos.transformed(repack=True)
 
-  new_columns = pick(columns,new_indices)
+  # Form mappings from old schemas to new
+  column_dest = [ new_columns.setdefault(c,len(new_columns)) for c in genos.columns ]
 
-  assert columns != new_columns
+  # Invert row and column dictionaries to recover insertion orderings
+  new_columns   = tuple(imap(itemgetter(0),sorted(new_columns.iteritems(),key=itemgetter(1))))
+  merge_columns = (new_columns != genos.columns)
 
-  genos = genos.materialize()
+  # Collect row labels and materialize all rows for later merging
+  if merge_rows:
+    rowdict = defaultdict(list)
+    for i,(row_label,row) in enumerate(genos):
+      new_rows.setdefault(row_label,len(new_rows))
+      rowdict[row_label].append(row)
 
-  new_rows = []
-  merge_rows = defaultdict(list)
-  for i,(row_label,row) in enumerate(genos):
-    if row_label not in merge_rows:
-      new_rows.append(row_label)
-    merge_rows[row_label].append(i)
-
-  if genos.format=='ldat':
-    new_models = []
-
-    def _merger():
-      # Apply fully general merge over duplicate rows and columns
-      data = map(itemgetter(1),genos)
-
-      for locus in new_rows:
-        # Form list of all genotypes at each new column
-        indices = merge_rows.pop(locus)
-        rows = pick(data, indices)
-
-        mset = set(pick(genos.models,indices))
-        if len(mset) != 1:
-          raise GenotypeRepresentationError('Incompatible genotype models in merge')
-        model = mset.pop()
-        new_models.append(model)
-
-        # FIXME: Is this faster?
-        #merge_columns = (sum((pick(row,merge_indices[column]) for row in rows),[])
-        #                                  for column in new_columns)
-
-        merge_columns = ([ row[i] for row in rows for i in merge_indices[column] ]
-                                  for column in new_columns)
-        new_row = mergefunc.merge_locus(new_columns,locus,model,merge_columns)
-
-        yield locus,new_row
-
-    new_genos = genos.clone(_merger(),samples=new_columns,loci=new_rows,models=new_models,
-                            packed=False,materialized=False,unique=True)
+    new_rows = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(),   key=itemgetter(1))))
+    rowdata = ( (label,rowdict.pop(label)) for label in new_rows )
 
   else:
-    new_models = []
-    for column in new_columns:
-      mset = set(pick(genos.models,merge_indices[column]))
-      if len(mset) != 1:
-        raise GenotypeRepresentationError('Incompatible genotype models in merge')
-      new_models.append(mset.pop())
+    rowdata = ( (label,[row]) for label,row in genos.use_stream() )
+    new_rows = genos.rows
 
-    def _merger():
-      # Apply fully general merge over duplicate rows and columns
-      data = map(itemgetter(1),genos)
+  if genos.format=='ldat':
+    models = []
+    samples,loci = new_columns,new_rows
+  else:
+    models = [ genos.genome.get_model(column) for column in new_columns ]
+    samples,loci = new_rows,new_columns
 
-      for sample in new_rows:
-        # Form list of all genotypes at each new column
-        indices = merge_rows.pop(sample)
-        rows = pick(data,indices)
-        merge_columns = ([ row[i] for row in rows for i in merge_indices[column] ]
-                                  for column in new_columns)
-        new_row = mergefunc.merge_sample(sample,new_columns,new_models,merge_columns)
+  def _merger():
+    n = len(new_columns)
 
-        yield sample,new_row
+    # Fully general merge over duplicate rows and columns
+    for label,rows in rowdata:
+      # All columns are extracted from rows of schema i
+      if len(rows) == 1:
+        new_row = tuple(rows[0])
+      else:
+        new_row = pick_columns(rows)
 
-    new_genos = genos.clone(_merger(),loci=new_columns,samples=new_rows,models=new_models,
-                                      packed=False,materialized=False,unique=True)
+      if merge_columns:
+        new_row = place_list([None]*n, new_row, column_dest)
 
-  return new_genos
+      # Merge genotypes
+      if genos.format=='ldat':
+        model   = genos.genome.get_model(label)
+        new_row = mergefunc.merge_locus(samples, label, model, new_row)
+      else:
+        new_row = mergefunc.merge_sample(label, loci, models, new_row)
+
+      # Yield new row
+      yield label,new_row
+
+  return genos.clone(_merger(),samples=samples,loci=loci,models=models,
+                               packed=False,materialized=False,unique=True)
 
 
 def merge_genomatrixstream_list(genos, mergefunc):
@@ -3583,7 +3324,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
   # Fastpath for nothing to merge
   if len(genos) == 1:
-    return genos[0]
+    return genos[0].merged(mergefunc)
 
   # Fastpath for identical schema: Concatenate all genotype rows and merge
   # using the single-matrix merge function.  Also optimizes the single input
@@ -3690,8 +3431,8 @@ def merge_genomatrixstream_list(genos, mergefunc):
           # lists, so use pick when possible
           cols = pick(rows[0], j)
         else:
-          # Otherwise use the more general pick_column
-          cols = pick_column(rows, j)
+          # Otherwise use the more general pick_columns
+          cols = pick_columns(rows, j)
 
         # Place columns in the correct destination
         place_list(new_row, cols, k)
@@ -4523,7 +4264,7 @@ def rename_genomatrixstream_column(genos,colmap):
     genos = genos.clone(genos.use_stream(), loci=new_columns, genome=genome, unique=unique)
 
     if recode:
-      genos = genos.transformed(recode_models=Genome())
+      genos = genos.transformed(recode_models=genome)
 
   return genos
 
@@ -4833,7 +4574,7 @@ def rename_genomatrixstream_row(genos,rowmap):
     new_genos = genos.clone(_rename(),loci=rows,genome=genome,materialized=False)
 
     if recode[0]:
-      new_genos = new_genos.transformed(recode_models=Genome())
+      new_genos = new_genos.transformed(recode_models=genome)
 
   else:
     phenome = Phenome()
@@ -5011,15 +4752,15 @@ def transpose_generator(columns, rows, m=16):
   if m <= 1:
     def _transpose_generator():
       for j,column in enumerate(columns):
-        yield column,pick_column(rows,j)
+        yield column,pick_columns(rows,j)
   else:
     def _transpose_generator():
       n = len(columns)
       for i in xrange(n//m+bool(n%m)):
-        indices = range(m*i,min(n,m*(i+1)))
-        cols    = pick_column(rows,indices)
-        for j,col in izip(indices,cols):
-          yield columns[j],col
+        cslice = slice(m*i, m*(i+1))
+        cols = pick_columns(rows, cslice)
+        for label,col in izip(columns[cslice],cols):
+          yield label,col
 
   return rowlabels,_transpose_generator()
 

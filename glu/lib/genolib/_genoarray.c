@@ -39,6 +39,7 @@ See GLU license for terms by running: glu license
                                                 && PyArray_TYPE((op))==PyArray_LONG)
 #define CountArray_Check2(op,len1,len2)        (PyArray_Check((op)) && PyArray_NDIM((op))== 2 && PyArray_DIMS((op))[0]==(len1) \
                                                 && PyArray_DIMS((op))[1]==(len2) && PyArray_TYPE((op))==PyArray_LONG)
+#define FastSequenceCheck(op)                  (PyTuple_Check(op) || PyList_Check(op))
 
 /* Exceptions */
 PyObject *GenotypeLookupError;
@@ -1758,7 +1759,7 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 	if(!len && !model)
 	{
 		PyErr_SetString(GenotypeRepresentationError,
-		             "empty genotype sequence with unknown model");
+		    "empty genotype sequence with unknown model");
 		return NULL;
 	}
 
@@ -1774,7 +1775,7 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 		if(!geno || !Genotype_CheckExact(geno))
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "invalid genotype object in genos at index %zd", 0L);
+			    "invalid genotype object in genos at index %zd", 0L);
 			Py_XDECREF(geno);
 			return NULL;
 		}
@@ -2274,7 +2275,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 		if(!geno || !Genotype_CheckExact(geno))
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "invalid genotype object in genos at index %zd", 0L);
+			    "invalid genotype object in genos at index %zd", 0L);
 			Py_XDECREF(geno);
 			goto error;
 		}
@@ -2434,7 +2435,7 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 				if(!geno || !Genotype_CheckExact(geno))
 				{
 					PyErr_Format(GenotypeRepresentationError,
-					     "invalid genotype object in genos at index %zd", i);
+					    "invalid genotype object in genos at index %zd", i);
 					Py_XDECREF(geno);
 					goto error;
 				}
@@ -2798,7 +2799,7 @@ genoarray_concordance(PyObject *self, PyObject *args)
 
 	if(len1 != len2) {
 		PyErr_Format(GenotypeRepresentationError,"genotype array sizes do not match: %zd != %zd",
-			     len1, len2);
+		             len1, len2);
 		goto error;
 	}
 
@@ -2814,21 +2815,21 @@ genoarray_concordance(PyObject *self, PyObject *args)
 		if(!a || !Genotype_CheckExact(a))
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "invalid genotype object in genos1 at index %zd", i);
+			    "invalid genotype object in genos1 at index %zd", i);
 			goto error;
 		}
 
 		if(!b || !Genotype_CheckExact(b))
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "invalid genotype object in genos2 at index %zd", i);
+			    "invalid genotype object in genos2 at index %zd", i);
 			goto error;
 		}
 
 		if(a->model != b->model)
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "genotype models do not match at index %zd", i);
+			    "genotype models do not match at index %zd", i);
 			goto error;
 		}
 
@@ -2909,7 +2910,7 @@ error:
 }
 
 static PyObject *
-pick_column_single(PyObject *rows, Py_ssize_t index)
+pick_columns_index(PyObject *rows, Py_ssize_t index)
 {
 	Py_ssize_t i, len;
 	PyObject *item, *result=NULL;
@@ -2941,7 +2942,79 @@ error:
 }
 
 static PyObject *
-pick_column_multiple(PyObject *rows, PyObject *indices)
+pick_columns_slice(PyObject *rows, PyObject *slice)
+{
+	Py_ssize_t i, j, k, rowlen, itemlen;
+	Py_ssize_t start, stop, step, slicelen;
+	PyObject *item, *result=NULL;
+	PyObject **rowitems, **resultitems;
+
+	rows = PySequence_Fast(rows,"cannot convert rows into a sequence");
+	if(!rows) return NULL;
+
+	rowlen     = PySequence_Fast_GET_SIZE(rows);
+	rowitems   = PySequence_Fast_ITEMS(rows);
+
+	if(!rowlen)
+	{
+		result = PyList_New(0);
+		goto done;
+	}
+
+	itemlen = PySequence_Size(rowitems[0]);
+	if(itemlen == -1) goto error;
+
+	if(!slice || slice == Py_None)
+	{
+		start    = 0;
+		stop     = itemlen;
+		step     = 1;
+		slicelen = itemlen;
+	}
+	else if(PySlice_Check(slice))
+	{
+		if(PySlice_GetIndicesEx( (PySliceObject *)slice, itemlen,
+		                         &start, &stop, &step, &slicelen) < 0)
+			goto error;
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError, "invalid index");
+		goto error;
+	}
+
+	result = PyList_New(slicelen);
+	if(!result) goto error;
+
+	resultitems = PySequence_Fast_ITEMS(result);
+
+	for(i=0; i<slicelen; ++i)
+	{
+		item = PyList_New(rowlen);
+		if(!item) goto error;
+		PyList_SET_ITEM(result, i, item);
+	}
+
+	for(j=0; j<rowlen; j++)
+		for (k=start, i=0; i<slicelen; k+=step, i++)
+		{
+			item = PySequence_GetItem(rowitems[j], k);
+			if(!item) goto error;
+			PyList_SET_ITEM(resultitems[i], j, item);
+		}
+
+done:
+	Py_DECREF(rows);
+	return result;
+
+error:
+	Py_XDECREF(rows);
+	Py_XDECREF(result);
+	return NULL;
+}
+
+static PyObject *
+pick_columns_indices(PyObject *rows, PyObject *indices)
 {
 	Py_ssize_t i, j, index, rowlen, indexlen;
 	Py_ssize_t *indexarray=NULL;
@@ -3000,11 +3073,11 @@ error:
 }
 
 static PyObject *
-pick_column(PyObject *self, PyObject *args)
+pick_columns(PyObject *self, PyObject *args)
 {
-	PyObject *rows, *index;
+	PyObject *rows, *index = Py_None;
 
-	if(!PyArg_ParseTuple(args, "OO", &rows, &index))
+	if(!PyArg_ParseTuple(args, "O|O", &rows, &index))
 		return NULL;
 
 	if(PyIndex_Check(index))
@@ -3012,13 +3085,15 @@ pick_column(PyObject *self, PyObject *args)
 		Py_ssize_t i = PyNumber_AsSsize_t(index, PyExc_IndexError);
 		if(i == -1 && PyErr_Occurred())
 			return NULL;
-		return pick_column_single(rows, i);
+		return pick_columns_index(rows, i);
 	}
+	else if(index == Py_None || PySlice_Check(index))
+		return pick_columns_slice(rows, index);
 	else if(PySequence_Check(index))
-		return pick_column_multiple(rows, index);
+		return pick_columns_indices(rows, index);
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "indices must be an integer or sequence");
+		PyErr_SetString(PyExc_TypeError, "indices must be an None, integer, sequence, or slice");
 		return NULL;
 	}
 }
@@ -3221,13 +3296,20 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		if(genofound->model != model)
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "invalid genotype object in genos at index %zd", 0L);
+			    "invalid genotype object in genos at index %zd", 0L);
 			goto error;
 		}
 		if(genofound->index != 0)
 			*status = MERGE_UNAMBIGUOUS;
 		Py_INCREF(genofound);
 		return genofound;
+	}
+
+	/* Add check temporarily to find slow code. */
+	if(!FastSequenceCheck(genos))
+	{
+		PyErr_SetString(PyExc_ValueError,"genos are not a tuple or list");
+		goto error;
 	}
 
 	genoseq = PySequence_Fast(genos,"genos is not a genotype or a sequence");
@@ -3243,7 +3325,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		if(!geno || !Genotype_CheckExact(geno) || geno->model != model)
 		{
 			PyErr_Format(GenotypeRepresentationError,
-		             "invalid genotype object in genos at index %zd", i);
+			    "invalid genotype object in genos at index %zd", i);
 			goto error;
 		}
 
@@ -3485,6 +3567,26 @@ genomerger_merge_sample(GenotypeMergerObject *self, PyObject *args)
 	if(!PyArg_ParseTuple(args, "OOOO", &sample, &loci, &models, &genos))
 		return NULL;
 
+
+	/* Add checks temporarily to find slow code. */
+	if(!FastSequenceCheck(loci))
+	{
+		PyErr_SetString(PyExc_ValueError,"loci are not a tuple or list");
+		goto error;
+	}
+
+	if(!FastSequenceCheck(models))
+	{
+		PyErr_SetString(PyExc_ValueError,"models are not a tuple or list");
+		goto error;
+	}
+
+	if(!FastSequenceCheck(genos))
+	{
+		PyErr_SetString(PyExc_ValueError,"genos are not a tuple or list");
+		goto error;
+	}
+
 	locusseq = PySequence_Fast(loci,"cannot convert loci into a sequence");
 	if(!locusseq) goto error;
 
@@ -3562,6 +3664,19 @@ genomerger_merge_locus(GenotypeMergerObject *self, PyObject *args)
 
 	if(!PyArg_ParseTuple(args, "OOOO", &samples, &locus, &model, &genos))
 		return NULL;
+
+	/* Add checks temporarily to find slow code. */
+	if(!FastSequenceCheck(samples))
+	{
+		PyErr_SetString(PyExc_ValueError,"samples are not a tuple or list");
+		goto error;
+	}
+
+	if(!FastSequenceCheck(genos))
+	{
+		PyErr_SetString(PyExc_ValueError,"genos are not a tuple or list");
+		goto error;
+	}
 
 	sampleseq = PySequence_Fast(samples,"cannot convert samples into a sequence");
 	if(!sampleseq) goto error;
@@ -3707,8 +3822,8 @@ static PyMethodDef genoarraymodule_methods[] = {
 	 "Generate simple concordance statistics from two genotype arrays stored in 2-bit format"},
 	{"pick",	pick,	METH_VARARGS,
 	 "Pick items from a sequence given indices"},
-	{"pick_column",	pick_column,	METH_VARARGS,
-	 "Pick elements of the i'th column of a two dimensional sequence"},
+	{"pick_columns",	pick_columns,	METH_VARARGS,
+	 "Pick one or more columns from a two dimensional sequence"},
 	{"place",	place,	METH_VARARGS,
 	 "Place items from a sequence at indices into a destination sequence"},
 	{"place_list",	place_list,	METH_VARARGS,
