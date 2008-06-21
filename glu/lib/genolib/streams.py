@@ -13,6 +13,8 @@ Requires:      Python 2.5
 Revision:      $Id$
 '''
 
+from __future__ import with_statement
+
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
@@ -22,7 +24,7 @@ from   operator          import itemgetter, getitem
 from   collections       import defaultdict
 from   itertools         import izip,ifilter,imap,chain,groupby,repeat
 
-from   glu.lib.utils     import tally,izip_exact
+from   glu.lib.utils     import tally,izip_exact,gcdisabled
 from   glu.lib.imerge    import imerge
 from   glu.lib.xtab      import xtab,rowsby
 
@@ -3177,21 +3179,22 @@ def merge_genomatrixstream(genos, mergefunc):
 
     # Fully general merge over duplicate rows and columns
     for label,rows in rowdata:
-      # All columns are extracted from rows of schema i
-      if len(rows) == 1:
-        new_row = tuple(rows[0])
-      else:
-        new_row = pick_columns(rows)
+      with gcdisabled():
+        # All columns are extracted from rows of schema i
+        if len(rows) == 1:
+          new_row = tuple(rows[0])
+        else:
+          new_row = pick_columns(rows)
 
-      if merge_columns:
-        new_row = place_list([None]*n, new_row, column_dest)
+        if merge_columns:
+          new_row = place_list([None]*n, new_row, column_dest)
 
-      # Merge genotypes
-      if genos.format=='ldat':
-        model   = genos.genome.get_model(label)
-        new_row = mergefunc.merge_locus(samples, label, model, new_row)
-      else:
-        new_row = mergefunc.merge_sample(label, loci, models, new_row)
+        # Merge genotypes
+        if genos.format=='ldat':
+          model   = genos.genome.get_model(label)
+          new_row = mergefunc.merge_locus(samples, label, model, new_row)
+        else:
+          new_row = mergefunc.merge_sample(label, loci, models, new_row)
 
       # Yield new row
       yield label,new_row
@@ -3416,35 +3419,36 @@ def merge_genomatrixstream_list(genos, mergefunc):
   def _merger():
     # Fully general merge over duplicate rows and columns
     for label in new_rows:
-      # Form null genotype lists at each new column
-      # (place_list understands None is a null list)
-      new_row = [None]*n
+      with gcdisabled():
+        # Form null genotype lists at each new column
+        # (place_list understands None is a null list)
+        new_row = [None]*n
 
-      # Iterate over input rows and schema, find the cooresponding column
-      # mappings, and append the relevant genotypes
-      for i,rows in merge_rows.pop(label).iteritems():
-        j,k  = merge_columns[i]
+        # Iterate over input rows and schema, find the cooresponding column
+        # mappings, and append the relevant genotypes
+        for i,rows in merge_rows.pop(label).iteritems():
+          j,k  = merge_columns[i]
 
-        # All columns are extracted from rows of schema i
-        if len(rows) == 1:
-          # place_list is smart enough to handle bare genotypes as well as
-          # lists, so use pick when possible
-          cols = pick(rows[0], j)
+          # All columns are extracted from rows of schema i
+          if len(rows) == 1:
+            # place_list is smart enough to handle bare genotypes as well as
+            # lists, so use pick when possible
+            cols = pick(rows[0], j)
+          else:
+            # Otherwise use the more general pick_columns
+            cols = pick_columns(rows, j)
+
+          # Place columns in the correct destination
+          place_list(new_row, cols, k)
+
+        # Merge genotypes
+        if format=='ldat':
+          model = genome.get_model(label)
+          models.append(model)
+          new_row = mergefunc.merge_locus(samples, label, model, new_row)
+
         else:
-          # Otherwise use the more general pick_columns
-          cols = pick_columns(rows, j)
-
-        # Place columns in the correct destination
-        place_list(new_row, cols, k)
-
-      # Merge genotypes
-      if format=='ldat':
-        model = genome.get_model(label)
-        models.append(model)
-        new_row = mergefunc.merge_locus(samples, label, model, new_row)
-
-      else:
-        new_row = mergefunc.merge_sample(label, loci, models, new_row)
+          new_row = mergefunc.merge_sample(label, loci, models, new_row)
 
       # Yield new row
       yield label,new_row
@@ -4714,7 +4718,7 @@ def remap_genomatrixstream_row(genos,rowmap):
   return rename_genomatrixstream_row(genos,rowmap)
 
 
-def transpose_generator(columns, rows, m=16):
+def transpose_generator(columns, rows, m=32):
   '''
   Transpose a matrix of row labels and row data generating one column of
   data at a time.  Return a generator of the columns of data stored in rows,

@@ -144,7 +144,7 @@ def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
       if not line or line.startswith('#'):
         continue
 
-      with gcdisabled:
+      with gcdisabled():
         fields = line.split()
 
         if len(fields) != n:
@@ -509,7 +509,7 @@ def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
       if not line or line.startswith('#'):
         continue
 
-      with gcdisabled:
+      with gcdisabled():
         fields = line.split()
 
         if len(fields) != n:

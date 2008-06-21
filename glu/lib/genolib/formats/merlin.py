@@ -128,7 +128,7 @@ def load_merlin(filename,genome=None,phenome=None,extra_args=None,**kwargs):
       if not line or line.startswith('#'):
         continue
 
-      with gcdisabled:
+      with gcdisabled():
         fields = line.split()
 
         if len(fields) != n:

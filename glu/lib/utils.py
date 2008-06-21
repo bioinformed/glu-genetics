@@ -392,30 +392,42 @@ def deprecated_by(msg):
   return deprecated
 
 
-class GCDisabled(object):
+class gcdisabled(object):
   '''
   Conext manager to temporarily disable Python's cyclic garbage collector.
-  The primary use is to avoid CPU and cache thrashing while allocating large
-  numbers of potentially cyclic objects.  It is not wise to disable the
-  garbage collector for too long.
+  The primary use is to avoid thrashing while allocating large numbers of
+  non-cyclic objects due to an overly aggressive garbage collector behavior.
 
-  >>> gc.isenabled
+  Will disable GC if it is enabled upon entry and renable upon exit:
+
+  >>> gc.isenabled()
   True
-  >>> with gcdisabled:
-  ...   print gc.isenabled
+  >>> with gcdisabled():
+  ...   print gc.isenabled()
   False
-  >>> print gc.isenabled
+  >>> print gc.isenabled()
   True
+
+  Will not reenable if GC was disabled upon entry:
+
+  >>> gc.disable()
+  >>> gc.isenabled()
+  False
+  >>> with gcdisabled():
+  ...   gc.isenabled()
+  False
+  >>> gc.isenabled()
+  False
   '''
+  def __init__(self):
+    self.isenabled = gc.isenabled()
+
   def __enter__(self):
     gc.disable()
 
   def __exit__(self, type, value, traceback):
-    gc.enable()
-
-
-gcdisabled = GCDisabled()
-del GCDisabled
+    if self.isenabled:
+      gc.enable()
 
 
 def _test():

@@ -824,7 +824,7 @@ def load_models(gfile,loci,version,compat_version,ignoreloci):
   @param compat_version: genotype file version backward compatibility number
   @type  compat_version: int
   '''
-  with gcdisabled:
+  with gcdisabled():
     if version == 1 or ignoreloci:
       return load_models_v1(gfile,loci)
     elif version in (2,3) or compat_version in (2,3):
