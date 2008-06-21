@@ -19,6 +19,8 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
+import gc
+import imp
 import sys
 import time
 import optparse
@@ -36,6 +38,7 @@ except (IOError,ValueError):
 
 
 class GLUError(RuntimeError): pass
+class ModuleMissingError(ImportError): pass
 
 
 def format_elapsed_time(t):
@@ -125,6 +128,49 @@ def module_info(name,module,out=sys.stderr):
     out.write('\n\n')
 
 
+def find_module(module, paths=None):
+  '''
+  Just like 'imp.find_module()', but with package support
+
+  Based on setuptools depends.py
+  '''
+
+  parts = module.split('.')
+
+  while parts:
+    part = parts.pop(0)
+
+    try:
+      f, path, (suffix,mode,kind) = info = imp.find_module(part, paths)
+
+      if kind==imp.PKG_DIRECTORY:
+        parts = parts or ['__init__']
+        paths = [path]
+      elif parts:
+        raise ImportError
+
+    except ImportError:
+      raise ModuleMissingError('Cannot find module %r in package %s' % (parts,module))
+
+  return info
+
+
+def load_module(module, paths=None):
+  parts = module.split('.')
+
+  name = None
+  for part in parts:
+    if name:
+      name += '.' + part
+    else:
+      name  = part
+
+    data   = find_module(name, paths)
+    module = imp.load_module(name, *data)
+
+  return module
+
+
 def option_parser():
   usage = 'usage: %prog [options] [module] [args...]'
   parser = optparse.OptionParser(usage=usage, version='%%prog %s' % __version__, add_help_option=False)
@@ -136,10 +182,21 @@ def option_parser():
                     help='display program runtime statistics')
   parser.add_option('-v', '--verbose', dest='verbose', action='store_true',
                     help='verbose error output')
-  parser.add_option('--path', dest='path', action='store_true',
-                    help='Display GLU path')
-  parser.add_option('-p', '--profile', dest='profile', action='store_true', help=optparse.SUPPRESS_HELP)
-  parser.add_option('--profiler', dest='profiler', metavar='P', default='python', help=optparse.SUPPRESS_HELP)
+
+  devopts = optparse.OptionGroup(parser, 'Options for software developers & power users')
+
+  devopts.add_option('--path', dest='path', action='store_true',
+                     help='Display GLU package installation path')
+  devopts.add_option('-p', '--profile', dest='profile', action='store_true',
+                     help='Profile GLU code to find performance bottlenecks')
+  devopts.add_option('--profiler', dest='profiler', metavar='P', default='python',
+                     help='Set the profiler to use when -p is specified')
+  devopts.add_option('--gcstats', dest='gcstats', action='store_true',
+                     help='Generate statistics from the runtime object garbage collector')
+  devopts.add_option('--gcthreshold', dest='gcthreshold', metavar='N', type='int', default=1000000,
+                     help='Set the threshold for triggering collection of generation-0 objects')
+
+  parser.add_option_group(devopts)
 
   return parser
 
@@ -158,37 +215,41 @@ def main():
                      '"glu list".\n\n')
     return
 
-  modulename = args[0]
-  module_options = args[1:]
+  if glu_options.gcstats:
+    gc.set_debug(gc.DEBUG_STATS)
+
+  if glu_options.gcthreshold >= 0:
+    gc.set_threshold(glu_options.gcthreshold,100,10)
+
+  module_name     = args[0]
+  module_fullname = 'glu.modules.' + module_name
+  module_options  = args[1:]
 
   try:
-    module = __import__('glu.modules.' + modulename, fromlist=['main'])
-  except ImportError:
-    sys.stderr.write('Unable to import module %s.  Please verify module name and try again.\n' % modulename)
-    if glu_options.verbose:
-      sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
-    return
+    module = load_module(module_fullname)
+    module_info(module_name,module)
 
-  try:
-    progmain = module.main
-  except AttributeError:
-    sys.stderr.write('Unable to execute module %s.\n' % modulename)
-    return
+    try:
+      progmain = module.main
+    except AttributeError:
+      sys.stderr.write('Unable to execute module %s.\n' % module_name)
+      return
 
-  sys.argv = ['glu %s' % modulename] + module_options
+    if glu_options.stats:
+      cstart = time.clock()
+      tstart = time.time()
+      sys.stderr.write('[%s] Execution start\n' % time.asctime())
 
-  module_info(modulename,module)
+    sys.argv = ['glu %s' % module_name] + module_options
 
-  if glu_options.stats:
-    cstart = time.clock()
-    tstart = time.time()
-    sys.stderr.write('[%s] Execution start\n' % time.asctime())
-
-  try:
     if glu_options.profile:
       run_profile(glu_options,progmain)
     else:
       progmain()
+
+  except ModuleMissingError:
+    sys.stderr.write('Unable to find module %s.  Please verify the module name and try again.\n' % module_name)
+    return
 
   except KeyboardInterrupt:
     sys.stderr.write('\n[%s] Execution aborted by user\n' % time.asctime())
@@ -210,6 +271,7 @@ def main():
 
   except SystemExit:
     pass
+
   except:
     sys.stderr.write('''
 Execution aborted due to a problem with the program input, parameters
