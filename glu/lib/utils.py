@@ -60,7 +60,6 @@ def as_set(items):
   >>> as_set(iter(t)) == set(t)
   True
   '''
-  assert not is_str(items)
   if isinstance(items, (dict,set)):
     return items
   return set(items)

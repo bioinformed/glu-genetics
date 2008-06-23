@@ -21,10 +21,11 @@ from   types             import NoneType
 from   collections       import defaultdict
 from   itertools         import izip
 
+from   glu.lib.utils     import as_set
 from   glu.lib.fileutils import namefile,get_arg,trybool,load_list,load_map,load_table
 
 
-list_type = (NoneType,set,dict,list,tuple)
+seq_type = (NoneType,set,dict,list,tuple)
 map_type  = (NoneType,dict)
 
 
@@ -198,16 +199,20 @@ class GenoSubTransform(object):
     @param   order: sort order, either 'samples', 'locus'
     @type    order: str
     '''
-    if not isinstance(include, list_type):
+    if not isinstance(include, seq_type):
       include = set(load_list(include))
+    elif include is not None:
+      include = as_set(include)
 
-    if not isinstance(exclude, list_type):
+    if not isinstance(exclude, seq_type):
       exclude = set(load_list(exclude))
+    elif exclude is not None:
+      exclude = as_set(exclude)
 
     if not isinstance(rename, map_type):
-      rename  = load_map(rename)
+      rename = load_map(rename)
 
-    if not isinstance(order, list_type):
+    if not isinstance(order, seq_type):
       order = load_list(order)
 
     self.include = include
@@ -250,9 +255,9 @@ def prove_bijective_mapping(items,transform):
   if items is None and transform.include is None:
     return False
   elif items is not None and transform.include is not None:
-    items = set(items) & set(transform.include)
+    items = as_set(items) & as_set(transform.include)
   elif transform.include is not None:
-    items = set(transform.include)
+    items = as_set(transform.include)
 
   # Construct the minimal sample reverse map by removing excluded items
   # to verify that no two map to the same identifier.

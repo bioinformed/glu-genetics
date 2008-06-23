@@ -24,7 +24,7 @@ from   operator          import itemgetter, getitem
 from   collections       import defaultdict
 from   itertools         import izip,ifilter,imap,chain,groupby,repeat
 
-from   glu.lib.utils     import tally,izip_exact,gcdisabled
+from   glu.lib.utils     import as_set,tally,izip_exact,gcdisabled
 from   glu.lib.imerge    import imerge
 from   glu.lib.xtab      import xtab,rowsby
 
@@ -4137,6 +4137,12 @@ def filter_genotriples(triples,sampleset,locusset,exclude=False):
   s2 l1 ('T', 'T')
   s2 l2 ('A', 'G')
   '''
+  if sampleset is not None:
+    sampleset = as_set(sampleset)
+
+  if locusset is not None:
+    locusset = as_set(locusset)
+
   def _filter():
     if exclude:
       for sample,locus,geno in triples:
@@ -4336,6 +4342,8 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   ('s2', [('A', 'T')])
   ('s3', [('T', 'T')])
   '''
+  colset = as_set(colset)
+
   columns = genos.columns
   if exclude:
     columns = ((name,i) for i,name in enumerate(columns) if name not in colset)
@@ -4662,13 +4670,17 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
   ('s2', [('A', 'G'), ('A', 'T')])
   ('s3', [('G', 'G'), ('T', 'T')])
   '''
-  # FIXME: Implement fast path when rows are known
+  rowset = as_set(rowset)
+
   rows = genos.rows
   if rows is not None:
     if exclude:
       rows = tuple(label for label in rows if label not in rowset)
     else:
       rows = tuple(label for label in rows if label     in rowset)
+
+    if rows == genos.rows:
+      return genos
 
   if genos.format=='sdat':
     if exclude:
