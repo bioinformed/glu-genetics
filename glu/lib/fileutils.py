@@ -21,7 +21,7 @@ import csv
 
 from   itertools     import islice,izip
 
-from   glu.lib.utils import peekfirst
+from   glu.lib.utils import is_str,peekfirst
 
 
 __all__ = ['autofile','namefile','hyphen',
@@ -85,7 +85,7 @@ def hyphen(filename,defaultfile,args=None):
   @return            : file name or file object to read from or write to
   @rtype             : str or file object
   '''
-  if not isstr(filename):
+  if not is_str(filename):
     return filename
 
   if args is None:
@@ -95,16 +95,6 @@ def hyphen(filename,defaultfile,args=None):
     return defaultfile
 
   return filename
-
-
-def isstr(s):
-  '''
-  Return whether the input is a string
-
-  @return   : indicate if the input is a string
-  @rtype    : bool
-  '''
-  return isinstance(s, basestring)
 
 
 def namefile(filething):
@@ -127,7 +117,7 @@ def namefile(filething):
   >>> namefile('/dev/null')
   '/dev/null'
   '''
-  if isstr(filething):
+  if is_str(filething):
     return filething
   elif getattr(filething, 'name', None) is not None:
     return filething.name
@@ -157,7 +147,7 @@ def compressed_filename(filename):
   >>> compressed_filename('../subjects.sdat.gz')
   'gz'
   '''
-  if not isstr(filename):
+  if not is_str(filename):
     return ''
 
   filename = os.path.expanduser(filename)
@@ -180,7 +170,7 @@ def autofile(filename, mode='r'):
   @rtype          : file object
   '''
   # Pass non-string filename objects back as file-objects
-  if not isstr(filename):
+  if not is_str(filename):
     return filename
 
   filename = os.path.expanduser(filename)
@@ -221,7 +211,7 @@ def guess_format(filename, formats, args=None):
   'ldat'
   '''
 
-  if not isstr(filename):
+  if not is_str(filename):
     return None
 
   # Parse to remove augmented arguments
@@ -260,7 +250,7 @@ def related_file(filename,extension):
   >>> related_file('foo', 'sdat')
   'foo.sdat'
   '''
-  if not isstr(filename):
+  if not is_str(filename):
     return None
 
   prefix = os.path.splitext(filename)[0]
@@ -286,7 +276,7 @@ def guess_related_file(filename,extensions):
   >>> guess_related_file('fileutils.dat',['py']) # doctest:+SKIP
   'fileutils.py'
   '''
-  if not isstr(filename):
+  if not is_str(filename):
     return None
 
   prefix,ext = os.path.splitext(filename)
@@ -335,7 +325,7 @@ def parse_augmented_filename(filename,args):
   >>> sorted(args.iteritems())
   [('', 'spoo'), ('baz', ''), ('foo', 'bar')]
   '''
-  if not isstr(filename):
+  if not is_str(filename):
     return filename
 
   filename_save = filename
@@ -487,7 +477,7 @@ def get_csv_dialect(args,default_dialect='tsv'):
 
 
 def _literal_list(filename):
-  return isstr(filename) and not os.path.exists(filename) and filename.startswith(':')
+  return is_str(filename) and not os.path.exists(filename) and filename.startswith(':')
 
 
 def get_arg(args, names, default=None):
@@ -966,7 +956,7 @@ def resolve_column_header(header,column):
     except ValueError:
       pass
 
-  if isstr(column):
+  if is_str(column):
     hyphens = column.count('-')
     if hyphens:
       start = 0
