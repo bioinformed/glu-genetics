@@ -155,22 +155,6 @@ def find_module(module, paths=None):
   return info
 
 
-def load_module(module, paths=None):
-  parts = module.split('.')
-
-  name = None
-  for part in parts:
-    if name:
-      name += '.' + part
-    else:
-      name  = part
-
-    data   = find_module(name, paths)
-    module = imp.load_module(name, *data)
-
-  return module
-
-
 def option_parser():
   usage = 'usage: %prog [options] [module] [args...]'
   parser = optparse.OptionParser(usage=usage, version='%%prog %s' % __version__, add_help_option=False)
@@ -226,7 +210,8 @@ def main():
   module_options  = args[1:]
 
   try:
-    module = load_module(module_fullname)
+    find_module(module_fullname)
+    module = __import__(module_fullname, fromlist=['main'])
     module_info(module_name,module)
 
     try:
