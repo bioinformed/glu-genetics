@@ -501,6 +501,7 @@ class GenotripleStream(GenotypeStream):
     if transform.recode_models is not None:
       triples = recode_genotriples(triples, transform.recode_models)
 
+    # FIXME: I'm not sure what I meant here, but it doesn't look quite right
     if transform.samples.order is not None and transform.loci.order is not None:
       if transform.samples.order is not None:
         order = 'samples'
