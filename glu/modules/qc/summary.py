@@ -23,7 +23,7 @@ import sys
 
 from   itertools                 import izip
 
-from   glu.lib.fileutils         import table_writer
+from   glu.lib.fileutils         import autofile,hyphen,load_list,table_writer
 from   glu.lib.hwp               import hwp_biallelic
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
@@ -33,14 +33,32 @@ from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
 LOCUS_HEADER  = ['LOCUS','CHROMOSOME','LOCATION','STRAND',
                  'NUM_ALLELES','ALLELES','ALLELE_COUNTS', 'MAF',
                  'NUM_GENOTYPES','GENOTYPES','GENOTYPE_COUNTS',
-                 'MISSING_COUNT', 'INFORMATIVE_COUNT', 'MISSING_RATE','HW_PVALUE']
+                 'MISSING_COUNT', 'INFORMATIVE_COUNT',
+                 'ATTEMPTED_MISSING_RAGE', 'OBSERVED_MISSING_RATE',
+                 'NONEMPTY_MISSING_RATE', 'HW_PVALUE']
 
 SAMPLE_HEADER = ['SAMPLE','MISSING_COUNT','HEMIZYGOTE_COUNT',
                  'HOMOZYGOTE_COUNT','HETEROZYGOTE_COUNT',
-                 'INFORMATIVE_COUNT', 'MISSING_RATE', 'HETEROZYGOSITY']
+                 'INFORMATIVE_COUNT', 'ATTEMPTED_MISSING_RAGE',
+                 'OBSERVED_MISSING_RATE', 'NONEMPTY_MISSING_RATE',
+                 'HETEROZYGOSITY']
 
 
-def locus_row(lname,locus,model,counts,compute_hwp):
+def rate(a,b):
+  if b!= 0:
+    return a/b
+  else:
+    ''
+
+
+def missing_rates(observed_missing,observed,empty,missing):
+  return [ rate(observed_missing+missing,observed+missing),
+           rate(observed_missing,        observed),
+           rate(observed_missing-empty,  observed-empty) ]
+
+
+def locus_row(lname,locus,counts,empty_samples,missing_samples,compute_hwp):
+  model   = locus.model
   acounts = izip(count_alleles_from_genocounts(model,counts),model.alleles)
   acounts = sorted(acounts,reverse=True)
   alleles = [ a for n,a in acounts if n if a and n ]
@@ -61,8 +79,9 @@ def locus_row(lname,locus,model,counts,compute_hwp):
   lcounts = [ n for n,g in lgenos if n ]
   lgenos  = [ (delim.join( [g[0] or '',g[1] or ''])) for n,g in lgenos if n ]
 
-  n = counts.sum()
-  missing_rate = str(counts[0]/n) if n else ''
+  missing = counts[0]
+  total   = counts.sum()
+  rates   = missing_rates(missing,total,empty_samples,missing_samples)
 
   hwp = ''
   if compute_hwp:
@@ -74,24 +93,78 @@ def locus_row(lname,locus,model,counts,compute_hwp):
   return [lname,locus.chromosome or '', str(locus.location or ''), locus.strand or '',
                 str(len(alleles)),'|'.join(alleles),'|'.join(str(n) for n in acounts),maf,
                 str(len(lgenos)), '|'.join(lgenos), '|'.join(str(n) for n in lcounts),
-                counts[0], sum(counts[1:]), missing_rate, hwp]
+                missing, sum(counts[1:])]+rates+[hwp]
 
 
-def locus_total(counts):
-  n = counts.sum()
-  missing_rate = str(counts[0]/n) if n else ''
+def locus_total(counts,empty_samples,missing_samples):
+  missing = counts[0]
+  total   = counts.sum()
+  rates   = missing_rates(missing,total,empty_samples,missing_samples)
 
-  return ['*','','','','','','','','','','',counts[0],sum(counts[1:]),missing_rate,'']
+  return ['*','','','','','','','','','','',
+          missing,sum(counts[1:])]+rates+['']
 
 
-def sample_row(sample,counts):
-  n = counts.sum()
-  missing_rate = str(counts[0]/n) if n else ''
+def sample_row(sample,counts,empty_loci,missing_loci):
+  missing = counts[0]
+  total   = counts.sum()
+  rates   = missing_rates(missing,total,empty_loci,missing_loci)
 
-  n = counts[2]+counts[3]
-  heterozygosity = str(counts[3]/(counts[2]+counts[3])) if n else ''
+  heterozygosity = rate(counts[3],counts[2]+counts[3])
 
-  return [sample]+counts.tolist()+[sum(counts[1:]),missing_rate,heterozygosity]
+  return ([sample]+counts.tolist()+[sum(counts[1:])]+rates+[heterozygosity])
+
+
+def summarize(genos):
+  if genos.format not in ('sdat','ldat'):
+    genos = genos.as_ldat()
+
+  if genos.format == 'ldat':
+    loci          = []
+    locus_counts  = []
+    samples       = genos.samples
+    sample_counts = None
+
+    for (lname,geno) in genos:
+      locus_count,sample_counts = locus_summary(geno,sample_counts)
+      loci.append(lname)
+      locus_counts.append(locus_count)
+
+  else:
+    samples       = []
+    sample_counts = []
+    loci          = genos.loci
+    locus_counts  = None
+
+    for sample,geno in genos:
+      sample_count,locus_counts = sample_summary(geno,locus_counts)
+      samples.append(sample)
+      sample_counts.append(sample_count)
+
+  if locus_counts is None:
+    locus_counts  = []
+
+  if sample_counts is None:
+    sample_counts = []
+
+  return loci,locus_counts,samples,sample_counts
+
+
+def count_empty(counts,n):
+  empty = 0
+  for count in counts:
+    if count[0]==n:
+      empty += 1
+  return empty
+
+
+def format_rate(numerator, denominator):
+  if denominator<=0:
+    rate = ''
+  else:
+    rate = numerator/denominator
+
+  return (numerator,denominator,rate)
 
 
 def option_parser():
@@ -106,19 +179,27 @@ def option_parser():
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
   parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
-                    help='Include list for those samples to only use')
+                    help='List of samples to include')
   parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
-                    help='Include list for those loci to only use')
+                    help='List of loci to include')
   parser.add_option('-x', '--excludesamples', dest='excludesamples', metavar='FILE',
-                    help='Exclude a list of samples')
+                    help='List of samples to exclude')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
-                    help='Exclude a list of loci')
+                    help='List of loci to exclude')
+  parser.add_option('-c','--locuscompletion', dest='locuscompletion', metavar='N', type='float',
+                    help='Exclude loci with completion rate less than N')
+  parser.add_option('-C','--samplecompletion', dest='samplecompletion', metavar='N', type='float',
+                    help='Exclude samples with completion rate less than N')
+  parser.add_option('-m','--mingenos', '--mincount', dest='mingenos', metavar='N',default=50, type='int',
+                    help='Exclude samples with less than N non-missing genotypes')
   parser.add_option('--hwp', dest='hwp', action='store_true',
                     help='Test for deviation from Hardy-Weinberg proportions')
-  parser.add_option('-o', '--locusout', dest='locusout', metavar='FILE', default='-',
-                    help='Locus output report')
-  parser.add_option('-O', '--sampleout', dest='sampleout', metavar='FILE', default='-',
-                    help='Locus output report')
+  parser.add_option('-s', '--summaryout', dest='summaryout', metavar='FILE', default='-',
+                    help='Summary output file name')
+  parser.add_option('-o', '--locusout', dest='locusout', metavar='FILE',
+                    help='Locus output table file name')
+  parser.add_option('-O', '--sampleout', dest='sampleout', metavar='FILE',
+                    help='Sample output table file name')
   return parser
 
 
@@ -133,56 +214,70 @@ def main():
   genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
                                   genome=options.loci)
 
-  genos = genos.transformed(include_loci=options.includeloci,
+  # Include lists are used to communicate the universe of attempted samples/loci
+  # Any not observed in the genotype data are classified as "missing"
+  includeloci    = set(load_list(options.includeloci))    if options.includeloci    else None
+  includesamples = set(load_list(options.includesamples)) if options.includesamples else None
+
+  genos = genos.transformed(include_loci=includeloci,
                             exclude_loci=options.excludeloci,
-                            include_samples=options.includesamples,
+                            include_samples=includesamples,
                             exclude_samples=options.excludesamples)
 
-  if genos.format not in ('sdat','ldat'):
-    genos = genos.as_ldat()
+  loci,locus_counts,samples,sample_counts = summarize(genos)
+  sample_totals = sum(sample_counts)
 
-  locusout  = table_writer(options.locusout,hyphen=sys.stdout)
-  sampleout = table_writer(options.sampleout,hyphen=sys.stdout)
+  # Locus statistics
+  missing_loci        = len(includeloci-set(loci)) if includeloci else 0
+  attempted_loci      = len(loci)+missing_loci
+  empty_loci          = count_empty(locus_counts, len(samples))
 
-  if genos.format == 'ldat':
-    sample_counts = None
+  # Sample statistics
+  missing_samples     = len(includesamples-set(samples)) if includesamples else 0
+  attempted_samples   = len(samples)+missing_samples
+  empty_samples       = count_empty(sample_counts,len(loci))
 
-    locusout.writerow(LOCUS_HEADER)
-    for (lname,geno),model in izip(genos,genos.models):
-      locus = genos.genome.get_locus(lname)
-      locus_count,sample_counts = locus_summary(geno,sample_counts)
+  # Observed genotype statistics
+  missing_genotypes   = sample_totals[0]
+  observed_genotypes  = sample_totals.sum()
+  found_genotypes     = observed_genotypes - missing_genotypes
 
-      locusout.writerow(locus_row(lname,locus,model,locus_count,options.hwp))
+  # Attempted and non-empty genotype statistics
+  empty_genotypes     = empty_loci*len(samples)
+  attempted_genotypes = attempted_loci*attempted_samples
+  nonempty_genotypes  = observed_genotypes  - empty_genotypes
+  phantom_genotypes   = attempted_genotypes - observed_genotypes
 
-    sample_totals = sum(sample_counts)
-    locusout.writerow(locus_total(sample_totals))
-    del locusout
+  if options.summaryout:
+    summaryout = autofile(hyphen(options.summaryout,sys.stdout),'w')
+    summaryout.write('loci   : attempted=%8d, observed=%8d, empty=%8d, missing=%8d\n'
+                         % (len(loci)+missing_loci,len(loci),empty_loci,missing_loci))
+    summaryout.write('samples: attempted=%8d, observed=%8d, empty=%8d, missing=%8d\n'
+                         % (len(samples)+missing_samples,len(samples),empty_samples,missing_samples))
+    summaryout.write('\n')
+    summaryout.write('Attempted genotypes: missing=%8d, total=%8d, rate=%g\n'
+                         % format_rate(attempted_genotypes-found_genotypes,attempted_genotypes))
+    summaryout.write('Observed  genotypes: missing=%8d, total=%8d, rate=%g\n'
+                         % format_rate(missing_genotypes,observed_genotypes))
+    summaryout.write('Non-empty genotypes: missing=%8d, total=%8d, rate=%g\n'
+                         % format_rate(missing_genotypes-empty_genotypes,nonempty_genotypes))
 
+  if options.sampleout:
+    sampleout = table_writer(options.sampleout,hyphen=sys.stdout)
     sampleout.writerow(SAMPLE_HEADER)
-    for sample,count in izip(genos.samples,sample_counts):
-      sampleout.writerow(sample_row(sample,count))
-
-    sampleout.writerow(sample_row('*',sample_totals))
-
-  else:
-    locus_counts  = None
-    sample_counts = 0
-
-    sampleout.writerow(SAMPLE_HEADER)
-    for sample,geno in genos:
-      sample_count,locus_counts = sample_summary(geno,locus_counts)
-      sample_counts += sample_count
-      sampleout.writerow(sample_row(sample,sample_count))
-
-    sampleout.writerow(sample_row('*',sample_counts))
+    for sample,count in izip(samples,sample_counts):
+      sampleout.writerow(sample_row(sample,count,empty_loci,missing_loci))
+    sampleout.writerow(sample_row('*',sample_totals,empty_genotypes,phantom_genotypes))
     del sampleout
 
+  if options.locusout:
+    locusout  = table_writer(options.locusout,hyphen=sys.stdout)
     locusout.writerow(LOCUS_HEADER)
-    for lname,model,locus_count in izip(genos.loci,genos.models,locus_counts):
+    for lname,locus_count in izip(loci,locus_counts):
       locus = genos.genome.get_locus(lname)
-      locusout.writerow(locus_row(lname,locus,model,locus_count,options.hwp))
-
-    locusout.writerow(locus_total(sample_counts))
+      locusout.writerow(locus_row(lname,locus,locus_count,empty_samples,missing_samples,options.hwp))
+    locusout.writerow(locus_total(sample_totals,empty_genotypes,phantom_genotypes))
+    del locusout
 
 
 if __name__=='__main__':
