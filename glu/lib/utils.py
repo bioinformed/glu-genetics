@@ -19,8 +19,9 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-__all__ = ['tally','ilen','pair_generator','percent','xenumerate','pick','peekfirst','groups',
-           'unique','izip_exact','deprecated','deprecated_by', 'gcdisabled']
+__all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumerate','pick',
+           'peekfirst','groups','unique','izip_exact','deprecated','deprecated_by',
+           'gcdisabled']
 
 import gc
 import array
@@ -29,6 +30,63 @@ import collections
 
 from   functools import update_wrapper
 from   itertools import izip, count, chain
+
+
+def as_set(items):
+  '''
+  Return items as a set if it not already a set or dict.
+
+  @param  items: sequence, set, or mapping
+  @rtype       : set or dict
+
+  Examples:
+
+  >>> s = set([1,2,3])
+  >>> as_set(s) is s
+  True
+
+  >>> d = dict(a=1, b=2)
+  >>> as_set(d) is d
+  True
+
+  >>> l = [1,2,3]
+  >>> as_set(l) == set(l)
+  True
+
+  >>> t = (1,2,3)
+  >>> as_set(t) == set(t)
+  True
+
+  >>> as_set(iter(t)) == set(t)
+  True
+  '''
+  assert not is_str(items)
+  if isinstance(items, (dict,set)):
+    return items
+  return set(items)
+
+
+def is_str(s):
+  '''
+  Return whether the input is a string
+
+  @param  s: object
+  @return  : indicate if the input is a string
+  @rtype   : bool
+
+  >>> is_str(True)
+  False
+
+  >>> is_str(None)
+  False
+
+  >>> is_str('abc')
+  True
+
+  >>> is_str(u'abc')
+  True
+  '''
+  return isinstance(s, basestring)
 
 
 def tally(seq):
