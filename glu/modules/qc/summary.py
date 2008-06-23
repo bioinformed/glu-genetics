@@ -227,33 +227,39 @@ def main():
   loci,locus_counts,samples,sample_counts = summarize(genos)
   sample_totals = sum(sample_counts)
 
+  assert len(loci)*len(samples) == sample_totals.sum()
+
   # Locus statistics
   missing_loci        = len(includeloci-set(loci)) if includeloci else 0
   attempted_loci      = len(loci)+missing_loci
   empty_loci          = count_empty(locus_counts, len(samples))
+  nonempty_loci       = len(loci)-empty_loci
 
   # Sample statistics
   missing_samples     = len(includesamples-set(samples)) if includesamples else 0
   attempted_samples   = len(samples)+missing_samples
   empty_samples       = count_empty(sample_counts,len(loci))
+  nonempty_samples    = len(samples)-empty_samples
 
   # Observed genotype statistics
   missing_genotypes   = sample_totals[0]
-  observed_genotypes  = sample_totals.sum()
+  observed_genotypes  = len(loci)*len(samples)
   found_genotypes     = observed_genotypes - missing_genotypes
 
-  # Attempted and non-empty genotype statistics
-  empty_genotypes     = empty_loci*len(samples)
+  # Non-empty genotype statistics
+  nonempty_genotypes  = nonempty_loci*nonempty_samples
+  empty_genotypes     = observed_genotypes - nonempty_genotypes
+
+  # Attempted genotype statistocs
   attempted_genotypes = attempted_loci*attempted_samples
-  nonempty_genotypes  = observed_genotypes  - empty_genotypes
   phantom_genotypes   = attempted_genotypes - observed_genotypes
 
   if options.summaryout:
     summaryout = autofile(hyphen(options.summaryout,sys.stdout),'w')
     summaryout.write('loci   : attempted=%8d, observed=%8d, empty=%8d, missing=%8d\n'
-                         % (len(loci)+missing_loci,len(loci),empty_loci,missing_loci))
+                         % (attempted_loci,len(loci),empty_loci,missing_loci))
     summaryout.write('samples: attempted=%8d, observed=%8d, empty=%8d, missing=%8d\n'
-                         % (len(samples)+missing_samples,len(samples),empty_samples,missing_samples))
+                         % (attempted_samples,len(samples),empty_samples,missing_samples))
     summaryout.write('\n')
     summaryout.write('Attempted genotypes: missing=%8d, total=%8d, rate=%g\n'
                          % format_rate(attempted_genotypes-found_genotypes,attempted_genotypes))
