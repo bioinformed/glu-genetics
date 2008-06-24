@@ -26,13 +26,14 @@ import time
 import optparse
 import traceback
 
-from   pkg_resources import resource_string
+import pkgutil
+import pkg_resources
 
 import glu
 
 
 try:
-  __version__ = resource_string('glu','VERSION').strip()
+  __version__ = pkg_resources.resource_string('glu','VERSION').strip()
 except (IOError,ValueError):
   __version__ = '(unknown)'
 
@@ -128,33 +129,6 @@ def module_info(name,module,out=sys.stderr):
     out.write('\n\n')
 
 
-def find_module(module, paths=None):
-  '''
-  Just like 'imp.find_module()', but with package support
-
-  Based on setuptools depends.py
-  '''
-
-  parts = module.split('.')
-
-  while parts:
-    part = parts.pop(0)
-
-    try:
-      f, path, (suffix,mode,kind) = info = imp.find_module(part, paths)
-
-      if kind==imp.PKG_DIRECTORY:
-        parts = parts or ['__init__']
-        paths = [path]
-      elif parts:
-        raise ImportError
-
-    except ImportError:
-      raise ModuleMissingError('Cannot find module %r in package %s' % (parts,module))
-
-  return info
-
-
 def option_parser():
   usage = 'usage: %prog [options] [module] [args...]'
   parser = optparse.OptionParser(usage=usage, version='%%prog %s' % __version__, add_help_option=False)
@@ -210,8 +184,13 @@ def main():
   module_options  = args[1:]
 
   try:
-    find_module(module_fullname)
-    module = __import__(module_fullname, fromlist=['main'])
+    loader = pkgutil.get_loader(module_fullname)
+
+    if loader is None:
+      raise ModuleMissingError()
+
+    module = loader.load_module(module_fullname)
+
     module_info(module_name,module)
 
     try:
