@@ -314,9 +314,9 @@ def option_parser():
                     help='Input genotype representation')
   parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
                     help='Locus description file and options')
-  parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='vote:1',
+  parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='unanimous',
                     help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
-                         'Values=vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=vote:1')
+                         'Values=unique,unanimous,vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=unanimous')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')
   parser.add_option('-T', '--threshold', dest='threshold', metavar='N%', type='int', default=85,

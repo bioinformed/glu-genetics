@@ -29,7 +29,8 @@ from   collections               import defaultdict
 from   glu.lib.fileutils         import load_map, table_writer
 from   glu.lib.remap             import remap_alleles, remap_category
 from   glu.lib.hwp               import hwp_exact_biallelic
-from   glu.lib.genolib           import GenotripleStream, load_genostream
+from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
+from   glu.lib.genolib           import GenotripleStream, load_genostream, snp
 from   glu.lib.genolib.transform import load_rename_alleles_file
 
 
@@ -141,20 +142,19 @@ def generate_locus_output(locusconcord,allelemaps):
     concordgenos = []
     discordgenos = []
     for (g1,g2),n in stats.iteritems():
-      cdat = (''.join(g1),''.join(g2),n)
       if g1.alleles()==g2.alleles():
-        concordgenos.append(cdat)
+        concordgenos.append((snp.to_string(g1),snp.to_string(g2),n))
       else:
-        discordgenos.append(cdat)
+        discordgenos.append((snp.to_string(g1),snp.to_string(g2),n))
 
-    locusstat.append( '|'.join( '%s->%s:%d' % (g1,g2,n) for g1,g2,n in concordgenos ))
-    locusstat.append( '|'.join( '%s->%s:%d' % (g1,g2,n) for g1,g2,n in discordgenos ))
+    locusstat.append( ', '.join( '%s->%s:%4d' % (g1,g2,n) for g1,g2,n in concordgenos ))
+    locusstat.append( ', '.join( '%s->%s:%4d' % (g1,g2,n) for g1,g2,n in discordgenos ))
 
     if allelemaps is not None:
       amap = allelemaps.get(locus[1])
       if amap is not None:
         locusstat.append(remap_category(amap))
-        locusstat.append('|'.join( '%s->%s' % (a or '',b or '') for a,b in amap.iteritems() if a or b))
+        locusstat.append(', '.join( '%s->%s' % (a or '',b or '') for a,b in amap.iteritems() if a or b))
       else:
         locusstat.extend(['',''])
 
@@ -192,8 +192,8 @@ def load_reference_genotypes(filename, format, locusset, sampleset):
 
 def load_comparison_genotypes(filename, format, locusset, sampleset, lmapfile, smapfile):
   genos = load_genostream(filename,format=format)
-  genos = genos.transformed(rename_samples=smapfile,   include_samples=smapfile,
-                            rename_loci=lmapfile,      include_loci=lmapfile)
+  genos = genos.transformed(rename_samples=smapfile, include_samples=smapfile,
+                            rename_loci=lmapfile,    include_loci=lmapfile)
   genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
   return genos
 
@@ -292,6 +292,16 @@ def output_allele_maps(amap,mapfile):
       w.writerow([locus, ','.join(old), ','.join(new)])
 
 
+def save_results(sw,locusconcord,sampleconcord,allelemaps):
+  locusrows  = generate_locus_output(locusconcord,allelemaps)
+  samplerows = generate_sample_output(sampleconcord)
+
+  locusrows   = [LOCUS_HEADER]  + locusrows
+  samplerows  = [SAMPLE_HEADER] + samplerows
+  save_section(sw, 'sample_concordance', samplerows)
+  save_section(sw, 'locus_concordance', locusrows)
+
+
 def option_parser():
   import optparse
   usage = 'Usage: %prog [options] reference comparison...'
@@ -318,6 +328,8 @@ def option_parser():
                      help='Equivalence mapping between the sample ids from the comparison data and the reference data')
   parser.add_option('--locuseq',    dest='locuseq',   metavar='FILE',
                      help='Equivalence mapping between the locus ids from the comparison data and the reference data')
+  parser.add_option('--tabularoutput', dest='tabularoutput', metavar='FILE',
+                     help='Generate machine readable tabular output of results')
   return parser
 
 
@@ -378,6 +390,11 @@ def main():
 
   if options.locusout:
     output_locus_concordstat(options.locusout,locusconcord,allelemaps)
+
+  if options.tabularoutput:
+    sw = SectionWriter(options.tabularoutput)
+    save_metadata_section(sw, analysis='concordance', analysis_version='0.1')
+    save_results(sw,locusconcord,sampleconcord,allelemaps)
 
 
 if __name__=='__main__':
