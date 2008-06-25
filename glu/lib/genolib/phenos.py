@@ -220,16 +220,16 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
         family = intern(row[family].strip()) or None
 
       if parent1_index is not None and parent1_index<n:
-        parent1 = intern(row[parent1].strip()) or None
+        parent1 = intern(row[parent1_index].strip()) or None
 
       if parent2_index is not None and parent2_index<n:
-        parent2 = intern(row[parent2].strip()) or None
+        parent2 = intern(row[parent2_index].strip()) or None
 
       if sex_index is not None and sex_index<n:
-        sex = SEX_MAP[row[sex].strip().upper()]
+        sex = SEX_MAP[row[sex_index].strip().upper()]
 
       if pheno_index is not None and pheno_index<n:
-        pheno = PHENO_MAP.get(row[pheno].upper(),PHENO_UNKNOWN)
+        pheno = PHENO_MAP.get(row[pheno_index].upper(),PHENO_UNKNOWN)
 
       if family is not None:
         name    = '%s:%s' % (family,ind)
@@ -243,7 +243,7 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
   return _phenos()
 
 
-def load_phenome(filename,**kwargs):
+def load_phenome(filename,phenome=None,**kwargs):
   '''
   Return the default model and a sequence of Locus objects from an augmented
   locus description file
@@ -252,7 +252,7 @@ def load_phenome(filename,**kwargs):
   '''
   phenos = load_phenome_records(filename,**kwargs)
 
-  phenome = Phenome()
+  phenome = phenome or Phenome()
 
   for name,family,individual,parent1,parent2,sex,phenoclass in phenos:
     if parent1:
@@ -260,6 +260,20 @@ def load_phenome(filename,**kwargs):
     if parent2:
       phenome.merge_phenos(parent2)
     phenome.merge_phenos(name,family,individual,parent1,parent2,sex,phenoclass)
+
+  return phenome
+
+
+def merge_phenome_list(phenomes):
+  phenome = phenomes[0]
+  for ph in phenomes[1:]:
+    for sample,pheno in ph.phenos.iteritems():
+      if sample in phenome.phenos:
+        phenome.merge_phenos(sample, file_phenos.family,  file_phenos.individual,
+                                     file_phenos.parent1, file_phenos.parent2,
+                                     file_phenos.sex,     file_phenos.phenoclass)
+      else:
+        phenome.phenos[sample] = pheno
 
   return phenome
 
