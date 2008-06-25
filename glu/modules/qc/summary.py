@@ -186,12 +186,6 @@ def option_parser():
                     help='List of samples to exclude')
   parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
                     help='List of loci to exclude')
-  parser.add_option('-c','--locuscompletion', dest='locuscompletion', metavar='N', type='float',
-                    help='Exclude loci with completion rate less than N')
-  parser.add_option('-C','--samplecompletion', dest='samplecompletion', metavar='N', type='float',
-                    help='Exclude samples with completion rate less than N')
-  parser.add_option('-m','--mingenos', '--mincount', dest='mingenos', metavar='N',default=50, type='int',
-                    help='Exclude samples with less than N non-missing genotypes')
   parser.add_option('--hwp', dest='hwp', action='store_true',
                     help='Test for deviation from Hardy-Weinberg proportions')
   parser.add_option('-s', '--summaryout', dest='summaryout', metavar='FILE', default='-',
