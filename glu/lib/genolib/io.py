@@ -19,12 +19,14 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
+from   glu.lib.utils             import is_str
 from   glu.lib.fileutils         import namefile, guess_format, parse_augmented_filename, get_arg
 
 from   glu.lib.genolib.streams   import GenotripleStream, GenomatrixStream
 from   glu.lib.genolib.transform import GenoTransform
 from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.locus     import load_genome, Genome
+from   glu.lib.genolib.phenos    import load_phenome, Phenome
 from   glu.lib.genolib.reprs     import get_genorepr
 
 # FIXME: Format support should ultimately be pluggable with a registration protocol
@@ -74,7 +76,71 @@ def guess_outformat(filename):
   return guess_format(filename, OUTPUT_FORMATS)
 
 
-def load_genostream(filename, extra_args=None, **kwargs):
+def geno_options(group,input=False,output=False,merge=False,filter=False,transform=False):
+  if input and output:
+    group.add_option('-f', '--informat', dest='informat', metavar='NAME',
+                      help='Input genotype format')
+    group.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP',
+                      help='Input genotype representation')
+
+  elif input:
+    group.add_option('-f', '--format', dest='format', metavar='NAME',
+                      help='Input genotype format')
+    group.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
+                      help='Input genotype representation')
+
+  if output:
+    group.add_option('-F','--outformat',  dest='outformat', metavar='string',
+                      help='Output genotype format')
+    group.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP',
+                      help='Output genotype representation')
+
+  if input or output:
+    group.add_option('-l', '--loci', dest='loci', metavar='FILE',
+                      help='Locus description file and options')
+    group.add_option('-p', '--pedigree', dest='pedigree', metavar='FILE',
+                      help='Pedigree description file and options')
+
+  if merge:
+    group.add_option('--merge', dest='merge', metavar='METHOD:T', default='unanimous',
+                      help='Genotype merge algorithm and optional consensus threshold used to form a '
+                           'consensus genotypes. Values=unique,unanimous,vote,ordered.  Value may be '
+                           'optionally followed by a colon and a threshold.  Default=unanimous')
+    group.add_option('--samplemerge', dest='samplemerge', metavar='FILE',
+                    help='Sample concordance statistics output to FILE (optional)')
+    group.add_option('--locusmerge',  dest='locusmerge',  metavar='FILE',
+                    help='Locus concordance statistics output to FILE (optional)')
+
+  if filter:
+    group.add_option('--filtermissing', action='store_true', dest='filtermissing',
+                      help='Filters out the samples or loci with missing genotypes')
+
+    group.add_option('--includesamples', dest='includesamples', metavar='FILE',
+                      help='List of samples to include')
+    group.add_option('--includeloci', dest='includeloci', metavar='FILE',
+                      help='List of loci to include')
+
+    group.add_option('--excludesamples', dest='excludesamples', metavar='FILE',
+                      help='List of samples to exclude')
+    group.add_option('--excludeloci', dest='excludeloci', metavar='FILE',
+                      help='List of loci to exclude')
+
+    group.add_option('--renamesamples', dest='renamesamples', metavar='FILE',
+                      help='Rename samples from a file containing rows of original name, tab, new name')
+    group.add_option('--renameloci', dest='renameloci', metavar='FILE',
+                      help='Rename loci from a file containing rows of original name, tab, new name')
+
+  if transform:
+    group.add_option('--ordersamples', dest='ordersamples', metavar='FILE',
+                      help='Order samples based on the order of names in FILE')
+    group.add_option('--orderloci', dest='orderloci', metavar='FILE',
+                      help='Order loci based on the order of names in FILE')
+    group.add_option('--renamealleles', dest='renamealleles', metavar='FILE',
+                      help='Rename alleles based on file of locus name, tab, old alleles (comma separated), '
+                           'tab, new alleles (comma separated)')
+
+
+def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
 
@@ -87,10 +153,10 @@ def load_genostream(filename, extra_args=None, **kwargs):
   @type   genorepr: str, UnphasedMarkerRepresentation or similar object
   @param   unique: flag indicating if repeated row or column elements do not exist. Default is None
   @type    unique: bool
-  @para    genome: map between a locus and an new internal genotype
-                   representation. If a string is specified, it is passed to load_genome().
-                   Default is None.
+  @para    genome: Genome metadata or filename
   @type    genome: str or Genome instance
+  @para   phenome: Pedigree and phenotype metadata or filename
+  @type   phenome: str or Phenome instance
   @return        : loaded genomatrix stream
   @rtype         : GenomatrixStream
 
@@ -125,14 +191,15 @@ def load_genostream(filename, extra_args=None, **kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  hyphen = get_arg(args, ['hyphen'])
-  format = get_arg(args, ['format'])
-  genome = get_arg(args, ['genome'])
+  hyphen  = get_arg(args, ['hyphen'])
+  format  = get_arg(args, ['format'])
+  genome  = get_arg(args, ['genome'])
+  phenome = get_arg(args, ['phenome'])
 
   if filename == '-':
     if hyphen is None:
       raise ValueError("loading genotypes from '-' is not supported")
-    if isinstance(hyphen,basestring):
+    if is_str(hyphen):
       raise ValueError('a file object must be supplied for hyphen redirection')
     filename = hyphen
 
@@ -140,35 +207,44 @@ def load_genostream(filename, extra_args=None, **kwargs):
     format = guess_informat(filename)
 
   # FIXME: Check genome is None behavior
-  if isinstance(genome,basestring) or genome is None:
+  if genome is None:
+    genome = Genome()
+  elif is_str(genome):
     genome = load_genome(genome,extra_args=args)
 
+  if phenome is None:
+    phenome = Phenome()
+  elif is_str(phenome):
+    phenome = load_phenome(phenome,extra_args=args)
+
+  kwargs = dict(genome=genome,phenome=phenome)
+
   if format == 'hapmap':
-    genos = load_hapmap(filename,genome=genome,extra_args=args)
+    genos = load_hapmap(filename,extra_args=args,**kwargs)
   elif format == 'ldat':
-    genos = load_genomatrix_text(filename,format,genome=genome,extra_args=args)
+    genos = load_genomatrix_text(filename,format,extra_args=args,**kwargs)
   elif format == 'sdat':
-    genos = load_genomatrix_text(filename,format,genome=genome,extra_args=args)
+    genos = load_genomatrix_text(filename,format,extra_args=args,**kwargs)
   elif format == 'lbat':
-    genos = load_genomatrix_binary(filename,'ldat',genome=genome,extra_args=args)
+    genos = load_genomatrix_binary(filename,'ldat',extra_args=args,**kwargs)
   elif format == 'sbat':
-    genos = load_genomatrix_binary(filename,'sdat',genome=genome,extra_args=args)
+    genos = load_genomatrix_binary(filename,'sdat',extra_args=args,**kwargs)
   elif format in ('tdat','trip','genotriple'):
-    genos = load_genotriples_text(filename,genome=genome,extra_args=args)
+    genos = load_genotriples_text(filename,extra_args=args,**kwargs)
   elif format in ('pb','prettybase'):
-    genos = load_prettybase(filename,genome=genome,extra_args=args)
+    genos = load_prettybase(filename,extra_args=args,**kwargs)
   elif format=='tbat':
-    genos = load_genotriples_binary(filename,genome=genome,extra_args=args)
+    genos = load_genotriples_binary(filename,extra_args=args,**kwargs)
   elif format in ('plink_ped','ped'):
-    genos = load_plink_ped(filename,genome=genome,extra_args=args)
+    genos = load_plink_ped(filename,extra_args=args,**kwargs)
   elif format in ('plink_tped','tped'):
-    genos = load_plink_tped(filename,genome=genome,extra_args=args)
+    genos = load_plink_tped(filename,extra_args=args,**kwargs)
   elif format in ('plink_bed','bed'):
-    genos = load_plink_bed(filename,genome=genome,extra_args=args)
+    genos = load_plink_bed(filename,extra_args=args,**kwargs)
   elif format in ('merlin','mach'):
-    genos = load_merlin(filename,genome=genome,extra_args=args)
+    genos = load_merlin(filename,extra_args=args,**kwargs)
   elif format in ('eigensoft','smartpca'):
-    genos = load_eigensoft_smartpca(filename,genome=genome,extra_args=args)
+    genos = load_eigensoft_smartpca(filename,extra_args=args,**kwargs)
   elif not format:
     raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
@@ -179,8 +255,14 @@ def load_genostream(filename, extra_args=None, **kwargs):
   #        smart enough to handle null transformations as a matter of
   #        course.  This can be relaxed once that path is rechecked.
   transform_args = len(args)
-  transform = GenoTransform.from_kwargs(args)
+  more_transform = GenoTransform.from_kwargs(args)
+
   if len(args) != transform_args:
+    if transform:
+      raise ValueError('Ambiguous transformation specification')
+    transform = more_transform
+
+  if transform:
     genos = genos.transformed(transform)
 
   # Kludge until extra_args is smarter about default values.
@@ -228,7 +310,7 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   if filename == '-':
     if hyphen is None:
       raise ValueError("saving genotypes to '-' is not supported")
-    if isinstance(hyphen,basestring):
+    if is_str(hyphen):
       raise ValueError('a file object must be supplied for hyphen redirection')
     filename = hyphen
 
@@ -273,7 +355,7 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
 
 def transform_files(infiles,informat,ingenorepr,
                     outfile,outformat,outgenorepr,
-                    transform=None,genome=None,
+                    transform=None,genome=None,phenome=None,
                     mergefunc=None,
                     inhyphen=None,outhyphen=None):
   '''
@@ -299,6 +381,10 @@ def transform_files(infiles,informat,ingenorepr,
   @type  outgenorepr: UnphasedMarkerRepresentation or similar object
   @param   transform: transformation object (optional)
   @type    transform: GenoTransform object
+  @para       genome: Genome metadata or filename
+  @type       genome: str or Genome instance
+  @para      phenome: Pedigree and phenotype metadata or filename
+  @type      phenome: str or Phenome instance
   @param   mergefunc: function to merge multiple genotypes into a consensus genotype. Default is None
   @type    mergefunc: callable
 
@@ -317,10 +403,10 @@ def transform_files(infiles,informat,ingenorepr,
   if informat is None:
     informat = guess_informat_list(infiles)
 
-  if isinstance(ingenorepr,basestring):
+  if is_str(ingenorepr):
     ingenorepr = get_genorepr(ingenorepr)
 
-  if isinstance(outgenorepr,basestring):
+  if is_str(outgenorepr):
     outgenorepr = get_genorepr(outgenorepr)
 
   if not outgenorepr:
@@ -328,13 +414,19 @@ def transform_files(infiles,informat,ingenorepr,
 
   if genome is None:
     genome = Genome()
-  elif isinstance(genome,basestring):
+  elif is_str(genome):
     genome = load_genome(genome)
 
-  if isinstance(mergefunc,basestring):
+  if phenome is None:
+    phenome = Phenome()
+  elif is_str(phenome):
+    phenome = load_phenome(phenome)
+
+  if is_str(mergefunc):
     mergefunc = get_genomerger(mergefunc)
 
-  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,genome=genome,hyphen=inhyphen)
+  genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,
+                              genome=genome,phenome=phenome,hyphen=inhyphen)
                             .transformed(transform) for f in infiles ]
   n = len(genos)
 

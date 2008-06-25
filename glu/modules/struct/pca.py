@@ -29,7 +29,7 @@ except ImportError:
 
 from   glu.lib.fileutils         import table_writer
 
-from   glu.lib.genolib           import load_genostream
+from   glu.lib.genolib           import load_genostream, GenoTransform, geno_options
 from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_genocounts, \
                                         major_allele_from_allelecounts
 
@@ -234,26 +234,12 @@ def option_parser():
   usage = 'usage: %prog [options] genotypes'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-f','--format',  dest='format',
-                    help='Input format of genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
-                    help='Input genotype representation')
-  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                    help='Locus description file and options')
+  geno_options(parser,input=True,filter=True)
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output principle components (eigenvectors) to FILE (default is "-" for standard out)')
   parser.add_option('-O', '--vecout', dest='vecout', metavar='FILE',
                     help='Output eigenvalues and statistics to FILE')
-
-  parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
-                    help='Include list for those samples to only use in the transformation and output')
-  parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
-                    help='Include list for those loci to only use in the transformation and output')
-  parser.add_option('-x', '--excludesamples', dest='excludesamples', metavar='FILE',
-                    help='Exclude a list of samples from the transformation and output')
-  parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
-                    help='Exclude a list of loci from the transformation and output')
 
   parser.add_option('--vectors', dest='vectors', metavar='N', type='int', default=10,
                     help='Output the top N eigenvectors.  Default=10')
@@ -269,12 +255,8 @@ def main():
     return
 
   genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                  genome=options.loci)
-
-  genos = genos.transformed(include_loci=options.includeloci,
-                            exclude_loci=options.excludeloci,
-                            include_samples=options.includesamples,
-                            exclude_samples=options.excludesamples)
+                                  genome=options.loci,phenome=options.pedigree,
+                                  transform=GenoTransform.from_options(options)).as_ldat()
 
   n = options.vectors or None
 
@@ -289,8 +271,9 @@ def main():
   if n:
     values  = values[:n]
     vectors = vectors[:n,:]
-    twstats = twstats[:n]
-    n_eff   = n_eff[:n]
+    if options.vecout:
+      twstats = twstats[:n]
+      n_eff   = n_eff[:n]
 
   if options.output:
     out = table_writer(options.output,hyphen=sys.stdout)

@@ -19,6 +19,8 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
+import optparse
+
 from   types             import NoneType
 from   operator          import itemgetter, getitem
 from   collections       import defaultdict
@@ -30,7 +32,7 @@ from   glu.lib.xtab      import xtab,rowsby
 
 from   glu.lib.genolib.reprs     import snp
 from   glu.lib.genolib.locus     import Genome
-from   glu.lib.genolib.phenos    import Phenome
+from   glu.lib.genolib.phenos    import Phenome,merge_phenome_list
 from   glu.lib.genolib.transform import GenoTransform, prove_unique_transform
 from   glu.lib.genolib.merge     import UniqueMerger, VoteMerger
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,Genotype,   \
@@ -133,6 +135,8 @@ class GenotripleStream(GenotypeStream):
     '''
     assert genome is not None
     assert isinstance(genome,Genome)
+    assert phenome is not None
+    assert isinstance(phenome,Phenome)
 
     if order not in (None,'locus','sample'):
       raise ValueError('invalid GenotripleStream order specified')
@@ -260,7 +264,59 @@ class GenotripleStream(GenotypeStream):
     '''
     if genome is None:
       genome = Genome()
+
+    if phenome is None:
+      phenome = Phenome()
+
     triples = encode_genotriples_from_tuples(triples, genome)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
+                                     unique=unique)
+
+  @staticmethod
+  def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False,
+                            genome=None, phenome=None):
+    '''
+    Alternate constructor that builds a new GenotripleStream object from a
+    sequence of triples with genotypes in a string format
+
+    @param      triples: sequence of genotriples(str,str,genotype representation)
+    @type       triples: sequence
+    @param     genorepr: internal representation of genotypes
+    @type      genorepr: UnphasedMarkerRepresentation or similar object
+    @param      samples: optional set of samples refered to by the triples. Default is None
+    @type       samples: sequence, set, or None
+    @param         loci: optional set of loci refered to by the triples. Default is None
+    @type          loci: sequence, set, or None
+    @param        order: sort order, 'sample' or 'locus', or None, Default is None
+    @type         order: str or None
+    @param       unique: flag indicating if repeated elements do not exist within the stream. Default is 'False'
+    @type        unique: bool
+    @param       genome: genome descriptor
+    @type        genome: Genome instance
+    @param      phenome: phenome descriptor
+    @type       phenome: Phenome instance
+
+    >>> triples = [('l1','s1','AA'),('l1','s1','  '),('l1','s2','AB'),('l2','s1','AA'),
+    ...            ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
+    >>> triples = GenotripleStream.from_strings(triples,snp)
+    >>> for row in triples:
+    ...   print row
+    ('l1', 's1', ('A', 'A'))
+    ('l1', 's1', (None, None))
+    ('l1', 's2', ('A', 'B'))
+    ('l2', 's1', ('A', 'A'))
+    ('l2', 's1', ('A', 'A'))
+    ('l3', 's1', ('B', 'B'))
+    ('l3', 's1', ('B', 'B'))
+    ('l3', 's1', ('A', 'B'))
+    '''
+    if genome is None:
+      genome = Genome()
+
+    if phenome is None:
+      phenome = Phenome()
+
+    triples = encode_genotriples_from_strings(triples, genorepr, genome)
     return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
                                      unique=unique)
 
@@ -307,50 +363,6 @@ class GenotripleStream(GenotypeStream):
     repr = genorepr.to_string
     for sample,locus,geno in self:
       yield sample,locus,repr(geno)
-
-  @staticmethod
-  def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False,
-                            genome=None, phenome=None):
-    '''
-    Alternate constructor that builds a new GenotripleStream object from a
-    sequence of triples with genotypes in a string format
-
-    @param      triples: sequence of genotriples(str,str,genotype representation)
-    @type       triples: sequence
-    @param     genorepr: internal representation of genotypes
-    @type      genorepr: UnphasedMarkerRepresentation or similar object
-    @param      samples: optional set of samples refered to by the triples. Default is None
-    @type       samples: sequence, set, or None
-    @param         loci: optional set of loci refered to by the triples. Default is None
-    @type          loci: sequence, set, or None
-    @param        order: sort order, 'sample' or 'locus', or None, Default is None
-    @type         order: str or None
-    @param       unique: flag indicating if repeated elements do not exist within the stream. Default is 'False'
-    @type        unique: bool
-    @param       genome: genome descriptor
-    @type        genome: Genome instance
-    @param      phenome: phenome descriptor
-    @type       phenome: Phenome instance
-
-    >>> triples = [('l1','s1','AA'),('l1','s1','  '),('l1','s2','AB'),('l2','s1','AA'),
-    ...            ('l2','s1','AA'),('l3','s1','BB'),('l3','s1','BB'),('l3','s1','AB')]
-    >>> triples = GenotripleStream.from_strings(triples,snp)
-    >>> for row in triples:
-    ...   print row
-    ('l1', 's1', ('A', 'A'))
-    ('l1', 's1', (None, None))
-    ('l1', 's2', ('A', 'B'))
-    ('l2', 's1', ('A', 'A'))
-    ('l2', 's1', ('A', 'A'))
-    ('l3', 's1', ('B', 'B'))
-    ('l3', 's1', ('B', 'B'))
-    ('l3', 's1', ('A', 'B'))
-    '''
-    if genome is None:
-      genome = Genome()
-    triples = encode_genotriples_from_strings(triples, genorepr, genome)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
-                                     unique=unique)
 
   def clone(self, triples, **kwargs):
     '''
@@ -466,8 +478,16 @@ class GenotripleStream(GenotypeStream):
     ('s1', 'l1', ('G', 'G'))
     ('s2', 'l1', ('G', 'T'))
     '''
-    if transform is not None and kwargs:
-      raise ValueError('specification of both a transform object and keyword arguments is not supported')
+    if transform and kwargs:
+      raise ValueError('Ambiguous transformation specification')
+
+    if transform:
+      if isinstance(transform, optparse.OptionContainer):
+        transform = GenoTransform.from_options(options)
+      elif isinstance(transform, dict):
+        transform = GenoTransform.from_kwargs(transform)
+      elif not isinstance(transform, GenoTransform):
+        raise ValueError('Invalid genotype transformation specification')
     elif kwargs:
       transform = GenoTransform.from_kwargs(**kwargs)
 
@@ -753,8 +773,8 @@ class GenomatrixStream(GenotypeStream):
 
     assert genome is not None
     assert isinstance(genome,Genome)
-
-    assert phenome is None or isinstance(phenome,Phenome)
+    assert phenome is not None
+    assert isinstance(phenome,Phenome)
 
     if phenome is None:
       phenome = Phenome()
@@ -967,6 +987,9 @@ class GenomatrixStream(GenotypeStream):
     else:
       raise ValueError('Invalid genotype matrix format')
 
+    if phenome is None:
+      phenome = Phenome()
+
     columns,models,genome,genos = encode_genomatrixstream_from_tuples(columns,genos,format,
                                    genome=genome,unique=unique)
     return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
@@ -1006,6 +1029,9 @@ class GenomatrixStream(GenotypeStream):
       columns = loci
     else:
       raise ValueError('Invalid genotype matrix format')
+
+    if phenome is None:
+      phenome = Phenome()
 
     columns,models,genome,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,
                                    genome=genome,unique=unique)
@@ -1246,8 +1272,16 @@ class GenomatrixStream(GenotypeStream):
     ...   print row
     ('l1', [('G', 'G'), ('G', 'T')])
     '''
-    if transform is not None and kwargs:
-      raise ValueError('specification of both a transform object and keyword arguments is not supported')
+    if transform and kwargs:
+      raise ValueError('Ambiguous transformation specification')
+
+    if transform:
+      if isinstance(transform, optparse.OptionContainer):
+        transform = GenoTransform.from_options(options)
+      elif isinstance(transform, dict):
+        transform = GenoTransform.from_kwargs(transform)
+      elif not isinstance(transform, GenoTransform):
+        raise ValueError('Invalid genotype transformation specification')
     elif kwargs:
       transform = GenoTransform.from_kwargs(**kwargs)
 
@@ -1388,7 +1422,8 @@ class GenomatrixStream(GenotypeStream):
 
     Non-unique columns:
 
-    >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
+    >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,
+    ...                                    genome=Genome(),phenome=Phenome())
     >>> genos.unique_checked()
     Traceback (most recent call last):
          ...
@@ -1576,7 +1611,8 @@ def unique_check_genomatrixstream(genos):
 
   Non-unique columns:
 
-  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,genome=Genome())
+  >>> genos = GenomatrixStream([],'sdat',loci=['L1','L2','L3','L1'],models=[snp]*4,
+  ...                                    genome=Genome(),phenome=Phenome())
   >>> unique_check_genomatrixstream(genos)
   Traceback (most recent call last):
        ...
@@ -2624,7 +2660,7 @@ def recode_genotriples(triples,genome):
   return triples.clone(_recode(),genome=genome,materialized=False)
 
 
-def encode_genotriples_from_tuples(triples,genome=None):
+def encode_genotriples_from_tuples(triples,genome):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
@@ -2638,7 +2674,7 @@ def encode_genotriples_from_tuples(triples,genome=None):
   >>> triples = [('s3', 'l1', ('G', 'G')),('s3', 'l2', ('A', 'A')),
   ...            ('s2', 'l3', ('G', 'T')),('s1', 'l1', ('T', 'T')),
   ...            ('s1', 'l1', ('G', 'G')),('s2', 'l2', ('A', 'A'))]
-  >>> for row in encode_genotriples_from_tuples(triples):
+  >>> for row in encode_genotriples_from_tuples(triples,Genome()):
   ...   print row
   ('s3', 'l1', ('G', 'G'))
   ('s3', 'l2', ('A', 'A'))
@@ -2647,9 +2683,6 @@ def encode_genotriples_from_tuples(triples,genome=None):
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   '''
-  if genome is None:
-    genome = Genome()
-
   try:
     for sample,locus,geno in triples:
       loc = genome.get_locus_model(locus)
@@ -2665,7 +2698,7 @@ def encode_genotriples_from_tuples(triples,genome=None):
                           % (locus,geno,loc.model.max_alleles,','.join(loc.model.alleles[1:])))
 
 
-def encode_genotriples_from_strings(triples,genorepr,genome=None):
+def encode_genotriples_from_strings(triples,genorepr,genome):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
@@ -2680,7 +2713,7 @@ def encode_genotriples_from_strings(triples,genorepr,genome=None):
   >>> triples = [('s3', 'l1', 'GG'),('s3', 'l2', 'AA'),
   ...            ('s2', 'l3', 'GT'),('s1', 'l1', 'TT'),
   ...            ('s1', 'l1', 'GG'),('s2', 'l2', 'AA')]
-  >>> for row in encode_genotriples_from_strings(triples,snp):
+  >>> for row in encode_genotriples_from_strings(triples,snp,Genome()):
   ...   print row
   ('s3', 'l1', ('G', 'G'))
   ('s3', 'l2', ('A', 'A'))
@@ -2848,11 +2881,10 @@ def combine_unsorted_genotriple_list(triplelist):
   elif len(triplelist) == 1:
     return triplelist[0]
 
-  # Normalize all triples to the same models
-  genome = triplelist[0].genome
+  # Normalize all triples to the same models and phenome
+  genome     = triplelist[0].genome
   triplelist = [ triples.transformed(recode_models=genome) for triples in triplelist ]
-
-  # FIXME: !!! Merge phenome !!!
+  phenome    = merge_phenome_list([triples.phenome for triples in triplelist ])
 
   # Extract parts of all of the triples
   samples = [ triples.samples  for triples in triplelist ]
@@ -2880,7 +2912,7 @@ def combine_unsorted_genotriple_list(triplelist):
   triples = chain(*triplelist)
 
   # Return a new baby triplestream object
-  return GenotripleStream(triples,samples=samples,loci=loci,genome=genome,
+  return GenotripleStream(triples,samples=samples,loci=loci,genome=genome,phenome=phenome,
                                   unique=unique)
 
 
@@ -2920,11 +2952,10 @@ def combine_sorted_genotriple_list(triplelist):
   elif len(triplelist) == 1:
     return triplelist[0]
 
-  # Normalize all triples to the same models
-  genome = triplelist[0].genome
+  # Normalize all triples to the same models and phenome
+  genome     = triplelist[0].genome
   triplelist = [ triples.transformed(recode_models=genome) for triples in triplelist ]
-
-  # FIXME: !!! Merge phenome !!!
+  phenome    = merge_phenome_list([triples.phenome for triples in triplelist ])
 
   # Extract parts of all of the triples
   samples = [ triples.samples  for triples in triplelist ]
@@ -2966,7 +2997,7 @@ def combine_sorted_genotriple_list(triplelist):
   triples = imerge(triplelist,key=key)
 
   # Return a new baby triplestream object
-  return GenotripleStream(triples,samples=samples,loci=loci,genome=genome,
+  return GenotripleStream(triples,samples=samples,loci=loci,genome=genome,phenome=phenome,
                                   order=order,unique=unique)
 
 
@@ -3337,10 +3368,9 @@ def merge_genomatrixstream_list(genos, mergefunc):
   if not all(g.format==format for g in genos):
     raise ValueError('Input genotypes must all be in same format')
 
-  genome = genos[0].genome
-  genos = [ g.transformed(recode_models=genome) for g in genos ]
-
-  # FIXME: !!! Merge phenome !!!
+  genome  = genos[0].genome
+  genos   = [ g.transformed(recode_models=genome) for g in genos ]
+  phenome = merge_phenome_list([g.phenome for g in genos ])
 
   columns = [ g.columns for g in genos ]
   if all(columns[0]==c for c in columns):
@@ -3663,6 +3693,9 @@ def pack_genomatrixstream(genos):
           descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
 
         yield label,GenotypeArray(descr,row)
+
+  if not genos.columns:
+    return genos
 
   return genos.clone(_pack(genos),packed=True)
 

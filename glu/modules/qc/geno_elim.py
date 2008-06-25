@@ -24,7 +24,7 @@ from   itertools         import izip,chain
 from   collections       import defaultdict
 
 from   glu.lib.fileutils import load_table,table_writer
-from   glu.lib.genolib   import load_genostream
+from   glu.lib.genolib   import load_genostream,geno_options
 
 
 errbylochead1 = ['','LEVEL_1_ERRORS','','LEVEL_2_ERRORS','','LEVEL_3_ERRORS']
@@ -38,14 +38,8 @@ def option_parser():
   usage = 'usage: %prog [options] genofile'
   parser = optparse.OptionParser(usage=usage, add_help_option=False)
 
-  parser.add_option('-f', '--format', dest='format', metavar='F',
-                    help='Input format for genotype or count data')
-  parser.add_option('-g', '--genorepr',        dest='genorepr',      metavar='REP',
-                    help='Input genotype representation')
-  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                    help='Locus description file and options')
-  parser.add_option('-p', '--pedfile',     dest='pedfile',                  metavar='FILE',
-                    help='Pedigree file')
+  geno_options(parser,input=True)
+
   parser.add_option('-o', '--errdetails',  dest='errdetails',  default='-', metavar='FILE',
                     help="The output file containing genotype matrix after elimination, '-' for standard out")
   parser.add_option('--locsum', dest='locsum', default='-', metavar='FILE',
@@ -645,18 +639,19 @@ def main():
   parser=option_parser()
   options,args=parser.parse_args()
 
-  if len(args) != 1 or not options.pedfile:
+  if len(args) != 1:
     parser.print_help()
     return
 
   genos = load_genostream(args[0],format=options.format,
                                   genorepr=options.genorepr,
-                                  genome=options.loci).as_ldat()
+                                  genome=options.loci,
+                                  phenome=options.pedigree).as_ldat()
 
   if options.errdetails:
     outdetails = output_file(options.errdetails,['']+genos.samples)
 
-  nfams,numoffams = build_nuclear_families(options.pedfile,genos.samples)
+  nfams,numoffams = build_nuclear_families(genos)
 
   errbyloc1,errbyloc2,errbyloc=genotype_elimination(nfams,genos,genos.samples,outdetails)
   errbylocf1=count_by_family(errbyloc1)

@@ -144,9 +144,16 @@ class GenoTransform(object):
     @return: transformed genotriple stream
     @rtype : GenotripleStream
     '''
-    return GenoTransform(options.includesamples, options.excludesamples, options.renamesamples, options.ordersamples,
-                         options.includeloci,    options.excludeloci,    options.renameloci,    options.orderloci,
-                         rename_alleles=options.renamealleles, filter_missing=options.filtermissing)
+    return GenoTransform(include_samples=getattr(options,'includesamples',None),
+                         exclude_samples=getattr(options,'excludesamples',None),
+                          rename_samples=getattr(options,'renamesamples', None),
+                           order_samples=getattr(options,'ordersamples',  None),
+                            include_loci=getattr(options,'includeloci',   None),
+                            exclude_loci=getattr(options,'excludeloci',   None),
+                             rename_loci=getattr(options,'renameloci',    None),
+                              order_loci=getattr(options,'orderloci',     None),
+                          rename_alleles=getattr(options,'renamealleles', None),
+                          filter_missing=getattr(options,'filtermissing', None))
 
   @staticmethod
   def from_kwargs(extra_args=None,**kwargs):

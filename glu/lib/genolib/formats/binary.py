@@ -32,7 +32,7 @@ from   glu.lib.utils             import izip_exact,gcdisabled
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
                                         namefile
 from   glu.lib.genolib.locus     import Genome,Locus
-from   glu.lib.genolib.phenos    import Phenome,SEX_UNKNOWN,PHENO_UNKNOWN
+from   glu.lib.genolib.phenos    import Phenome,SEX_UNKNOWN,PHENO_UNKNOWN,merge_phenome_list
 from   glu.lib.genolib.streams   import GenomatrixStream,GenotripleStream
 from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
 
@@ -573,7 +573,7 @@ def save_genotriples_binary(filename,genos,extra_args=None,**kwargs):
     writer.writerows(genos.as_genotriples())
 
 
-def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
+def load_genotriples_binary(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -581,6 +581,8 @@ def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
   @type      filename: str or file object
   @param       genome: genome descriptor
   @type        genome: Genome instance
+  @param      phenome: phenome descriptor
+  @type       phenome: Phenome instance
   @return:             sequence of tuples of sample name, locus name, and genotype representation
   @rtype:              generator
 
@@ -636,11 +638,7 @@ def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
   loci    = map(str,gfile.root.loci[:])
 
   file_genome,models = load_models(gfile,loci,version,compat_version,ignoreloci)
-
-  if not ignorephenos:
-    phenome = load_phenos(gfile,samples,version,compat_version)
-  else:
-    phenome = Phenome()
+  phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   def _load():
     for row in gfile.root.genotypes:
@@ -649,7 +647,7 @@ def load_genotriples_binary(filename,genome=None,extra_args=None,**kwargs):
     gfile.close()
 
   # FIXME: Order must be restored
-  genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),genome=file_genome)
+  genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),genome=file_genome,phenome=phenome)
 
   if genome:
     genos = genos.transformed(recode_models=genome)
@@ -1002,7 +1000,7 @@ def save_phenos(gfile, samples, phenome, filters=None):
   save_strings(gfile,'names', names, filters=filters)
 
 
-def load_phenos(gfile,samples,version,compat_version):
+def load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -1017,12 +1015,17 @@ def load_phenos(gfile,samples,version,compat_version):
   @param compat_version: genotype file version backward compatibility number
   @type  compat_version: int
   '''
-  if version < 3:
-    return Phenome()
+  if ignorephenos or version < 3:
+    return phenome or Phenome()
   elif version == 3 or compat_version == 3:
-    return load_phenos_v3(gfile,samples)
+    file_phenome = load_phenos_v3(gfile,samples)
   else:
     raise ValueError('Unknown genotype file version: %s' % version)
+
+  if phenome is None:
+    return file_phenome
+
+  return merge_phenome_list([phenome,file_phenome])
 
 
 def load_phenos_v3(gfile,samples):
@@ -1141,7 +1144,7 @@ def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
     writer.writerows(genos.transformed(repack=True))
 
 
-def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs):
+def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -1240,11 +1243,7 @@ def load_genomatrix_binary(filename,format,genome=None,extra_args=None,**kwargs)
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
   file_genome,models = load_models(gfile,loci,version,compat_version,ignoreloci)
-
-  if not ignorephenos:
-    phenome = load_phenos(gfile,samples,version,compat_version)
-  else:
-    phenome = Phenome()
+  phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   if format == format_found == 'sdat':
     def _load():

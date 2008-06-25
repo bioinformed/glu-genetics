@@ -25,6 +25,7 @@ from   numpy               import isfinite
 from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import Linear,LinAlgError
 
+from   glu.lib.genolib     import geno_options
 from   glu.lib.association import build_models,print_results_linear,format_pvalue
 
 
@@ -36,18 +37,8 @@ def option_parser():
 
   input = optparse.OptionGroup(parser, 'Input options')
 
-  input.add_option('-f', '--format', dest='format', metavar='NAME',
-                    help='Input genotype format')
-  input.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
-                    help='Input genotype representation')
-  input.add_option('-i', '--includesamples', dest='includesamples', metavar='FILE',
-                    help='List of samples to include')
-  input.add_option('-d', '--excludesamples', dest='excludesamples', metavar='FILE',
-                    help='List of samples to exclude')
-  input.add_option('-I', '--includeloci', dest='includeloci', metavar='FILE',
-                    help='List of loci to include')
-  input.add_option('-D', '--excludeloci', dest='excludeloci', metavar='FILE',
-                    help='List of loci to exclude')
+  geno_options(input,input=True,filter=True)
+
   input.add_option('--fixedloci', dest='fixedloci', metavar='FILE',
                     help='Genotypes for fixed loci that can be included in the model')
   input.add_option('--minmaf', dest='minmaf', metavar='N', default=0.01, type='float',
@@ -79,7 +70,7 @@ def option_parser():
                     help='Output detailed results to FILE')
   output.add_option('--display', dest='display', metavar='F',
                       help='Formula terms to display in the summary output table.  Defaults to all test terms.')
-  output.add_option('-p', '--detailsmaxp', dest='detailsmaxp', metavar='P', type='float', default=1.0,
+  output.add_option('--detailsmaxp', dest='detailsmaxp', metavar='P', type='float', default=1.0,
                     help='Output detailed results for only pvalues below P threshold')
   output.add_option('-v', '--verbose', dest='verbose', metavar='LEVEL', type='int', default=1,
                     help='Verbosity level of diagnostic output.  O for none, 1 for some (default), 2 for exhaustive.')

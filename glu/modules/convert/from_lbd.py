@@ -31,9 +31,10 @@ from   glu.lib.fileutils         import autofile,load_table,table_writer
 from   glu.lib.sections          import read_sections
 from   glu.lib.sequence          import norm_snp_seq,complement_base
 
-from   glu.lib.genolib.locus     import Genome, Nothing
+from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
+from   glu.lib.genolib.phenos    import Phenome, load_phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.io        import save_genostream
+from   glu.lib.genolib.io        import save_genostream, geno_options
 from   glu.lib.genolib.genoarray import model_from_alleles
 
 
@@ -362,12 +363,11 @@ def option_parser():
 
   usage = 'usage: %prog [options] lbdfile...'
   parser = optparse.OptionParser(usage=usage)
+
+  geno_options(parser,output=True)
+
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output genotype file name')
-  parser.add_option('-F','--outformat',  dest='outformat', metavar='string',
-                    help='Output genotype format')
-  parser.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP',
-                    help='Output genotype representation')
   parser.add_option('-m', '--abmap', dest='abmap', metavar='FILE',
                     help='Mappings from A and B probes to other allele codings')
   parser.add_option('-M', '--manifest', dest='manifest', metavar='FILE',
@@ -395,6 +395,17 @@ def main():
     return
 
   genome = Genome()
+
+  if options.loci is None:
+    genome = Genome()
+  elif is_str(options.loci):
+    genome = load_genome(options.loci)
+
+  if options.pedigree is None:
+    phenome = Phenome()
+  elif is_str(phenome):
+    phenome = load_phenome(options.pedigree)
+
   abmap = {}
 
   errorhandler = None
@@ -432,7 +443,7 @@ def main():
 
   genomap,models = build_models(loci,abmap,genome)
   samples = encode_genotypes(loci, samples, genomap)
-  genos = GenomatrixStream(samples, 'sdat', loci=loci, models=models, genome=genome)
+  genos = GenomatrixStream(samples, 'sdat', loci=loci, models=models, genome=genome, phenome=phenome)
 
   save_genostream(options.output,genos,format=options.outformat,genorepr=options.outgenorepr,hyphen=sys.stdout)
 

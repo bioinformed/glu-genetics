@@ -380,17 +380,16 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
 
 
 def _load_loci(filename,options,keep):
-  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr).as_ldat()
-
-  if options.includeloci or options.excludeloci:
-    loci = loci.transformed(include_loci=options.includeloci,
-                            exclude_loci=options.excludeloci)
-
   if options.includesamples:
-    keep &= set(load_list(options.includesamples))
+    options.includesamples = set(load_list(options.includesamples))
+    keep &= options.includesamples
 
   if options.excludesamples:
-    keep -= set(load_list(options.excludesamples))
+    options.excludesamples = set(load_list(options.excludesamples))
+    keep -= options.excludesamples
+
+  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr,
+                         transform=GenoTransform.from_options(options)).as_ldat()
 
   if loci.samples:
     keep &= set(loci.samples)

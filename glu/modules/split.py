@@ -30,7 +30,7 @@ import sys
 from   collections               import defaultdict
 
 from   glu.lib.fileutils         import load_map
-from   glu.lib.genolib.io        import load_genostream, guess_outformat,               \
+from   glu.lib.genolib.io        import load_genostream, guess_outformat, geno_options, \
                                         TextGenomatrixWriter, TextGenotripleWriter,     \
                                         BinaryGenomatrixWriter, BinaryGenotripleWriter
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor, GenotypeArray, pick
@@ -369,12 +369,8 @@ def option_parser():
   usage = 'usage: %prog [options] matrixfile'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-f','--format', dest='format',
-                    help='Input format for genotype data. Values=hapmap, ldat, sdat, trip, or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
-                    help='genotype representation')
-  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                    help='Locus description file and options')
+  geno_options(parser,input=True)
+
   parser.add_option('-d', '--destdir', dest='destdir', default='',
                     help='Destination directory for output files.  Write to input file directory by default.')
   parser.add_option('--maxrows', dest='maxrows', metavar='N', type='int',
@@ -411,7 +407,7 @@ def main():
   prefix,suffix = split_fullname(filename,options.destdir)
 
   genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                  genome=options.loci,hyphen=sys.stdin)
+                                  genome=options.loci,phenome=options.pedigree,hyphen=sys.stdin)
 
   outformat = guess_outformat(args[0]) or options.format or genos.format
   split(genos, outformat, prefix, suffix, options)

@@ -25,7 +25,7 @@ from   itertools                 import izip
 
 from   glu.lib.fileutils         import autofile,hyphen,load_list,table_writer
 from   glu.lib.hwp               import hwp_biallelic
-from   glu.lib.genolib           import load_genostream
+from   glu.lib.genolib           import load_genostream, geno_options, GenoTransform
 from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
                                         count_alleles_from_genocounts
 
@@ -172,20 +172,9 @@ def option_parser():
 
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
-  parser.add_option('-f', '--format', dest='format',
-                    help='Input format for genotype or count data')
-  parser.add_option('-g', '--genorepr',        dest='genorepr',      metavar='REP',
-                    help='Input genotype representation')
-  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                    help='Locus description file and options')
-  parser.add_option('-n', '--includesamples', dest='includesamples', metavar='FILE',
-                    help='List of samples to include')
-  parser.add_option('-u', '--includeloci', dest='includeloci', metavar='FILE',
-                    help='List of loci to include')
-  parser.add_option('-x', '--excludesamples', dest='excludesamples', metavar='FILE',
-                    help='List of samples to exclude')
-  parser.add_option('-e', '--excludeloci', dest='excludeloci', metavar='FILE',
-                    help='List of loci to exclude')
+
+  geno_options(parser,input=True,filter=True)
+
   parser.add_option('--hwp', dest='hwp', action='store_true',
                     help='Test for deviation from Hardy-Weinberg proportions')
   parser.add_option('-s', '--summaryout', dest='summaryout', metavar='FILE', default='-',
@@ -205,18 +194,17 @@ def main():
     parser.print_help()
     return
 
-  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
-                                  genome=options.loci)
-
   # Include lists are used to communicate the universe of attempted samples/loci
   # Any not observed in the genotype data are classified as "missing"
   includeloci    = set(load_list(options.includeloci))    if options.includeloci    else None
   includesamples = set(load_list(options.includesamples)) if options.includesamples else None
 
-  genos = genos.transformed(include_loci=includeloci,
-                            exclude_loci=options.excludeloci,
-                            include_samples=includesamples,
-                            exclude_samples=options.excludesamples)
+  options.includeloci    =   includeloci
+  options.includesamples = includesamples
+
+  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                  genome=options.loci,phenome=options.pedigree,
+                                  transform=GenoTransform.from_options(options))
 
   loci,locus_counts,samples,sample_counts = summarize(genos)
   sample_totals = sum(sample_counts)

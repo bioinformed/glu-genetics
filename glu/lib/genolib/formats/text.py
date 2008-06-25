@@ -33,7 +33,7 @@ __all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
            'save_genomatrix_text',  'load_genomatrix_text']
 
 
-def load_genomatrix_text(filename,format,genome=None,extra_args=None,**kwargs):
+def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load the genotype matrix data from file.
   Note that the first row is header and the rest rows are genotypes,
@@ -126,9 +126,11 @@ def load_genomatrix_text(filename,format,genome=None,extra_args=None,**kwargs):
       yield label,genos
 
   if format=='ldat':
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,genome=genome,unique=unique)
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,
+                                                      genome=genome,phenome=phenome,unique=unique)
   else:
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,genome=genome,unique=unique)
+    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,
+                                                      genome=genome,phenome=phenome,unique=unique)
 
   if unique:
     genos = genos.unique_checked()
@@ -336,7 +338,7 @@ def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
     writer.writerows(genos)
 
 
-def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
+def load_genotriples_text(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -419,7 +421,9 @@ def load_genotriples_text(filename,genome=None,extra_args=None,**kwargs):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),genome=genome,samples=samples,loci=loci,unique=unique,order=order)
+  return GenotripleStream.from_tuples(_load(),samples=samples,loci=loci,
+                                              genome=genome,phenome=phenome,
+                                              unique=unique,order=order)
 
 
 class TextGenotripleWriter(object):

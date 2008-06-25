@@ -34,7 +34,7 @@ HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID 
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
 
-def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
+def load_hapmap(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a HapMap genotype data file.
 
@@ -132,7 +132,8 @@ def load_hapmap(filename,genome=None,extra_args=None,**kwargs):
 
       yield locus,genos
 
-  genos = GenomatrixStream.from_strings(_load_hapmap(),'ldat',genorepr=hapmap,samples=columns,genome=genome,unique=unique)
+  genos = GenomatrixStream.from_strings(_load_hapmap(),'ldat',genorepr=hapmap,samples=columns,
+                                                              genome=genome,phenome=phenome,unique=unique)
 
   if unique:
     genos = genos.unique_checked()

@@ -30,7 +30,7 @@ from   glu.lib.genolib.streams   import GenotripleStream
 __all__ = ['PrettybaseWriter', 'save_prettybase', 'load_prettybase']
 
 
-def load_prettybase(filename,genome=None,extra_args=None,**kwargs):
+def load_prettybase(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -99,7 +99,9 @@ def load_prettybase(filename,genome=None,extra_args=None,**kwargs):
 
       yield sample,locus,geno
 
-  return GenotripleStream.from_tuples(_load(),genome=genome,samples=samples,loci=loci,unique=unique,order=order)
+  return GenotripleStream.from_tuples(_load(),genome=genome,phenome=phenome,
+                                              samples=samples,loci=loci,
+                                              unique=unique,order=order)
 
 
 class PrettybaseWriter(object):

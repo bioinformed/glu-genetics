@@ -27,7 +27,7 @@ from   glu.lib.utils             import pair_generator
 from   glu.lib.fileutils         import table_writer
 from   glu.lib.union_find        import union_find
 
-from   glu.lib.genolib.io        import load_genostream
+from   glu.lib.genolib.io        import load_genostream,geno_options
 from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.genoarray import genoarray_concordance
 
@@ -38,15 +38,8 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-f','--format',  dest='format',
-                    help='Input format for genotype data. Values=hapmap, ldat, sdat, trip or genotriple')
-  parser.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
-                    help='Input genotype representation')
-  parser.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                    help='Locus description file and options')
-  parser.add_option('--merge', dest='merge', metavar='METHOD:T', default='unanimous',
-                    help='Genotype merge algorithm and optional consensus threshold used to form a consensus genotypes. '
-                         'Values=unique,unanimous,vote,ordered.  Value may be optionally followed by a colon and a threshold.  Default=unanimous')
+  geno_options(parser,input=True)
+
   parser.add_option('-e', '--duplicates', dest='duplicates', metavar='FILE',
                     help='Mapping from sample identifier to subject identifier')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -78,9 +71,9 @@ def main():
       for dup in dupset:
         expected_dupset.union(dupset[0],dup)
 
-  genos  = load_genostream(args[0],format=options.format,genorepr=options.genorepr,genome=options.loci)
-  merger = get_genomerger(options.merge)
-  genos  = genos.as_sdat(merger).materialize()
+  genos  = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+                                   genome=options.loci,phenome=options.pedigree)
+  genos  = genos.as_sdat().materialize()
 
   status = { (True, True ): ['EXPECTED',  'CONCORDANT'],
              (True, False): ['EXPECTED',  'DISCORDANT'],
