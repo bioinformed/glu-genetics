@@ -15,51 +15,87 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-# FIXME: THIS NEEDS TO BE INCORPORATED INTO GLU
-
 import sys
-import csv
 
 from   operator  import itemgetter
-from   itertools import repeat
+from   itertools import repeat,izip
 
-
-def percent(a,b):
-  if not b:
-    return 0.
-  return float(a)/b*100
-
-
-def genorepr(g):
-  if not g:
-    return None
-  elif '/' in g:
-    a1,a2 = g.split('/')
-  elif len(g) == 2:
-    a1,a2 = g
-  else:
-    raise ValueError('Invalid genotype: %s' % g)
-
-  if a1>a2:
-    a1,a2 = a2,a1
-
-  return intern(a1),intern(a2)
-
-
-def load_genomatrix(genofile):
-  rows = csv.reader(genofile,dialect='excel-tab')
-
-  header = rows.next()[1:]
-
-  yield header
-
-  for row in rows:
-    label = row[0]
-    genos = map(genorepr,row[1:])
-    yield label,genos
+from   glu.lib.utils             import percent
+from   glu.lib.fileutils         import load_table,table_writer
+from   glu.lib.genolib           import load_genostream,geno_options,GenoTransform
 
 
 def parent_offspring_concordance(parent1, parent2, child, locusstats):
+  '''
+  >>> from glu.lib.genolib.genoarray import model_from_alleles,GenotypeArrayDescriptor,GenotypeArray
+  >>> model = model_from_alleles('AB')
+  >>> NN,AA,AB,BB = model.genotypes
+  >>> def lstats(n): return [ [0,0] for i in xrange(n) ]
+
+  All null:
+
+  >>> p1,p2,c,l = None,None,None,lstats(1)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (0, 0)
+  >>> l
+  [[0, 0]]
+
+  Child null:
+
+  >>> p1,p2,c,l = [AA],[AB],None,lstats(1)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (0, 0)
+  >>> l
+  [[0, 0]]
+
+  Parents null:
+
+  >>> p1,p2,c,l = None,None,[AB],lstats(1)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (0, 0)
+  >>> l
+  [[0, 0]]
+
+  Missings:
+
+  >>> p1,p2,c,l = [NN,AA,NN],[NN,AB,NN],[NN,NN,AB],lstats(3)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (0, 0)
+  >>> l
+  [[0, 0], [0, 0], [0, 0]]
+
+  Parent concordant:
+
+  >>> p1,p2,c,l = [AA,AA,NN,NN],[NN,NN,AA,AA],[AA,AB,AA,AB],lstats(4)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (4, 4)
+  >>> l
+  [[1, 1], [1, 1], [1, 1], [1, 1]]
+
+  Homozygous concordant:
+
+  >>> p1,p2,c,l = [AA,BB],[BB,AA],[AB,AB],lstats(2)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (2, 2)
+  >>> l
+  [[1, 1], [1, 1]]
+
+  Homozygous discordant:
+
+  >>> p1,p2,c,l = [BB,BB,AA,AA],[AA,AA,BB,BB],[AA,BB,AA,BB],lstats(4)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (0, 4)
+  >>> l
+  [[0, 1], [0, 1], [0, 1], [0, 1]]
+
+  Heterozygous concordant:
+
+  >>> p1,p2,c,l = [AB,AB,AB],[AB,AB,AB],[AA,AB,BB],lstats(3)
+  >>> parent_offspring_concordance(p1,p2,c,l)
+  (3, 3)
+  >>> l
+  [[1, 1], [1, 1], [1, 1]]
+  '''
   # Must have informative child and at least one parent
   if not child or not (parent1 and parent2):
     return 0,0
@@ -69,37 +105,33 @@ def parent_offspring_concordance(parent1, parent2, child, locusstats):
   if not parent2:
     parent2 = repeat(None)
 
-  i = n = 0
-  for locusstat,p1,p2,c in zip(locusstats,parent1,parent2,child):
+  concordant = comparisons = 0
+  for p1,p2,c,locusstat in izip(parent1,parent2,child,locusstats):
     # Must have informative child and at least one parent genotype
-    if not c or not (p1 and p2):
+    if not c or not (p1 or p2):
       continue
 
     locusstat[1] += 1
+    comparisons  += 1
 
     # If ensure that p1 is not missing
-    if not p2 and p1:
+    if not p1 and p2:
       p1,p2 = p2,p1
 
+    a,b = c
+
     # Check Parent1 -> Offspring case
-    if p1 and not p2 and c[0] in p1 or c[1] in p1:
-      i += 1
+    if p1 and not p2:
+      if a in p1 or b in p1:
+        concordant   += 1
+        locusstat[0] += 1
+
+    # Check Parent1,Parent2 -> Offspring case
+    elif (a in p1 and b in p2) or (b in p1 and a in p2):
+      concordant   += 1
       locusstat[0] += 1
 
-    # CHeck Parent1,Parent2 -> Offspring case
-    elif (c[0] in p1 and c[1] in p2) or (c[1] in p1 and c[0] in p2):
-      i += 1
-      locusstat[0] += 1
-
-    n += 1
-
-  return i,n
-
-
-
-def load_pedigree(pedfilename):
-  pedfile = csv.reader(file(pedfilename),dialect='excel-tab')
-  return [ row[:3] for row in pedfile if row[0] ]
+  return concordant,comparisons
 
 
 def option_parser():
@@ -108,11 +140,11 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-p', '--pedigree', dest='pedigree', metavar='FILE',
-                    help='A tab delimited pedigree file ')
+  geno_options(parser,input=True,filter=True)
+
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output Mendelian concordance by sample')
-  parser.add_option('-l', '--locout', dest='locout', metavar='FILE',
+  parser.add_option('-O', '--locout', dest='locout', metavar='FILE',
                     help='Output Mendelian concordance by locus')
   return parser
 
@@ -125,48 +157,53 @@ def main():
     parser.print_help()
     return
 
-  if not options.pedigree:
-    print >> sys.stderr, 'A pedigree file must be specified (--pedigree)'
-    return
+  genos = load_genostream(args[0],format=options.format,
+                                  genorepr=options.genorepr,
+                                  genome=options.loci,
+                                  phenome=options.pedigree,
+                                  transform=GenoTransform.from_options(options))
 
-  relationships = load_pedigree(options.pedigree)
+  if genos.samples:
+    pset = set()
+    for sample in genos.samples:
+      phenos = genos.phenome.get_phenos(sample)
+      if phenos.parent1 or phenos.parent2:
+        pset.add(sample)
+        pset.add(phenos.parent1)
+        pset.add(phenos.parent2)
+    genos = genos.transformed(includesamples=pset)
 
-  if options.output == '-':
-    sampleout = sys.stdout
-  else:
-    sampleout = file(options.output, 'w')
-
-  sampleout = csv.writer(sampleout,dialect='excel-tab')
-
-  samples = load_genomatrix(file(args[0]))
-
-  # Get locus names
-  loci = samples.next()
+  genos = genos.as_sdat().materialize()
 
   # Index samples
-  samples = dict(samples)
+  samples = dict(genos)
 
   # Initialize statistics
   samplestats = []
-  locusstats  = [ [0,0] for i in range(len(loci)) ]
+  locusstats  = [ [0,0] for i in xrange(len(genos.loci)) ]
 
   # Check all parent child relationships
-  for child,parent1,parent2 in relationships:
+  for child in samples:
+    phenos  = genos.phenome.get_phenos(child)
+    parent1 = phenos.parent1
+    parent2 = phenos.parent2
+
     i,n = parent_offspring_concordance(samples.get(parent1), samples.get(parent2),
                                        samples.get(child), locusstats)
     if i!=n:
       samplestats.append( (child,parent1,parent2,i,n,percent(i,n)) )
 
   # Build and sort resulting statistics
-  locusstats = sorted( (locus,i,n,percent(i,n)) for locus,(i,n) in zip(loci,locusstats) )
+  locusstats = sorted( (locus,i,n,percent(i,n)) for locus,(i,n) in zip(genos.loci,locusstats) )
   samplestats.sort(key=itemgetter(5))
 
   # Produce output
+  sampleout = table_writer(options.output,hyphen=sys.stdout)
   sampleout.writerow( ['CHILD','PARENT1','PARENT2','CONCORDANT','TOTAL','RATE'] )
   sampleout.writerows(samplestats)
 
   if options.locout:
-    locout = csv.writer(file(options.locout,'w'),dialect='excel-tab')
+    locout = table_writer(options.locout)
     locout.writerow( ['LOCUS','CONCORDANT','TOTAL','RATE'] )
     locout.writerows(locusstats)
 
