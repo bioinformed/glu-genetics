@@ -269,9 +269,9 @@ def merge_phenome_list(phenomes):
   for ph in phenomes[1:]:
     for sample,pheno in ph.phenos.iteritems():
       if sample in phenome.phenos:
-        phenome.merge_phenos(sample, file_phenos.family,  file_phenos.individual,
-                                     file_phenos.parent1, file_phenos.parent2,
-                                     file_phenos.sex,     file_phenos.phenoclass)
+        phenome.merge_phenos(sample, pheno.family,  pheno.individual,
+                                     pheno.parent1, pheno.parent2,
+                                     pheno.sex,     pheno.phenoclass)
       else:
         phenome.phenos[sample] = pheno
 
