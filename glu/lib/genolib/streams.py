@@ -1498,11 +1498,10 @@ class GenomatrixStream(GenotypeStream):
     rows,tgenos = transpose_generator(genos.columns, genos.use_stream())
 
     if genos.format == 'ldat':
-      format = 'sdat'
+      return genos.clone(tgenos, format='sdat', loci=tuple(rows),    packed=False, materialized=False)
     else:
-      format = 'ldat'
+      return genos.clone(tgenos, format='ldat', samples=tuple(rows), packed=False, materialized=False)
 
-    return genos.clone(tgenos, format=format, packed=False, materialized=False)
 
   def as_genotriples(self):
     '''
@@ -3080,11 +3079,17 @@ def merge_genomatrixstream(genos, mergefunc):
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.samples
   ('s1', 's2', 's3', 's4')
+  >>> genos.loci
+  ('l1', 'l2', 'l3')
+  >>> len(genos.models)
+  0
   >>> for row in genos:
   ...   print row
   ('l1', [('A', 'A'), (None, None), ('A', 'A'), ('A', 'T')])
   ('l2', [(None, None), (None, None), (None, None), (None, None)])
   ('l3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])
+  >>> len(genos.models)
+  3
   >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
   [('s1', [2, 0, 0, 0, 1]), ('s2', [0, 0, 0, 0, 3]), ('s3', [1, 0, 0, 0, 2]), ('s4', [2, 0, 0, 0, 1])]
   >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
@@ -3225,6 +3230,7 @@ def merge_genomatrixstream(genos, mergefunc):
         if genos.format=='ldat':
           model   = genos.genome.get_model(label)
           new_row = mergefunc.merge_locus(samples, label, model, new_row)
+          models.append(model)
         else:
           new_row = mergefunc.merge_sample(label, loci, models, new_row)
 
