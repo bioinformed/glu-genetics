@@ -29,7 +29,7 @@ from   scipy             import stats
 
 from   glu.lib.utils     import tally
 from   glu.lib.fileutils import namefile,load_list,load_map,load_table,tryint1
-from   glu.lib.genolib   import load_genostream,pick
+from   glu.lib.genolib   import load_genostream,GenoTransform,pick
 from   glu.lib.formula   import get_term,INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
                                 NULL,TREND,GENO,FormulaParser
 
@@ -408,7 +408,7 @@ def parse_formulae(options,models):
     _,options.display = FormulaParser().parse(options.display)
 
   if options.model and not options.test:
-    options.test = COMBINATION(t for t in options.model.terms() if not t.loci())
+    options.test = COMBINATION(t for t in options.model.terms() if t.loci())
 
   if not options.test:
     options.test = GENO('locus')
