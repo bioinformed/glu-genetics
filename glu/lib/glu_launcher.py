@@ -20,7 +20,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 
 import gc
-import imp
 import sys
 import time
 import optparse
@@ -77,7 +76,7 @@ def run_profile(options,progmain):
     try:
       return prof.runcall(progmain)
     finally:
-      stats = pstats.Stats(prof)
+      stats = pstats.Stats(prof,stream=sys.stderr)
       stats.strip_dirs()
       stats.sort_stats('time', 'calls')
       stats.print_stats(25)
@@ -98,6 +97,7 @@ def run_profile(options,progmain):
     finally:
       prof.close()
       stats = hotshot.stats.load(statfile)
+      stats.stream = sys.stderr
       stats.strip_dirs()
       stats.sort_stats('time', 'calls')
       stats.print_stats(25)
