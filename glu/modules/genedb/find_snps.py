@@ -22,28 +22,18 @@ __license__   = 'See GLU license for terms by running: glu license'
 
 import sys
 import sqlite3
+import bisect
 
-from   itertools         import islice
+from   operator                      import itemgetter
 
-from   glu.lib.fileutils import hyphen,table_writer
-from   preprocess        import load_features
+from   glu.lib.fileutils             import load_table,table_writer
+
+from   glu.modules.genedb.preprocess import resolve_features
+from   glu.modules.genedb.queries    import query_snps_by_location
 
 
 HEADER = ['SNP_NAME','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
           'REGION_START','REGION_END','FEATURE_NAME','FEATURE_STRAND','FEATURE_START','FEATURE_END','FEATURE_TYPE']
-
-
-def query_snps_by_location(con,chr,start,end):
-  sql = '''
-  SELECT   lname,chromosome,location,strand
-  FROM     snp
-  WHERE    chromosome = ?
-    AND    location BETWEEN ? AND ?
-  ORDER BY location;
-  '''
-  cur = con.cursor()
-  cur.execute(sql,(chr,start,end))
-  return cur.fetchall()
 
 
 def option_parser():
@@ -52,12 +42,18 @@ def option_parser():
   usage = 'usage: %prog [options] genome_database'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-u', '--upbases',   dest='upbases',   default=20000, type='int',  metavar='N',
+                    help='upstream margin in bases')
+  parser.add_option('-d', '--downbases', dest='downbases', default=10000, type='int',  metavar='N',
+                    help='downstream margin in bases')
+  parser.add_option('-U', '--upsnps',    dest='upsnps',                   type='int',  metavar='N',
+                    help='maximum number of upstream SNPs')
+  parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
+                    help='maximum number of downstream SNPs')
   parser.add_option('-o', '--outfile',  dest='outfile', default='-', metavar='FILE',
                     help="the name of the output file, '-' for standard out")
   parser.add_option('-i', '--infile',   dest='infile',  default='-', metavar='FILE',
                     help="the name of the feature file containing list of features, '-' for standard in")
-  parser.add_option(      '--limit',     dest='limit',   type='int',
-                    help='limit the number of features being explored for testing purpose.')
   return parser
 
 
@@ -71,40 +67,38 @@ def feature_margin(start,end,strand,mup,mdown):
 
 
 def process_results(results,start,end,strand,nup,ndown):
+  loci   = sorted(results,key=itemgetter(1,2,0))
+  locs   = [ loc[2] for loc in loci ]
+  m1,m2  = (nup,ndown) if strand=='+' else (ndown,nup)
+
+  istart = bisect.bisect_left(locs,start)
+  iend   = bisect.bisect_right(locs,end)
+
+  if m2 and len(loci)-iend>m2:
+    loci = loci[:iend+m2]
+
+  if m1 and istart > m1:
+    loci   = loci[istart-m1:]
+    iend  -= istart-m1
+    istart = m1
+
   def _calc_rank_dist():
-    istart = locs.index(start)
-    iend = locs.index(end)
-    for i,loc in enumerate(locs):
-      if loc < start:
-        distance = start-loc
-        rank = i - istart
-      elif loc > end:
-        distance = loc-end
-        rank = i - iend
-      else:
-        rank=distance=0
+    for i,loc in enumerate(loci):
+      pos = loc[2]
+
+      rank = distance = 0
+      if pos < start:
+        distance = pos-start
+        rank     = i-istart
+      elif pos > end:
+        distance = pos-end
+        rank     = i-iend+1
+
       if strand == '-':
         rank = -rank
-      result = locdict.get(loc,None)
-      if result is not None:
-        result.extend([distance,rank])
-        yield result
 
-  locdict = dict( (result[2],list(result)) for result in results )
-  locs= set(locdict)
-  locs.add(start)
-  locs.add(end)
-  locs = list(locs)
-  locs.sort()
+      yield list(loc)+[distance,rank]
 
-  if strand == '+':
-    left  = max(0,locs.index(start)-nup) if nup else 0
-    right = min(len(locs),locs.index(end)+ndown+1) if ndown else len(locs)
-  else:
-    left  = max(0,locs.index(start)-ndown) if ndown else 0
-    right = min(len(locs),locs.index(end)+nup+1) if nup else len(locs)
-
-  locs = list(islice(locs,left,right))
   return _calc_rank_dist()
 
 
@@ -121,19 +115,23 @@ def main():
   out.writerow(HEADER)
 
   for infile in args[1:]:
-    features = load_features(hyphen(infile,sys.stdin),options.limit)
+    features = load_table(infile,want_header=True,hyphen=sys.stdin)
+    features = resolve_features(con,features,options)
+
     for name,chr,strand,start,end,mup,mdown,nup,ndown,featuretype in features:
       if featuretype == 'UNKNOWN':
         continue
       start = int(start)
-      end = int(end or start)
-      nup = nup or 0
+      end   = int(end or start)
+      nup   = nup or 0
       ndown = ndown or 0
       chrStart,chrEnd = feature_margin(start,end,strand,int(mup or 0),int(mdown or 0))
+
       results = query_snps_by_location(con,chr,chrStart,chrEnd)
       results = process_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
+
       for result in results:
-        result.extend([chrStart,chrEnd,name,strand,start,end,featuretype])
+        result += [chrStart,chrEnd,name,strand,start,end,featuretype]
         out.writerow(result)
 
 

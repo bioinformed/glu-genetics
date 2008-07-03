@@ -20,16 +20,18 @@ __license__   = 'See GLU license for terms by running: glu license'
 import glob
 import sqlite3
 
-from   itertools         import chain
+from   itertools         import chain,islice
 
-from   glu.lib.fileutils import autofile, load_table
+from   glu.lib.fileutils import autofile, load_table, tryint
 
 from   glu.modules.convert.from_lbd import load_illumina_manifest
 
 
-HAPMAP='/usr/local/share/hapmap/build23/rs_strand/non-redundant/geno*'
-MANIFESTS=['/usr/local/share/manifests/Human1Mv1_C.csv',
-           '/usr/local/share/manifests/Human610-Quadv1_B.csv']
+DBSNP     = ['data/snp128.txt.gz', 'data/snp126.txt.gz']
+ARRAYS    = glob.glob('data/snpArray*')
+HAPMAP    = glob.glob('/usr/local/share/hapmap/build23/rs_strand/non-redundant/geno*')
+MANIFESTS = ['/usr/local/share/manifests/Human1Mv1_C.csv',
+             '/usr/local/share/manifests/Human610-Quadv1_B.csv']
 
 
 def clean_alias(a):
@@ -176,10 +178,9 @@ def load_genes(con,genes):
 
   sql = 'SELECT COUNT(*) FROM GENE;'
   cur.execute(sql)
-  print cur.fetchall()
+  print 'GENES:',cur.fetchall()[0][0]
 
   con.commit()
-
 
 
 def load_aliases(con, aliases):
@@ -197,30 +198,12 @@ def load_aliases(con, aliases):
 
   sql = 'SELECT COUNT(*) FROM ALIAS;'
   cur.execute(sql)
-  print cur.fetchall()[0][0]
+  print 'ALIASES:',cur.fetchall()[0][0]
 
   sql = 'CREATE INDEX idx_aliases ON ALIAS (alias);'
   cur.execute(sql)
 
   con.commit()
-
-
-def get_hapmap_snps(filename):
-  filenames = glob.glob(filename)
-  for filename in filenames:
-    print filename
-    gfile = autofile(filename)
-    header = gfile.next()
-    for line in gfile:
-      fields     = line.split(' ')
-      rs         = fields[0]
-      chromosome = fields[2]
-      strand     = fields[4]
-
-      if chromosome.startswith('chr'):
-        chromosome = chromosome[3:]
-      position = int(fields[3])
-      yield rs,chromosome,position,strand
 
 
 def squash_dups(snps):
@@ -239,19 +222,48 @@ def load_snps(con, snps):
   except:
     pass
 
-  cur.execute('CREATE TABLE SNP (lname TEXT PRIMARY KEY, chromosome TEXT, location INTEGER, strand TEXT);')
+  cur.execute('''
+    CREATE TABLE SNP (lname      TEXT PRIMARY KEY,
+                      chromosome TEXT,
+                      location   INTEGER,
+                      strand     TEXT,
+                      alleles    TEXT);''')
 
-  sql = 'INSERT INTO SNP VALUES (?,?,?,?);'
-  cur.executemany(sql, snps)
+  sql = 'INSERT INTO SNP VALUES (?,?,?,?,?);'
+
+  while 1:
+    rows = list(islice(snps,50000))
+    if not rows:
+      break
+    cur.executemany(sql, rows)
+    con.commit()
 
   sql = 'SELECT COUNT(*) FROM SNP;'
   cur.execute(sql)
-  print cur.fetchall()[0][0]
+  print 'SNPS:',cur.fetchall()[0][0]
 
   sql = 'CREATE INDEX idx_snp ON SNP (chromosome,location);'
   cur.execute(sql)
 
   con.commit()
+
+
+def get_hapmap_snps(filename):
+  print 'LOADING HAPMAP:',filename
+  gfile  = autofile(filename)
+  header = gfile.next()
+  for line in gfile:
+    fields     = line.split(' ')
+    rs         = fields[0]
+    chromosome = fields[2]
+    strand     = fields[4]
+    alleles    = fields[1]
+    position   = int(fields[3])
+
+    if chromosome.startswith('chr'):
+      chromosome = chromosome[3:]
+
+    yield rs,chromosome,position,strand,alleles
 
 
 def find_index(header,headings):
@@ -271,6 +283,7 @@ def extract_illumina_snps(manifest):
   name_idx    = find_index(header,['Name'])
   chr_idx     = find_index(header,['Chr'])
   loc_idx     = find_index(header,['MapInfo'])
+  snp_idx     = find_index(header,['SNP'])
 
   strandmap   = {'F':'+','R':'-','U':'+'}
 
@@ -279,12 +292,118 @@ def extract_illumina_snps(manifest):
     chromosome = assay[chr_idx]
     position   = int(assay[loc_idx])
     strand     = strandmap[assay[assayid_idx].split('_')[-2]]
+    alleles    = assay[snp_idx][1:-1]
 
-    yield rs,chromosome,position,strand
+    if chromosome=='Mt':
+      chromosome='M'
+
+    yield rs,chromosome,position,strand,alleles
+
+
+def get_goldenpath_dbsnp(snpfile):
+  print 'LOADING DBSNP:',snpfile
+  for row in load_table(snpfile):
+    rs         = row[4]
+    chromosome = row[1]
+    position   = tryint(row[2])
+    strand     = row[6]
+    alleles    = row[9]
+
+    # Adjust for 0-based indexing
+    if position is not None:
+      position += 1
+
+    if chromosome.startswith('chr'):
+      chromosome = chromosome[3:]
+
+    yield rs,chromosome,position,strand,alleles
+
+
+def get_goldenpath_arrays(arrayfile):
+  print 'LOADING ARRAY:',arrayfile
+  for row in load_table(arrayfile):
+    name       = row[4]
+    chromosome = row[1]
+    position   = tryint(row[2])
+    strand     = row[6]
+    alleles    = row[7]
+
+    # Adjust for 0-based indexing
+    if position is not None:
+      position += 1
+
+    if chromosome.startswith('chr'):
+      chromosome = chromosome[3:]
+
+    # If rsId is available, output only that
+    if len(row)>=9:
+      rs = row[8]
+      yield rs,chromosome,position,strand,alleles
+    else:
+      yield name,chromosome,position,strand,alleles
+
+
+def get_cytobands(cytofile):
+  print 'LOADING CYTOBANDS:',cytofile
+  seen = set()
+  for row in load_table(cytofile):
+    band       = row[3]
+    chromosome = row[0]
+    start      = tryint(row[1])
+    stop       = tryint(row[2])
+    color      = row[4]
+
+    # Adjust for 0-based indexing
+    if start is not None:
+      start += 1
+
+    if chromosome.startswith('chr'):
+      chromosome = chromosome[3:]
+
+    name = chromosome + band
+
+    if name in seen:
+      print name,row
+
+    seen.add(name)
+
+    yield name,chromosome,start,stop,color
+
+
+def load_cytobands(con,bands):
+  cur = con.cursor()
+
+  try:
+    cur.execute('DROP TABLE CYTOBAND;')
+  except:
+    pass
+
+  cur.execute('''
+    CREATE TABLE CYTOBAND (band       TEXT PRIMARY KEY,
+                           chromosome TEXT,
+                           start      INTEGER,
+                           stop       INTEGER,
+                           color      TEXT);''')
+
+  sql = 'INSERT INTO CYTOBAND VALUES (?,?,?,?,?);'
+  cur.executemany(sql, bands)
+
+  sql = 'SELECT COUNT(*) FROM CYTOBAND;'
+  cur.execute(sql)
+  print 'BANDS:',cur.fetchall()[0][0]
+
+  sql = 'CREATE INDEX idx_cytoband ON CYTOBAND (chromosome,start,stop);'
+  cur.execute(sql)
+
+  con.commit()
 
 
 def main():
-  con = sqlite3.connect('genome36.3.db')
+  con = sqlite3.connect('snp128+.db')
+
+  con.execute('PRAGMA synchronous=OFF;')
+  con.execute('PRAGMA journal_mode=OFF;')
+  con.execute('PRAGMA cache_size=20000;')
 
   if 1:
     genes = list(get_genes('data/seq_gene.md.b36.3.gz'))
@@ -296,10 +415,16 @@ def main():
     load_aliases(con,aliases)
 
   if 1:
-    streams = []
+    bands = get_cytobands('data/cytoBand.txt.gz')
+    load_cytobands(con,bands)
+
+  if 0:
+    streams  = []
+    streams += [ get_goldenpath_dbsnp(s)  for s in DBSNP  ]
+    streams += [ get_goldenpath_arrays(a) for a in ARRAYS ]
+    streams += [ get_hapmap_snps(h)       for h in HAPMAP ]
     streams += [ extract_illumina_snps(load_illumina_manifest(m))
                    for m in MANIFESTS ]
-    streams += [ get_hapmap_snps(HAPMAP) ]
 
     snps = chain(*streams)
     snps = squash_dups(snps)
