@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          find_regions.py
+File:          find_snps.py
 
 Authors:       Zhaoming Wang(wangzha@mail.nih.gov)
                Xiang    Deng(dengx@mail.nih.gov)
@@ -24,12 +24,12 @@ import sys
 import sqlite3
 import bisect
 
-from   operator                      import itemgetter
+from   operator                        import itemgetter
 
-from   glu.lib.fileutils             import load_table,table_writer
+from   glu.lib.fileutils               import load_table,table_writer
 
-from   glu.modules.genedb.preprocess import resolve_features
-from   glu.modules.genedb.queries    import query_snps_by_location
+from   glu.modules.genedb.find_regions import resolve_features
+from   glu.modules.genedb.queries      import query_snps_by_location
 
 
 HEADER = ['SNP_NAME','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
