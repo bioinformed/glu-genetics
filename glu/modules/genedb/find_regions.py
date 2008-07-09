@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''
-File:          preprocess.py
+File:          find_regions.py
 
 Authors:       Zhaoming Wang(wangzha@mail.nih.gov)
                Xiang    Deng(dengx@mail.nih.gov)
