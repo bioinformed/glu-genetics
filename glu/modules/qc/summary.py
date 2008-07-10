@@ -34,21 +34,18 @@ LOCUS_HEADER  = ['LOCUS','CHROMOSOME','LOCATION','STRAND',
                  'NUM_ALLELES','ALLELES','ALLELE_COUNTS', 'MAF',
                  'NUM_GENOTYPES','GENOTYPES','GENOTYPE_COUNTS',
                  'MISSING_COUNT', 'INFORMATIVE_COUNT',
-                 'ATTEMPTED_MISSING_RAGE', 'OBSERVED_MISSING_RATE',
+                 'ATTEMPTED_MISSING_RATE', 'OBSERVED_MISSING_RATE',
                  'NONEMPTY_MISSING_RATE', 'HW_PVALUE']
 
 SAMPLE_HEADER = ['SAMPLE','MISSING_COUNT','HEMIZYGOTE_COUNT',
                  'HOMOZYGOTE_COUNT','HETEROZYGOTE_COUNT',
-                 'INFORMATIVE_COUNT', 'ATTEMPTED_MISSING_RAGE',
+                 'INFORMATIVE_COUNT', 'ATTEMPTED_MISSING_RATE',
                  'OBSERVED_MISSING_RATE', 'NONEMPTY_MISSING_RATE',
                  'HETEROZYGOSITY']
 
 
 def rate(a,b):
-  if b!= 0:
-    return a/b
-  else:
-    ''
+  return a/b if b!=0 else ''
 
 
 def missing_rates(observed_missing,observed,empty,missing):
@@ -59,7 +56,15 @@ def missing_rates(observed_missing,observed,empty,missing):
 
 def locus_row(lname,locus,counts,empty_samples,missing_samples,compute_hwp):
   model   = locus.model
-  acounts = izip(count_alleles_from_genocounts(model,counts),model.alleles)
+  m       = len(model.genotypes)
+
+  # Counts can be padded with extra zeros that must be removed
+  assert not sum(counts[m:])
+  counts  = counts[:m]
+
+  # Count alleles
+  acounts = count_alleles_from_genocounts(model,counts)
+  acounts = izip(acounts,model.alleles) if acounts else []
   acounts = sorted(acounts,reverse=True)
   alleles = [ a for n,a in acounts if n if a and n ]
   acounts = [ n for n,a in acounts if n if a and n ]
