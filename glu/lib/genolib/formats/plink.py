@@ -38,7 +38,7 @@ __all__ = ['PlinkPedWriter',  'save_plink_ped',  'load_plink_ped',
            'PlinkBedWriter',  'save_plink_bed',  'load_plink_bed']
 
 
-ALLELE_MAP  = {'0':None}
+ALLELE_MAP  = {'0':None,'1':'1','2':'2','A':'A','C':'C','G':'G','T':'T','B':'B','+':'+','-':'-'}
 ALLELE_RMAP = {None:'0'}
 
 SEX_MAP    = {'1':SEX_MALE,'2':SEX_FEMALE}
@@ -140,6 +140,8 @@ def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   n     = 6 + 2*len(loci)
 
   def _load_plink():
+    aget = ALLELE_MAP.get
+
     for line_num,line in enumerate(gfile):
       if not line or line.startswith('#'):
         continue
@@ -150,7 +152,7 @@ def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
         if len(fields) != n:
           raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
 
-        family,name,father,mother,sex,pheno = [ s.strip() for s in fields[:6] ]
+        family,name,father,mother,sex,pheno = fields[:6]
 
         if name == '0':
           raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
@@ -171,8 +173,9 @@ def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
         phenome.merge_phenos(ename, family, name, efather, emother, sex, pheno)
 
-        fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,6,None) ]
-        genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
+        a1 = [ aget(a,a) for a in islice(fields,6,None,2) ]
+        a2 = [ aget(a,a) for a in islice(fields,7,None,2) ]
+        genos = zip(a1,a2)
 
       yield ename,genos
 
@@ -505,6 +508,8 @@ def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   n     = 4 + 2*len(samples)
 
   def _load_plink():
+    aget = ALLELE_MAP.get
+
     for line_num,line in enumerate(gfile):
       if not line or line.startswith('#'):
         continue
@@ -528,8 +533,9 @@ def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
         genome.merge_locus(lname, chromosome=chr, location=pdist)
 
-        fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,4,None) ]
-        genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
+        a1 = [ aget(a,a) for a in islice(fields,4,None,2) ]
+        a2 = [ aget(a,a) for a in islice(fields,5,None,2) ]
+        genos = zip(a1,a2)
 
       yield lname,genos
 

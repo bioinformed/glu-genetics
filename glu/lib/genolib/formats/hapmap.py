@@ -68,12 +68,12 @@ def load_hapmap(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   try:
     header = gfile.next()
   except StopIteration:
-    header = []
+    header = ''
 
   if not any(header.startswith(h) for h in HAPMAP_HEADERS):
     raise ValueError("Input file '%s' does not appear to be in HapMap format." % namefile(filename))
 
-  columns = [ intern(h.strip()) for h in islice(header.split(),11,None) ]
+  columns = [ intern(h) for h in islice(header.split(),11,None) ]
 
   if genome is None:
     genome = Genome()

@@ -124,6 +124,8 @@ def load_merlin(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   n     = 5 + 2*len(loci)
 
   def _load_merlin():
+    aget = ALLELE_MAP.get
+
     for line_num,line in enumerate(gfile):
       if not line or line.startswith('#'):
         continue
@@ -155,8 +157,9 @@ def load_merlin(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
         phenome.merge_phenos(ename, family, name, efather, emother, sex)
 
-        fields = [ ALLELE_MAP.get(a,a) for a in islice(fields,5,None) ]
-        genos  = zip(islice(fields,0,None,2),islice(fields,1,None,2))
+        a1 = [ aget(a,a) for a in islice(fields,5,None,2) ]
+        a2 = [ aget(a,a) for a in islice(fields,6,None,2) ]
+        genos = zip(a1,a2)
 
       yield ename,genos
 
