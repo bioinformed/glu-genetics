@@ -34,12 +34,10 @@ def query_snps_by_location(con,chr,start,end):
 
 def query_gene(con,name):
   sql = '''
-  SELECT   a.Alias,s.featureName,s.chromosome,s.orientation,s.chrStart,s.chrEnd
+  SELECT   a.Alias,s.featureName,s.chromosome,s.orientation,s.chrStart,s.chrEnd,s.featureType
   FROM     alias a, gene s
   WHERE    s.geneID = a.geneID
     AND    a.Alias = ?
-    AND    s.featureType='GENE'
-    AND    s.submitGroup='reference'
   ORDER BY s.chromosome,MIN(s.chrStart,s.chrEnd);
   '''
   cur = con.cursor()
@@ -63,16 +61,12 @@ def query_gene_neighborhood(con,chromosome,location,up,dn):
   SELECT   featureName,chromosome,orientation,chrStart,chrEnd
   FROM     gene
   WHERE    orientation = '+'
-    AND    featureType='GENE'
-    AND    submitGroup='reference'
     AND    chromosome=?
     AND    ? BETWEEN (chrStart - ?) AND (chrEnd + ?)
   UNION
   SELECT   featureName,chromosome,orientation,chrStart,chrEnd
   FROM     gene
   WHERE    orientation = '-'
-    AND    featureType='GENE'
-    AND    submitGroup='reference'
     AND    chromosome=?
     AND    ? BETWEEN (chrStart - ?) AND (chrEnd + ?)
   ORDER BY chromosome,chrStart;

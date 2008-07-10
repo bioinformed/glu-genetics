@@ -24,9 +24,9 @@ __license__   = 'See GLU license for terms by running: glu license'
 import sys
 import sqlite3
 
-from glu.lib.fileutils          import load_table,table_writer,tryint
+from   glu.lib.fileutils          import load_table,table_writer,tryint
 
-from glu.modules.genedb.queries import query_gene, query_snp
+from   glu.modules.genedb.queries import query_gene, query_snp
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
@@ -59,6 +59,10 @@ def coalesce(*items):
   return None
 
 
+def is_int(i):
+  return isinstance(i, (int,long))
+
+
 def resolve_feature(con,feature,options):
   name        = feature[0]
   chr         = feature[1] or None
@@ -70,32 +74,33 @@ def resolve_feature(con,feature,options):
   upsnps      = coalesce(tryint(feature[7]), options.upsnps)
   downsnps    = coalesce(tryint(feature[8]), options.downsnps)
 
-  if start and end:
+  if (start is not None and end is None) or (is_int(start) and is_int(end) and start+1==end):
+    feature = 'SNP'
+  elif chr and start and end:
     geneinfo = query_gene(con,name)
-    if not geneinfo:
-      feature = 'REGION'
-    elif (chr,start,end,strand) == geneinfo[0][2:6]:
+    if any( (chr,start,end) == (gi[2],gi[4],gi[5]) for gi in geneinfo):
       feature = 'GENE'
     else:
-      print >> sys.stderr, 'Warning: conflict information for %s' % name
-
-    return name,chr,strand,start,end,upbases,downbases,upsnps,downsnps,feature
-
-  elif start and not end:
-    #FIXME: verify the SNP information by quering snp table
-    return name,chr,strand,start,end,upbases,downbases,upsnps,downsnps,'SNP'
-
+      feature = 'REGION'
   else:
     geneinfo = query_gene(con,name)
-    if geneinfo:
-      return list(geneinfo[0][1:6])+[upbases,downbases,upsnps,downsnps,'GENE']
+    if len(geneinfo) == 1:
+      name,chr,strand,start,end = geneinfo[0][1:6]
+      feature = geneinfo[0][6]
+    elif len(geneinfo) > 1:
+      feature = 'AMBIGUOUS'
+    else:
+      snpinfo = query_snp(con,name)
+      if len(snpinfo)==1:
+        lname,chr,start,strand = snpinfo[0]
+        end = start+1
+        feature = 'SNP'
+      elif len(snpinfo) > 1:
+        feature = 'AMBIGUOUS'
+      else:
+        feature = 'UNKNOWN'
 
-    snp_info = query_snp(con,name)
-    if snp_info:
-      lname,chr,location,strand = snp_info[0]
-      return lname,chr,strand,location,None,None,None,None,None,'SNP'
-
-    return name,None,None,None,None,None,None,None,None,'UNKNOWN'
+  return name,chr,strand,start,end,upbases,downbases,upsnps,downsnps,feature
 
 
 def resolve_features(con,features,options):
