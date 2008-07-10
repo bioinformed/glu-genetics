@@ -28,7 +28,7 @@ from   itertools                 import groupby,imap
 
 import tables
 
-from   glu.lib.utils             import izip_exact,gcdisabled
+from   glu.lib.utils             import izip_exact,gcdisabled,is_str
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
                                         namefile
 from   glu.lib.genolib.locus     import Genome,Locus
@@ -141,6 +141,9 @@ class BinaryGenomatrixWriter(object):
 
     if format not in ('ldat','sdat'):
       raise IOError('format must be either ldat or sdat')
+
+    if not is_str(filename):
+      raise ValueError('Invalid filename')
 
     if compressed_filename(filename):
       raise IOError('Binary genotype files must not have a compressed extension')
@@ -390,6 +393,9 @@ class BinaryGenotripleWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
+    if not is_str(filename):
+      raise ValueError('Invalid filename')
+
     if compressed_filename(filename):
       raise IOError('Binary genotype files must not have a compressed extension')
 
@@ -615,6 +621,9 @@ def load_genotriples_binary(filename,genome=None,phenome=None,extra_args=None,**
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
+  if not is_str(filename):
+    raise ValueError('Invalid filename')
+
   if compressed_filename(filename):
     raise IOError('Binary genotype files must not have a compressed extension')
 
@@ -634,10 +643,11 @@ def load_genotriples_binary(filename,genome=None,phenome=None,extra_args=None,**
   if version > GENOMATRIX_VERSION:
     version = compat_version
 
-  samples = map(str,gfile.root.samples[:])
-  loci    = map(str,gfile.root.loci[:])
+  samples = gfile.root.samples[:].tolist()
+  loci    = gfile.root.loci[:].tolist()
 
-  file_genome,models = load_models(gfile,loci,version,compat_version,ignoreloci)
+  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
+  models = list(file_models)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   def _load():
@@ -822,13 +832,12 @@ def load_models(gfile,loci,version,compat_version,ignoreloci):
   @param compat_version: genotype file version backward compatibility number
   @type  compat_version: int
   '''
-  with gcdisabled():
-    if version == 1 or ignoreloci:
-      return load_models_v1(gfile,loci)
-    elif version in (2,3) or compat_version in (2,3):
-      return load_models_v2(gfile,loci)
-    else:
-      raise ValueError('Unknown genotype file version: %s' % version)
+  if version == 1 or ignoreloci:
+    return load_models_v1(gfile,loci)
+  elif version in (2,3) or compat_version in (2,3):
+    return load_models_v2(gfile,loci)
+  else:
+    raise ValueError('Unknown genotype file version: %s' % version)
 
 
 def load_models_v1(gfile,loci):
@@ -842,34 +851,38 @@ def load_models_v1(gfile,loci):
   '''
   assert len(gfile.root.locus_models) == len(loci)
 
-  alleles         = map(str,gfile.root.model_alleles[:])
+  alleles         = gfile.root.model_alleles[:].tolist()
   alleles[0]      = None
-  mods            = list(gfile.root.models[:])
+  mods            = gfile.root.models[:].tolist()
+  genos           = gfile.root.model_genotypes[:].tolist()
   model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
-                           for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
+                           for i,mgenos in groupby(genos,itemgetter(0)) )
 
-  locs = []
-  models = []
-  modelcache = {}
+  genome = Genome()
 
-  for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
-    max_alleles,allow_hemizygotes = mods[lmod[0]]
+  def _models():
+    modelcache = {}
 
-    genotypes = model_genotypes.get(lmod[0],())
-    key       = (allow_hemizygotes,max_alleles)+genotypes
-    model     = modelcache.get(key)
+    for locus,lmod in izip_exact(loci,gfile.root.locus_models[:].tolist()):
+      max_alleles,allow_hemizygotes = mods[lmod[0]]
 
-    if model is None:
-      model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
-      for g in genotypes:
-        model.add_genotype(g)
-      if len(model.alleles)-1 == max_alleles:
-        modelcache[key] = model
+      genotypes = model_genotypes.get(lmod[0],())
+      key       = (allow_hemizygotes,max_alleles)+genotypes
+      model     = modelcache.get(key)
 
-    models.append(model)
-    locs.append( Locus(locus, model) )
+      if model is None:
+        model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
+        for g in genotypes:
+          model.add_genotype(g)
+        if len(model.alleles)-1 == max_alleles:
+          modelcache[key] = model
 
-  return Genome(loci=locs),models
+      genome.loci[locus] = Locus(locus, model)
+
+      yield model
+
+  return genome,_models()
+
 
 
 def load_models_v2(gfile,loci):
@@ -883,41 +896,48 @@ def load_models_v2(gfile,loci):
   '''
   assert len(gfile.root.locus_models) == len(loci)
 
-  alleles         = map(str,gfile.root.model_alleles[:])
+  alleles         = gfile.root.model_alleles[:].tolist()
   alleles[0]      = None
-  mods            = list(gfile.root.models[:])
-  chrs            = [ str(c) or None for c in gfile.root.chromosomes[:] ]
+  mods            = gfile.root.models[:].tolist()
+  chrs            = [ c or None for c in gfile.root.chromosomes[:].tolist() ]
+
+  genos = gfile.root.model_genotypes[:].tolist()
   model_genotypes = dict( (i,tuple( (alleles[a1],alleles[a2]) for j,a1,a2 in mgenos) )
-                           for i,mgenos in groupby(gfile.root.model_genotypes[:],itemgetter(0)) )
+                           for i,mgenos in groupby(genos,itemgetter(0)) )
 
-  locs = []
-  models = []
-  modelcache = {}
+  genome = Genome()
 
-  for locus,lmod in izip_exact(loci,gfile.root.locus_models[:]):
-    max_alleles,allow_hemizygotes = mods[lmod[0]]
+  def _models():
+    empty      = ()
+    strands    = STRANDS
+    modelcache = {}
 
-    genotypes = model_genotypes.get(lmod[0],())
-    key       = (allow_hemizygotes,max_alleles)+genotypes
-    model     = modelcache.get(key)
+    lmodels = gfile.root.locus_models[:].tolist()
 
-    if model is None:
-      model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
-      for g in genotypes:
-        model.add_genotype(g)
-      if len(model.alleles)-1 == max_alleles:
-        modelcache[key] = model
+    for locus,lmod in izip_exact(loci,lmodels):
+      max_alleles,allow_hemizygotes = mods[lmod[0]]
 
-    location = lmod[2]
-    if location == -1:
-      location = None
+      genotypes = model_genotypes.get(lmod[0],empty)
+      model     = None
+      key       = (allow_hemizygotes,max_alleles)+genotypes
+      model     = modelcache.get(key)
 
-    models.append(model)
-    locs.append( Locus(locus, model, None,
-                              chrs[lmod[1]], location,
-                              STRANDS[lmod[3]] ) )
+      if model is None:
+        model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
+        for g in genotypes:
+          model.add_genotype(g)
+        if len(model.alleles)-1 == max_alleles:
+          modelcache[key] = model
 
-  return Genome(loci=locs),models
+      location = lmod[2]
+      if location == -1:
+        location = None
+
+      genome.loci[locus] = Locus(locus, model, None, chrs[lmod[1]], location, strands[lmod[3]])
+
+      yield model
+
+  return genome,_models()
 
 
 #######################################################################################
@@ -1037,8 +1057,8 @@ def load_phenos_v3(gfile,samples):
   @param   gfile: output file
   @type    gfile: PyTables HDF5 file instance
   '''
-  names  = map(str,gfile.root.names[:])
-  phenos = gfile.root.phenotypes[:]
+  names  = gfile.root.names[:].tolist()
+  phenos = gfile.root.phenotypes[:].tolist()
 
   names[0] = None
 
@@ -1204,13 +1224,16 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
 
   filename = parse_augmented_filename(filename,args)
 
-  chunksize    = int(get_arg(args,['chunksize'],4096))
-  scratch      = int(get_arg(args,['scratch'],32*1024*1024))
+  chunksize    =     int(get_arg(args,['chunksize'],4096))
+  scratch      =     int(get_arg(args,['scratch'],32*1024*1024))
   ignoreloci   = trybool(get_arg(args,['ignoreloci']))
   ignorephenos = trybool(get_arg(args,['ignorephenos']))
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  if not is_str(filename):
+    raise ValueError('Invalid filename')
 
   if compressed_filename(filename):
     raise ValueError('Binary genotype files must not have a compressed extension')
@@ -1230,8 +1253,8 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   if version > GENOMATRIX_VERSION:
     version = compat_version
 
-  columns = tuple(imap(intern,map(str,gfile.root.cols[:])))
-  rows    = tuple(imap(intern,map(str,gfile.root.rows[:])))
+  columns = tuple(gfile.root.cols[:].tolist())
+  rows    = tuple(gfile.root.rows[:].tolist())
 
   if format_found == 'sdat':
     samples  = rows
@@ -1242,10 +1265,12 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
 
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
-  file_genome,models = load_models(gfile,loci,version,compat_version,ignoreloci)
+  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   if format == format_found == 'sdat':
+    models = list(file_models)
+
     def _load():
       descr = GenotypeArrayDescriptor(models)
 
@@ -1265,6 +1290,8 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
       gfile.close()
 
   elif format == format_found == 'ldat':
+    models = []
+
     def _load():
       descrcache = {}
 
@@ -1272,13 +1299,13 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
       chunks    = int(len(rows)+chunksize-1)//chunksize
 
       stop = 0
-      mods = iter(models)
       for i in xrange(chunks):
         start,stop = stop,stop+chunksize
         labels = rows[start:stop]
         chunk  = gfile.root.genotypes[start:stop,:]
         for j,label in enumerate(labels):
-          model = mods.next()
+          model = file_models.next()
+          models.append(model)
           descr = descrcache.get(model)
           if descr is None:
             descr = descrcache[model] = GenotypeArrayDescriptor( [model]*len(samples) )
@@ -1291,88 +1318,6 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   else:
     raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
                         % (namefile(filename),format,format_found))
-
-  # FIXME: Broken for variable bit encoded data
-  #
-  #if format == 'ldat' and format_found == 'sdat':
-  #  def _load():
-  #    descr = GenotypeArrayDescriptor(models)
-  #
-  #    chunkrows,chunkcols = gfile.root.genotypes.chunkshape
-  #    chunksize = max(1,int(scratch/(chunkcols*len(rows))))*chunkcols
-  #    chunkbits = chunksize*8
-  #    chunks    = int((gfile.root.genotypes.rowsize+chunksize-1)//chunksize)
-  #
-  #    stopbit = 0
-  #    stop    = 0
-  #    mods = iter(models)
-  #    for i in xrange(chunks):
-  #      start    = stop
-  #      startbit = stopbit
-  #
-  #      # Note: O(N) sequential search.  This could be done via binary search
-  #      while (stopbit-startbit) < chunkbits and stop < len(columns):
-  #        stop   += 1
-  #        stopbit = descr.offsets[stop]
-  #
-  #      labels     = columns[start:stop]
-  #      startbyte  = int(startbit//8)
-  #      stopbyte   = int((stopbit+7)//8)
-  #      offset     = int(startbit%8)
-  #      chunk      = gfile.root.genotypes[:,startbyte:stopbyte]
-  #      chunkdescr = GenotypeArrayDescriptor(models[start:stop],initial_offset=offset)
-  #
-  #      chunkgenos = []
-  #      for j in xrange(len(rows)):
-  #        g = GenotypeArray(chunkdescr)
-  #        g.data = chunk[j,:]
-  #        chunkgenos.append(g[:])
-  #
-  #      for j,label in enumerate(labels):
-  #        coldescr = GenotypeArrayDescriptor( [mods.next()]*len(rows) )
-  #        g = GenotypeArray(coldescr, imap(itemgetter(j), chunkgenos))
-  #        yield label,g
-  #
-  #    gfile.close()
-  #
-  #elif format == 'sdat' and format_found == 'ldat':
-  #  def _load():
-  #    descr = GenotypeArrayDescriptor(models)
-  #
-  #    chunkrows,chunkcols = gfile.root.genotypes.chunkshape
-  #    chunksize = max(1,int(scratch/(chunkcols*len(rows))))*chunkcols
-  #    chunkbits = chunksize*8
-  #    chunks    = int((gfile.root.genotypes.rowsize+chunksize-1)//chunksize)
-  #
-  #    stopbit = 0
-  #    stop    = 0
-  #    for i in xrange(chunks):
-  #      start    = stop
-  #      startbit = stopbit
-  #
-  #      # Note: O(N) sequential search.  This could be done via binary search
-  #      while (stopbit-startbit) < chunkbits and stop < len(columns):
-  #        stop   += 1
-  #        stopbit = descr.offsets[stop]
-  #
-  #      labels     = columns[start:stop]
-  #      startbyte  = int(startbit//8)
-  #      stopbyte   = int((stopbit+7)//8)
-  #      offset     = int(startbit%8)
-  #      chunk      = gfile.root.genotypes[:,startbyte:stopbyte]
-  #
-  #      chunkgenos = []
-  #      for j in xrange(len(rows)):
-  #        chunkdescr = GenotypeArrayDescriptor([models[j]]*(stop-start),initial_offset=offset)
-  #        g = GenotypeArray(chunkdescr)
-  #        g.data = chunk[j,:]
-  #        chunkgenos.append(g[:])
-  #
-  #      for j,label in enumerate(labels):
-  #        g = GenotypeArray(descr, imap(itemgetter(j), chunkgenos))
-  #        yield label,g
-  #
-  #    gfile.close()
 
   genos = GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,genome=file_genome,
                                          phenome=phenome,unique=unique,packed=True)
