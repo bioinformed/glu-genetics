@@ -78,53 +78,45 @@ def main():
 
   if genos.samples is not None:
     out.write('sample count: %d\n' % len(genos.samples))
-    if options.outputsamples:
-
-      def _samples():
-        yield ['SAMPLE','FAMILY','INDIVIDUAL','PARENT1','PARENT2','SEX','PHENOCLASS']
-
-        phenome = genos.phenome
-
-        for sample in genos.samples:
-          phenos = genos.phenome.get_phenos(sample)
-          sex    = {SEX_UNKNOWN:'',SEX_MALE:'MALE',SEX_FEMALE:'FEMALE'}[phenos.sex]
-          pheno  = {PHENO_UNKNOWN:'',PHENO_UNAFFECTED:'UNAFFECTED',PHENO_AFFECTED:'AFFECTED'}[phenos.phenoclass]
-
-          yield [sample, phenos.family or '', phenos.individual,
-                         phenos.parent1 or '', phenos.parent2 or '',
-                         sex, pheno]
-
-      emit(options.outputsamples,_samples())
 
   if genos.loci is not None:
     out.write('locus  count: %d\n' % len(genos.loci))
 
-    if genos.format == 'genotriple':
-      models = [ genos.genome.get_model(locus) for locus in genos.loci ]
-    else:
-      models = genos.models
+  if options.outputsamples:
+    def _samples():
+      yield ['SAMPLE','FAMILY','INDIVIDUAL','PARENT1','PARENT2','SEX','PHENOCLASS']
 
-    known_models = None not in (genos.loci,genos.samples) or all(m.fixed for m in models)
-  else:
-    models = None
-    known_models = False
+      phenome   = genos.phenome
+      sex_map   = {SEX_UNKNOWN:'',SEX_MALE:'MALE',SEX_FEMALE:'FEMALE'}
+      pheno_map = {PHENO_UNKNOWN:'',PHENO_UNAFFECTED:'UNAFFECTED',PHENO_AFFECTED:'AFFECTED'}
 
-  if known_models:
-    out.write('model  count: %d\n' % len(set(models)))
+      for sample in genos.samples:
+        phenos = genos.phenome.get_phenos(sample)
+        sex    = sex_map[phenos.sex]
+        pheno  = pheno_map[phenos.phenoclass]
 
-    if options.outputloci:
-      def _loci():
-        yield ['LOCUS','MAX_ALLELES','ALLELES','CHROMOSOME','LOCATION','STRAND']
-        for locus in genos.loci:
-          loc = genos.genome.get_locus(locus)
+        yield [sample, phenos.family or '', phenos.individual,
+                       phenos.parent1 or '', phenos.parent2 or '',
+                       sex, pheno]
 
-          yield [locus, str(loc.model.max_alleles), ','.join(sorted(loc.model.alleles[1:])),
-                        loc.chromosome or '', loc.location or '', loc.strand or '']
+    emit(options.outputsamples,_samples())
 
-      emit(options.outputloci,_loci())
 
-  elif genos.loci is not None and options.outputloci:
-    emit(options.outputloci, chain([['LOCUS']],([l] for l in genos.loci)))
+  if options.outputloci:
+    # FIXME: Add information to streams about known models
+    if not genos.materialized: # not genos.known_models:
+      for geno in genos:
+        pass
+
+    def _loci():
+      yield ['LOCUS','MAX_ALLELES','ALLELES','CHROMOSOME','LOCATION','STRAND']
+      for locus in genos.loci:
+        loc = genos.genome.get_locus(locus)
+        assert loc.model is not None
+        yield [locus, str(loc.model.max_alleles), ','.join(sorted(loc.model.alleles[1:])),
+                      loc.chromosome or '', loc.location or '', loc.strand or '']
+
+    emit(options.outputloci,_loci())
 
 
 if __name__=='__main__':
