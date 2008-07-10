@@ -47,7 +47,7 @@ except ImportError:
 
   from   bitarray  import getbits,setbits
 
-  print >> sys.stderr, "WARNING: Using slow Python genoarray"
+  print >> sys.stderr, '[WARNING] Using slow Python genoarray'
 
 
   def _hemi(geno):

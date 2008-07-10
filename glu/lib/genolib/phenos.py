@@ -16,21 +16,29 @@ Revision:      $Id$
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
+
+import sys
+
+
 from collections               import defaultdict
 
 from glu.lib.fileutils         import namefile,load_table
 
 
-SEX_UNKNOWN,SEX_MALE,SEX_FEMALE = None,0,1
+SEX_UNKNOWN,SEX_MALE,SEX_FEMALE               = None,0,1
 PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED = None,0,1
 
 SEX_MAP = { '':SEX_UNKNOWN, '?':SEX_UNKNOWN,
            '1':SEX_MALE,    'M':SEX_MALE,     'MALE':SEX_MALE,
            '2':SEX_FEMALE,  'F':SEX_FEMALE, 'FEMALE':SEX_FEMALE}
 
+SEX_RMAP = {SEX_UNKNOWN:'?',SEX_MALE:'M',SEX_FEMALE:'F'}
+
 PHENO_MAP = {  '':PHENO_UNKNOWN,    '?':PHENO_UNKNOWN,    'UNKNOWN':PHENO_UNKNOWN,
               '0':PHENO_UNAFFECTED, '-':PHENO_UNAFFECTED, 'UNAFFECTED':PHENO_UNAFFECTED,
               '1':PHENO_AFFECTED,   '+':PHENO_AFFECTED,   'AFFECTED':PHENO_AFFECTED}
+
+PHENO_RMAP = {PHENO_UNKNOWN:'UNKNOWN',PHENO_UNAFFECTED:'UNAFFECTED',PHENO_AFFECTED:'AFFECTED'}
 
 
 class Nothing(object): pass
@@ -104,7 +112,7 @@ class Phenome(object):
       pheno.phenoclass = phenoclass
 
   def merge_phenos(self, name, family=None, individual=None, parent1=None, parent2=None,
-                               sex=SEX_UNKNOWN, phenoclass=None):
+                               sex=SEX_UNKNOWN, phenoclass=None, warn=False):
     '''
     FIXME: docstring
     '''
@@ -119,38 +127,63 @@ class Phenome(object):
     if family is not None:
       if pheno.family is None:
         pheno.family = family
-      elif pheno.family is not family:
-        raise ValueError('Incompatible family')
+      elif pheno.family != family:
+        msg = 'Phenotype record %s incompatible family (%s != %s)' % (name,pheno.family,family)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if individual is not None:
       if pheno.individual is None:
         pheno.individual = individual
-      elif pheno.individual is not individual:
-        raise ValueError('Incompatible individual')
+      elif pheno.individual != individual:
+        msg = 'Phenotype record %s incompatible individual (%s != %s)' % (name,pheno.individual,individual)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if parent1 is not None:
       if pheno.parent1 is None:
         pheno.parent1 = parent1
-      elif pheno.parent1 is not parent1:
-        raise ValueError('Incompatible parent1')
+      elif pheno.parent1 != parent1:
+        msg = 'Phenotype record %s incompatible parent1 (%s != %s)' % (name,pheno.parent1,parent1)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if parent2 is not None:
       if pheno.parent2 is None:
         pheno.parent2 = parent2
-      elif pheno.parent2 is not parent2:
-        raise ValueError('Incompatible parent2')
+      elif pheno.parent2 != parent2:
+        msg = 'Phenotype record %s incompatible parent2 (%s != %s)' % (name,pheno.parent2,parent2)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if sex is not SEX_UNKNOWN:
       if pheno.sex is SEX_UNKNOWN:
         pheno.sex = sex
       elif pheno.sex is not sex:
-        raise ValueError('Incompatible sex')
+        msg = 'Phenotype record %s incompatible sex (%s != %s)' % (name,SEX_RMAP[pheno.sex],SEX_RMAP[sex])
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if phenoclass is not PHENO_UNKNOWN:
       if pheno.phenoclass is PHENO_UNKNOWN:
         pheno.phenoclass = phenoclass
       elif pheno.phenoclass is not phenoclass:
-        raise ValueError('Incompatible phenoclass')
+        msg = 'Phenotype record %s incompatible phenoclass (%s != %s)' \
+                  % (name,PHENO_RMAP[pheno.phenoclass],PHENO_RMAP[phenoclass])
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
   def get_phenos(self, name):
     '''

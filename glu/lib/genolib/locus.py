@@ -17,10 +17,12 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 
 
-from collections               import defaultdict
+import sys
 
-from glu.lib.fileutils         import namefile,load_table,get_arg,parse_augmented_filename
-from glu.lib.genolib.genoarray import model_from_alleles
+from   collections               import defaultdict
+
+from   glu.lib.fileutils         import namefile,load_table,get_arg,parse_augmented_filename
+from   glu.lib.genolib.genoarray import model_from_alleles
 
 
 class Nothing(object): pass
@@ -106,7 +108,8 @@ class Genome(object):
       locus.strand = strand
 
   def merge_locus(self, name, model=None, fixed=None, chromosome=None,
-                              location=None, strand=STRAND_UNKNOWN):
+                              location=None, strand=STRAND_UNKNOWN,
+                              warn=False):
     '''
     FIXME: docstring
     '''
@@ -122,31 +125,51 @@ class Genome(object):
       if locus.model is None:
         locus.model = model
       elif locus.model is not model:
-        raise ValueError('Incompatible models')
+        msg = 'Locus record %s incompatible models' % name
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if fixed is not None:
       if locus.fixed is None:
         locus.fixed = fixed
       elif locus.fixed != fixed:
-        raise ValueError('Incompatible fixed status of models')
+        msg = 'Locus record %s incompatible fixed status of models' % name
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if chromosome is not None:
       if locus.chromosome is None:
         locus.chromosome = chromosome
       elif locus.chromosome != chromosome:
-        raise ValueError('Incompatible chromsomes (%s != %s)' % (locus.chromosome,chromosome))
+        msg = 'Locus record %s incompatible chromosomes (%s != %s)' % (name,locus.chromosome,chromosome)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if location is not None:
       if locus.location is None:
         locus.location = location
       elif locus.location != location:
-        raise ValueError('Incompatible locations (%s != %s)' % (locus.location,location))
+        msg = 'Locus record %s incompatible locations (%s != %s)' % (name,locus.location,location)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
     if strand is not STRAND_UNKNOWN:
       if locus.strand is STRAND_UNKNOWN:
         locus.strand = strand
       elif locus.strand != strand:
-        raise ValueError('Incompatible strands (%s != %s)' % (locus.strand,strand))
+        msg = 'Locus record %s incompatible strands (%s != %s)' % (name,locus.strand,strand)
+        if warn:
+          sys.stderr.write('[WARNING] %s\n' % msg)
+        else:
+          raise ValueError(msg)
 
   def get_locus(self, name):
     '''
