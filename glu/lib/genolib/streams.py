@@ -428,8 +428,8 @@ class GenotripleStream(GenotypeStream):
     genos   = list(self.use_stream())
 
     # FIXME: These extraction operators should work in parallel to avoid thrashing
-    loci    = set(imap(itemgetter(0),genos))
-    samples = set(imap(itemgetter(1),genos))
+    samples = set(imap(itemgetter(0),genos))
+    loci    = set(imap(itemgetter(1),genos))
 
     return self.clone(genos, loci=loci, samples=samples, materialized=True)
 
