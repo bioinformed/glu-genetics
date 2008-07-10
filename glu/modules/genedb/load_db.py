@@ -47,7 +47,7 @@ def get_aliases(con,filename):
   sql = 'SELECT geneid,featureName FROM GENE;'
   cur = con.cursor()
   cur.execute(sql)
-  geneids = dict( (int(geneid),symbol) for geneid,symbol in cur.fetchall() )
+  geneids = dict( (tryint(geneid),symbol) for geneid,symbol in cur.fetchall() )
 
   aliasfile = load_table(filename,want_header=True)
   aliasfile.next()
@@ -74,6 +74,7 @@ def get_aliases(con,filename):
     yield symbol,geneid,symbol
     if symbol != symbol.upper():
       yield symbol.upper(),geneid,symbol.upper()
+    yield str(geneid),geneid,symbol
 
   aliasfile = load_table(filename,want_header=True)
   aliasfile.next()
@@ -398,6 +399,33 @@ def load_cytobands(con,bands):
   con.commit()
 
 
+def get_mirbase(mfile):
+  print 'LOADING MIRBASE'
+  for row in load_table(mfile):
+    if not row or row[0].startswith('#'):
+      continue
+
+    names       = [ tuple(n.strip().replace('"','').split('=')) for n in row[8].strip().split(';') ]
+    names       = dict(names[:-1])
+    geneid      = names['ACC']
+    featureName = names['ID']
+    chromosome  = row[0]
+    chrStart    = int(row[3])
+    chrEnd      = int(row[4])
+    orientation = row[6]
+    contig      = None
+    cnt_start   = None
+    cnt_stop    = None
+    cnt_orient  = None
+    featureType = row[2]
+    groupLabel  = 'reference'
+    transcript  = None
+    evidence    = None
+
+    yield geneid,featureName,chromosome,chrStart,chrEnd,orientation,contig,cnt_start,\
+          cnt_stop,cnt_orient,featureType,groupLabel,transcript,evidence
+
+
 def main():
   con = sqlite3.connect('snp128+.db')
 
@@ -406,7 +434,9 @@ def main():
   con.execute('PRAGMA cache_size=20000;')
 
   if 1:
-    genes = list(get_genes('data/seq_gene.md.b36.3.gz'))
+    genes = [ get_genes('data/seq_gene.md.b36.3.gz'),
+              get_mirbase('data/hsa.gff') ]
+    genes = list(chain(*genes))
     load_genes(con,genes)
 
   if 1:
@@ -414,7 +444,7 @@ def main():
     aliases = list(filter_aliases(aliases))
     load_aliases(con,aliases)
 
-  if 1:
+  if 0:
     bands = get_cytobands('data/cytoBand.txt.gz')
     load_cytobands(con,bands)
 
