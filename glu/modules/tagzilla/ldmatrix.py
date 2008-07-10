@@ -22,7 +22,7 @@ import sys
 from   operator          import itemgetter
 from   itertools         import islice, chain, izip
 
-from   glu.lib.fileutils import autofile, hyphen
+from   glu.lib.fileutils import load_table,table_writer
 from   glu.lib.xtab      import xtab
 
 
@@ -55,9 +55,9 @@ def main():
     parser.print_help()
     return
 
-  out = csv.writer(autofile(hyphen(options.outfile,sys.stdout),'w'),dialect='excel-tab')
+  out = table_writer(options.outfile,hyphen=sys.stdout)
 
-  datain = [ islice(csv.reader(autofile(hyphen(arg,sys.stdin)),dialect='excel-tab'),1,None) for arg in args ]
+  datain = [ islice(load_table(arg,hyphen=sys.stdin),1,None) for arg in args ]
   datain = chain(*datain)
 
   if options.measure.lower() == 'r2':
