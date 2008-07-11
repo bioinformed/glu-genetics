@@ -1,24 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          hagzilla.py
-
-Authors:       Kevin Jacobs (jacobs@bioinformed.com)
-
-Created:       Wed May 17 08:51:57 EDT 2006
-
-Abstract:      Front-end for running TagZilla for SNPPlex and Illumina assay design
-
-Compatibility: Python 2.5 and above
-
-Requires:
-
-Revision:      $Id$
-'''
 
 __program__   = 'HagZilla'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
+__abstract__  = 'Front-end for running TagZilla assay design'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import os
 import sys
@@ -45,17 +32,17 @@ POPS = {'CEU'    : 'hapmap',
        }
 
 #FIXME: Make configurable
-if 0:
+if 1:
   GENOMEDB      = '/usr/local/share/genedb/genome36.3.db'
   HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build23/rs_strand/non-redundant/genotypes_chr%s_%s_r23a_nr.b36.txt.gz'
   HAP_FORMAT    = 'hapmap'
-elif 0:
+elif 1:
   GENOMEDB      = '/usr/local/share/genedb/genome36.3.db'
   HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build22/rs_strand/non-redundant/genotypes_chr%s_%s_r22_nr.b36.txt.gz'
   HAP_FORMAT    = 'hapmap'
-elif 1:
+elif 0:
   GENOMEDB      = '/usr/local/share/genedb/genome35-1.db'
   HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build21a/rs_strand/non-redundant/genotypes_chr%s_%s_r21a_nr.txt.gz'

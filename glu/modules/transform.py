@@ -1,23 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          transform.py
 
-Authors:       Brian Staats  (staatsb@mail.nih.gov)
-               Xiang Deng      (dengx@mail.nih.gov)
-               Jun Lu          (lujun@mail.nih.gov)
-               Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2006-06-29
-
-Abstract:      Performs various transformation on a genotype files
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Performs various transformation on a genotype files'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          join.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2008-03-06
-
-Abstract:      Toy module to read and write GLU tables
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Convert and manipulate delimited files'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 

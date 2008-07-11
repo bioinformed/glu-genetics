@@ -1,19 +1,12 @@
 # -*- coding: utf-8 -*-
-'''
-File:          license.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2007-06-13
-
-Abstract:      GLU License
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'GLU copyright and license terms'
+__index__     = 'General modules'
+__order__     = 5
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__license__   = 'See this file or run: glu license'
+__revision__  = '$Id$'
 
 license = '''\
 GLU SOFTWARE LICENSE

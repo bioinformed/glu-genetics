@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          linear1.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:
-
-Abstract:      Fit linear genotype-phenotype association models
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Fit single-SNP linear genotype-phenotype association models'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 

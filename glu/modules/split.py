@@ -1,28 +1,12 @@
 # -*- coding: utf-8 -*-
-'''
-File:          split.py
-
-Authors:       Zhaoming Wang (wangzha@mail.nih.gov)
-               Kevin Jacobs (jacobske@mail.nih.gov)
-
-Created:       June 7, 2006
-
-Abstract:      This utility script can split an input matrix into multiple
-               output files by row and column groupings
-
-Compatibility: Python 2.5 and above
-
-Requires:      glu
-
-Version:       0.99
-
-Revision:      $Id$
-'''
 
 from __future__ import with_statement
 
+__gluindex__  = True
+__abstract__  = 'Split a genotype file into multiple pieces based on sample and locus groups'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import os
 import sys

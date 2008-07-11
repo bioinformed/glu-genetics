@@ -1,17 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          test.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:
-
-Abstract:      Run glu doctest suite
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
+__abstract__  = 'Run GLU lib doctest suite'
+__copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import pkg_resources
 pkg_resources.require('glu')

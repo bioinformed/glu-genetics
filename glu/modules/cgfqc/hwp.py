@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          hwp.py
 
-Authors:       Kevin Jacobs (jacobske@mail.nih.gov)
-
-Created:       2006-06-01
-
-Abstract:      Test genotype data for deviations from Hardy-Weinbery proportions
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = False
+__abstract__  = 'Test genotype data for deviations from Hardy-Weinbery proportions'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 

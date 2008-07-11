@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          pca.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2008-03-06
-
-Abstract:      Performs Principle Components Analysis on genotype data
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Principle Components Analysis (PCA) to find large-scale correlations among samples based on genotype data'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 

@@ -1,25 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          test.py
 
-Authors:       Zhaoming Wang
-               Kevin Jacobs (jacobs@bioinformed.com)
-
-Created:       December 30, 2005
-
-Abstract:      Test snpselct module
-
-Compatibility: Python 2.5 and above
-
-Requires:      No external dependencies, yet...
-
-Version:       0.99
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'Test tagzilla'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import unittest
 import random

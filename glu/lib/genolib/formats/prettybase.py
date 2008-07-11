@@ -1,22 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          prettybase.py
-
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2006-01-01
-
-Abstract:      GLU text genotype format input/output objects
-
-Requires:      Python 2.5
-
-Revision:      $Id$
-'''
 
 from __future__ import with_statement
 
+__abstract__  = 'PrettyBase genotype format input/output objects'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import re

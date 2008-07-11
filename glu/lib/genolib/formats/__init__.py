@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          __init__.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2006-01-01
-
-Abstract:      GLU genotype data input/output objects
-
-Requires:      Python 2.5
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'GLU genotype input/output formats'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 # FIXME: Format support should ultimately be pluggable with a registration protocol

@@ -1,23 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          find_snps.py
 
-Authors:       Zhaoming Wang(wangzha@mail.nih.gov)
-               Xiang    Deng(dengx@mail.nih.gov)
-
-Created:       Thr Aug  3 14:45:03 EDT 2006
-
-Abstract:      Find the snps for the region around a feature
-
-Compatibility: Python 2.5 and above
-
-Requires:      No external dependencies, yet...
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Find SNPs near a set of genomic features (SNPs, genes or regions)'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

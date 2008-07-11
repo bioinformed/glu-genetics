@@ -1,22 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          from_lbd.py
 
-Authors:       Brian Staats (staatsb@mail.nih.gov)
-               Kevin Jacobs (jacobske@mail.nih.gov)
-
-Created:       2006-06-15
-
-Abstract:      Parses an Illumina Locus by DNA report file and outputs a
-               genotype matrix or triple stream.
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Convert an Illumina Locus by DNA report file into a GLU genotype file'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 import csv

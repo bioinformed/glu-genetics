@@ -1,40 +1,24 @@
 # -*- coding: utf-8 -*-
-'''
-File:          tagzilla.py
-
-Authors:       Kevin Jacobs (jacobs@bioinformed.com)
-               Zhaoming Wang (wangzha@mail.nih.gov)
-
-Created:       November 8, 2005
-
-Abstract:      A robust and fast SNP binning and tagging program that takes
-               many forms of input data, can be tuned by over a dozen
-               meaningful parameters, and produces several useful human and
-               machine readable outputs.  The heart of the program takes
-               genotype data, haplotype frequencies, from which pairwise
-               r-squared or D' linkage disequilibrium statistics are
-               computed.  Those LD statistics are used to compute bins using
-               a greedy maximal algorithm (similar to that of Carlson et al,
-               2004), and reports detailed information on bins and tags.
-               Many useful extensions are also implemented, including
-               sex-linked analysis, efficient multi-population tagging,
-               incorporation of design scores and bin informativity
-               measures, and calculation of detailed bin and locus coverage
-               statistics by type of bin.  Please consult the accompanying
-               manual for more information.
-
-Compatibility: Python 2.5 and above
-
-Requires:      No external dependencies, yet...
-
-Revision:      $Id$
-'''
 
 __program__   = 'TagZilla'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)',
                  'Zhaoming Wang (wangzha@mail.nih.gov)']
+__abstract__  = '''\
+A robust and fast SNP binning and tagging program that takes many forms of
+input data, can be tuned by over a dozen meaningful parameters, and produces
+several useful human and machine readable outputs.  The heart of the program
+takes genotype data, haplotype frequencies, from which pairwise r-squared or
+D' linkage disequilibrium statistics are computed.  Those LD statistics are
+used to compute bins using a greedy maximal algorithm (similar to that of
+Carlson et al, 2004), and reports detailed information on bins and tags.
+Many useful extensions are also implemented, including sex-linked analysis,
+efficient multi-population tagging, incorporation of design scores and bin
+informativity measures, and calculation of detailed bin and locus coverage
+statistics by type of bin.  Please consult the accompanying manual for more
+information.'''
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 __accelerators__ = ['pqueue','tagzillac']
 

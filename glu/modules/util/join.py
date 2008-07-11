@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          join.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2008-03-06
-
-Abstract:      Utility to join two data tables on a equal row keys
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Utility to merge rows with matching values from two files'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

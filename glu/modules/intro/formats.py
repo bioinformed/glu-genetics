@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          formats.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2007-06-13
-
-Abstract:      Description of file formats
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Overview of GLU file formats'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 formats = '''\
 GLU uses several tab-delimited ASCII file formats for specifying genotypes
@@ -58,7 +48,7 @@ Example:
 
 S1	rs12345	AA
 S2	rs54321	GG
-S3	rs12345	AT	
+S3	rs12345	AT
 S1	rs54321	AG
 
 --------------------------------------------------------------------------------

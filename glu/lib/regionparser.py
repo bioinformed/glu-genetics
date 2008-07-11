@@ -1,24 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          regionparser.py
 
-Authors:       Zhaoming Wang (wangzha@mail.nih.gov)
-
-Created:       Oct 25, 2006
-
-Abstract:      This library module can be called to parse the region section file
-
-Compatibility: Python 2.5 and above
-
-Requires:      glu
-
-Version:       0.99
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'parser for region files'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 import csv

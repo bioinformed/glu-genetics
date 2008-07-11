@@ -1,24 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          find_regions.py
 
-Authors:       Zhaoming Wang(wangzha@mail.nih.gov)
-               Xiang    Deng(dengx@mail.nih.gov)
-
-Created:       Tue Aug  1 14:45:03 EDT 2006
-
-Abstract:      Resolve genomic metadata given feature names for SNPs, genes,
-               and bounded regions
-
-Compatibility: Python 2.5 and above
-
-Requires:      glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Resolve genomic metadata given feature names for SNPs, genes, and bounded regions'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

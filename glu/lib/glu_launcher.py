@@ -1,22 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          glu_lancher.py
-
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2007-06-10
-
-Abstract:      Application runner
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
 
 from __future__ import absolute_import
 
+__abstract__  = 'GLU application shell and launcher'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import gc

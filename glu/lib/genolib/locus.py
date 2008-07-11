@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          locus.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2007-10-15
-
-Abstract:      GLU locus model input and output
-
-Requires:      Python 2.5
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'locus model input and output'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

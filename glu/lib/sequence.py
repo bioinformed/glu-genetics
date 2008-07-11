@@ -1,23 +1,13 @@
 # -*- coding: utf-8 -*-
-'''
-File:          sequence.py
 
-Authors:       Kevin Jacobs (jacobske@mail.nih.gov)
-
-Created:       2007-02-06
-
-Abstract:      Implements sequence alphabet, manipulation, and mapping of
-               top/bottom sequence normalization and A/B SNP allele
-               canonical mappings based on Illumina and dbSNP standards
-               documented at ftp://ftp.ncbi.nih.gov/snp/database/Illumina_top_bot_strand.note.txt
-
-Requires:
-
-Revision:      $Id$
-'''
-
+__abstract__  = '''\
+Implements sequence alphabet, manipulation, and mapping of top/bottom
+sequence normalization and A/B SNP allele canonical mappings based on
+Illumina and dbSNP standards documented at
+ftp://ftp.ncbi.nih.gov/snp/database/Illumina_top_bot_strand.note.txt'''
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 from   itertools import izip

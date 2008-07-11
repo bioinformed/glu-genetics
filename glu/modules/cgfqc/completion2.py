@@ -1,18 +1,5 @@
 # -*- coding: utf-8 -*-
 '''
-File:          completion.py
-
-Authors:       Kevin Jacobs (jacobs@bioinformed.com)
-               Xiang Deng    (dengx@mail.nih.gov)
-
-Created:       2006-06-29
-
-Abstract:      Performs completion analysis on genotype data
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-
 Input genodata file format(command line argument)
 
   sdat
@@ -60,8 +47,11 @@ Optionsl input file to map the sample/locus to grouping variables
         l1	name1
 '''
 
+__gluindex__  = False
+__abstract__  = 'Compute assay and sample completion'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 import unittest

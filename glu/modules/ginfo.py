@@ -1,25 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          ginfo.py
 
-Authors:       Zhaoming Wang (wangzha@mail.nih.gov)
-               Kevin Jacobs (jacobske@mail.nih.gov)
-
-Created:       September 5, 2007
-
-Abstract:      Extract available metadata from a GLU genotype file
-
-Compatibility: Python 2.5 and above
-
-Requires:      glu
-
-Version:       0.99
-
-Revision:      $Id: $
-'''
-
+__gluindex__  = True
+__abstract__  = 'Print information about a GLU genotype file'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

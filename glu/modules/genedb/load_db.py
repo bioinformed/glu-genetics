@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          load_db.py
 
-Authors:
-
-Created:
-
-Abstract:
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'Build a genedb database'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import glob

@@ -1,20 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          overview.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2007-06-13
-
-Abstract:      Overview of GLU
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Brief overview of GLU functionality'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 overview = '''\
 Whole-genome association studies are generating unprecedented amounts of

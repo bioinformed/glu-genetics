@@ -1,22 +1,12 @@
 # -*- coding: utf-8 -*-
-'''
-File:          dupcheck2.py
 
-Authors:       Jun Lu          (lujun@mail.nih.gov)
-               Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2006-10-01
-
-Abstract:      Detect expected and unexpected duplicate samples by genotype
-               concordance
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = False
+__abstract__  = '''\
+Detect expected and unexpected duplicate samples based on expected sample
+equivalence and empirical genotype concordance rate'''
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

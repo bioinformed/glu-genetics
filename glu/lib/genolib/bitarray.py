@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          bitarray.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2007-04-10
-
-Abstract:      Functions to get and set bits in a byte array
-
-Requires:      Python 2.5
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'Functions to get and set bits in a byte array'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 __all__ = ['getbits','setbits']

@@ -1,22 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          queries.py
 
-Authors:       Kevin Jacobs (jacobske@mail.nih.gov)
-
-Created:       Thr Aug  3 14:45:03 EDT 2006
-
-Abstract:      Query genedb database
-
-Compatibility: Python 2.5 and above
-
-Requires:      No external dependencies, yet...
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'Query genedb database'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 def query_snps_by_location(con,chr,start,end):

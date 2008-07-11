@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          sections.py
 
-Authors:       Brian Staats (staatsb@mail.nih.gov)
-
-Created:       2006-07-13
-
-Abstract:      Set of tools and parsers to read, write, and manipulate analysis result files.
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'Read and write multi-part file streams.'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import  sys
 import  time

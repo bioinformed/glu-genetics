@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          association.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:
-
-Abstract:      Support library for association testing
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'library for association testing'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 

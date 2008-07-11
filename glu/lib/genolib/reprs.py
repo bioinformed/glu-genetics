@@ -1,20 +1,9 @@
 # -*- coding: utf-8 -*-
-'''
-File:          reprs.py
 
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:
-
-Abstract:      Genotype representation parsers for text file input/output
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
-
+__abstract__  = 'Genotype representation parsers for text file input/output'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 from   operator                   import getitem
 from   itertools                  import imap, repeat

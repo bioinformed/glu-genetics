@@ -1,25 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          concordance.py
 
-Authors:       Zhaoming Wang (wangzha@mail.nih.gov)
-
-Created:       June 14, 2006
-
-Abstract:      This utility script runs the concordance check betweeen the reference
-               genotypes and genotypes from a comparison set of files.
-
-Compatibility: Python 2.5 and above
-
-Requires:      glu, genomerge
-
-Version:       0.99
-
-Revision:      $Id$
-'''
-
+__gluindex__  = False
+__abstract__  = 'Check concordance betweeen a reference and comparison genotypes set'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import sys
 

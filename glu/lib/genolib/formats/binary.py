@@ -1,22 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          binary.py
-
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:
-
-Abstract:      Genotype storage formats based on a Bit-packed binary representation
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
 
 from __future__ import with_statement
 
+__abstract__  = 'Genotype storage formats based on a Bit-packed binary representation'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 __all__ = ['BinaryGenomatrixWriter', 'BinaryGenotripleWriter',
            'save_genotriples_binary','load_genotriples_binary',

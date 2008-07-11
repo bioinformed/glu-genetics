@@ -1,24 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          coverage.py
-
-Authors:       Kevin Jacobs (jacobs@bioinformed.com)
-
-Created:       November 8, 2005
-
-Abstract:      Evaluate maximum coverage of a set of tags
-
-Compatibility: Python 2.5 and above
-
-Requires:      No external dependencies, yet...
-
-Revision:      $Id$
-'''
 
 __program__   = 'TagZilla coverage'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
+__abstract__  = 'Evaluate maximum coverage of a set of tags'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 __accelerators__ = ['tagzillac']
 

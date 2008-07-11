@@ -1,22 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          eigensoft.py
-
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2008-03-31
-
-Abstract:      GLU EIGENSOFT (smartpca) genotype format input/output
-
-Requires:      Python 2.5
-
-Revision:      $Id$
-'''
 
 from __future__ import with_statement
 
+__abstract__  = 'EIGENSOFT (smartpca) genotype format input/output'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 from   itertools                 import izip

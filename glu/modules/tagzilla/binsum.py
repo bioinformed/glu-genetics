@@ -1,24 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          binsum.py
-
-Authors:       Kevin Jacobs (jacobs@bioinformed.com)
-
-Created:       November 8, 2005
-
-Abstract:      Script to generate bin summaries from TagZilla output files.
-
-Compatibility: Python 2.5 and above
-
-Requires:      Matching version of tagzilla.py
-
-Revision:      $Id$
-'''
 
 __program__   = 'TagZilla binsum'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
+__abstract__  = 'Generate bin summaries from TagZilla output files'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import heapq

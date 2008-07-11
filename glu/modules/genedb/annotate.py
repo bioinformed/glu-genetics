@@ -1,23 +1,10 @@
 # -*- coding: utf-8 -*-
-'''
-File:          annotate.py
 
-Authors:       Zhaoming Wang(wangzha@mail.nih.gov)
-               Xiang    Deng(dengx@mail.nih.gov)
-
-Created:       Tue Aug  1 14:45:03 EDT 2006
-
-Abstract:      Generate the input file for find_snps script from SQLite database
-
-Compatibility: Python 2.5 and above
-
-Requires:      glu
-
-Revision:      $Id$
-'''
-
+__gluindex__  = True
+__abstract__  = 'Add columns of genomic annotation to a file containing a list of SNP names'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

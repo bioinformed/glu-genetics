@@ -1,24 +1,12 @@
 # -*- coding: utf-8 -*-
-'''
-File:          dupcheck.py
-
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:
-
-Abstract:      Detect expected and unexpected duplicate samples based on
-               expected sample equivalence and empirical genotype
-               concordance rate
-
-Requires:      Python 2.5, glu
-
-Revision:      $Id$
-'''
 
 from   __future__ import division
 
+__gluindex__  = True
+__abstract__  = 'Detect duplicate samples based on an all pairs-comparison of genotype concordance rates'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys

@@ -1,22 +1,11 @@
 # -*- coding: utf-8 -*-
-'''
-File:          streams.py
-
-Authors:       Kevin Jacobs (jacobske@bioinformed.com)
-
-Created:       2006-01-01
-
-Abstract:      GLU genotype data management objects
-
-Requires:      Python 2.5
-
-Revision:      $Id$
-'''
 
 from __future__ import with_statement
 
+__abstract__  = 'GLU genotype data management objects'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 
 import sys
