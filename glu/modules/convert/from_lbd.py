@@ -22,11 +22,11 @@ from   glu.lib.sequence          import norm_snp_seq,complement_base
 from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
 from   glu.lib.genolib.phenos    import Phenome, load_phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.io        import save_genostream, geno_options
+from   glu.lib.genolib.io        import save_genostream, geno_options, GenoTransform
 from   glu.lib.genolib.genoarray import model_from_alleles
 
 
-def load_lbd_file(filename):
+def load_lbd_file(filename,options):
   def parse_gentrain():
     row = data.next()
     assert row[1] == 'Gentrain Scores'
@@ -71,6 +71,12 @@ def load_lbd_file(filename):
   loci    = parse_loci()
   skiprows(5)
   samples = sample_generator()
+
+  if options.samples.include is not None:
+    samples = (s for s in samples if s[0]     in options.samples.include)
+
+  if options.samples.exclude is not None:
+    samples = (s for s in samples if s[0] not in options.samples.exclude)
 
   assert len(gentrain) == len(loci)
 
@@ -352,7 +358,7 @@ def option_parser():
   usage = 'usage: %prog [options] lbdfile...'
   parser = optparse.OptionParser(usage=usage)
 
-  geno_options(parser,output=True)
+  geno_options(parser,filter=True,output=True)
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output genotype file name')
@@ -410,12 +416,14 @@ def main():
   if options.abmap:
     abmap.update(load_abmap(options.abmap))
 
+  filter = GenoTransform.from_options(options)
+
   args = iter(args)
-  loci,gentrain,samples = load_lbd_file(args.next())
+  loci,gentrain,samples = load_lbd_file(args.next(),filter)
 
   loci = list(loci)
   for arg in args:
-    more_loci,more_gentrain,more_samples = load_lbd_file(arg)
+    more_loci,more_gentrain,more_samples = load_lbd_file(arg,filter)
 
     if list(more_loci) != loci:
       raise RuntimeError('Genotype headers do not match')
@@ -432,6 +440,10 @@ def main():
   genomap,models = build_models(loci,abmap,genome)
   samples = encode_genotypes(loci, samples, genomap)
   genos = GenomatrixStream(samples, 'sdat', loci=loci, models=models, genome=genome, phenome=phenome)
+
+  # Late removal of excluded loci and insurance on removal of samples.
+  # renaming is supported, but not really a good idea in most cases
+  genos = genos.transformed(transform=filter)
 
   save_genostream(options.output,genos,format=options.outformat,genorepr=options.outgenorepr,hyphen=sys.stdout)
 
