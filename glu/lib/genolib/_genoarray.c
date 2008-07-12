@@ -1448,7 +1448,8 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 	unsigned int *offsets;
 	int ret = -1;
 
-	if(!value) {
+	if(!value)
+	{
 		/* delete slice */
 		PyErr_SetString(PyExc_TypeError, "genoarray objects do not support item deletion");
 		return -1;
@@ -1488,7 +1489,8 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 
 		m = PySequence_Fast_GET_SIZE(seq);
 
-		if(m != slicelength) {
+		if(m != slicelength)
+		{
 			PyErr_Format(PyExc_ValueError, "attempt to assign sequence of size %zd to slice of size %zd",
 			             m, slicelength);
 			goto error;
@@ -1547,7 +1549,8 @@ error:
 static int
 genoarray_ass_subscript(GenotypeArrayObject *self, PyObject *item, PyObject *value)
 {
-	if(PyIndex_Check(item)) {
+	if(PyIndex_Check(item))
+	{
 		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
 		if(i == -1 && PyErr_Occurred())
 			return -1;
@@ -1556,7 +1559,8 @@ genoarray_ass_subscript(GenotypeArrayObject *self, PyObject *item, PyObject *val
 	}
 	else if(PySlice_Check(item))
 		return genoarray_ass_slice(self, (PySliceObject *)item, value);
-	else {
+	else
+	{
 		PyErr_SetString(PyExc_TypeError, "indices must be integers");
 		return -1;
 	}
@@ -1619,7 +1623,8 @@ genoarray_data_set(GenotypeArrayObject *self, PyObject *new_data, void *closure)
 static Py_ssize_t
 genoarray_getreadbuf(GenotypeArrayObject *self, Py_ssize_t index, const void **ptr)
 {
-	if( index != 0 ) {
+	if( index != 0 )
+	{
 		PyErr_SetString(PyExc_SystemError,
 				"accessing non-existent genoarray segment");
 		return -1;
@@ -2797,7 +2802,8 @@ genoarray_concordance(PyObject *self, PyObject *args)
 	len1 = PySequence_Fast_GET_SIZE(genos1);
 	len2 = PySequence_Fast_GET_SIZE(genos2);
 
-	if(len1 != len2) {
+	if(len1 != len2)
+	{
 		PyErr_Format(GenotypeRepresentationError,"genotype array sizes do not match: %zd != %zd",
 		             len1, len2);
 		goto error;
@@ -3830,6 +3836,8 @@ static PyMethodDef genoarraymodule_methods[] = {
 	 "Place items from a sequence at indices into a destination sequence concatenating into lists if items are not None"},
 	{"merge_unanimous",	merge_unanimous_func,	METH_VARARGS,
 	 "Merge a list of genotypes requiring non-missing genotypes to be unanimous or they are setting to missing"},
+	{"count_haplotypes",	count_haplotypes,	METH_VARARGS, "Count haplotypes at two loci"},
+	{"estimate_ld",	estimate_ld,	METH_VARARGS, "Compute LD statistics from haplotype counts"},
 	{NULL}  /* Sentinel */
 };
 

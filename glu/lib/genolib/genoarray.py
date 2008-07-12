@@ -34,7 +34,7 @@ except ImportError:
   import sys
   from   math      import log, ceil
 
-  from   bitarray  import getbits,setbits
+  from   glu.lib.genolib.bitarray  import getbits,setbits
 
   print >> sys.stderr, '[WARNING] Using slow Python genoarray'
 
@@ -1230,27 +1230,32 @@ def minor_allele_from_genocounts(model,counts):
   return minor_allele_from_allelecounts(model, counts)
 
 
-def minor_allele_from_genos(model,genos):
+def minor_allele_from_genos(genos):
   '''
   >>> model = model_from_alleles('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
-  >>> minor_allele_from_genos(model,mkgenos(0,1,2,1))
+  >>> minor_allele_from_genos(mkgenos(0,1,2,1))
   ('A', 0.5)
-  >>> minor_allele_from_genos(model,mkgenos(0,1000,2000,1000))
+  >>> minor_allele_from_genos(mkgenos(0,1000,2000,1000))
   ('A', 0.5)
-  >>> minor_allele_from_genos(model,mkgenos(10000,1000,2000,1000))
+  >>> minor_allele_from_genos(mkgenos(10000,1000,2000,1000))
   ('A', 0.5)
-  >>> minor_allele_from_genos(model,mkgenos(10000,0,2000,2000))
+  >>> minor_allele_from_genos(mkgenos(10000,0,2000,2000))
   ('A', 0.25)
-  >>> minor_allele_from_genos(model,mkgenos(10000,2000,2000,0))
+  >>> minor_allele_from_genos(mkgenos(10000,2000,2000,0))
   ('B', 0.25)
-  >>> minor_allele_from_genos(model,mkgenos(0,1000,0,0))
+  >>> minor_allele_from_genos(mkgenos(0,1000,0,0))
   ('B', 0.0)
-  >>> minor_allele_from_genos(model,mkgenos(1000,0,0,0))
+  >>> minor_allele_from_genos(mkgenos(1000,0,0,0))
   (None, 0.0)
   '''
+  if not genos:
+    return (None, 0.0)
+
+  model = genos[0].model
+
   counts = count_alleles_from_genocounts(model,count_genotypes(genos))
   return minor_allele_from_allelecounts(model, counts)
 
@@ -1318,27 +1323,32 @@ def major_allele_from_genocounts(model,counts):
   return major_allele_from_allelecounts(model, counts)
 
 
-def major_allele_from_genos(model,genos):
+def major_allele_from_genos(genos):
   '''
   >>> model = model_from_alleles('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
-  >>> major_allele_from_genos(model,mkgenos(0,1,2,1))
+  >>> major_allele_from_genos(mkgenos(0,1,2,1))
   ('B', 0.5)
-  >>> major_allele_from_genos(model,mkgenos(0,1000,2000,1000))
+  >>> major_allele_from_genos(mkgenos(0,1000,2000,1000))
   ('B', 0.5)
-  >>> major_allele_from_genos(model,mkgenos(10000,1000,2000,1000))
+  >>> major_allele_from_genos(mkgenos(10000,1000,2000,1000))
   ('B', 0.5)
-  >>> major_allele_from_genos(model,mkgenos(10000,0,2000,2000))
+  >>> major_allele_from_genos(mkgenos(10000,0,2000,2000))
   ('B', 0.75)
-  >>> major_allele_from_genos(model,mkgenos(10000,2000,2000,0))
+  >>> major_allele_from_genos(mkgenos(10000,2000,2000,0))
   ('A', 0.75)
-  >>> major_allele_from_genos(model,mkgenos(0,1000,0,0))
+  >>> major_allele_from_genos(mkgenos(0,1000,0,0))
   ('A', 1.0)
-  >>> major_allele_from_genos(model,mkgenos(1000,0,0,0))
+  >>> major_allele_from_genos(mkgenos(1000,0,0,0))
   (None, 0.0)
   '''
+  if not genos:
+    return (None, 0.0)
+
+  model = genos[0].model
+
   counts = count_alleles_from_genocounts(model,count_genotypes(genos))
   return major_allele_from_allelecounts(model, counts)
 
