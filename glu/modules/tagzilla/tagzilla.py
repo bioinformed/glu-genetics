@@ -20,590 +20,74 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-__accelerators__ = ['pqueue','tagzillac']
 
-import os
 import re
-import csv
 import sys
 import copy
 import time
 import optparse
-import collections
 
-from   collections import defaultdict
-from   itertools   import islice, chain, repeat, groupby, izip, dropwhile
-from   operator    import attrgetter, itemgetter
-from   math        import log, ceil, sqrt, fabs, exp, pi
+from   math                      import log, ceil
+from   operator                  import itemgetter
+from   collections               import defaultdict
+from   itertools                 import chain, repeat, groupby, izip, dropwhile
+
+from   glu.lib.hwp               import hwp_biallelic
+from   glu.lib.stats             import mean, median
+from   glu.lib.utils             import pair_generator, percent
+from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table, table_writer
+from   glu.lib.glu_launcher      import GLUError
+from   glu.lib.genolib           import load_genostream, geno_options
+from   glu.lib.genolib.ld        import estimate_ld, count_haplotypes, bound_ld
+from   glu.lib.genolib.genoarray import minor_allele_from_genos
+
 
 epsilon = 10e-10
 
-GENO_HEADER = 'rs#\tchr\tpos\t'
-HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',
-                  'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
-LOCUS_HEADER1 = ['LNAME','LOCATION','MAF','BINNUM','DISPOSITION']
-LOCUS_HEADER2 = ['LNAME','LOCATION','POPULATION','MAF','BINNUM','DISPOSITION']
-PAIR_HEADER   = ['BIN','LNAME1','LNAME2','POPULATION','RSQUARED','DPRIME','DISPOSITION']
-#MULTI_METHODS = ['random', 'merge1', 'merge2', 'merge2+', 'merge3', 'merge3+', 'minld', 'minld+', 'global']
+LOCUS_HEADER1   = ['LNAME','LOCATION','MAF','BINNUM','DISPOSITION']
+LOCUS_HEADER2   = ['LNAME','LOCATION','POPULATION','MAF','BINNUM','DISPOSITION']
+PAIR_HEADER     = ['BIN','LNAME1','LNAME2','POPULATION','RSQUARED','DPRIME','DISPOSITION']
 MULTI_METHODS_S = ['merge2', 'merge3', 'minld']
 MULTI_METHODS_M = ['global']
 MULTI_METHODS = MULTI_METHODS_S + MULTI_METHODS_M
 re_spaces = re.compile('[\t ,]+')
 
 
-class TagZillaError(RuntimeError): pass
-
-
-def tally(seq):
-  '''
-  tally(sequence) -> { item:count,... }
-
-  Returns a dictionary of values mapped to the number of times each
-  item appears in the input sequence.
-  '''
-  d = collections.defaultdict(int)
-  for item in seq:
-    d[item] += 1
-  return dict(d)
-
-
-def slow_count_haplotypes(genos1, genos2):
-  '''
-    Count the various haplotype combinations and return a vector containing:
-       c11 - haplotype counts for allele 1 by allele 1
-       c12 - haplotype counts for allele 1 by allele 2
-       c21 - haplotype counts for allele 2 by allele 1
-       c22 - haplotype counts for allele 2 by allele 2
-       dh  - double heterozygote haplotypes (uninformative)
-  '''
-  if len(genos1) != len(genos2):
-    raise ValueError('genos1 and genos2 must be of same length')
-  diplo_counts = count_diplotypes(genos1, genos2)
-
-  het1,het2 = find_heterozygotes(diplo_counts)
-  indices = list(enumerate([(0,0),(0,1),(1,0),(1,1)]))
-  x = [0,0,0,0,0]
-
-  for g1,g2,n in diplo_counts:
-    if (g1,g2) == (het1,het2):
-      x[4] = n
-      continue
-
-    if ' ' in g1 and g1[1] != het1[1]:
-      g1 = g1[::-1]
-
-    if ' ' in g2 and g2[1] != het2[1]:
-      g2 = g2[::-1]
-
-    # Homozygotes count twice, since they appear in only one class --
-    # conversely, all other configurations appear in two.
-    if ' ' not in g1+g2 and g1 != het1 and g2 != het2:
-      n *= 2
-
-    # Sum the counts of each category of allele configurations
-    for i,(a,b) in indices:
-      if (g1[a],g2[b]) == (het1[a],het2[b]):
-        x[i] += n
-
-  return tuple(x)
-
-
-def count_diplotypes(genos1, genos2):
-  '''Return a list of diplotype frequencies and a sets of alleles from each locus'''
-  diplo_counts = {}
-  for g1,g2 in izip(genos1,genos2):
-    if '  ' in (g1,g2):
-      continue
-    g1 = min(g1)+max(g1)
-    g2 = min(g2)+max(g2)
-    diplo_counts[g1,g2] = diplo_counts.get( (g1,g2), 0) + 1
-  return tuple( (g1,g2,n) for (g1,g2),n in diplo_counts.iteritems() )
-
-
-def find_heterozygotes(diplo_counts):
-  '''Return exemplar heterozygoes for each locus'''
-  a1 = set()
-  a2 = set()
-  for g1,g2,n in diplo_counts:
-    a1.update(g1)
-    a2.update(g2)
-
-  return find_hetz(a1),find_hetz(a2)
-
-
-def find_hetz(alleles):
-  '''Return the heterozygote genotype for the given alleles'''
-  het = ''.join(sorted(alleles)).replace(' ','')
-  if len(het) > 2:
-    raise ValueError('Only biallelic loci are allowed')
-  while len(het) < 2:
-    het += '\0'
-  return het
-
-
-try:
-  # Load the optimized C version of count_haplotypes, if available
-  from tagzillac import count_haplotypes
-
-except ImportError:
-  # If not, fall back on the pure-Python version
-  count_haplotypes = slow_count_haplotypes
-
-
-def slow_estimate_ld(c11,c12,c21,c22,dh):
-  '''
-     Compute r-squared (pair-wise) measure of linkage disequlibrium for genotypes at two loci
-
-         c11 - haplotype counts for allele 1 by allele 1
-         c12 - haplotype counts for allele 1 by allele 2
-         c21 - haplotype counts for allele 2 by allele 1
-         c22 - haplotype counts for allele 2 by allele 2
-         dh  - double heterozygote haplotypes (uninformative)
-  '''
-
-  # Bail out on monomorphic markers
-  information = (c11+c12, c21+c22, c11+c21, c12+c22)
-  if not dh and 0 in information:
-    return 0.,0.
-
-  TOLERANCE = 10e-9
-
-  # Initial estimate
-  n = c11 + c12 + c21 + c22 + 2*dh
-  p = float(c11 + c12 + dh)/n
-  q = float(c11 + c21 + dh)/n
-
-  p11 = p*q
-  p12 = p*(1-q)
-  p21 = (1-p)*q
-  p22 = (1-p)*(1-q)
-
-  loglike = -999999999
-
-  for i in xrange(100):
-    oldloglike=loglike
-
-    # Force estimates away from boundaries
-    p11=max(epsilon, p11)
-    p12=max(epsilon, p12)
-    p21=max(epsilon, p21)
-    p22=max(epsilon, p22)
-
-    a = p11*p22 + p12*p21
-
-    loglike = (c11*log(p11) + c12*log(p12) + c21*log(p21) + c22*log(p22)
-            +  dh*log(a))
-
-    if abs(loglike-oldloglike) < TOLERANCE:
-      break
-
-    nx1 = dh*p11*p22/a
-    nx2 = dh*p12*p21/a
-
-    p11 = (c11+nx1)/n
-    p12 = (c12+nx2)/n
-    p21 = (c21+nx2)/n
-    p22 = (c22+nx1)/n
-
-  d = p11*p22 - p12*p21
-
-  if d > 0:
-    dmax = min( p*(1-q), (1-p)*q )
-  else:
-    dmax = -min( p*q, (1-p)*(1-q) )
-
-  dprime = d/dmax
-  r2 = d*d/(p*(1-p)*q*(1-q))
-
-  return r2,dprime
-
-
-def slow_bound_ld(c11,c12,c21,c22,dh):
-  # Hack to estimate d, maxd, and r2max
-  n = c11 + c12 + c21 + c22 + 2*dh
-  p = float(c11 + c12 + dh)/n
-  q = float(c11 + c21 + dh)/n
-
-  if p and p > 0.5:
-    p = 1-p
-    c11,c12,c21,c22 = c21,c22,c11,c12
-  if q and q > 0.5:
-    q = 1-q
-    c11,c12,c21,c22 = c12,c11,c22,c21
-  if p > q:
-    p,q=q,p
-    c11,c12,c21,c22 = c22,c21,c12,c11
-
-  # Obtain rough estimate d ignoring double-heterozygotes
-  n -= 2*dh
-  d = float(c11*c22 - c12*c21)/n/n
-
-  # Distinguish coupling from repulsion:
-  #   Magic constant -0.005 can be refined by interval arithmetic, exploiting
-  #   the minimum MAF and uncertainty in the estimates of p and q
-  if d > -0.005:
-    dmax =  min( p*(1-q), (1-p)*q )
-  else:
-    dmax = -min( p*q, (1-p)*(1-q) )
-
-  if p > 0:
-    r2max = dmax*dmax / (p*(1-p)*q*(1-q))
-  else:
-    r2max = 1.0
-
-  return r2max
-
-
-try:
-  # Load the optimized C version of estimate_ld, if available
-  from tagzillac import estimate_ld
-
-except ImportError:
-  # If not, fall back on the pure-Python version
-  estimate_ld = slow_estimate_ld
-
-
-def slow_estimate_maf(genos):
-  '''
-     Estimate Minor Allele Frequency (MAF) for the specified genos
-
-     Missing alleles are coded as ' '
-  '''
-  f = tally(allele for geno in genos for allele in geno if allele != ' ')
-  n = sum(f.itervalues())
-
-  maf = 0
-  if len(f) > 2:
-    raise ValueError('invalid genotypes: locus may have no more than 2 alleles')
-  elif len(f) == 2:
-    maf = float(min(f.itervalues()))/n
-
-  return maf
-
-
-try:
-  # Load the optimized C version of estimate_maf, if available
-  from tagzillac import estimate_maf
-
-except ImportError:
-  # If not, fall back on the pure-Python version
-  estimate_maf = slow_estimate_maf
-
-
-def OSGzipFile(filename, mode):
-  if "'" in filename or '"' in filename or '\\' in filename:
-    raise ValueError('Invalid characters in filename')
-
-  if 'w' in mode:
-    f = os.popen('/bin/gzip -c > "%s"' % filename, 'w', 10240)
-  else:
-    f = os.popen('/bin/gunzip -c "%s"' % filename, 'r', 10240)
-
-  return f
-
-
-def autofile(filename, mode='r', hyphen=None):
-  if filename == '-' and hyphen is not None:
-    return hyphen
-
-  if filename.endswith('.gz'):
-    try:
-      f = OSGzipFile(filename, mode)
-    except (ImportError,OSError):
-      import gzip
-      f = gzip.GzipFile(filename, mode)
-
-  else:
-    f = file(filename, mode)
-
-  return f
-
-
-sqrt_pi = sqrt(pi)
-log_sqrt_pi = log(sqrt_pi)
-
-
-def prob_chisq(xx,df):
-  '''
-  prob_chisq(x,df) => P(X<=x) for a chi-squared distribution
-
-  Returns the (1-tailed) probability value associated with the provided
-  chi-square value and df.  Adapted from chisq.c in Gary Perlman's |Stat.
-  '''
-  BIG = 20.0
-  def ex(x):
-    if x < -BIG:
-      return 0.0
-    else:
-      return exp(x)
-
-  if xx <=0 or df < 1:
-    return 1.0
-
-  a = 0.5 * xx
-
-  even = not df%2
-
-  if df > 1:
-    y = ex(-a)
-
-  if even:
-    s = y
-  else:
-    s = 2.0 * prob_z(-sqrt(xx))
-
-  if df > 2:
-    xx = 0.5 * (df - 1.0)
-
-    if even:
-      z = 1.0
-    else:
-      z = 0.5
-
-    if a > BIG:
-      if even:
-        e = 0.0
-      else:
-        e = log_sqrt_pi
-
-      c = log(a)
-
-      while z <= xx:
-        e = log(z) + e
-        s = s + ex(c*z-a-e)
-        z = z + 1.0
-
-    else:
-      if even:
-        e = 1.0
-      else:
-        e = 1.0 / sqrt_pi / sqrt(a)
-      c = 0.0
-      while z <= xx:
-        e = e * a/float(z)
-        c = c + e
-        z = z + 1.0
-      s = c*y+s
-
-  return 1.0-s
-
-
-def prob_z(z):
-  '''
-  prob_prob_z(z) => P(Z<=z) for a standard Normal distribution
-
-  Returns the area under the normal curve from -infinity to the given z value.
-    for z<0, prob_z(z) = 1-tail probability
-    for z>0, 1.0-prob_z(z) = 1-tail probability
-    for any z, 2.0*(1.0-prob_z(abs(z))) = 2-tail probability
-
-  Adapted from z.c in Gary Perlman's |Stat.
-  '''
-  Z_MAX = 6.0  # maximum meaningful z-value
-  x = 0.0
-  if z != 0.0:
-    y = 0.5 * fabs(z)
-    if y >= (Z_MAX*0.5):
-      x = 1.0
-    elif (y < 1.0):
-      w = y*y
-      x = ((((((((0.000124818987  * w
-                 -0.001075204047) * w + 0.005198775019) * w
-                 -0.019198292004) * w + 0.059054035642) * w
-                 -0.151968751364) * w + 0.319152932694) * w
-                 -0.531923007300) * w + 0.797884560593) * y * 2.0
-    else:
-      y -= 2.0
-      x = (((((((((((((-0.000045255659  * y
-                       +0.000152529290) * y - 0.000019538132) * y
-                       -0.000676904986) * y + 0.001390604284) * y
-                       -0.000794620820) * y - 0.002034254874) * y
-                       +0.006549791214) * y - 0.010557625006) * y
-                       +0.011630447319) * y - 0.009279453341) * y
-                       +0.005353579108) * y - 0.002141268741) * y
-                       +0.000535310849) * y + 0.999936657524
-  if z > 0.0:
-    prob = (x+1.0)*0.5
-  else:
-    prob = (1.0-x)*0.5
-
-  return prob
-
-
-def count_genos(genos):
-  '''
-  Estimate allele and genotype frequencies
-  Missing alleles are coded as ' '
-  '''
-  f = tally(g for g in genos if ' ' not in g)
-
-  hom1 = hom2 = het = 0
-
-  for g,n in f.iteritems():
-    if g[0] != g[1]:
-      het = n
-    elif hom1:
-      hom2 = n
-    else:
-      hom1 = n
-
-  return hom1,het,hom2
-
-
-def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
-  '''
-  hwp_exact_biallelic(count, het_count, hom2_count):
-
-  Exact SNP test for deviations from Hardy-Weinberg proportions.  Based on
-  'A Note on Exact Tests of Hardy-Weinberg Equilibrium', Wigginton JE,
-  Cutler DJ and Abecasis GR; Am J Hum Genet (2005) 76: 887-93
-
-  Input: Count of observed homogygote 1, count of observed heterozygotes,
-         count of observed homogyhote 2.
-  Output: Exact p-value for deviation (2-sided) from Hardy-Weinberg
-          Proportions (HWP)
-
-  Complexity: time and space O(min(hom1_count,hom2_count)+het_count)
-  '''
-
-  # Computer the number of rare and common alleles
-  rare   = 2*min(hom1_count,hom2_count)+het_count
-  common = 2*max(hom1_count,hom2_count)+het_count
-
-  # Compute the expected number of heterogygotes under HWP
-  hets = rare*common/(rare+common)
-
-  # Account for rounding error on the number of hets, if the
-  # parity of rare and hets do not match
-  if rare%2 != hets%2:
-    hets += 1
-
-  # Initialize the expected number of rare and common homogygotes under HWP
-  hom_r = (rare-hets)/2
-  hom_c = (common-hets)/2
-
-  # Initialize heterozygote probability vector, such that once filled in
-  # P(hets|observed counts) = probs[hets/2]/sum(probs)
-  probs = [0]*(rare/2+1)
-
-  # Set P(expected hets)=1, since the remaining probabilities will be
-  # computed relative to it
-  probs[hets/2] = 1.0
-
-  # Fill in relative probabilities for less than the expected hets
-  for i,h in enumerate(xrange(hets,1,-2)):
-    probs[h/2-1] = probs[h/2]*h*(h-1) / (4*(hom_r+i+1)*(hom_c+i+1))
-
-  # Fill in relative probabilities fore greater than the expected hets
-  for i,h in enumerate(xrange(hets,rare-1,2)):
-    probs[h/2+1] = probs[h/2]*4*(hom_r-i)*(hom_c-i) / ((h+1)*(h+2))
-
-  # Compute the pvalue by summing the probabilities <= to that of the
-  # observed number of heterogygotes and normalize by the total
-  p_obs = probs[het_count/2]
-  pvalue = sum(p for p in probs if p <= p_obs)/sum(probs)
-
-  return pvalue
-
-
-def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
-  '''Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes'''
-
-  n = hom1_count + het_count + hom2_count
-
-  if not n:
-    return 1.0
-
-  p = float(2*hom1_count+het_count)/(2*n)
-  q = float(2*hom2_count+het_count)/(2*n)
-
-  def score(o,e):
-    if e<=0:
-      return 0.
-    return (o-e)**2/e
-
-  xx = (score(hom1_count,   n*p*p)
-     +  score( het_count, 2*n*p*q)
-     +  score(hom2_count,   n*q*q))
-
-  return 1-prob_chisq(xx,1)
-
-
-def hwp_biallelic(genos):
-  hom1_count,het_count,hom2_count = count_genos(genos)
-
-  # Only use the exact test when there are less than 1000 rare alleles
-  # otherwise, use the asymptotic test
-  if 2*min(hom1_count,hom2_count)+het_count < 1000:
-    p = hwp_exact_biallelic(hom1_count, het_count, hom2_count)
-  else:
-    p = hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
-
-  return p
-
-
-def median(seq):
-  '''
-  Find the median value of the input sequence
-  @param seq: a sequence of numbers
-  @type seq: sequence such as list, and it must be able to invoke sort()
-  @rtype: number
-  @return: the median number for the sequence
-  '''
-  if not isinstance(seq, list):
-    seq = list(seq)
-  seq.sort()
-  n = len(seq)
-  if not n:
-    raise ValueError('Input sequence cannot be empty')
-  if n % 2 == 1:
-    return seq[n//2]
-  else:
-    return (seq[n//2-1]+seq[n//2])/2.0
-
-
-def average(seq):
-  '''
-  Find the average value for the input sequence
-  @param seq: a sequence of numbers
-  @type seq: sequence such as list
-  @rtype: float
-  @return: the average for the sequence and return 0 if the sequence is empty
-  '''
-  if not len(seq):
-    raise ValueError('Input sequence cannot be empty ')
-  return float(sum(seq))/len(seq)
+class TagZillaError(GLUError): pass
 
 
 class Locus(object):
   __slots__ = ('name','location','maf','genos')
   def __init__(self, name, location, genos):
+    a,maf = minor_allele_from_genos(genos)
+
     self.name     = name
     self.location = location
-    self.maf      = estimate_maf(genos)
+    self.maf      = maf
     self.genos    = genos
 
 
 def scan_ldpairs(loci, maxd, rthreshold, dthreshold):
   '''
-     A generator for pairs of loci within a specified genomic distance.
-     Loci are assumed to be sorted by genomic location.
+  A generator for pairs of loci within a specified genomic distance.
+  Loci are assumed to be sorted by genomic location.
   '''
   # Scan each locus
   n = len(loci)
   for i in xrange(n):
-    locus1 = loci[i]
+    locus1    = loci[i]
+    genos1    = locus1.genos
     location1 = locus1.location
 
     # And up to maxd distance beyond it
     for j in xrange(i+1,n):
-      locus2 = loci[j]
+      locus2    = loci[j]
       location2 = locus2.location
 
       if location2 - location1 > maxd:
         break
 
-      counts = count_haplotypes(locus1.genos, locus2.genos)
+      counts = count_haplotypes(genos1, locus2.genos)
       r2,dprime = estimate_ld(*counts)
 
       if r2 >= rthreshold and abs(dprime) >= dthreshold:
@@ -671,8 +155,8 @@ def merge_loci(loci):
 
 def scan_ldpairs_multi(loci, maxd, multi_options):
   '''
-     A generator for pairs of loci within a specified genomic distance.
-     Loci are assumed to be sorted by genomic location.
+  A generator for pairs of loci within a specified genomic distance.
+  Loci are assumed to be sorted by genomic location.
   '''
 
   loci = list(merge_multi_loci(loci))
@@ -722,12 +206,12 @@ def scan_ldpairs_multi(loci, maxd, multi_options):
 
 def filter_loci_by_maf(loci, minmaf, minobmaf, include):
   '''
-     Generator that filters loci by a minimum MAF
+  Generator that filters loci by a minimum MAF
 
-     Loci come in two flavors, each with a distinct minimum MAF.
-     If the locus.name is not in the provided include set, then
-     the minmaf parameter is used as a threshold.  Otherwise, the
-     minobmaf (minimum obligate MAF) threshold is applied.
+  Loci come in two flavors, each with a distinct minimum MAF.
+  If the locus.name is not in the provided include set, then
+  the minmaf parameter is used as a threshold.  Otherwise, the
+  minobmaf (minimum obligate MAF) threshold is applied.
   '''
 
   mafs = (minmaf,minobmaf)
@@ -789,7 +273,7 @@ def filter_loci_by_range(loci, rangestring):
 
 
 def completion(locus):
-  return len(locus) - locus.count('  '),len(locus)
+  return sum(1 for g in locus if g),len(locus)
 
 
 def filter_loci_by_completion(loci, mincompletion, mincompletionrate):
@@ -804,17 +288,6 @@ def filter_loci_by_completion(loci, mincompletion, mincompletionrate):
 
     if m >= mincompletion and rate >= mincompletionrate:
       yield locus
-
-
-def pair_generator(bins):
-  '''Generator for unique pairs of bins'''
-
-  if not isinstance(bins, (list,tuple)):
-    bins = list(bins)
-  n = len(bins)
-  for i in xrange(n):
-    for j in xrange(0,i):
-      yield bins[i],bins[j]
 
 
 class Bin(set):
@@ -972,7 +445,7 @@ class PairwiseBinOutput(NullPairwiseBinOutput):
 
 
 def save_ldpairs(filename, ldpairs):
-  out = csv.writer(autofile(filename,'w'),dialect='excel-tab')
+  out = table_writer(filename)
   out.writerow(['LNAME1','LNAME2','RSQUARED','DPRIME'])
 
   def _gen():
@@ -1037,7 +510,7 @@ class BinInfo(NullBinInfo):
 
     aspacing = 0
     if len(spacing) > 1:
-      aspacing = average(spacing)
+      aspacing = mean(spacing)
 
     if bin.maxcovered == 1:
       hlen = 0
@@ -1061,11 +534,11 @@ class BinInfo(NullBinInfo):
     population = population or 'user specified'
     out.write('Bin %-4d population: %s, sites: %d, tags %d, other %d, tags required %d, width %d, avg. MAF %.1f%%\n' \
                    % (binnum,population,binsize,len(bin.tags),len(bin.others),bin.tags_required,width,amaf))
-    out.write('Bin %-4d Location: min %d, median %d, average %d, max %d\n' \
-                  % (binnum,locs[0],median(locs),average(locs),locs[-1]))
+    out.write('Bin %-4d Location: min %d, median %d, mean %d, max %d\n' \
+                  % (binnum,locs[0],median(locs),mean(locs),locs[-1]))
     if len(spacing) > 1:
-      out.write('Bin %-4d Spacing: min %d, median %d, average %d, max %d\n' \
-                    % (binnum,spacing[0],median(spacing),average(spacing),spacing[-1]))
+      out.write('Bin %-4d Spacing: min %d, median %d, mean %d, max %d\n' \
+                    % (binnum,spacing[0],median(spacing),mean(spacing),spacing[-1]))
     out.write('Bin %-4d TagSnps: %s\n' % (binnum,' '.join(sorted(bin.tags))))
     if bin.recommended_tags:
       out.write('Bin %-4d RecommendedTags: %s\n' % (binnum, ' '.join(bin.recommended_tags)))
@@ -1187,9 +660,7 @@ def locus_result_sequence(filename, locusmap, exclude):
         to unparse tagzilla output and is included as a utility function
         for when tagzilla is used as a module.
   '''
-  import csv
-
-  locusfile = csv.reader(autofile(filename), dialect='excel-tab')
+  locusfile = load_table(filename)
 
   header = locusfile.next()
 
@@ -1346,12 +817,12 @@ class NaiveBinSequence(object):
 
   def peek(self):
     '''
-       Find the largest bin among all the sets, selecting bins ordered by
-       inclusion status, size (descending), and MAF (descending).  This
-       implementation is mainly for demonstration and testing, as it uses a
-       naive and potentially very slow linear search.  See the
-       FastBinSequence descendant class for a more efficient solution based
-       on a priority queue.
+    Find the largest bin among all the sets, selecting bins ordered by
+    inclusion status, size (descending), and MAF (descending).  This
+    implementation is mainly for demonstration and testing, as it uses a
+    naive and potentially very slow linear search.  See the
+    FastBinSequence descendant class for a more efficient solution based
+    on a priority queue.
     '''
     bins = self.binsets.iteritems()
     # First set the first bin as the best
@@ -1492,14 +963,14 @@ class NaiveMultiBinSequence(object):
     prio = None
     while prio is None:
       lname = lnames.next()
-      prio = self.priority(lname)
+      prio  = self.priority(lname)
 
     # Then iterate through the remaining items to refine the result
-    for lname in lnames:
-      current_prio = self.priority(lname)
+    for current_lname in lnames:
+      current_prio = self.priority(current_lname)
       if current_prio is not None and current_prio < prio:
         lname = current_lname
-        prio = current_prio
+        prio  = current_prio
 
     return lname
 
@@ -1727,12 +1198,6 @@ def pair_disposition(lname1, lname2, bin, qualifier=None):
 def sfloat(n):
   '''Compactly format a float as a string'''
   return ('%.3f' % n).rstrip('0.').lstrip('0') or '0'
-
-
-def percent(a,b):
-  if not b:
-    return 0.
-  return float(a)/b*100
 
 
 def can_tag(bin, reference):
@@ -1989,295 +1454,6 @@ def do_tagging_vector(ldpairs, includes, exclude, designscores, options):
       yield bins,lddata,locusmap
 
 
-def hapmap_geno(g):
-  return intern(g.strip().replace('N',' '))
-
-
-def linkage_geno(g):
-  return intern(''.join(g).strip().replace('0',' '))
-
-
-def prettybase_geno(g):
-  return intern(''.join(g).strip().replace('N',' '))
-
-
-def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
-  '''
-  Generalized cross-tab function to aggregate a spare representation
-  (row,column,value) into a matrix of rows by columns with values optionally
-  aggregated into a scalar using aggregatefunc.
-  '''
-  get0 = itemgetter(0)
-  get1 = itemgetter(1)
-  get2 = itemgetter(2)
-
-  rowkeys  = {}
-  colkeys  = {}
-  datalist = []
-
-  # Pass 1: Build row, column, and data list
-  for row in data:
-    rowkey = rowkeyfunc(row)
-    colkey = colkeyfunc(row)
-    value  = valuefunc(row)
-    i=rowkeys.setdefault(rowkey, len(rowkeys))
-    j=colkeys.setdefault(colkey, len(colkeys))
-    datalist.append( (i,j,value) )
-
-  # Invert and sort the row and column keys
-  rowkeys = sorted(rowkeys.iteritems(), key=get1)
-  colkeys = sorted(colkeys.iteritems(), key=get1)
-
-  datalist.sort()
-
-  # Output column metadata
-  columns = map(get0, colkeys)
-  rows    = map(get0, rowkeys)
-
-  yield columns
-
-  # Pass 2: Build and yield result rows
-  for i,rowdata in groupby(datalist, get0):
-    row = [None]*len(colkeys)
-
-    for j,vs in groupby(rowdata, get1):
-      row[j] = map(get2, vs)
-
-    if aggregatefunc:
-      for colkey,j in colkeys:
-        row[j] = aggregatefunc(rows[i], colkey, row[j])
-
-    yield rows[i],row
-
-
-def genomerge(locus, sample, genos):
-  '''
-  Merge multiple genotypes for the same locus and sample
-  '''
-  if not genos:
-    return '  '
-  elif len(genos) == 1:
-    return genos[0]
-
-  genos = set(genos)
-  genos.discard('  ')
-
-  if not genos:
-    return '  '
-  elif len(genos) == 1:
-    return genos.pop()
-  else:
-    return '  '
-
-
-def load_prettybase_genotypes(filename, nonfounders):
-  '''
-  Loads the genome location, subject,and genotypes from a PrettyBase
-  formatted file.  Returns a generator that yields successive Locus objects.
-  '''
-
-  gfile = autofile(filename, 'r', hyphen=sys.stdin)
-
-  def _data():
-    for line in gfile:
-      fields = re_spaces.split(line.strip())
-
-      if len(fields) < 4:
-        continue
-
-      locus,sample,a1,a2 = fields[:4]
-
-      if nonfounders is not None and sample in nonfounders:
-        continue
-
-      yield locus,sample,prettybase_geno( (a1,a2) )
-
-  loci = xtab(_data(),itemgetter(0),itemgetter(1),itemgetter(2),genomerge)
-  samples = loci.next()
-
-  for locus,genos in loci:
-    try:
-      yield Locus(locus, int(locus), genos)
-    except ValueError:
-      # Ignore invalid loci with just a warning, for now
-      print >> sys.stderr, "WARNING: Invalid locus in file '%s', name '%s'" % (filename,fields[0])
-
-
-def load_hapmap_genotypes(filename, nonfounders):
-  '''
-  Loads the RS#, Genome location, and genotypes from a HapMap formatted
-  file.  Returns a generator that yields successive Locus objects.
-
-  Genotypes strings are 'interned' to save massive amounts of memory.
-  i.e. all 'AA' string objects refer to the same immutable string object,
-  rather than each 'AA' genotype allocating a distinct string object.
-  See the Python builtin 'intern' function for more details.
-  '''
-
-  gfile = autofile(filename, 'r', hyphen=sys.stdin)
-
-  gfile = dropwhile(lambda s: s.startswith('#'), gfile)
-  header = gfile.next()
-
-  if not any(header.startswith(h) for h in HAPMAP_HEADERS):
-    if filename == '-':
-      filename = '<stdin>'
-    raise TagZillaError("ERROR: HapMap Input file '%s' does not seem to be a HapMap data file." % filename)
-
-  header = header.strip().split(' ')
-
-  if nonfounders is None:
-    indices = range(11,len(header))
-  else:
-    indices = [ i for i,name in enumerate(header) if i >= 11 and name not in nonfounders ]
-
-  for line in gfile:
-    fields = line.split(' ')
-    n = len(fields)
-    genos = [ hapmap_geno(fields[i]) for i in indices if i < n ]
-    try:
-      yield Locus(fields[0], int(fields[3]), genos)
-    except (ValueError,KeyError):
-      # Ignore invalid loci with just a warning, for now
-      print >> sys.stderr, "WARNING: Invalid locus in file '%s', name '%s'" % (filename,fields[0])
-
-
-def read_locus_file(filename):
-  locfile = autofile(filename)
-  locus_info = []
-
-  try:
-    for i,line in enumerate(locfile):
-      fields = re_spaces.split(line.strip())
-
-      if not fields:
-        continue
-
-      if len(fields) == 2:
-        locus_info.append( (fields[0], int(fields[1])) )
-      else:
-        raise ValueError('Invalid locus file')
-
-  except (ValueError,IndexError):
-    raise TagZillaError('ERROR: Invalid line %d in locus file "%s".' % (i+1,filename))
-
-  return locus_info
-
-
-def linkage_genotypes(fields):
-  '''Return an iterator that yields genotype from a Linkage record'''
-  allele1s = islice(fields,6,None,2)
-  allele2s = islice(fields,7,None,2)
-  return map(linkage_geno, izip(allele1s,allele2s))
-
-
-def load_linkage_genotypes(filename, loci):
-  '''
-  Load each individual genotypes from the linkage formatted file
-  for all the founders and assign the loaded genotypes to each locus
-  in loci and construct a list of Locus objects.
-
-  Note that Genotypes strings are 'interned' to save massive amounts of memory.
-  i.e. all 'AA' string objects refer to the same immutable string object,
-  rather than each 'AA' genotype allocating a distinct string object.
-  See the Python builtin 'intern' function for more details.
-
-  @param filename: name of the linkage formatted genotype data file
-  @type  filename: string
-  @param     loci: the locus information
-  @type      loci: set of tuples with each like (locusname, location)
-  @rtype         : list
-  @return        : list of Locus objects
-  '''
-
-  pedfile = autofile(filename)
-
-  ind_genos = []
-  for line in pedfile:
-    fields = re_spaces.split(line.strip())
-
-    # Filter out all non-founders
-    if len(fields) < 10 or fields[2:4] != ['0','0']:
-      continue
-
-    ind_genos.append( linkage_genotypes(fields) )
-
-  n = len(ind_genos)
-  missing_geno = intern('  ')
-  loci = [ Locus(lname, location, [missing_geno]*n) for lname,location in loci ]
-
-  for i,genos in enumerate(ind_genos):
-    for j,g in enumerate(genos):
-      loci[j].genos[i] = g
-
-  for locus in loci:
-    locus.maf = estimate_maf(locus.genos)
-
-  return loci
-
-
-def load_raw_genotypes(filename, nonfounders=None):
-  '''
-  Loads the RS#, Genome location, and genotypes from a native formatted
-  genotype file.  Returns a generator that yields successive Locus objects.
-
-  Genotypes strings are 'interned' to save massive amounts of memory.
-  i.e. all 'AA' string objects refer to the same immutable string object,
-  rather than each 'AA' genotype allocating a distinct string object.
-  '''
-
-  gfile = autofile(filename, 'r', hyphen=sys.stdin)
-
-  header = gfile.readline()
-
-  if not header.startswith(GENO_HEADER):
-    if filename == '-':
-      filename = '<stdin>'
-    raise TagZillaError("ERROR: Genotype input file '%s' does not seem to be in the right format." % filename)
-
-  header = header.strip().split('\t')
-
-  if nonfounders is None:
-    indices = range(3,len(header))
-  else:
-    indices = [ i for i,name in enumerate(header) if i >= 3 and name not in nonfounders ]
-
-  for line in gfile:
-    fields = line.split('\t')
-    n = len(fields)
-    genos = [ intern(fields[i].strip() or '  ') for i in indices if i < n ]
-    yield Locus(fields[0], int(fields[2]), genos)
-
-
-def load_ldat_genotypes(filename, loci, nonfounders=None):
-  '''
-  Loads the RS# and genotypes from a ldat genotype file.  Returns a
-  generator that yields successive Locus objects.
-
-  Genotypes strings are 'interned' to save massive amounts of memory.
-  i.e. all 'AA' string objects refer to the same immutable string object,
-  rather than each 'AA' genotype allocating a distinct string object.
-  '''
-  loci = dict(loci)
-
-  gfile = autofile(filename, 'r', hyphen=sys.stdin)
-
-  header = gfile.readline()
-
-  header = header.strip().split('\t')
-
-  if nonfounders is None:
-    indices = range(1,len(header))
-  else:
-    indices = [ i for i,name in enumerate(header) if i >= 1 and name not in nonfounders ]
-
-  for line in gfile:
-    fields = line.split('\t')
-    n = len(fields)
-    genos = [ intern(fields[i].strip() or '  ') for i in indices if i < n ]
-    yield Locus(fields[0], loci[fields[0]], genos)
-
-
 def load_festa_file(filename, locusmap, subset, rthreshold):
   '''
   Load FESTA formatted file that contain pre-computed LD data for pairs of loci
@@ -2332,53 +1508,6 @@ def load_hapmapld_file(filename, locusmap, subset, maxd, rthreshold, dthreshold)
 
     if r2 >= rthreshold and abs(dprime) >= dthreshold:
       yield lname1,lname2,r2,dprime
-
-
-def read_hapmap_nonfounders(filename, nonfounders):
-  pedfile = autofile(filename)
-
-  founder = ['0','0']
-  for line in pedfile:
-    fields = line.strip().split('\t')
-
-    # Filter out all founders
-    if fields[2:4] == founder or len(fields) < 7:
-      continue
-
-    sample = fields[6].split(':')[-2]
-    nonfounders.add(sample)
-
-  return nonfounders
-
-
-def read_linkage_nonfounders(filename, nonfounders):
-  pedfile = autofile(filename)
-
-  founder = ['0','0']
-  for line in pedfile:
-    fields = re_spaces.split(line.strip())
-
-    # Filter out all non-founders
-    if fields[2:4] == founder:
-      continue
-
-    nonfounders.add(tuple(fields[0:2]))
-
-  return nonfounders
-
-
-def read_snp_list(name, sset):
-  if name.startswith(':'):
-    sset.update(name[1:].split(','))
-    return
-
-  sfile = autofile(name)
-  for line in sfile:
-    fields = re_spaces.split(line.strip())
-    if fields:
-      sset.add(fields[0])
-
-  return sset
 
 
 def build_design_score(designscores,designdefault=0):
@@ -2482,7 +1611,7 @@ class TagSelector(object):
     func = locals().get(method.lower(),None)
 
     if not callable(func):
-      raise InternalError('Invalid tag information criterion specified')
+      raise RuntimeError('Invalid tag information criterion specified')
 
     w = {}
     for lname1,lname2,r2,dprime in bin.ld:
@@ -2534,64 +1663,10 @@ def read_illumina_design_score(filename):
 
 
 def load_genotypes(filename, options):
-  options.format = options.format.lower()
-  if options.format not in ('','hapmap','raw','ldat','linkage','hapmapld','festa','prettybase'):
-    raise TagZillaError('ERROR: Unknown genotype/ld data format specified: "%s"' % options.format)
-
-  if options.format == '':
-    if options.loci:
-      options.format = 'linkage'
-    else:
-      options.format = 'hapmap'
-
-  nonfounders = None
-  if options.pedfile:
-    if not options.pedformat:
-      if options.format == 'hapmap':
-        options.pedformat = 'hapmap'
-      else:
-        options.pedformat = 'linkage'
-
-    nonfounders = set()
-    if options.pedformat.lower() == 'hapmap':
-      for pedfile in options.pedfile:
-        read_hapmap_nonfounders(pedfile, nonfounders)
-    elif options.pedformat.lower() == 'linkage':
-      for pedfile in options.pedfile:
-        read_linkage_nonfounders(pedfile, nonfounders)
-    else:
-      raise TagZillaError('ERROR: Unsupported pedigree file format specified: %s' % options.format)
-
-  locus_info = None
-  if options.loci:
-    if options.format not in ('linkage','ldat'):
-      # XXX: This warning will trigger spuriously for multi-format input parameters
-      #print >> sys.stderr, 'WARNING: It is not meaningful to specify a locus info file when not reading data in Linkage format.'
-      pass
-
-    locus_info = read_locus_file(options.loci)
-
-  if options.format == 'hapmap':
-    loci = load_hapmap_genotypes(filename, nonfounders)
-  elif options.format == 'raw':
-    loci = load_raw_genotypes(filename, nonfounders)
-  elif options.format == 'prettybase':
-    loci = load_prettybase_genotypes(filename, nonfounders)
-  elif options.format == 'ldat':
-    if not locus_info:
-      raise TagZillaError('ERROR: Cannot load ldat format data since no loci are defined.')
-    loci = load_ldat_genotypes(filename, locus_info, nonfounders)
-  elif options.format == 'linkage':
-    if not locus_info:
-      raise TagZillaError('ERROR: Cannot load Linkage format data since no loci are defined.')
-    loci = load_linkage_genotypes(filename, locus_info)
-  else:
-    raise TagZillaError('ERROR: Cannot load genotype data in %s format' % options.format)
-
-  if options.limit:
-    loci = islice(loci,options.limit)
-
-  return loci
+  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr,genome=options.loci).as_ldat()
+  genome = loci.genome
+  for lname,genos in loci:
+    yield Locus(lname,genome.get_locus(lname).location,genos)
 
 
 def filter_loci(loci, include, subset, options):
@@ -2616,15 +1691,11 @@ def filter_loci(loci, include, subset, options):
   return loci
 
 
-def materialize_loci(loci):
-  loci = list(loci)
-
+def order_loci(loci):
   def locus_key(l):
     return l.location,l.name
 
-  loci.sort(key=locus_key)
-
-  return loci
+  return sorted(loci,key=locus_key)
 
 
 def scan_loci_ldsubset(monitor, loci, maxd):
@@ -2685,18 +1756,17 @@ def generate_ldpairs_single(args, locusmap, include, subset, ldsubset, options):
 
 def generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, options):
   sys.stderr.write('[%s] Processing input file %s\n' % (time.asctime(),filename))
-  format = options.format.lower()
 
-  if format == 'festa':
+  if options.format == 'festa':
     return load_festa_file(filename, locusmap, subset, options.r)
 
-  elif format == 'hapmapld':
+  elif options.format == 'hapmapld':
     return load_hapmapld_file(filename, locusmap, subset, options.maxdist*1000, options.r, options.d)
 
   else: # generate from genotype file
-    loci = load_genotypes(filename, options)
+    loci = load_genotypes(filename,options)
     loci = filter_loci(loci, include, subset, options)
-    loci = materialize_loci(loci)
+    loci = order_loci(loci)
     loci = filter_loci_ldsubset(loci, ldsubset, options.maxdist*1000)
 
     # Locusmap must contain only post-filtered loci
@@ -2737,15 +1807,15 @@ def generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options):
     multi_options = []
 
     for file_options,filename in args[i*pops:(i+1)*pops]:
-      loci = list(load_genotypes(filename, file_options))
+      loci = list(load_genotypes(filename,file_options))
 
       if method not in ('merge2','merge2+'):
         loci = filter_loci(loci, include, subset, file_options)
-        loci = materialize_loci(loci)
+        loci = order_loci(loci)
         # Locusmap must contain only post-filtered loci
         locusmap.update( (locus.name,locus) for locus in loci if locus.genos )
       else:
-        loci = materialize_loci(loci)
+        loci = order_loci(loci)
 
       multi_loci.append(loci)
       multi_options.append(file_options)
@@ -2838,25 +1908,12 @@ class TagZillaOptionParser(optparse.OptionParser):
 
 def option_parser():
   usage = 'usage: %prog [options] genofile... [options] genofile...'
-  parser = TagZillaOptionParser(usage=usage, add_help_option=False)
-
-  parser.add_option('-h', '--help', dest='help', action='store_true',
-                        help='show this help message and exit')
-  parser.add_option('--license', dest='license', action='store_true',
-                          help="show program's copyright and license terms and exit")
-  parser.add_option('--profile', dest='profile', metavar='P', help=optparse.SUPPRESS_HELP)
+  parser = TagZillaOptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
-  inputgroup.add_option('-f', '--format', dest='format', metavar='NAME', default='',
-                          help='Format for genotype/pedigree or ld input data.  Values: hapmap (default), linkage, prettybase, ldat, raw, festa, hapmapld.')
-  inputgroup.add_option(      '--pedformat', dest='pedformat', metavar='NAME', default='',
-                          help='Format for pedigree data.  Values: hapmap or linkage.  Defaults to hapmap when '
-                               'reading HapMap files and linkage format otherwise.')
-  inputgroup.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                          help='Locus description file for input in Linkage format')
-  inputgroup.add_option('-p', '--pedfile', dest='pedfile', metavar='FILE', action='append',
-                          help='Pedigree file for HapMap or PrettyBase data files (optional)')
+  geno_options(inputgroup,input=True,filter=True)
+
   inputgroup.add_option('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
                           help='File containing loci that are excluded from being a tag')
   inputgroup.add_option('-i', '--includeuntyped', dest='include_untyped', metavar='FILE', default='',
@@ -2968,28 +2025,28 @@ def do_tagging(ldpairs, locusmap, includes, exclude, designscores, options):
 def build_output(options, exclude):
   pairinfofile = None
   if options.outfile:
-    pairinfofile = autofile(options.outfile, 'w', hyphen=sys.stdout)
+    pairinfofile = autofile(hyphen(options.outfile,sys.stdout), 'w')
     pairinfo = PairwiseBinOutput(pairinfofile, exclude)
   else:
     pairinfo = NullPairwiseBinOutput()
 
   locusinfofile = None
   if options.locusinfo:
-    locusinfofile = autofile(options.locusinfo, 'w', hyphen=sys.stdout)
+    locusinfofile = autofile(hyphen(options.locusinfo,sys.stdout), 'w')
     locusinfo = LocusOutput(locusinfofile, exclude)
   else:
     locusinfo = NullLocusOutput()
 
   infofile = None
   if options.bininfo:
-    infofile = autofile(options.bininfo, 'w', hyphen=sys.stdout)
+    infofile = autofile(hyphen(options.bininfo,sys.stdout), 'w')
 
   if options.bininfo or options.sumfile:
     bininfo = BinInfo(infofile, options.histomax+1)
   else:
     bininfo = NullBinInfo()
 
-  sumfile = autofile(options.sumfile, 'w', hyphen=sys.stdout)
+  sumfile = autofile(hyphen(options.sumfile,sys.stdout),'w')
 
   if [pairinfofile,locusinfofile,infofile,sumfile].count(sys.stdout) > 1:
     raise TagZillaError('ERROR: More than one output file directed to standard out.')
@@ -3012,26 +2069,7 @@ class Includes(object):
     return len(self.typed)+len(self.untyped)
 
 
-def tagzilla(options,args):
-  pops = len(get_populations(options.multipopulation))
-
-  if pops > 1:
-    method = (options.multimethod or '').lower()
-
-    if pops <= 1 or not method:
-      raise TagZillaError('ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod')
-
-    if method not in MULTI_METHODS:
-      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
-
-    if method in MULTI_METHODS_M:
-      return tagzilla_multi(options,args)
-
-  return tagzilla_single(options,args)
-
-
 def tagzilla_single(options,args):
-
   subset          = set()
   include_untyped = set()
   include_typed   = set()
@@ -3039,19 +2077,19 @@ def tagzilla_single(options,args):
   ldsubset        = set()
 
   if options.subset:
-    read_snp_list(options.subset, subset)
+    subset = set(load_list(options.subset))
 
   if options.ldsubset:
-    read_snp_list(options.ldsubset, ldsubset)
+    ldsubset = set(load_list(options.ldsubset))
 
   if options.include_untyped:
-    read_snp_list(options.include_untyped, include_untyped)
+    include_untyped = set(load_list(options.include_untyped))
 
   if options.include_typed:
-    read_snp_list(options.include_typed, include_typed)
+    include_typed = set(load_list(options.include_typed))
 
   if options.exclude:
-    read_snp_list(options.exclude, exclude)
+    exclude = set(load_list(options.exclude))
 
   includes     = Includes(include_typed, include_untyped)
   designscores = build_design_score(options.designscores,options.designdefault)
@@ -3136,7 +2174,6 @@ def subset_tags(result, tags, recommended=None):
 
 
 def tagzilla_multi(options,args):
-
   subset          = set()
   ldsubset        = set()
   include_untyped = set()
@@ -3144,19 +2181,19 @@ def tagzilla_multi(options,args):
   exclude         = set()
 
   if options.subset:
-    read_snp_list(options.subset, subset)
+    subset = set(load_list(options.subset))
 
   if options.ldsubset:
-    read_snp_list(options.ldsubset, ldsubset)
+    ldsubset = set(load_list(options.ldsubset))
 
   if options.include_untyped:
-    read_snp_list(options.include_untyped, include_untyped)
+    include_untyped = set(load_list(options.include_untyped))
 
   if options.include_typed:
-    read_snp_list(options.include_typed, include_typed)
+    include_typed = set(load_list(options.include_typed))
 
   if options.exclude:
-    read_snp_list(options.exclude, exclude)
+    exclude = set(load_list(options.exclude))
 
   includes     = Includes(include_typed, include_untyped)
   designscores = build_design_score(options.designscores,options.designdefault)
@@ -3237,169 +2274,30 @@ def tagzilla_multi(options,args):
   bininfo.emit_multipop_summary(sumfile, popdtags)
 
 
-def run_profile(progmain,options,args):
-  if not getattr(options,'profile',None):
-    return progmain(options,args)
-
-  if options.profile == 'python':
-    try:
-      import cProfile as profile
-    except ImportError:
-      import profile
-    import pstats
-
-    prof = profile.Profile()
-    try:
-      return prof.runcall(progmain, options, args)
-    finally:
-      stats = pstats.Stats(prof)
-      stats.strip_dirs()
-      stats.sort_stats('time', 'calls')
-      stats.print_stats(25)
-
-  elif options.profile == 'hotshot':
-    import hotshot, hotshot.stats
-    prof = hotshot.Profile('tmp.prof')
-    try:
-      return prof.runcall(progmain, options, args)
-    finally:
-      prof.close()
-      stats = hotshot.stats.load('tmp.prof')
-      stats.strip_dirs()
-      stats.sort_stats('time', 'calls')
-      stats.print_stats(25)
-
-  else:
-    raise TagZillaError('ERROR: Unknown profiling option provided "%s"' % options.profile)
-
-
-def format_elapsed_time(t):
-  units = [('s',60),('m',60),('h',24),('d',365),('y',None)]
-
-  elapsed = []
-  for symbol,divisor in units:
-    if divisor:
-      t,e = divmod(t,divisor)
-    else:
-      t,e = 0,t
-
-    if e:
-      if symbol == 's':
-        elapsed.append('%.2f%s' % (e,symbol))
-      else:
-        elapsed.append('%d%s' % (e,symbol))
-
-    if not t:
-      break
-
-  elapsed.reverse()
-  return ''.join(elapsed) or '0s'
-
-
-def check_accelerators(accelerators, quiet=False):
-    failed = []
-    for a in accelerators:
-      try:
-        __import__('glu.modules.tagzilla.%s' % a)
-      except ImportError:
-        failed.append(a)
-
-    if failed and not quiet:
-      print 'WARNING: Failed to import the following native code accelerators:'
-      print '            ',', '.join(failed)
-      print '''\
-         This will result in significantly increased computation times.
-         Please do not post comparitive timing or benchmarking data when
-         running in this mode.
-'''
-    return not failed
-
-
-def launcher(progmain, opt_parser,
-                       __program__      = '',
-                       __version__      = '0.0',
-                       __authors__      = [],
-                       __copyright__    = '',
-                       __license__      = '',
-                       __accelerators__ = [],
-                       **kwargs):
-
-  if __program__ and __version__:
-    print '%s version %s\n' % (__program__,__version__)
-  elif __program__:
-    print __program__
-  elif __version__:
-    print 'Version %s\n' % __version__
-
-  if __authors__:
-    print 'Written by %s' % __authors__[0]
-    for author in __authors__[1:]:
-      print '      and %s' % author
-    print
-
-  if __copyright__:
-    print __copyright__
-    print
-
-  parser = opt_parser()
+def main():
+  parser = option_parser()
   options,args = parser.parse_args()
 
-  if __license__ and options.license:
-    print __license__
-    return
-
-  check_accelerators(__accelerators__)
-
-  if options.help:
+  if not args:
     parser.print_help(sys.stdout)
     return
 
-  if not args:
-    parser.print_usage(sys.stdout)
-    print '''basic options:
-      -h, --help            show detailed help on program usage'''
-    if __copyright__ or __license__:
-      print "      --license             show program's copyright and license terms and exit"
-    print
-    return
+  pops = len(get_populations(options.multipopulation))
 
-  start = time.clock()
-  sys.stderr.write('[%s] Analysis start\n' % time.asctime())
+  if pops > 1:
+    method = (options.multimethod or '').lower()
 
-  try:
-    run_profile(progmain,options,args)
+    if pops <= 1 or not method:
+      raise TagZillaError('ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod')
 
-  except KeyboardInterrupt:
-    sys.stderr.write('\n[%s] Analysis aborted by user\n' % time.asctime())
+    if method not in MULTI_METHODS:
+      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
 
-  except TagZillaError, e:
-    sys.stderr.write('\n%s\n\n[%s] Analysis aborted due to reported error\n' % (e,time.asctime()))
+    if method in MULTI_METHODS_M:
+      return tagzilla_multi(options,args)
 
-  except IOError, e:
-    sys.stderr.write('\n%s\n\n[%s] Analysis aborted due to input/output error\n' % (e,time.asctime()))
+  return tagzilla_single(options,args)
 
-  except:
-    import traceback
-    sys.stderr.write('''
-Analysis aborted due to a problem with the program input, parameters
-supplied, an error in the program.  Please examine the following failure
-trace for clues as to what may have gone wrong.  When in doubt, please send
-this message and a complete description of the analysis you are attempting
-to perform to the software developers.
-
-Traceback:
-  %s
-
-[%s] Analysis aborted due to unhandled error
-''' % (traceback.format_exc().replace('\n','\n  '),time.asctime()))
-
-  else:
-    sys.stderr.write('[%s] Analysis completed successfully\n' % time.asctime())
-    sys.stderr.write('[%s] CPU time: %s\n' % (time.asctime(),format_elapsed_time(time.clock()-start)))
-
-
-def main():
-  launcher(tagzilla, option_parser, **globals())
 
 if __name__ == '__main__':
   main()

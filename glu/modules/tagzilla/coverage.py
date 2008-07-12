@@ -7,7 +7,6 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-__accelerators__ = ['tagzillac']
 
 from tagzilla import *
 
@@ -24,15 +23,8 @@ def option_parser():
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
-  inputgroup.add_option('-f', '--format', dest='format', metavar='NAME', default='',
-                          help='Format for genotype/pedigree or ld input data.  Values: hapmap (default), linkage, festa, prettybase, raw.')
-  inputgroup.add_option(      '--pedformat', dest='pedformat', metavar='NAME', default='',
-                          help='Format for pedigree data.  Values: hapmap or linkage.  Defaults to hapmap when '
-                               'reading HapMap files and linkage format otherwise.')
-  inputgroup.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                          help='Locus description file for input in Linkage format')
-  inputgroup.add_option('-p', '--pedfile', dest='pedfile', metavar='FILE', action='append',
-                          help='Pedigree file for HapMap or PrettyBase data files (optional)')
+  geno_options(inputgroup,input=True,filter=True)
+
   inputgroup.add_option('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
                           help='File containing loci that are excluded from being a tag')
   inputgroup.add_option('-s', '--subset', dest='subset', metavar='FILE', default='',

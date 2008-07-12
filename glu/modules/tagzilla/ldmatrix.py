@@ -5,8 +5,8 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-import csv
 import sys
+import optparse
 
 from   operator          import itemgetter
 from   itertools         import islice, chain, izip
@@ -16,8 +16,6 @@ from   glu.lib.xtab      import xtab
 
 
 def option_parser():
-  import optparse
-
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 

@@ -60,17 +60,17 @@ class tagzillaTest(unittest.TestCase):
   A test class for the tagzilla module.
   '''
 
-  def test_average(self):
+  def test_mean(self):
     '''
-    Test a successful run of the average function for a
+    Test a successful run of the mean function for a
     sequence feed
     '''
-    self.assertRaises(ValueError, average, [])
-    self.assertRaises(TypeError,  average, 'abc')
-    self.assertEquals(1,          average([1]))
-    self.assertAlmostEquals(1.5,  average([1,2]))
-    self.assertEquals(2,          average([1,2,3]))
-    self.assertEquals(4,          average(range(0,9)))
+    self.assertRaises(ValueError, mean, [])
+    self.assertRaises(TypeError,  mean, 'abc')
+    self.assertEquals(1,          mean([1]))
+    self.assertAlmostEquals(1.5,  mean([1,2]))
+    self.assertEquals(2,          mean([1,2,3]))
+    self.assertEquals(4,          mean(range(0,9)))
 
   def test_median(self):
     '''
@@ -97,9 +97,9 @@ class tagzillaTest(unittest.TestCase):
         self.assertEquals(0, func(['AA']*n))
         self.assertEquals(0, func(['  ']*n))
         self.assertAlmostEquals(0.5, func(['AB']*n))
-        self.assertAlmostEquals(0.5, func(['AB','  ']*n))
+        self.assertAlmostEquals(0.5, func(['AB',None]*n))
         self.assertAlmostEquals(0.3, func(['AA', 'AC', 'AA', 'CC', 'AA']*n))
-        self.assertAlmostEquals(0.3, func(['AA', 'AC', 'AA', '  ', 'CC', 'AA']*n))
+        self.assertAlmostEquals(0.3, func(['AA', 'AC', 'AA', None, 'CC', 'AA']*n))
         self.assertRaises(ValueError,func,['AA', 'AC', 'AA', 'AG', 'CC', 'AA']*n)
 
 
