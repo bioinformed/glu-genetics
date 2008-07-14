@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
+__gluindex__  = True
 __program__   = 'TagZilla surrogates'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
-__abstract__  = 'Find the best surrogate SNP for any that fail design'
+__abstract__  = 'Find LD surrogate for SNPs'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -100,6 +101,9 @@ def surrogates(options,args):
   best_surrogate = {}
   for pairs in ldpairs:
     for lname1,lname2,r2,dprime in pairs:
+      if lname1==lname2:
+        continue
+
       d1=designscores.get(lname1,options.designdefault) > epsilon
       d2=designscores.get(lname2,options.designdefault) > epsilon
 

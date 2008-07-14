@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+__gluindex__  = True
 __program__   = 'TagZilla coverage'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
 __abstract__  = 'Evaluate maximum coverage of a set of tags'
@@ -107,6 +108,9 @@ def coverage(options,args):
   missing = '',-1
   for pairs in ldpairs:
     for lname1,lname2,r2,dprime in pairs:
+      if lname1==lname2:
+        continue
+
       for l1,l2 in (lname1,lname2),(lname2,lname1):
         if l2 in tags:
           best_locus,best_r2 = besttag.get(l1,missing)

@@ -3,7 +3,8 @@
 __program__   = 'TagZilla'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)',
                  'Zhaoming Wang (wangzha@mail.nih.gov)']
-__abstract__  = '''\
+__abstract__  = 'Robust and fast SNP tagging program'
+__descr__     = '''\
 A robust and fast SNP binning and tagging program that takes many forms of
 input data, can be tuned by over a dozen meaningful parameters, and produces
 several useful human and machine readable outputs.  The heart of the program
@@ -37,7 +38,7 @@ from   glu.lib.stats             import mean, median
 from   glu.lib.utils             import pair_generator, percent
 from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table, table_writer
 from   glu.lib.glu_launcher      import GLUError
-from   glu.lib.genolib           import load_genostream, geno_options
+from   glu.lib.genolib           import load_genostream, geno_options, GenoTransform
 from   glu.lib.genolib.ld        import estimate_ld, count_haplotypes, bound_ld
 from   glu.lib.genolib.genoarray import minor_allele_from_genos
 
@@ -57,17 +58,55 @@ class TagZillaError(GLUError): pass
 
 
 class Locus(object):
-  __slots__ = ('name','location','maf','genos')
-  def __init__(self, name, location, genos):
+  __slots__ = ('name','chromosome','location','maf','genos')
+  def __init__(self, name, chromosome, location, genos):
     a,maf = minor_allele_from_genos(genos)
 
-    self.name     = name
-    self.location = location
-    self.maf      = maf
-    self.genos    = genos
+    self.name       = name
+    self.chromosome = chromosome
+    self.location   = location or 0
+    self.maf        = maf
+    self.genos      = genos
 
 
 def scan_ldpairs(loci, maxd, rthreshold, dthreshold):
+  '''
+  A generator for pairs of loci within a specified genomic distance.
+  Loci are assumed to be sorted by genomic location.
+
+  Split loci into non-communicating regions based on chromosome boundaries
+  or gaps larger than maxd and generates pairwise ld using
+  scan_ldpairs_region
+  '''
+  regions  = []
+  region   = []
+  last_chr = None
+  last_loc = None
+
+  # Collect all regions
+  for locus in loci:
+    chr = locus.chromosome
+    loc = locus.location
+
+    # Detect boundary and split the current region
+    if (chr!=last_chr or loc-last_loc>maxd) and region:
+      regions.append(region)
+      region = []
+
+    last_chr = chr
+    last_loc = loc
+    region.append(locus)
+
+  # Pick up tailings
+  if region:
+    regions.append(region)
+
+  # Generate ld and chain results together
+  sys.stderr.write('[%s] Generating LD in %d region(s)\n' % (time.asctime(),len(regions)))
+  return [ iter(scan_ldpairs_region(region, maxd, rthreshold, dthreshold)) for region in regions ]
+
+
+def scan_ldpairs_region(loci, maxd, rthreshold, dthreshold):
   '''
   A generator for pairs of loci within a specified genomic distance.
   Loci are assumed to be sorted by genomic location.
@@ -76,8 +115,11 @@ def scan_ldpairs(loci, maxd, rthreshold, dthreshold):
   n = len(loci)
   for i in xrange(n):
     locus1    = loci[i]
+    name1     = locus1.name
     genos1    = locus1.genos
     location1 = locus1.location
+
+    yield name1,name1,1.0,1.0
 
     # And up to maxd distance beyond it
     for j in xrange(i+1,n):
@@ -91,7 +133,7 @@ def scan_ldpairs(loci, maxd, rthreshold, dthreshold):
       r2,dprime = estimate_ld(*counts)
 
       if r2 >= rthreshold and abs(dprime) >= dthreshold:
-        yield locus1.name,locus2.name,r2,dprime
+        yield name1,locus2.name,r2,dprime
 
 
 def merge_multi_loci(loci):
@@ -119,14 +161,6 @@ def merge_multi_loci(loci):
     yield results
 
 
-def fill_empty(genos, n):
-  m = len(genos)
-  assert m <= n
-  if m < n:
-    genos.extend( ['  ']*(n-m) )
-  return genos
-
-
 def merge_loci(loci):
   loci = list(merge_multi_loci(loci))
 
@@ -135,17 +169,13 @@ def merge_loci(loci):
   #        the load_genotypes routines are augmented to always return a
   #        fixed number of genotypes.
   pops = len(loci[0])
-  lens = [0]*pops
-  for locus in loci:
-    lens = [ max(m,len(l.genos)) for m,l in izip(lens,locus) ]
-
-  assert len(lens) == pops
 
   for locus in loci:
     assert len(locus) == pops
     genos = []
+    # FIXME: This needs to be a proper merge
     for i in xrange(pops):
-      genos.extend(fill_empty(locus[i].genos, lens[i]))
+      genos.extend(locus[i].genos)
 
     try:
       yield Locus(locus[0].name, locus[0].location, genos)
@@ -1078,15 +1108,10 @@ def build_binsets(loci, ldpairs, includes, exclude, designscores):
       if lname2 not in binsets:
         binsets[lname2] = Bin([lname2], loci[lname2].maf)
 
-      lddata[lname1,lname2] = r2,dprime
-      binsets[lname1].add(lname2, loci[lname2].maf)
-      binsets[lname2].add(lname1, loci[lname1].maf)
-
-  # Add singletons once all ldpair sets have been consumed.
-  # This is necessary since loci are filled in lazily
-  for lname in loci:
-    if lname not in binsets:
-      binsets[lname] = Bin([lname], loci[lname].maf)
+      if lname1 != lname2:
+        binsets[lname1].add(lname2, loci[lname2].maf)
+        lddata[lname1,lname2] = r2,dprime
+        binsets[lname2].add(lname1, loci[lname1].maf)
 
   # Update the bin disposition if the lname is one of the excludes
   for lname in exclude:
@@ -1402,8 +1427,9 @@ def generate_ldpairs_vector(args, include, subset, ldsubset, options):
     locusmap = []
 
     for file_options,filename in args[i*pops:(i+1)*pops]:
-      lmap = {}
-      pairs = generate_ldpairs_from_file(filename, lmap, include, subset, ldsubset, file_options)
+      lmap    = {}
+      regions = generate_ldpairs_from_file(filename, lmap, include, subset, ldsubset, file_options)
+      pairs   = chain(*regions)
 
       ldpairs.append(pairs)
       locusmap.append(lmap)
@@ -1663,10 +1689,15 @@ def read_illumina_design_score(filename):
 
 
 def load_genotypes(filename, options):
-  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr,genome=options.loci).as_ldat()
+  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr,genome=options.loci,
+                                  transform=GenoTransform.from_options(options)).as_ldat()
+
+  loci = loci.transformed(repack=True)
+
   genome = loci.genome
   for lname,genos in loci:
-    yield Locus(lname,genome.get_locus(lname).location,genos)
+    loc = genome.get_locus(lname)
+    yield Locus(lname,loc.chromosome,loc.location,genos)
 
 
 def filter_loci(loci, include, subset, options):
@@ -1693,7 +1724,7 @@ def filter_loci(loci, include, subset, options):
 
 def order_loci(loci):
   def locus_key(l):
-    return l.location,l.name
+    return l.chromosome,l.location,l.name
 
   return sorted(loci,key=locus_key)
 
@@ -1708,7 +1739,6 @@ def scan_loci_ldsubset(monitor, loci, maxd):
   is within maxd if a monitored location on both the left and the right.
   '''
   n = len(loci)
-  monitor = sorted(monitor)
 
   # Scan forward though loci, yielding all following loci within maxd of a
   # monitored location
@@ -1735,9 +1765,8 @@ def filter_loci_ldsubset(loci, ldsubset, maxd):
   if not ldsubset:
     return loci
 
-  locusmap = dict( (l.name,l.location) for l in loci )
-  monitor  = (locusmap[l] for l in ldsubset if l in locusmap)
-  keep     = set(scan_loci_ldsubset(monitor,loci,maxd))
+  monitor = [ l for l in loci if l.name in ldsubset ]
+  keep    = set(scan_loci_ldsubset(monitor,loci,maxd))
   return [ l for l in loci if l in keep ]
 
 
@@ -1751,7 +1780,14 @@ def update_locus_map(locusmap, loci):
 
 def generate_ldpairs_single(args, locusmap, include, subset, ldsubset, options):
   for file_options,filename in args:
-    yield generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, file_options)
+    regions = generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, file_options)
+
+    for ldpairs in regions:
+      yield ldpairs
+
+    # Clear locusmap to save memory
+    # FIXME: May need to be disabled due to potentially wonky semantics
+    locusmap.clear()
 
 
 def generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, options):
@@ -2014,10 +2050,10 @@ def do_tagging(ldpairs, locusmap, includes, exclude, designscores, options):
     yield bins,lddata
   else:
     # Otherwise, process each sequence of ldpairs independently
-    for pairs in ldpairs:
-      sys.stderr.write('[%s] Building binsets\n' % time.asctime())
+    for i,pairs in enumerate(ldpairs):
+      sys.stderr.write('[%s] Generating LD and binsets for region %d\n' % (time.asctime(),i+1))
       binsets,lddata = build_binsets(locusmap, [pairs], includes, exclude, designscores)
-      sys.stderr.write('[%s] Choosing bins\n' % time.asctime())
+      sys.stderr.write('[%s] Choosing bins for region %d\n' % (time.asctime(),i+1))
       bins = binner(locusmap, binsets, lddata, includes, get_tags_required_function(options))
       yield bins,lddata
 
@@ -2145,9 +2181,6 @@ def tagzilla_single(options,args):
     # (i.e. the inter-bin pairwise)
     if options.extra:
       pairinfo.emit_extra(lddata, tags, population)
-
-    # Clear locus data after all bins are processed to save memory
-    locusmap.clear()
 
   # Emit useful bin summary table
   bininfo.emit_summary(sumfile, population)
