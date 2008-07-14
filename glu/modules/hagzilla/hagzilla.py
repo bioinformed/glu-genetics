@@ -15,11 +15,12 @@ import fcntl
 import subprocess
 import sqlite3
 
-from   itertools                      import groupby,chain
+from   itertools                      import groupby
 from   operator                       import itemgetter
 
 from   glu.lib.fileutils              import load_list,load_table
 from   glu.modules.tagzilla.tagzilla  import locus_result_sequence
+from   glu.modules.genedb.queries     import query_snps_by_location, query_gene_by_name
 
 
 POPS = {'CEU'    : 'hapmap',
@@ -62,136 +63,6 @@ PLCO_PEDIGREES = None
 PLCO_GENOTYPES = '/u3/projects/CGEMS/Scans/Prostate/1/build2/genotypes/STUDY/subjects_STUDY_%s.ldat.gz'
 PLCO_MAP       = '/u3/projects/CGEMS/Scans/Prostate/1/raw/snp.map'
 PLCO_FORMAT    = 'ldat'
-
-
-def query_genes_by_name(con,gene):
-  sql = '''
-  SELECT   a.Alias,s.featureName,s.chromosome,s.chrStart,s.chrEnd,s.orientation
-  FROM     alias a, gene s
-  WHERE    s.geneID = a.geneID
-    AND    a.Alias %s
-    AND    s.featureType='GENE'
-    AND    s.submitGroup='reference'
-  ORDER BY s.chromosome,MIN(s.chrStart,s.chrEnd);
-  '''
-  if '%' in gene:
-    sql = sql % 'LIKE ?'
-  else:
-    sql = sql % '= ?'
-
-  cur = con.cursor()
-  cur.execute(sql, (gene,))
-  return cur.fetchall()
-
-
-def query_gene_by_name(con,gene):
-  genes = query_genes_by_name(con,gene)
-  if not genes:
-    raise KeyError('Cannot find gene "%s"' % gene)
-  elif len(genes) > 1:
-    raise KeyError('Gene not unique "%s"' % gene)
-  return genes[0]
-
-
-def query_genes_by_location(con,chr,loc):
-  sql = '''
-  SELECT   s.featureName,s.featureName,s.chromosome,s.chrStart,s.chrEnd,s.orientation
-  FROM     gene s
-  WHERE    s.chromosome = %s
-    AND    %d BETWEEN s.chrStart AND s.chrEnd
-    AND    s.featureType='GENE'
-    AND    s.submitGroup='reference'
-  ORDER BY s.chromosome,MIN(s.chrStart,s.chrEnd);
-  '''
-  cur = con.cursor()
-  cur.execute(sql, chr, loc)
-  return cur.fetchall()
-
-
-def gene_margin(start, stop, strand, upstream=20000, downstream=10000):
-  if None in (start,stop,strand):
-    return None,None
-
-  if start>stop:
-    start,stop = stop,start
-
-  if strand == '+':
-    return start-upstream,stop+downstream
-  elif strand == '-':
-    return start-downstream,stop+upstream
-  else:
-    raise ValueError('Unknown gene orientation')
-
-
-def get_snps(con, population, chromosome, start, stop):
-  sql = '''
-  SELECT   lname, chromosome, location
-  FROM     snp
-  WHERE    chromosome=?
-    AND    location BETWEEN ? AND ?;
-  '''
-  cur = con.cursor()
-  cur.execute(sql, (chromosome,start,stop) )
-  return cur.fetchall()
-
-
-def escape_sql(s):
-  return "'%s'" % s.replace("'","''")
-
-
-def get_sequences(con,snps):
-  cur = con.cursor()
-
-  try:
-    cur.execute('CREATE TABLE snpsequence (lname TEXT PRIMARY KEY, sequence TEXT);')
-  except:
-    pass
-
-  sql = '''
-  SELECT  lname,sequence
-  FROM    snpsequence
-  WHERE   lname IN (%s);
-  '''
-  sqlsnps = ','.join(escape_sql(snp) for snp in snps if snp)
-  cur.execute(sql % sqlsnps)
-  results  = cur.fetchall()
-
-  missing  = snps - set(lname for lname,seq in results)
-  results2 = [ s for s in get_sequences_from_genewindow(missing) if len(s) == 2 ]
-
-  missing -= set(lname for lname,seq in results2)
-  results3 = ((lname,'') for lname in missing)
-
-  sql = 'INSERT INTO snpsequence VALUES (?,?);'
-  cur.executemany(sql, chain(results2,results3))
-
-  con.commit()
-
-  return ( (lname,seq) for lname,seq in chain(results,results2) if seq)
-
-
-def get_sequences_from_genewindow(snps):
-  snps = list(snps)
-  if not snps:
-    return []
-
-  command = 'java -Xmx1000M -classpath sequence/gw_tools.jar:sequence/classes12.jar:sequence nci/cgf/annotator/tools/export/BatchExport'
-  snpname = 'tmpFoo%d' % time.time()
-  sequencename = 'tmpBar%d' % time.time()
-  try:
-    snpfile = file(snpname,'w')
-    for snp in snps:
-      snpfile.write('%s\n' % snp)
-    snpfile.close()
-    args = '%s %s sequence/sublist.txt sequence/oblig.txt %s 2>/dev/null' % (command,snpname,sequencename)
-    subprocess.Popen(args, shell=True).communicate()
-    return load_table(sequencename)
-  finally:
-    os.unlink(snpname)
-    try:
-      os.unlink(sequencename)
-    except:
-      pass
 
 
 def project_chdir(*dirs):
@@ -360,6 +231,21 @@ def strip(r):
   return [ f.strip() for f in r ]
 
 
+def gene_margin(start, stop, strand, upstream=20000, downstream=10000):
+  if None in (start,stop,strand):
+    return None,None
+
+  if start>stop:
+    start,stop = stop,start
+
+  if strand == '+':
+    return start-upstream,stop+downstream
+  elif strand == '-':
+    return start-downstream,stop+upstream
+  else:
+    raise ValueError('Unknown gene orientation')
+
+
 def clean_tasks(con,tasks,options):
   for task in tasks:
     project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude = task
@@ -372,7 +258,7 @@ def clean_tasks(con,tasks,options):
       task[5] = int(stop)
     else:
       try:
-        alias,qgene,qchromosome,qstart,qstop,qstrand = query_gene_by_name(con, gene)
+        alias,qgene,qchromosome,qstart,qstop,qstrand,qtype = query_gene_by_name(con, gene)
       except KeyError,e:
         print >> sys.stderr, 'Invalid gene: %s' % e.args[0]
         continue
@@ -396,7 +282,7 @@ def clean_tasks(con,tasks,options):
     task[10] = set(i.strip() for i in include.split(',') if i.strip())
     task[11] = set(e.strip() for e in exclude.split(',') if e.strip())
 
-    snps = set(snp[0] for snp in get_snps(con, population, task[3], task[4], task[5]))
+    snps = set(s[0] for s in query_snps_by_location(con, task[3], task[4], task[5]))
     task.append(snps)
 
     yield task
@@ -466,8 +352,6 @@ def option_parser():
                     help='upstream margin in bases')
   parser.add_option('--downstream', dest='downstream', default=10000, type='int',  metavar='N',
                     help='downstream margin in bases')
-  parser.add_option('--getsequence', dest='getsequence', action='store_true',
-                          help='Output design sequence from GeneWindow')
   parser.add_option('--dryrun', dest='dryrun', action='store_true',
                           help='Perform a dryrun. Perform all processing except actually tagging')
   parser.add_option('--maxqueue', dest='maxqueue', default=1, type='int',
@@ -498,7 +382,6 @@ def main():
   tasks      = sorted(clean_tasks(con,tasks,options))
 
   genecounts = {}
-  genestuff  = {}
   genefail   = {}
 
   print '\t'.join(['Project','Population','Region','Chr','Start','Stop', 'Strand',
@@ -549,14 +432,7 @@ def main():
       for rs in sorted(design):
         designfile.write('%s\n' % rs)
 
-      seqs = []
-      if options.getsequence:
-        designfile = file(project_file(outdir,project,gene,'design.fasta'),'w')
-        for rs,seq in get_sequences(con, design):
-          designfile.write('>%s\n%s\n' % (rs,seq))
-
       genecounts[gene] = len(design)
-      genestuff[gene]  = seqs
 
       d = map(str,[project,population,gene,chromosome,start,stop,strand,
                    len(snps),len(qsnps),len(tags),len(obligate),len(excl)])
@@ -569,11 +445,6 @@ def main():
     for rs in ptags:
       designfile.write('%s\n' % rs)
 
-    if options.getsequence:
-      designfile = file(project_file(outdir,project,'design.fasta'),'w')
-      for rs,seq in get_sequences(con, ptags):
-        designfile.write('>%s\n%s\n' % (rs,seq))
-
     pdir = project_path(outdir,project)
     command = 'glu tagzilla.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
     print >> sys.stderr, subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
@@ -581,11 +452,6 @@ def main():
     sumfile = file(project_file(outdir,project,'genesum.out'),'w')
     for gene,n in sorted(genecounts.iteritems()):
       sumfile.write('%s\t%d\n' % (gene,n))
-
-    sumfile = file(project_file(outdir,project,'genestuff.out'),'w')
-    for gene,seqs in sorted(genestuff.iteritems()):
-      for rs,seq in seqs:
-        sumfile.write('%s\t%s\t%s\n' % (gene,rs,seq))
 
 
 if __name__ == '__main__':
