@@ -9,7 +9,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-from glu.modules.tagzilla.tagzilla import *
+import sys
+import optparse
+
+from   glu.lib.fileutils             import load_list, table_writer
+from   glu.lib.genolib               import geno_options
+
+from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, epsilon, sfloat, \
+                                            build_design_score, generate_ldpairs
 
 
 def option_parser():
@@ -77,25 +84,30 @@ def option_parser():
   return parser
 
 
-def surrogates(options,args):
+def main():
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if not args:
+    parser.print_help()
+    return
+
   subset  = set()
   exclude = set()
 
   if options.subset:
-    read_snp_list(options.subset, subset)
+    subset = set(load_list(options.subset))
 
   if options.exclude:
-    read_snp_list(options.exclude, exclude)
+    exclude = set(load_list(options.exclude))
 
-  designscores = build_design_score(options.designscores)
-  if options.designdefault <= epsilon:
-    ldsubset = set(lname for lname,d in designscores.iteritems() if d <= epsilon)
-  else:
-    ldsubset = set()
+  if options.designscores:
+    designscores = build_design_score(options.designscores)
+    exclude.update(lname for lname,d in designscores.iteritems() if d <= epsilon)
 
   locusmap = {}
   options.multipopulation = None
-  ldpairs = generate_ldpairs(args, locusmap, set(), subset, ldsubset, options)
+  ldpairs = generate_ldpairs(args, locusmap, set(), subset, exclude, options)
 
   missing = '',0
   best_surrogate = {}
@@ -104,27 +116,23 @@ def surrogates(options,args):
       if lname1==lname2:
         continue
 
-      d1=designscores.get(lname1,options.designdefault) > epsilon
-      d2=designscores.get(lname2,options.designdefault) > epsilon
+      d1=lname1 not in exclude
+      d2=lname2 not in exclude
 
-      if d1 and not d2 and lname2 in designscores:
+      if d1 and not d2:
         best_locus,best_r2 = best_surrogate.get(lname2,missing)
         if r2 > best_r2:
           best_surrogate[lname2] = lname1,r2
-      elif not d1 and d2 and lname1 in designscores:
+      elif not d1 and d2:
         best_locus,best_r2 = best_surrogate.get(lname1,missing)
         if r2 > best_r2:
           best_surrogate[lname1] = lname2,r2
 
-  outfile = autofile(options.outfile, 'w', hyphen=sys.stdout)
-  outfile.write('LNAME\tSURROGATE\tRSQUARED\n')
+  outfile = table_writer(options.outfile, hyphen=sys.stdout)
+  outfile.writerow(['LNAME','SURROGATE','RSQUARED'])
   for lname,(surrogate,r2) in best_surrogate.iteritems():
     r2 = sfloat(r2)
-    outfile.write('%s\t%s\t%s\n' % (lname,surrogate,r2))
-
-
-def main():
-  launcher(surrogates, option_parser, **globals())
+    outfile.writerow([lname,surrogate,r2])
 
 
 if __name__ == '__main__':

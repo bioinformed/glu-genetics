@@ -9,7 +9,14 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-from tagzilla import *
+import sys
+import optparse
+
+from   glu.lib.fileutils             import load_list, table_writer
+from   glu.lib.genolib               import geno_options
+
+from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, epsilon, sfloat, \
+                                            build_design_score, generate_ldpairs
 
 
 def option_parser():
@@ -77,20 +84,26 @@ def option_parser():
   return parser
 
 
-def coverage(options,args):
-  tags    = set()
+def main():
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if not args:
+    parser.print_help()
+    return
+
   subset  = set()
   exclude = set()
 
-  read_snp_list(args[0][1], tags)
+  tags = set(load_list(args[0][1]))
 
   args = args[1:]
 
   if options.subset:
-    read_snp_list(options.subset, subset)
+    subset = set(load_list(options.subset))
 
   if options.exclude:
-    read_snp_list(options.exclude, exclude)
+    exclude = set(load_list(options.exclude))
 
   designscores = build_design_score(options.designscores)
 
@@ -104,12 +117,13 @@ def coverage(options,args):
   options.multipopulation = None
   ldpairs = generate_ldpairs(args, locusmap, set(), subset, tags, options)
 
+  loci    = set()
   besttag = dict( (tag,(tag,1)) for tag in tags )
   missing = '',-1
   for pairs in ldpairs:
     for lname1,lname2,r2,dprime in pairs:
       if lname1==lname2:
-        continue
+        loci.add(lname1)
 
       for l1,l2 in (lname1,lname2),(lname2,lname1):
         if l2 in tags:
@@ -118,19 +132,15 @@ def coverage(options,args):
             besttag[l1] = l2,r2
           break
 
-  outfile = autofile(options.outfile, 'w', hyphen=sys.stdout)
-  outfile.write('LNAME\tTAG\tBEST RSQUARED\n')
+  outfile = table_writer(options.outfile, hyphen=sys.stdout)
+  outfile.writerow(['LNAME','TAG','BEST RSQUARED'])
   missing = '',sfloat(0)
-  for lname in locusmap:
+  for lname in loci:
     tag,r2 = missing
     if lname in besttag:
       tag,r2 = besttag[lname]
       r2 = sfloat(r2)
-    outfile.write('%s\t%s\t%s\n' % (lname,tag,r2))
-
-
-def main():
-  launcher(coverage, option_parser, **globals())
+    outfile.writerow([lname,tag,r2])
 
 
 if __name__ == '__main__':

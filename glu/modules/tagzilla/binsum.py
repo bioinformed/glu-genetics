@@ -9,32 +9,16 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-import heapq
-from   tagzilla import *
+import sys
+import optparse
 
+from   glu.lib.imerge                import imerge
+from   glu.lib.fileutils             import autofile, hyphen, load_list
 
-def imerge(*its):
-  pqueue = []
-  for i in map(iter, its):
-    try:
-      pqueue.append((i.next(), i.next))
-    except StopIteration:
-      pass
-
-  heapq.heapify(pqueue)
-
-  while pqueue:
-    val, it = pqueue[0]
-    yield val
-    try:
-      heapq.heapreplace(pqueue, (it(), it))
-    except StopIteration:
-      heapq.heappop(pqueue)
+from   glu.modules.tagzilla.tagzilla import BinInfo, NullBinInfo, locus_result_sequence, bin_qualifier
 
 
 def option_parser():
-  import optparse
-
   usage = 'usage: %prog [options] genofile...'
   parser = optparse.OptionParser(usage=usage, add_help_option=False)
 
@@ -58,17 +42,24 @@ def option_parser():
   return parser
 
 
-def binsum(options,args):
+def main():
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if not args:
+    parser.print_help()
+    return
+
   infofile = None
   if options.bininfo:
-    infofile = autofile(options.bininfo, 'w', hyphen=sys.stdout)
+    infofile = autofile(hyphen(options.bininfo,sys.stdout), 'w')
 
   if options.bininfo or options.sumfile:
     bininfo = BinInfo(infofile, options.histomax+1)
   else:
     bininfo = NullBinInfo()
 
-  sumfile = autofile(options.sumfile, 'w', hyphen=sys.stdout)
+  sumfile = autofile(hyphen(options.sumfile,sys.stdout), 'w')
 
   if [infofile,sumfile].count(sys.stdout) > 1:
     print >> sys.stderr, 'ERROR: More than one output file directed to standad out.'
@@ -78,7 +69,7 @@ def binsum(options,args):
   exclude = set()
 
   if options.subset:
-    read_snp_list(options.subset, subset)
+    subset = set(load_list(options.subset))
 
   locusmap = {}
   results = [ locus_result_sequence(filename, locusmap, exclude) for filename in args ]
@@ -94,7 +85,7 @@ def binsum(options,args):
   except ImportError:
     pass
 
-  results = imerge(*results)
+  results = imerge(results)
 
   popdtags = {}
   populations = set()
@@ -121,10 +112,6 @@ def binsum(options,args):
 
   if len(populations) > 1:
     bininfo.emit_multipop_summary(sumfile,popdtags)
-
-
-def main():
-  launcher(binsum, option_parser, **globals())
 
 
 if __name__ == '__main__':
