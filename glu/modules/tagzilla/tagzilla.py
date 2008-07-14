@@ -1636,7 +1636,7 @@ def order_loci(loci):
   return sorted(loci,key=locus_key)
 
 
-def scan_loci_ldsubset(monitor, loci, maxd):
+def filter_loci_ldsubset(loci, ldsubset, maxd):
   '''
   Yield only loci where there exists at least one monitored location within
   maxd distance.
@@ -1645,36 +1645,35 @@ def scan_loci_ldsubset(monitor, loci, maxd):
   forward and one in reverse.  As such, a locus may be yielded twice if it
   is within maxd if a monitored location on both the left and the right.
   '''
+  if not ldsubset:
+    return loci
+
+  monitor = [ (l.chromosome,l.location) for l in loci if l.name in ldsubset ]
+
   n = len(loci)
+  keep = set()
 
   # Scan forward though loci, yielding all following loci within maxd of a
   # monitored location
   pos = 0
-  for m in monitor:
-    while pos < n and loci[pos].location < m:
+  for chr,loc in monitor:
+    while pos < n and (loci[pos].chromosome,loci[pos].location) < (chr,loc):
       pos += 1
-    while pos < n and loci[pos].location-m <= maxd:
-      yield loci[pos]
+    while pos < n and loci[pos].chromosome==chr and loci[pos].location-loc <= maxd:
+      keep.add(loci[pos])
       pos += 1
 
   # Scan backward though loci, yielding all prior loci within maxd if a
   # monitored location
   pos = n-1
-  for m in reversed(monitor):
-    while pos >= 0 and loci[pos].location > m:
+  for chr,loc in reversed(monitor):
+    while pos >= 0 and (loci[pos].chromosome,loci[pos].location) > (chr,loc):
       pos -= 1
-    while pos >= 0 and m-loci[pos].location <= maxd:
-      yield loci[pos]
+    while pos >= 0 and loci[pos].chromosome==chr and loc-loci[pos].location <= maxd:
+      keep.add(loci[pos])
       pos -= 1
 
-
-def filter_loci_ldsubset(loci, ldsubset, maxd):
-  if not ldsubset:
-    return loci
-
-  monitor = [ l for l in loci if l.name in ldsubset ]
-  keep    = set(scan_loci_ldsubset(monitor,loci,maxd))
-  return [ l for l in loci if l in keep ]
+  return order_loci(keep)
 
 
 def update_locus_map(locusmap, loci):
