@@ -172,6 +172,10 @@ def main():
   module_fullname = 'glu.modules.' + module_name
   module_options  = args[1:]
 
+  if glu_options.stats:
+    cstart = time.clock()
+    tstart = time.time()
+
   try:
     loader = pkgutil.get_loader(module_fullname)
 
@@ -189,8 +193,6 @@ def main():
       return
 
     if glu_options.stats:
-      cstart = time.clock()
-      tstart = time.time()
       sys.stderr.write('[%s] Execution start\n' % time.asctime())
 
     sys.argv = ['glu %s' % module_name] + module_options
