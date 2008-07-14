@@ -31,7 +31,7 @@ import optparse
 from   math                      import log, ceil
 from   operator                  import itemgetter
 from   collections               import defaultdict
-from   itertools                 import chain, repeat, groupby, izip, dropwhile
+from   itertools                 import chain, groupby, izip, dropwhile
 
 from   glu.lib.hwp               import hwp_biallelic
 from   glu.lib.stats             import mean, median
@@ -48,9 +48,6 @@ epsilon = 10e-10
 LOCUS_HEADER1   = ['LNAME','LOCATION','MAF','BINNUM','DISPOSITION']
 LOCUS_HEADER2   = ['LNAME','LOCATION','POPULATION','MAF','BINNUM','DISPOSITION']
 PAIR_HEADER     = ['BIN','LNAME1','LNAME2','POPULATION','RSQUARED','DPRIME','DISPOSITION']
-MULTI_METHODS_S = ['merge2', 'merge3', 'minld']
-MULTI_METHODS_M = ['global']
-MULTI_METHODS = MULTI_METHODS_S + MULTI_METHODS_M
 re_spaces = re.compile('[\t ,]+')
 
 
@@ -134,104 +131,6 @@ def scan_ldpairs_region(loci, maxd, rthreshold, dthreshold):
 
       if r2 >= rthreshold and abs(dprime) >= dthreshold:
         yield name1,locus2.name,r2,dprime
-
-
-def merge_multi_loci(loci):
-  def locus_iter(loci):
-    return chain(loci,repeat(None))
-
-  pops  = len(loci)
-  loci  = [ locus_iter(locus) for locus in loci ]
-  locus = [ l.next() for l in loci ]
-
-  while 1:
-    if locus.count(None) == pops:
-      break
-
-    location,name,min_locus = min( (l.location,l.name,l) for l in locus if l )
-
-    results = []
-    for i,l in enumerate(locus):
-      if l and l.name == name and l.location == location:
-        results.append(l)
-        locus[i] = loci[i].next()
-      else:
-        results.append( Locus(name, location, []) )
-
-    yield results
-
-
-def merge_loci(loci):
-  loci = list(merge_multi_loci(loci))
-
-  # FIXME: Materializing full streams is somewhat wasteful.  We should use
-  #        itertools.tee instead.  However, this is the safer method until
-  #        the load_genotypes routines are augmented to always return a
-  #        fixed number of genotypes.
-  pops = len(loci[0])
-
-  for locus in loci:
-    assert len(locus) == pops
-    genos = []
-    # FIXME: This needs to be a proper merge
-    for i in xrange(pops):
-      genos.extend(locus[i].genos)
-
-    try:
-      yield Locus(locus[0].name, locus[0].location, genos)
-    except ValueError:
-      print >> sys.stderr, 'WARNING: BAD LOCUS %s (too many alleles).  Skipping.' % locus[0].name
-
-
-def scan_ldpairs_multi(loci, maxd, multi_options):
-  '''
-  A generator for pairs of loci within a specified genomic distance.
-  Loci are assumed to be sorted by genomic location.
-  '''
-
-  loci = list(merge_multi_loci(loci))
-  ths = [ (options.d,options.r) for options in multi_options ]
-
-  # Scan each locus
-  n = len(loci)
-  for i in xrange(n):
-    location1 = loci[i][0].location
-
-    # And up to maxd distance beyond it
-    for j in xrange(i+1,n):
-      location2 = loci[j][0].location
-
-      if location2 - location1 > maxd:
-        break
-
-      # Initialize r2 and dprime to absurdly large values, since we will be
-      # tracking their minimums
-      r2 = dprime = 10
-
-      # Track if we have seen only pairs of loci that meet the required
-      # thresholds
-      good = True
-
-      for (dth,rth),locus1,locus2 in izip(ths,loci[i],loci[j]):
-        if not locus1.genos or not locus2.genos:
-          continue
-
-        counts = count_haplotypes(locus1.genos, locus2.genos)
-        r2_pop,dprime_pop = estimate_ld(*counts)
-
-        r2,dprime = min(r2,r2_pop),min(dprime,dprime_pop)
-
-        # Check the population-specific thresholds and stop if the current
-        # pair do not meet them.
-        if r2_pop < rth or abs(dprime_pop) < dth:
-          good = False
-          break
-
-      # If there was at least one valid pair of loci (r2<10) and all pairs
-      # met the necessary thresholds, yield the locus names and
-      # corresponding minimum r-squared and dprime
-      if r2<10 and good:
-        yield locus1.name,locus2.name,r2,dprime
 
 
 def filter_loci_by_maf(loci, minmaf, minobmaf, include):
@@ -561,7 +460,7 @@ class BinInfo(NullBinInfo):
     if not out:
       return
 
-    population = population or 'user specified'
+    population = population or 'default'
     out.write('Bin %-4d population: %s, sites: %d, tags %d, other %d, tags required %d, width %d, avg. MAF %.1f%%\n' \
                    % (binnum,population,binsize,len(bin.tags),len(bin.others),bin.tags_required,width,amaf))
     out.write('Bin %-4d Location: min %d, median %d, mean %d, max %d\n' \
@@ -621,7 +520,7 @@ class BinInfo(NullBinInfo):
   def emit_multipop_summary(self, sumfile, tags):
     n = sum(tags.itervalues())
 
-    sumfile.write('\nTags required by disposition for all population:\n')
+    sumfile.write('\nTags required by disposition for all populations:\n')
 
     sumfile.write('                      tags         \n')
     sumfile.write(' disposition          req.     %   \n')
@@ -639,7 +538,7 @@ class BinInfo(NullBinInfo):
     if not population:
       out.write('\nBin statistics by bin size for %s:\n\n' % disposition)
     else:
-      out.write('\nBin statistics by bin size for %s in population %s:\n\n' % (disposition,population))
+      out.write('\nBin statistics by bin size for %s for population %s:\n\n' % (disposition,population))
 
     out.write(' bin   tags                                total   non-     avg    avg\n')
     out.write(' size  req.   bins     %    loci      %    tags    tags    tags  width\n')
@@ -1778,7 +1677,7 @@ def update_locus_map(locusmap, loci):
   locusmap.update(addloci)
 
 
-def generate_ldpairs_single(args, locusmap, include, subset, ldsubset, options):
+def generate_ldpairs(args, locusmap, include, subset, ldsubset, options):
   for file_options,filename in args:
     regions = generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, file_options)
 
@@ -1822,78 +1721,6 @@ def get_populations(option):
     labels = [ l.strip() for l in option.split(',') if l.strip() ]
 
   return labels
-
-
-def generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options):
-  # FIXME: This can be easily corrected
-  formats = set(file_options.format.lower() for file_options,filename in args)
-  if formats.intersection( ('festa','hapmapld') ):
-    raise TagZillaError('ERROR: Multipopulation binning algoritm cannot currently accept data in LD/FESTA format.')
-
-  method = options.multimethod.lower()
-  labels = get_populations(options.multipopulation)
-  pops = len(labels)
-  regions = len(args) // pops
-
-  if len(args) % pops != 0:
-    raise TagZillaError('ERROR: The number of input files must be a multiple of the number of populations')
-
-  for i in xrange(regions):
-    multi_loci = []
-    multi_options = []
-
-    for file_options,filename in args[i*pops:(i+1)*pops]:
-      loci = list(load_genotypes(filename,file_options))
-
-      if method not in ('merge2','merge2+'):
-        loci = filter_loci(loci, include, subset, file_options)
-        loci = order_loci(loci)
-        # Locusmap must contain only post-filtered loci
-        locusmap.update( (locus.name,locus) for locus in loci if locus.genos )
-      else:
-        loci = order_loci(loci)
-
-      multi_loci.append(loci)
-      multi_options.append(file_options)
-
-    if method in ['minld']:
-      ldpairs = scan_ldpairs_multi(multi_loci, options.maxdist*1000, multi_options)
-
-    elif method in ['merge2','merge3']:
-      loci = merge_loci(multi_loci)
-
-      if method in ['merge2']:
-        loci = filter_loci(loci, include, subset, options)
-
-      # Locusmap must contain only post-filtered loci
-      loci = list(loci)
-      locusmap.update( (locus.name,locus) for locus in loci if locus.genos )
-
-      ldpairs = scan_ldpairs(loci, options.maxdist*1000, options.r, options.d)
-
-    else:
-      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
-
-    yield ldpairs
-
-
-def generate_ldpairs(args, locusmap, include, subset, ldsubset, options):
-  pops = len(get_populations(options.multipopulation))
-  if pops > 1:
-    method = (options.multimethod or '').lower()
-
-    if pops <= 1 or not method:
-      raise TagZillaError('ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod')
-
-    if method not in MULTI_METHODS_S:
-      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
-
-    ldpairs = generate_ldpairs_multi(args, locusmap, include, subset, ldsubset, options)
-
-  else:
-    ldpairs = generate_ldpairs_single(args, locusmap, include, subset, ldsubset, options)
-
-  return ldpairs
 
 
 def get_tags_required_function(options):
@@ -2014,9 +1841,6 @@ def option_parser():
   bingroup.add_option('-M', '--multipopulation', dest='multipopulation', metavar='N or P1,P2,...',
                           help='Multipopulation tagging where every N input files represent a group of populations. '
                                'May be specified as an integer N or a comma separated list of population labels.')
-  bingroup.add_option(      '--multimethod', dest='multimethod', type='str', metavar='METH', default='global',
-                          help='Merge populations when performing multipopulation tagging.  '
-                               'METH may be %s. (default=global)' % ', '.join(MULTI_METHODS))
   bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.8,
                           help='Minimum r-squared threshold to output (default=0.8)')
   bingroup.add_option('-t', '--targetbins', dest='targetbins', metavar='N', type='int', default=0,
@@ -2156,8 +1980,6 @@ def tagzilla_single(options,args):
     population = get_populations(options.multipopulation)[0]
   except IndexError:
     pass
-
-  population = population or 'user specified'
 
   for bins,lddata in results:
     for bin in bins:
@@ -2318,18 +2140,9 @@ def main():
   pops = len(get_populations(options.multipopulation))
 
   if pops > 1:
-    method = (options.multimethod or '').lower()
-
-    if pops <= 1 or not method:
-      raise TagZillaError('ERROR: Multipopulation analysis requires specification of both -M/--multipopulation and --multimethod')
-
-    if method not in MULTI_METHODS:
-      raise TagZillaError('ERROR: Unsupported multipopulation method (--multimethod) chosen: %s' % options.multimethod)
-
-    if method in MULTI_METHODS_M:
-      return tagzilla_multi(options,args)
-
-  return tagzilla_single(options,args)
+    return tagzilla_multi(options,args)
+  else:
+    return tagzilla_single(options,args)
 
 
 if __name__ == '__main__':
