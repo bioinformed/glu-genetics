@@ -12,7 +12,7 @@ import sqlite3
 
 from   glu.lib.fileutils          import load_table,table_writer,tryint
 
-from   glu.modules.genedb.queries import query_gene, query_snp
+from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
@@ -63,20 +63,20 @@ def resolve_feature(con,feature,options):
   if (start is not None and end is None) or (is_int(start) and is_int(end) and start+1==end):
     feature = 'SNP'
   elif chr and start and end:
-    geneinfo = query_gene(con,name)
-    if any( (chr,start,end) == (gi[2],gi[4],gi[5]) for gi in geneinfo):
+    geneinfo = query_genes_by_name(con,name)
+    if any( (chr,start,end) == (gi[2],gi[3],gi[4]) for gi in geneinfo):
       feature = 'GENE'
     else:
       feature = 'REGION'
   else:
-    geneinfo = query_gene(con,name)
+    geneinfo = query_genes_by_name(con,name)
     if len(geneinfo) == 1:
-      name,chr,strand,start,end = geneinfo[0][1:6]
+      name,chr,start,end,strand = geneinfo[0][1:6]
       feature = geneinfo[0][6]
     elif len(geneinfo) > 1:
       feature = 'AMBIGUOUS'
     else:
-      snpinfo = query_snp(con,name)
+      snpinfo = query_snps_by_name(con,name)
       if len(snpinfo)==1:
         lname,chr,start,strand = snpinfo[0]
         end = start+1

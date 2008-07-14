@@ -10,9 +10,9 @@ __revision__  = '$Id$'
 import sys
 import sqlite3
 
-from   glu.lib.fileutils          import hyphen,load_table,table_writer,resolve_column_headers
+from   glu.lib.fileutils          import load_table,table_writer,resolve_column_headers
 
-from   glu.modules.genedb.queries import query_snp,query_gene_neighborhood
+from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood
 
 
 HEADER = ['CHROMOSOME','LOCATION','GENE NEIGHBORHOOD']
@@ -50,7 +50,7 @@ def annotate(con,header,rows,options):
       yield row + ['']*3
       continue
 
-    snps = query_snp(con,row[column])
+    snps = query_snps_by_name(con,row[column])
 
     if not snps:
       info = ['UNKNOWN','','']
