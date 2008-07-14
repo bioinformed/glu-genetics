@@ -78,7 +78,7 @@ def scan_ldpairs(loci, maxd, rthreshold, dthreshold):
   regions  = []
   region   = []
   last_chr = None
-  last_loc = None
+  last_loc = 0
 
   # Collect all regions
   for locus in loci:
