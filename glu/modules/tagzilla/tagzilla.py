@@ -47,6 +47,7 @@ epsilon = 10e-10
 
 LOCUS_HEADER1   = ['LNAME','LOCATION','MAF','BINNUM','DISPOSITION']
 LOCUS_HEADER2   = ['LNAME','LOCATION','POPULATION','MAF','BINNUM','DISPOSITION']
+LOCUS_HEADER3   = ['LNAME','CHROMOSOME','LOCATION','POPULATION','MAF','BINNUM','DISPOSITION']
 PAIR_HEADER     = ['BIN','LNAME1','LNAME2','POPULATION','RSQUARED','DPRIME','DISPOSITION']
 re_spaces = re.compile('[\t ,]+')
 
@@ -345,7 +346,7 @@ class PairwiseBinOutput(NullPairwiseBinOutput):
   def __init__(self, outfile, exclude):
     self.outfile = outfile
     self.exclude = exclude
-    outfile.write('BIN\tLNAME1\tLNAME2\tPOPULATION\tRSQUARED\tDPRIME\tDISPOSITION\n')
+    outfile.writerow(['BIN','LNAME1','LNAME2','POPULATION','RSQUARED','DPRIME','DISPOSITION'])
 
   def emit_bin(self, bin, qualifier, population, options):
     outfile = self.outfile
@@ -360,7 +361,7 @@ class PairwiseBinOutput(NullPairwiseBinOutput):
       r2 = sfloat(r2)
       dprime = sfloat(dprime)
       disposition = pair_disposition(lname1, lname2, bin, qualifier)
-      outfile.write('%d\t%s\t%s\t%s\t%s\t%s\t%s\n' % (bin.binnum,lname1,lname2,population,r2,dprime,disposition))
+      outfile.writerow([bin.binnum,lname1,lname2,population,r2,dprime,disposition])
 
   def emit_extra(self, lddata, tags, population):
     outfile = self.outfile
@@ -370,7 +371,7 @@ class PairwiseBinOutput(NullPairwiseBinOutput):
       disposition = pair_disposition(lname1,lname2,bin,qualifier='interbin')
       r2     = sfloat(r2)
       dprime = sfloat(dprime)
-      outfile.write('\t%s\t%s\t%s\t%s\t%s\t%s\n' % (lname1,lname2,population,r2,dprime,disposition))
+      outfile.writerow(['',lname1,lname2,population,r2,dprime,disposition])
 
 
 def save_ldpairs(filename, ldpairs):
@@ -395,7 +396,7 @@ class LocusOutput(NullLocusOutput):
   def __init__(self, locusinfofile, exclude):
     self.locusinfofile = locusinfofile
     self.exclude = exclude
-    locusinfofile.write('LNAME\tLOCATION\tPOPULATION\tMAF\tBINNUM\tDISPOSITION\n')
+    locusinfofile.writerow(LOCUS_HEADER3)
 
   def emit_bin(self, bin, locusmap, qualifier, population):
     locusinfofile = self.locusinfofile
@@ -404,7 +405,8 @@ class LocusOutput(NullLocusOutput):
       disposition = locus_disposition(lname, bin, exclude, qualifier)
       l = locusmap[lname]
       maf = sfloat(l.maf)
-      locusinfofile.write('%s\t%d\t%s\t%s\t%d\t%s\n' % (l.name, l.location, population, maf, bin.binnum, disposition))
+      locusinfofile.writerow([l.name, l.chromosome, l.location, population,
+                                   maf, bin.binnum, disposition])
 
 
 class NullBinInfo(object):
@@ -595,13 +597,16 @@ def locus_result_sequence(filename, locusmap, exclude):
 
   if header == PAIR_HEADER:
     version = 0
-    grouper = lambda row: (row[0],row[3])
+    grouper = itemgetter(0,3)
   elif header == LOCUS_HEADER1:
     version = 1
     grouper = itemgetter(3)
   elif header == LOCUS_HEADER2:
     version = 2
-    grouper = lambda row: (row[4],row[2])
+    grouper = itemgetter(4,2)
+  elif header == LOCUS_HEADER3:
+    version = 3
+    grouper = itemgetter(5,3)
   else:
     raise TagZillaError('ERROR: Invalid input format for file %s.' % filename)
 
@@ -631,12 +636,15 @@ def locus_result_sequence(filename, locusmap, exclude):
         disposition = locus[6]
       elif version == 1:
         lname,location,maf,binnum,disposition = locus
-        population = ''
-      else:
+        population = chr = ''
+      elif version == 2:
         lname,location,population,maf,binnum,disposition = locus
+        chr = ''
+      elif version == 3:
+        lname,chr,location,population,maf,binnum,disposition = locus
 
       bin.binnum = binnum
-      locus = locusmap[lname] = Locus(lname, int(location), [])
+      locus = locusmap[lname] = Locus(lname, chr, int(location), [])
 
       maf = float(maf)
       locus.maf = maf
@@ -1885,21 +1893,21 @@ def do_tagging(ldpairs, locusmap, includes, exclude, designscores, options):
 def build_output(options, exclude):
   pairinfofile = None
   if options.outfile:
-    pairinfofile = autofile(hyphen(options.outfile,sys.stdout), 'w')
+    pairinfofile = table_writer(options.outfile,hyphen=sys.stdout)
     pairinfo = PairwiseBinOutput(pairinfofile, exclude)
   else:
     pairinfo = NullPairwiseBinOutput()
 
   locusinfofile = None
   if options.locusinfo:
-    locusinfofile = autofile(hyphen(options.locusinfo,sys.stdout), 'w')
+    locusinfofile = table_writer(options.locusinfo,hyphen=sys.stdout)
     locusinfo = LocusOutput(locusinfofile, exclude)
   else:
     locusinfo = NullLocusOutput()
 
   infofile = None
   if options.bininfo:
-    infofile = autofile(hyphen(options.bininfo,sys.stdout), 'w')
+    infofile = autofile(hyphen(options.bininfo,sys.stdout),'w')
 
   if options.bininfo or options.sumfile:
     bininfo = BinInfo(infofile, options.histomax+1)
