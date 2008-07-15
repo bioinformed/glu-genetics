@@ -1,1 +1,3 @@
-include MANIFEST.in README LICENSE docs glu/VERSION
+include MANIFEST.in README LICENSE glu/VERSION
+recursive-include glu  README *.py *.c *.h
+recursive-include docs Makefile conf.py *.rst *.html *.dat *.py
