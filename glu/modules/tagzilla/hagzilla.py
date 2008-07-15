@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
+__gluindex__  = True
 __program__   = 'HagZilla'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
-__abstract__  = 'Front-end for running TagZilla assay design'
+__abstract__  = 'Simplified interface for tag-based assay design'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -99,9 +100,6 @@ def get_genotypes(populations,chromosome):
 
   populations = populations.split(',')
   command.append(' -M %s' % escape_spaces(','.join(populations)))
-
-  if len(populations) > 1:
-    command.append('--multimethod global')
 
   for population in populations:
     data = POPS[population]
