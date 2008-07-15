@@ -399,8 +399,8 @@ def get_mirbase(mfile):
     geneid      = names['ACC']
     featureName = names['ID']
     chromosome  = row[0]
-    chrStart    = int(row[3])
-    chrEnd      = int(row[4])
+    chrStart    = int(row[3])-1
+    chrEnd      = int(row[4])-1
     orientation = row[6]
     contig      = None
     cnt_start   = None
