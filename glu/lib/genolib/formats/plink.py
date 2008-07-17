@@ -38,6 +38,9 @@ PHENO_RMAP = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}
 
 PARENT_MAP = {'0':None}
 
+CHR_MAP    = {'0':None,'23':'X','24':'Y','25':'XY','26':'M'}
+CHR_RMAP   = {None:'0','':'0','X':'23','Y':'24','XY':'25','M':'26','MT':26}
+
 
 def load_plink_map(filename,genome):
   mfile = autofile(filename)
@@ -774,7 +777,7 @@ def load_plink_bim(filename,genome):
     if len(fields) != 6:
       raise ValueError('Invalid PLINK BIM record %d' % (i+1))
 
-    chr     = fields[0]
+    chr     = CHR_MAP.get(fields[0].upper(),fields[0])
     locus   = fields[1]
     gdist   = int(fields[2])      if fields[2] else None
     pdist   = abs(int(fields[3])) if fields[3] else None
@@ -1258,9 +1261,11 @@ class PlinkBedWriter(object):
       out = autofile(self.bimfile,'wb')
       for locus in loci:
         loc   = self.genome.get_locus(locus)
+        chrom = loc.chromosome or ''
+        chrom = CHR_RMAP.get(chrom.upper(),chrom)
         a1,a2 = (loc.model.alleles[1:]+[0,0])[:2]
 
-        out.write( ' '.join( map(str,[loc.chromosome or 0,locus,0,loc.location or 0, a1, a2] )) )
+        out.write( ' '.join( map(str,[chrom,locus,0,loc.location or 0, a1, a2] )) )
         out.write('\r\n')
 
   def __enter__(self):
