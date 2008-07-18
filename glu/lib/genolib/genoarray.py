@@ -20,9 +20,14 @@ from   glu.lib.utils import izip_exact
 
 MISSING,HEMIZYGOTE,HOMOZYGOTE,HETEROZYGOTE=range(4)
 
+# Set to test pure-Python implementation
+FORCE_PYTHON=False
+
 
 try:
-  #raise ImportError    # Uncomment to test pure-Python implementation
+  if FORCE_PYTHON:
+    raise ImportError
+
   from   glu.lib.genolib._genoarray import (GenotypeArray, Genotype, GenotypeArrayDescriptor,
                                             UnphasedMarkerModel, genotype_indices,
                                             count_genotypes, genotype_categories,
@@ -37,7 +42,6 @@ except ImportError:
   from   glu.lib.genolib.bitarray  import getbits,setbits
 
   print >> sys.stderr, '[WARNING] Using slow Python genoarray'
-
 
   def _hemi(geno):
     return (geno[0] is None) ^ (geno[1] is None)
@@ -747,8 +751,8 @@ except ImportError:
     n = len(genos)
 
     if locus_counts is None:
-      locus_counts = [0]*len(model.genotypes)
-    elif len(locus_counts) != len(model.genotypes):
+      locus_counts = [0]*(1<<model.bit_size)
+    elif len(locus_counts) < len(model.genotypes):
       raise ValueError('invalid locus count array')
 
     if sample_counts is None:

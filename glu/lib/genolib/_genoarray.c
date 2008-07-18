@@ -2249,6 +2249,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 	locus_summary_state state;
 	PyObject *ret = NULL;
 	int model_len;
+	Py_ssize_t geno_len;
 	int category_len[2];
 	int len;
 
@@ -2294,11 +2295,17 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 		goto error;
 	}
 
-	model_len = PyList_Size( ((UnphasedMarkerModelObject *)model)->genotypes);
+	// Count array is conservative and defaults to 1<<model->bit_size.
+	model_len = 1<<((UnphasedMarkerModelObject *)model)->bit_size;
+
+	// However a pre-existing count array must only be longer than the genotypes
+	geno_len  = PyList_Size( ((UnphasedMarkerModelObject *)model)->genotypes);
+	if(geno_len==-1) goto error;
 
 	if(locus_counts)
 	{
-		if(!CountArray_Check(locus_counts,model_len))
+		if(!PyArray_Check(locus_counts)     ||  PyArray_TYPE(locus_counts)!=PyArray_LONG ||
+		    PyArray_NDIM(locus_counts) != 1 || !PyArray_DIMS(locus_counts)[0]<geno_len)
 		{
 			PyErr_SetString(PyExc_ValueError,"invalid locus count array");
 			goto error;
@@ -3541,6 +3548,8 @@ genomerger_merge_geno(GenotypeMergerObject *self, PyObject *args)
 
 	geno = genomerger_merge_genotype(self, model, genos, &status);
 
+	if(!geno) goto error;
+
 	if(self->trackstats)
 	{
 		PyObject *stats;
@@ -3558,7 +3567,7 @@ genomerger_merge_geno(GenotypeMergerObject *self, PyObject *args)
 	return geno;
 
 error:
-	Py_DECREF(geno);
+	Py_XDECREF(geno);
 	return NULL;
 }
 

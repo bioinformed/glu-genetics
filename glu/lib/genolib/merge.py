@@ -13,7 +13,7 @@ from   collections               import defaultdict
 from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import table_writer
 
-from   glu.lib.genolib.genoarray import Genotype,model_from_alleles
+from   glu.lib.genolib.genoarray import Genotype,model_from_alleles,FORCE_PYTHON
 
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)
@@ -88,7 +88,10 @@ class Unique(object):
       raise NonUniqueGenotypeError('Non-unique genotype found')
 
 try:
-  from _genoarray import merge_unanimous as unanimous
+  if FORCE_PYTHON:
+    raise ImportError
+
+  from glu.lib.genolib._genoarray import merge_unanimous as unanimous
 
   def test_unanimous():
     '''
@@ -464,7 +467,10 @@ class Ordered(object):
 
 
 try:
-  from _genoarray import GenotypeMerger
+  if FORCE_PYTHON:
+    raise ImportError
+
+  from glu.lib.genolib._genoarray import GenotypeMerger
 
   def test_merger():
     '''
@@ -526,11 +532,12 @@ except ImportError:
     3) discordant:   two or more non-missing genotypes that do not meet voting threshold
     4) missing:      zero or more missing genotypes only
     '''
-    def __init__(self, votefunc):
+    def __init__(self, votefunc, trackstats=True):
       '''
       Create a new GenotypeMerger object
       '''
-      self.votefunc = votefunc
+      self.votefunc   = votefunc
+      self.trackstats = trackstats
       self.clear()
 
     def clear(self):
@@ -576,8 +583,9 @@ except ImportError:
       '''
       concordclass,geno = self.votefunc(model,genos)
 
-      self.samplestats[sample][concordclass] += 1
-      self.locusstats[locus][concordclass]   += 1
+      if self.trackstats:
+        self.samplestats[sample][concordclass] += 1
+        self.locusstats[locus][concordclass]   += 1
 
       return geno
 
@@ -616,11 +624,12 @@ except ImportError:
       '''
       status,new_row = zip(*imap(self.votefunc,repeat(model),row))
 
-      lstat = self.locusstats[locus]
-      sstat = self.samplestats
-      for sample,s in izip(samples,status):
-        lstat[s] += 1
-        sstat[sample][s] += 1
+      if self.trackstats:
+        lstat = self.locusstats[locus]
+        sstat = self.samplestats
+        for sample,s in izip(samples,status):
+          lstat[s] += 1
+          sstat[sample][s] += 1
 
       return list(new_row)
 
@@ -659,11 +668,12 @@ except ImportError:
       '''
       status,new_row = zip(*imap(self.votefunc,models,row))
 
-      lstat = self.locusstats
-      sstat = self.samplestats[sample]
-      for locus,s in izip(loci,status):
-        lstat[locus][s] += 1
-        sstat[s] += 1
+      if self.trackstats:
+        lstat = self.locusstats
+        sstat = self.samplestats[sample]
+        for locus,s in izip(loci,status):
+          lstat[locus][s] += 1
+          sstat[s] += 1
 
       return list(new_row)
 
