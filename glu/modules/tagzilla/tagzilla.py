@@ -375,7 +375,7 @@ class PairwiseBinOutput(NullPairwiseBinOutput):
 
 
 def save_ldpairs(filename, ldpairs):
-  out = table_writer(filename)
+  out = table_writer(filename,hyphen=sys.stdout)
   out.writerow(['LNAME1','LNAME2','RSQUARED','DPRIME'])
 
   def _gen():
