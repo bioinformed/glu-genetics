@@ -57,6 +57,9 @@ def _imerge(its):
   Generator to efficiently merge sorted iterables using native Python sort
   order.
 
+  Based on a non-micro optimized version of Raymond Hettinger's recipe at
+  http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/491285
+
   Equivalent, but much more efficient than:
 
     iter(sorted(*chain(*its)))
