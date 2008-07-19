@@ -2304,8 +2304,8 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 
 	if(locus_counts)
 	{
-		if(!PyArray_Check(locus_counts)     ||  PyArray_TYPE(locus_counts)!=PyArray_LONG ||
-		    PyArray_NDIM(locus_counts) != 1 || !PyArray_DIMS(locus_counts)[0]<geno_len)
+		if(!PyArray_Check(locus_counts)     || PyArray_TYPE(locus_counts)!=PyArray_LONG ||
+		    PyArray_NDIM(locus_counts) != 1 || PyArray_DIMS(locus_counts)[0]<geno_len)
 		{
 			PyErr_SetString(PyExc_ValueError,"invalid locus count array");
 			goto error;
