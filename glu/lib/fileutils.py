@@ -998,6 +998,125 @@ def resolve_column_headers(header,columns):
   return indices
 
 
+def load_table_rows(rows, columns, header=None, want_header=False):
+  '''
+  Return a rows from a sequence for columns specified by name or number. A
+  single row of column headers may be embedded within the row sequence or
+  provided out-of-band.  Similarly, the header may be returned in-band or
+  not at all.
+
+  This function is typically used to post-process rows of data read from
+  various delimited formats to select the number and order of columns.  In
+  addition, all rows are padded to be of length of at least the header or
+  first row, though longer rows are never truncated.  This simplifies many
+  downstream operations.
+
+  The columns parameter can be None, a comma separated list of column
+  indices or column names.  None implies that all columns should be
+  returned.  Index numbers given as strings are interpreted as 1-based
+  indexes, while indices provided as Python objects are treated as 0-based.
+  The rationale behind the different bases is that users will typically
+  specify the string-based indices and counting from 1 is much more natural.
+  Programmatic interfaces will provide native integers and will follow the
+  standard 0-based convention.
+
+  @param         rows: input row sequence
+  @type          rows: iterable sequence of sequences
+  @param      columns: columns to extract
+  @type       columns: string or sequence
+  @param       header: out-of-band specification of row headers
+  @type        header: sequence
+  @param  want_header: flag to request header to be returned as part of the
+                       output stream
+  @type   want_header: bool
+  @return            : sequence of rows containing the columns requested
+  @rtype             : generator
+
+  >>> list(load_table_rows([['loc1','locA '],['loc2'],[''],['',''],[' loc3 ','locC'],['','foo'],['loc4','']],None))
+  [['loc1', 'locA'], ['loc2', ''], ['', ''], ['', ''], ['loc3', 'locC'], ['', 'foo'], ['loc4', '']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[0,1]))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[1,0]))
+  [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
+  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2']))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')]))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')]))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('1','c2')]))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1']))
+  [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2'],header=['c1','c2']))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')],header=['c1','c2']))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')],header=['c1','c2'],want_header=True))
+  [['c1', 'c2'], ['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('1','c2')],header=['c1','c2']))
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1'],header=['c1','c2']))
+  [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
+  '''
+  rows = iter(rows)
+
+  # All columns are to be returned
+  if not columns:
+    def _load_table_all(header):
+      if header is None:
+        try:
+          row = rows.next()
+        except StopIteration:
+          return
+
+        # Process row 1 (may or may not be a header)
+        row = map(str.strip,row)
+        n   = len(row)
+        yield row
+
+      else:
+        header = map(str.strip,header)
+        n      = len(header)
+        if want_header:
+          yield header
+
+      for row in rows:
+        result  = map(str.strip,row)
+        result += ['']*(n-len(result))
+        yield result
+
+    return _load_table_all(header)
+
+  # Otherwise, resolve column heading names into indices
+  if header is None:
+    try:
+      indices = resolve_column_headers(None,columns)
+    except ValueError:
+      # Need headers
+      try:
+        header = map(str.strip,rows.next())
+      except StopIteration:
+        return
+
+  indices = resolve_column_headers(header,columns)
+
+  if not want_header:
+    header = None
+
+  def _load_table_columns():
+    if header is not None:
+      yield [ header[j] for j in indices ]
+
+    # Build result rows
+    for row in rows:
+      m = len(row)
+      result  = [ (row[j].strip() if j<m else '') for j in indices ]
+      yield result
+
+  return _load_table_columns()
+
+
 def load_table(filename,want_header=False,extra_args=None,**kwargs):
   '''
   Return a table of data read from a delimited file as a list of rows, based
@@ -1101,6 +1220,17 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
   >>> test(StringIO("c1\\tc2\\nloc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=['c2','c1'])
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=['c1','c2'],header=['c1','c2'])
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[('c1','c2')],header=['c1','c2'])
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[(0,'c2')],header=['c1','c2'],want_header=True)
+  [['c1', 'c2'], ['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=[('1','c2')],header=['c1','c2'])
+  [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> test(StringIO("loc1\\nloc2\\nloc1\\tloc1\\nloc2"),columns=['c2','c1'],header=['c1','c2'])
+  [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
+
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
   >>> f.write('H1\\tH2\\nv11\\tv12\\nv21\\n\\tv32')
@@ -1129,6 +1259,10 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   skip    = int(get_arg(args, ['skip','s'], 0))
   format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
+  header  = get_arg(args, ['h','header'])
+
+  if header is not None and isinstance(header,str):
+    header = map(str.strip,header.split(','))
 
   format  = format.lower()
   if format in ('xls','excel'):
@@ -1144,56 +1278,8 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   if skip:
     rows = islice(rows,skip,None)
 
-  # All columns are to be returned
-  if not columns:
-    def _load_table_all(rows):
-      try:
-        row = rows.next()
-      except StopIteration:
-        return
+  return load_table_rows(rows,columns,header=header,want_header=want_header)
 
-      # Process row 1 (may or may not be a header)
-      row = map(str.strip,row)
-      yield row
-
-      n = len(row)
-      for row in rows:
-        result  = map(str.strip,row)
-        result += ['']*(n-len(result))
-        yield result
-
-    return _load_table_all(rows)
-
-  # Otherwise, resolve column heading names into indices
-  header = None
-  try:
-    indices = resolve_column_headers(None,columns)
-  except ValueError:
-    # Need headers
-    try:
-      header = map(str.strip,rows.next())
-    except StopIteration:
-      return
-
-    indices = resolve_column_headers(header,columns)
-
-    if not want_header:
-      header = None
-
-  def _load_table_columns(header, rows):
-    if header is not None:
-      yield [ header[j] for j in indices ]
-
-    n = len(indices)
-
-    # Build result rows
-    for row in rows:
-      m = len(row)
-      result  = [ (row[j].strip() if j<m else '') for j in indices ]
-      result += ['']*(n-len(result))
-      yield result
-
-  return _load_table_columns(header, rows)
 
 
 class TableWriter(object):
