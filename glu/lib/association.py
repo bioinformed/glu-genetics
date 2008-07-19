@@ -17,7 +17,7 @@ from   numpy             import array,matrix,asarray,asanyarray,zeros, \
 from   scipy             import stats
 
 from   glu.lib.utils     import tally
-from   glu.lib.fileutils import namefile,load_list,load_map,load_table,tryint1
+from   glu.lib.fileutils import namefile,load_list,load_map,load_table,load_table_rows,resolve_column_headers,tryint1
 from   glu.lib.genolib   import load_genostream,GenoTransform,pick
 from   glu.lib.formula   import get_term,INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
                                 NULL,TREND,GENO,FormulaParser
@@ -279,7 +279,7 @@ def strip_trailing_empty(row):
 
 
 # FIXME: Needs docs+tests
-def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
+def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
   '''
   Load phenotypes from a tab-delimited file
 
@@ -302,9 +302,19 @@ def load_phenos(filename,deptype=int,allowdups=False,verbose=1,errs=sys.stderr):
   except StopIteration:
     raise ValueError('Empty phenotype file')
 
-  if len(header) < 2:
-    header = normalize(header,2)
+  indices = resolve_column_headers(header,[pid,pheno])
+  if columns is not None:
+    indices.extend(resolve_column_headers(header,columns))
+  else:
+    used = set(indices)
+    indices.extend(i for i in range(len(header)) if i not in used)
 
+  if indices != range(len(header)):
+    phenos = load_table_rows(phenos, columns=indices, header=header, want_header=True)
+    header = phenos.next()
+
+  # Assign default names to missing headers to ensure that output code
+  # doesn't get cranky
   for i,h in enumerate(header):
     if not h:
       if i == 0:
@@ -387,8 +397,7 @@ def _load_loci(filename,options,keep):
 
 
 def parse_formulae(options,models):
-  if options.model is not None:
-    pheno,options.model = FormulaParser().parse(options.model)
+  scan = options.scan = options.scan if options.scan is not None else 'locus'
 
   if options.test is not None:
     _,options.test = FormulaParser().parse(options.test)
@@ -396,11 +405,17 @@ def parse_formulae(options,models):
   if options.display is not None:
     _,options.display = FormulaParser().parse(options.display)
 
+  if options.model and scan not in options.model.loci():
+    raise ValueError('Model does not contain any genotype scan terms')
+
   if options.model and not options.test:
-    options.test = COMBINATION(t for t in options.model.terms() if t.loci())
+    options.test = COMBINATION(t for t in options.model.terms() if scan in t.loci())
 
   if not options.test:
-    options.test = GENO('locus')
+    options.test = GENO(scan)
+
+  if scan not in options.test.loci():
+    raise ValueError('Test does not contain any genotype scan terms')
 
   if not options.model:
     phenos = COMBINATION( PHENOTERM(pheno) for pheno in models.pheno_header[2:] )
@@ -420,13 +435,7 @@ def parse_formulae(options,models):
     raise ValueError('Formula does not contain all terms to display')
 
   options.null = COMBINATION(t for t in options.model.terms()
-                                if t not in options.test and not t.loci())
-
-  if not any(t for t in options.test.terms() if t.loci()):
-    raise ValueError('Test does not contain any locus terms')
-
-  if any(t for t in options.null.terms() if t.loci()):
-    raise ValueError('Null model may not contain loci to be scanned')
+                                if t not in options.test and scan not in t.loci())
 
   options.stats = set(t.strip().lower() for t in options.stats.split(','))
   options.stats.discard('')
@@ -438,8 +447,18 @@ def parse_formulae(options,models):
 def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   warn_msg = '[WARNING] Subject "%s" excluded from analysis\n'
 
+  if options.model is not None:
+    pheno,options.model = FormulaParser().parse(options.model)
+    if pheno is not None:
+      options.pheno = pheno
+    covs = set(t.name for t in options.model.expand_terms() if isinstance(t,PHENOTERM))
+  else:
+    pheno  = covs = None
+    covs = None
+
   verbose       = options.verbose
-  header,phenos = load_phenos(phenofile,deptype=deptype,allowdups=options.allowdups,verbose=verbose,errs=errs)
+  header,phenos = load_phenos(phenofile,pid=options.pid,pheno=options.pheno,columns=covs,deptype=deptype,
+                                        allowdups=options.allowdups,verbose=verbose,errs=errs)
   phenos        = list(phenos)
   subjects      = set(p[0] for p in phenos)
   keep          = subjects.copy()
@@ -477,7 +496,7 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   gterms = []
   for t in options.model.expand_terms():
     if isinstance(t, GENOTERM):
-      if t.name=='locus':
+      if t.name==options.scan:
         gterms.append(t)
       elif t.name not in fixedloci:
         raise ValueError('Locus %s used in model, but not found in fixed loci' % t.name)
@@ -649,6 +668,9 @@ class LocusModelBuilder(object):
         try:
           t.pindex = self.pheno_header.index(t.name)
         except (ValueError,IndexError):
+          # FIXME: Index refers to file header, not pheno header.  More so,
+          # you can't specify 0 or 1 because those are taken as intercept
+          # terms.
           try:
             t.pindex = tryint1(t.name)
             t.name   = self.pheno_header[t.pindex]

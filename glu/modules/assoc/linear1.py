@@ -46,6 +46,12 @@ def option_parser():
   analysis.add_option('--stats', dest='stats', default='score', metavar='T1,T2,..',
                       help='Comma separated list of test statistics to apply to each model.  Supported tests '
                            'include score, Wald, and likelihood ratio statistics.  Values: score, wald, lrt.')
+  analysis.add_option('--scan', dest='scan', metavar='NAME', default='locus',
+                      help='Name of locus over which to scan, used in --model, --test and --display (default=locus)')
+  analysis.add_option('--pid', dest='pid', metavar='NAME', default='1',
+                      help='Column name or number of subject in the phenotype file (default=1)')
+  analysis.add_option('--pheno', dest='pheno', metavar='NAME', default='2',
+                      help='Phenotype column name or number in the phenotype file (default=2)')
   analysis.add_option('--refalleles', dest='refalleles', metavar='FILE',
                       help='Mapping of locus name to the corresponding reference allele')
   analysis.add_option('--allowdups', dest='allowdups', action='store_true', default=False,
