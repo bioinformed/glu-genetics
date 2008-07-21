@@ -55,7 +55,7 @@ Glossary
 
   HUGO gene symbol
     A gene symbol approved by and included in the HGNC (HUGO Gene
-    Nomenclature Committee database) - see http://www.gene.ucl.ac.uk/nomenclature
+    Nomenclature Committee database) - see http://www.genenames.org/
 
   minor allele frequency
     The frequency of chromosomes in the population carrying the less common variant of SNP

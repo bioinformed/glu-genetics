@@ -1,4 +1,6 @@
-Title: Style Guide for GLU Code
+++++++++++++++++++++
+GLU Code Style Guide
+++++++++++++++++++++
 
 .. Note::
 
@@ -7,8 +9,9 @@ Title: Style Guide for GLU Code
    Much of the original text remains, though many details have been altered
    of and some recommendations consciously countermanded.
 
-   Original Authors: guido@python.org (Guido van Rossum),
-                     barry@python.org (Barry Warsaw)
+   Original Authors:
+     * guido@python.org (Guido van Rossum),
+     * barry@python.org (Barry Warsaw)
 
 
 Introduction
@@ -51,9 +54,10 @@ Code lay-out
     Use 2 spaces per indentation level.
 
     Python style guides usually recommend 4 spaces, however I've found that
-    scientific code tends to get wider and therefor benefits from less real
-    estate taken up by indentation.  To offset this, work hard to limit the
-    levels of nesting by using function and class abstractions.
+    even clean scientific code tends to need fairly wide lines and therefor
+    benefits from less real estate taken up by indentation.  To offset this,
+    work hard to limit the levels of nesting by using function and class
+    abstractions.
 
     For really old code that you don't want to mess up, you may continue to
     use the original intendation.  However, plan to normalize it before
@@ -108,12 +112,16 @@ Imports
 
     - Imports should usually be on separate lines, e.g.:
 
-        Yes: import os
+        Yes::
+
+             import os
              import sys
 
-        No:  import sys, os
+        No::
 
-      it's okay to say this though:
+             import sys, os
+
+      it's okay to say this though::
 
         from subprocess import Popen, PIPE
 
@@ -155,31 +163,56 @@ Whitespace in Expressions and Statements
 
     - Immediately inside parentheses, brackets or braces.
 
-      Yes: spam(ham[1], {eggs: 2})
-      No:  spam( ham[ 1 ], { eggs: 2 } )
+      Yes::
+
+           spam(ham[1], {eggs: 2})
+
+      No::
+
+          spam( ham[ 1 ], { eggs: 2 } )
 
     - Unless delimiting a generator expression or some other interesting
       nested construct
 
-      Yes: list.extend( f(a) for a in stuff if g(a) )
-      Yes: foo = [ f(a) for a in stuff if g(a) ) ]
+      Yes::
+
+            list.extend( f(a) for a in stuff if g(a) )
+
+      Yes::
+
+            foo = [ f(a) for a in stuff if g(a) ) ]
 
     - Immediately before a comma, semicolon, or colon:
 
-      Yes: if x == 4: print x, y; x, y = y, x
-      No:  if x == 4 : print x , y ; x , y = y , x
+      Yes::
+
+           if x == 4: print x, y; x, y = y, x
+
+      No::
+
+           if x == 4 : print x , y ; x , y = y , x
 
     - Immediately before the open parenthesis that starts the argument
       list of a function call:
 
-      Yes: spam(1)
-      No:  spam (1)
+      Yes::
+
+           spam(1)
+
+      No::
+
+           spam (1)
 
     - Immediately before the open parenthesis that starts an indexing or
       slicing:
 
-      Yes: dict['key'] = list[index]
-      No:  dict ['key'] = list [index]
+      Yes::
+
+            dict['key'] = list[index]
+
+      No::
+
+            dict ['key'] = list [index]
 
 
   Extra whitespace is allowed to align operator and expressions.
@@ -187,25 +220,25 @@ Whitespace in Expressions and Statements
   vertically can sometimes result is vastly better readability.  However it
   can be overdone, so good taste and restraint should be applied.
 
-      Yes:
+      Yes::
 
           x  = 1
           y  = 2
           xy = 3
 
-      No:
+      No::
 
           x             = 1
           y             = 2
           long_variable = 3
 
-      Yes:
+      Yes::
 
           gmap = { 'sub'   : 'submarine',
                    'super' : 'supercharged',
                    'fire'  : 'fireman' }
 
-      No:
+      No::
 
           gmap = { 'supercalifragilisticexpialidociousisreallyquiteattrocious' : 'soup',
                    'super'                                                     : 'soup',
@@ -222,13 +255,13 @@ Whitespace in Expressions and Statements
     - Break the previous rule when spaces help to clarify precidence and
       grouping
 
-      Yes:
+      Yes::
 
           x = x*2 - 1
           hypot2 = x*x + y*y
           c = (a+b) * (a-b)
 
-      No:
+      No::
 
           x = x * 2 - 1
           hypot2 = x * x + y * y
@@ -237,12 +270,12 @@ Whitespace in Expressions and Statements
     - Don't use spaces around the '=' sign when used to indicate a
       keyword argument or a default parameter value.
 
-      Yes:
+      Yes::
 
           def complex(real, imag=0.0):
               return magic(r=real, i=imag)
 
-      No:
+      No::
 
           def complex(real, imag = 0.0):
               return magic(r = real, i = imag)
@@ -250,7 +283,7 @@ Whitespace in Expressions and Statements
     - Compound statements (multiple statements on the same line) are
       strongly discouraged.
 
-      Yes:
+      Yes::
 
           if foo == 'blah':
             do_blah_thing()
@@ -258,7 +291,7 @@ Whitespace in Expressions and Statements
           do_two()
           do_three()
 
-      No:
+      No::
 
           if foo == 'blah': do_blah_thing()
           do_one(); do_two(); do_three()
@@ -267,7 +300,7 @@ Whitespace in Expressions and Statements
       body on the same line, never do this for multi-clause
       statements.  Also avoid folding such long lines!
 
-      Rather not:
+      Rather not::
 
           if not foo: return
           if not foo: break
@@ -275,7 +308,7 @@ Whitespace in Expressions and Statements
           for x in lst: total += x
           while t < 10: t = delay()
 
-      Definitely not:
+      Definitely not::
 
           if foo == 'blah': do_blah_thing()
           else: do_non_blah_thing()
@@ -331,11 +364,11 @@ Comments
     They should start with a # and a single space.
 
     Inline comments are unnecessary and in fact distracting if they state
-    the obvious.  Don't do this:
+    the obvious.  Don't do this::
 
         x = x + 1                 # Increment x
 
-    But sometimes, this is useful:
+    But sometimes, this is useful::
 
         x = x + 1                 # Compensate for border
 
@@ -356,13 +389,13 @@ Documentation Strings
 
     - PEP 257 describes good docstring conventions.  Note that most
       importantly, the ''' that ends a multiline docstring should be on a line
-      by itself, and preferably preceded by a blank line, e.g.:
+      by itself, e.g.::
 
-      '''Return a foobang
+        '''Return a foobang
 
-      Optional plotz says to frobnicate the bizbaz first.
+        Optional plotz says to frobnicate the bizbaz first.
 
-      '''
+        '''
 
     - For one liner docstrings, it's okay to keep the closing ''' on the same
       line.
@@ -372,9 +405,9 @@ Documentation Strings
 Version Bookkeeping # FIXME: Describe standard file header
 
     If you have to have Subversion, CVS, or RCS crud in your source file, do
-    it as follows.
+    it as follows::
 
-        __version__ = "$Revision$"
+        __version__ = "$Id$"
         # $Source$
 
     These lines should be included after the module's docstring, before any
@@ -440,9 +473,9 @@ Naming Conventions
     convention):
 
     - _single_leading_underscore: weak "internal use" indicator.  E.g. "from M
-      import *" does not import objects whose name starts with an underscore.
+      import \*" does not import objects whose name starts with an underscore.
 
-    - single_trailing_underscore_: used by convention to avoid conflicts with
+    - single_trailing_underscore\_: used by convention to avoid conflicts with
       Python keyword, e.g.
 
       Tkinter.Toplevel(master, class_='ClassName')
@@ -459,12 +492,12 @@ Naming Conventions
 
     Names to Avoid
 
-      Never use the characters `l' (lowercase letter el), `O' (uppercase
-      letter oh), or `I' (uppercase letter eye) as single character variable
+      Never use the characters 'l' (lowercase letter el), 'O' (uppercase
+      letter oh), or 'I' (uppercase letter eye) as single character variable
       names.
 
       In some fonts, these characters are indistinguishable from the numerals
-      one and zero.  When tempted to use `l', use `L' instead.
+      one and zero.  When tempted to use 'l', use 'L' instead.
 
     Package and Module Names
 
@@ -499,7 +532,7 @@ Naming Conventions
       (Let's hope that these variables are meant for use inside one module
       only.)  The conventions are about the same as those for functions.
 
-      Modules that are designed for use via "from M import *" should use the
+      Modules that are designed for use via "from M import \*" should use the
       __all__ mechanism to prevent exporting globals, or use the older
       convention of prefixing such globals with an underscore (which you might
       want to do to indicate these globals are "module non-public").
@@ -520,7 +553,7 @@ Naming Conventions
 
       If a function argument's name clashes with a reserved keyword, it is
       generally better to append a single trailing underscore rather than use
-      an abbreviation or spelling corruption.  Thus "print_" is better than
+      an abbreviation or spelling corruption.  Thus "print\_" is better than
       "prnt".  (Perhaps better is to avoid such clashes by using a synonym.)
 
     Method Names and Instance Variables
@@ -692,7 +725,7 @@ Programming Recommendations
       to the absolute minimum amount of code necessary.  Again, this
       avoids masking bugs.
 
-      Yes:
+      Yes::
 
           try:
               value = collection[key]
@@ -701,7 +734,7 @@ Programming Recommendations
           else:
               return handle_value(value)
 
-      No:
+      No::
 
           try:
               # Too broad!
@@ -722,30 +755,42 @@ Programming Recommendations
       startswith() and endswith() are cleaner and less error prone.  For
       example:
 
-        Yes: if foo.startswith('bar'):
+        Yes::
 
-        No:  if foo[:3] == 'bar':
+              if foo.startswith('bar'):
+
+        No::
+
+              if foo[:3] == 'bar':
 
     - Object type comparisons should always use isinstance() instead
       of comparing types directly.
 
-        Yes: if isinstance(obj, int):
+        Yes::
 
-        No:  if type(obj) is type(1):
+             if isinstance(obj, int):
+
+        No::
+
+             if type(obj) is type(1):
 
       When checking if an object is a string, keep in mind that it might be a
       unicode string too!  As of Python 2.3, str and unicode have a common base
-      class, basestring, so you can do:
+      class, basestring, so you can do::
 
         if isinstance(obj, basestring):
 
     - For sequences, (strings, lists, tuples), use the fact that empty
       sequences are false.
 
-      Yes: if not seq:
+      Yes::
+
+           if not seq:
            if seq:
 
-      No: if len(seq)
+      No::
+
+          if len(seq)
           if not len(seq)
 
     - Don't write string literals that rely on significant trailing
@@ -754,11 +799,17 @@ Programming Recommendations
 
     - Don't compare boolean values to True or False using ==
 
-        Yes:   if greeting:
+        Yes::
 
-        No:    if greeting == True:
+               if greeting:
 
-        Worse: if greeting is True:
+        No::
+
+               if greeting == True:
+
+        Worse::
+
+               if greeting is True:
 
 
 References

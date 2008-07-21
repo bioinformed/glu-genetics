@@ -1,9 +1,6 @@
-+++++++++++++++++++
-Documentation Index
-+++++++++++++++++++
-
-Welcome to GLU
-==============
++++++++++++++++++++++++++++++++
+Welcome to GLU's documentation!
++++++++++++++++++++++++++++++++
 
 GLU is a suite of tools for statistical geneticists, epidemiologists,
 statisticicians and analysis working with large sets of Single Nucleotide
@@ -12,19 +9,35 @@ and specific phenotypes.
 
 GLU provides tools to:
 
-* manage of SNP genotype data sets (designed to scale to 10 billion
-  genotypes and beyond...)
+  * manage of SNP genotype data sets (designed to scale to 10 billion
+    genotypes and beyond...)
 
-* many methods to verify genotype data quality
+  * many methods to verify genotype data quality
 
-* tests for association between SNP markers and continuous or discrete trait
-  phenotypes.
+  * tests for association between SNP markers and continuous or discrete trait
+    phenotypes.
 
-Additional documentation
-========================
+Contents
+--------
 
-* `Installation information <INSTALL.html>`_
-* `Quickstart Guide <quickstart.html>`_
-* `User reference manual <user_manual.html>`_
-* `License information <license.html>`_
-* `Contributors <contributors.html>`_
+.. toctree::
+   :maxdepth: 2
+
+   whatsnew/index.rst
+   INSTALL
+   quickstart
+   user_manual/index.rst
+   modules/index
+   dev_manual/index.rst
+
+   license
+   contributors
+   glossary
+   aboutdocs
+
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`

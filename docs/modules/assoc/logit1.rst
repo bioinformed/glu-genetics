@@ -9,4 +9,4 @@
    :synopsis: Association models between a logistic outcome and SNP genotypes
 
 Single-locus association tests of dichotomous and unordered polytomous
-outcomes with optional covariates.
+outcomes with optional covariates and interactions.

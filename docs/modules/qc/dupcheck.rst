@@ -8,14 +8,14 @@
 .. module:: dupcheck
    :synopsis: Find duplicate samples within a genotype data set
 
-The dupcheck module looks at genotype data and identifies three categories
-of duplicates:
+The :mod:`qc.dupcheck` module looks at genotype data and identifies three
+categories of duplicates:
 
-- expected duplicates
+  * expected duplicates
 
-- unexpected duplicates
+  * unexpected duplicates
 
-- expected duplicates not found.
+  * expected duplicates not found.
 
 The input can be in hapmap, ldat, sdat, triple, or genotriple format. The
 user can indicate a threshold value (percent) for determining identity

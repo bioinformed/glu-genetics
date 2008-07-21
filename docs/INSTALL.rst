@@ -2,10 +2,6 @@
 Installation Guide
 ++++++++++++++++++
 
-GLU provides command-line tools for the management of large amounts of SNP
-genotype data, and programs to check data quality and association between
-SNP markers with continuous or discrete trait phenotypes.
-
 Installation the easy way (binary installation)
 ===============================================
 
@@ -14,15 +10,15 @@ Installation the easy way (binary installation)
 Major GLU releases will be available in the form of binary installation
 packages for the following operating systems:
 
- ========================== ===== ===== =====================
-    Operating system        bits  CPU     Installer Types
- ========================== ===== ===== =====================
- Microsoft Windows XP/Vista 32bit Intel MSI
- Microsoft Windows XP/Vista 32bit AMD   MSI
- Fedora Linux 7             64bit Intel RPM, egg
- Fedora Linux 7             64bit AMD   RPM, egg
- Apple OS X 10.4.6 (Tiger)  Intel       egg
- ========================== ===== ===== =====================
+  ========================== ====== =====
+     Operating system        bits   CPU
+  ========================== ====== =====
+  Microsoft Windows XP/Vista 32 bit Intel
+  Microsoft Windows XP/Vista 32 bit AMD
+  Fedora Linux 7             64 bit Intel
+  Fedora Linux 7             64 bit AMD
+  Apple OS X 10.4.6 (Tiger)         Intel
+  ========================== ====== =====
 
 Additional platforms can be added by request, although limited by my access
 to suitable systems.  Contributed binary versions for additional platforms
@@ -43,11 +39,11 @@ Prerequisites for using GLU:
 
 GLU requires the following free and open source packages:
 
- * Python   2.5.1 or newer from http://www.python.org/
- * NumPy    1.0.3 or newer from http://numpy.scipy.org/
- * SciPy    0.5.3 or newer from http://www.scipy.org/
- * PyTables 2.0   or newer from http://www.pytables.org/
- * SQLite   2.4.1 or newer from http://www.sqlite.org/
+ * Python   2.5.2 or newer from http://www.python.org/
+ * NumPy    1.1.0 or newer from http://numpy.scipy.org/
+ * SciPy    0.6.0 or newer from http://www.scipy.org/
+ * PyTables 2.0.4 or newer from http://www.pytables.org/
+ * SQLite   3.5.9 or newer from http://www.sqlite.org/
 
 Prerequisites of the prerequisites:
 
@@ -55,15 +51,23 @@ Prerequisites of the prerequisites:
    many numerical functions.  As these are performance-critical, optimized
    versions have been developed, including:
 
-   - MKL  by Intel Corp from http://www3.intel.com/cd/software/products/asmo-na/eng/307757.htm
-   - ACML by   AMD Corp from http://developer.amd.com/acml.jsp
-   - ATLAS+LAPACK       from http://math-atlas.sourceforge.net/
+   - MKL     by Intel from http://www3.intel.com/cd/software/products/asmo-na/eng/307757.htm
+   - ACML    by AMD   from http://www.amd.com/acml
+   - PerfLib by Sun   from http://developers.sun.com/sunstudio/overview/topics/perflib_index.html
+   - ATLAS+LAPACK     from http://math-atlas.sourceforge.net/
+
+   Otherwise, unoptimized versions are available from:
+
+   - BLAS from http://www.netlib.org/blas/
+   - LAPACK from http://www.netlib.org/lapack/
+
+   For more information on installing NumPy and SciPy see http://www.scipy.org/Installing_SciPy
 
  * In addition, PyTables is based on the HDF5 standard and requires:
 
-   - HDF5 1.6.5 or newer from http://hdfgroup.org/HDF5/
+   - HDF5 1.8.1 or newer from http://hdfgroup.org/HDF5/
 
-Then to build and install GLU, run::
+To build and install GLU, run::
 
         python setup.py install
 
@@ -72,11 +76,12 @@ To run GLU::
         glu -h
         glu <module>
 
-To get started::
+For information on getting started::
 
         glu intro
 
-Please contact me if you have any questions, suggestions, or would like to contribute better documentation.
+Please contact me if you have any questions, suggestions, or would like to
+help improve GLU.
 
 | *Kevin Jacobs*
 | *BioInformed LLC*

@@ -9,5 +9,6 @@ genotype data using GLU.
 
 .. toctree::
 
-  transform.rst
-  split.rst
+   ginfo.rst
+   transform.rst
+   split.rst

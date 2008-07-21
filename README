@@ -7,75 +7,87 @@ between SNP markers with continuous or discrete trait phenotypes.
 This will be an informative, witty, and insightful README file at some
 point.  In the mean time, please excuse the current humble incarnation.
 
+Installation the easy way (binary installation)
+===============================================
 
-Installation the easy way
--------------------------
+*Instructions for binary installation will be available soon...*
 
 Major GLU releases will be available in the form of binary installation
 packages for the following operating systems:
 
-	Microsoft Windows XP/Vista 32bit Intel MSI installer
-	Microsoft Windows XP/Vista 32bit AMD   MSI installer
-	Fedora Linux 7             64bit Intel RPM installer, egg file
-	Fedora Linux 7             64bit AMD   RPM installer, egg file
-	Apple OS X 10.4.6 (Tiger)        Intel egg file
+  ========================== ====== =====
+     Operating system        bits   CPU
+  ========================== ====== =====
+  Microsoft Windows XP/Vista 32 bit Intel
+  Microsoft Windows XP/Vista 32 bit AMD
+  Fedora Linux 7             64 bit Intel
+  Fedora Linux 7             64 bit AMD
+  Apple OS X 10.4.6 (Tiger)         Intel
+  ========================== ====== =====
 
 Additional platforms can be added by request, although limited by my access
 to suitable systems.  Contributed binary versions for additional platforms
-are greatfully accepted, though only from contributors who are willing to
+are gratefully accepted, though only from contributors who are willing to
 track and provide builds for major releases in a timely fashion.
 
+Installation from source
+========================
 
-Installtion from source
------------------------
-
-For most, a binary installation of GLU will be the preferred method of
-installtion.  However, power-users and software developers who which to
+For most users, a binary installation of GLU will be the preferred method of
+installation.  However, power users and software developers who wish to
 extend or modify GLU will want to consider installing from source. GLU is
-easily built from source on Unix-like systems, but requires several
-pre-requistite packages to be installed and access to Fortran and C
+easily built from source on Unix-like systems, but source installation
+requires several prerequisite packages, and access to Fortran and C
 compilers.
 
-Prerequistites for using GLU:
+Prerequisites for using GLU:
 
 GLU requires the following free and open source packages:
 
-	Python   2.5.1   or newer from http://www.python.org/
-	NumPy    1.0.4   or newer from http://numpy.scipy.org/
-	SciPy    0.6.0   or newer from http://www.scipy.org/
-	PyTables 2.0.2   or newer from http://www.pytables.org/
-        SQLite   3.5.2   or newer from http://www.sqlite.org/
+ * Python   2.5.2 or newer from http://www.python.org/
+ * NumPy    1.1.0 or newer from http://numpy.scipy.org/
+ * SciPy    0.6.0 or newer from http://www.scipy.org/
+ * PyTables 2.0.4 or newer from http://www.pytables.org/
+ * SQLite   3.5.9 or newer from http://www.sqlite.org/
 
-Prerequistites of the prerequistites:
+Prerequisites of the prerequisites:
 
-	NumPy and SciPy require a full version of BLAS and LAPACK libraries
-	for many numerical functions.  As these are performance-critical,
-	optimized versions have been developed, including:
-	
-	MKL  by Intel Corp from http://www3.intel.com/cd/software/products/asmo-na/eng/307757.htm
-	ACML by   AMD Corp from http://developer.amd.com/acml.jsp
-	ATLAS+LAPACK       from http://math-atlas.sourceforge.net/
+ * NumPy and SciPy require a full version of BLAS and LAPACK libraries for
+   many numerical functions.  As these are performance-critical, optimized
+   versions have been developed, including:
 
-	In addition, PyTables is based on the HDF5 standard and requires:
+   - MKL     by Intel from http://www3.intel.com/cd/software/products/asmo-na/eng/307757.htm
+   - ACML    by AMD   from http://www.amd.com/acml
+   - PerfLib by Sun   from http://developers.sun.com/sunstudio/overview/topics/perflib_index.html
+   - ATLAS+LAPACK     from http://math-atlas.sourceforge.net/
 
-	HDF5 1.6.6 or newer from http://hdfgroup.org/HDF5/
+   Otherwise, unoptimized versions are available from:
 
-Then to build install GLU, run:
+   - BLAS from http://www.netlib.org/blas/
+   - LAPACK from http://www.netlib.org/lapack/
 
-	python setup.py install
+   For more information on installing NumPy and SciPy see http://www.scipy.org/Installing_SciPy
 
-To run GLU:
+ * In addition, PyTables is based on the HDF5 standard and requires:
 
-	glu -h
-	glu <module>
+   - HDF5 1.8.1 or newer from http://hdfgroup.org/HDF5/
 
-To get started:
+To build and install GLU, run::
 
-	glu intro
+        python setup.py install
 
-Please contact me if you have any questions, suggestions, or want to
-contribute better documentation.
+To run GLU::
 
--Kevin Jacobs
-BioInformed LLC
-jacobs@bioinformed.com
+        glu -h
+        glu <module>
+
+For information on getting started::
+
+        glu intro
+
+Please contact me if you have any questions, suggestions, or would like to
+help improve GLU.
+
+| *Kevin Jacobs*
+| *BioInformed LLC*
+| *jacobs@bioinformed.com*

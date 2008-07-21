@@ -4,13 +4,11 @@
 Quality Control
 ***************
 
-The modules described in this chapter provide functionality to compute data
-summaries and to verify data quality using GLU.
+Modules described in this chapter provide functionality to compute data
+summaries and to verify data quality.
 
 .. toctree::
 
-  completion.rst
+  summary.rst
   concordance.rst
   dupcheck.rst
-  hwp.rst
-  maf.rst

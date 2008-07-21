@@ -31,7 +31,11 @@ and analysis.
 .. toctree::
   :maxdepth: 2
 
-  datamanagement.rst
-  convert/index.rst
-  qc/index.rst
-  assoc/index.rst
+  intro
+  datamanagement
+  convert/index
+  genedb/index
+  qc/index
+  assoc/index
+  struct/index
+  util/index

@@ -4,9 +4,6 @@
 GLU Developer Manual
 ++++++++++++++++++++
 
-:Release: |version|
-:Date: |today|
-
 This reference manual describes how GLU is implemented in order to customize
 and extend it.  The current version is very much a work in progress and is
 in some places terse and incomplete.
@@ -14,4 +11,4 @@ in some places terse and incomplete.
 .. toctree::
    :maxdepth: 2
 
-  intro.rst
+   intro

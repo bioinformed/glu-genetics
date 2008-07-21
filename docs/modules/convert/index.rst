@@ -9,4 +9,4 @@ to GLU formats and export files from GLU formats.
 
 .. toctree::
 
-  lbd2sdat.rst
+  from_lbd.rst
