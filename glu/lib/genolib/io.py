@@ -79,7 +79,7 @@ def geno_options(group,input=False,output=False,merge=False,filter=False,transfo
                       help='Input genotype representation')
 
   if output:
-    group.add_option('-F','--outformat',  dest='outformat', metavar='string',
+    group.add_option('-F','--outformat',  dest='outformat', metavar='NAME',
                       help='Output genotype format')
     group.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP',
                       help='Output genotype representation')

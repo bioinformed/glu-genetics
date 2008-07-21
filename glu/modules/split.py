@@ -350,7 +350,7 @@ def split(genos, outformat, prefix, suffix, options):
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] matrixfile'
+  usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
   geno_options(parser,input=True)

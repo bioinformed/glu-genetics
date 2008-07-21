@@ -26,7 +26,7 @@ HEADER = ['SNP_NAME','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genome_database'
+  usage = 'usage: %prog [options] genome_database file'
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-u', '--upbases',   dest='upbases',   default=20000, type='int',  metavar='N',
@@ -92,12 +92,12 @@ def process_results(results,start,end,strand,nup,ndown):
 def main():
   parser = option_parser()
   options,args = parser.parse_args()
-  con = sqlite3.connect(args[0])
 
   if len(args)<2:
     parser.print_help(sys.stderr)
     return
 
+  con = sqlite3.connect(args[0])
   out = table_writer(options.outfile,hyphen=sys.stdout)
   out.writerow(HEADER)
 

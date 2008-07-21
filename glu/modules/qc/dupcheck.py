@@ -32,7 +32,7 @@ def option_parser():
                     help='Mapping from sample identifier to subject identifier')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output of duplicate check report')
-  parser.add_option('-T', '--threshold', dest='threshold', metavar='N%', type='int', default=85,
+  parser.add_option('-T', '--threshold', dest='threshold', metavar='N', type='int', default=85,
                     help='Threshold for the percentage of identity shared between two individuals (default=85)')
   parser.add_option('-m', '--mingenos', '--mincount', dest='mingenos', metavar='N', type='int', default=20,
                     help='Minimum concordant genotypes to be considered informative for duplicate checking')

@@ -22,7 +22,7 @@ HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BA
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genome_database'
+  usage = 'usage: %prog [options] genome_database file'
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-u', '--upbases',   dest='upbases',   default=20000, type='int',  metavar='N',
