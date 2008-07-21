@@ -1,3 +1,5 @@
+.. _contents:
+
 +++++++++++++++++++++++++++++++
 Welcome to GLU's documentation!
 +++++++++++++++++++++++++++++++
@@ -21,7 +23,7 @@ Contents
 --------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 10
 
    whatsnew/index.rst
    INSTALL
@@ -41,3 +43,4 @@ Indices and tables
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+* :ref:`glossary`

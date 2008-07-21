@@ -15,15 +15,17 @@ GLU Code Style Guide
 
 
 Introduction
+------------
 
     This document gives coding conventions for the Python code comprising
     the GLU package.  Please see the companion informational PEP describing
-    style guidelines for the C code in the C implementation of GLU [1].
+    style guidelines for the C code in the C implementation of GLU [1]_.
 
 A Foolish Consistency is the Hobgoblin of Little Minds
+------------------------------------------------------
 
     A key insights is that code is read much more often than it is written
-    (made by Guido von Rossum, the Python project leader).  The guidelines
+    (made by Guido von Rossum, the Python project leader [2]_).  The guidelines
     provided here are intended to improve the readability of code and make
     it consistent across the wide spectrum of Python code.
 
@@ -46,8 +48,8 @@ A Foolish Consistency is the Hobgoblin of Little Minds
         historic reasons) -- although this is also an opportunity to clean up
         someone else's mess (in true XP style).
 
-
 Code lay-out
+------------
 
   Indentation
 
@@ -109,6 +111,7 @@ Code lay-out
     alphabet MUST provide a latin transliteration of their names.
 
 Imports
+-------
 
     - Imports should usually be on separate lines, e.g.:
 
@@ -142,12 +145,12 @@ Imports
       Always use the absolute package path for all imports.
 
     - When importing a class from a class-containing module, it's usually okay
-      to spell this
+      to spell this::
 
         from myclass           import MyClass
         from foo.bar.yourclass import YourClass
 
-      If this spelling causes local name clashes, then spell them
+      If this spelling causes local name clashes, then spell them::
 
         import myclass
         import foo.bar.yourclass
@@ -156,6 +159,7 @@ Imports
 
 
 Whitespace in Expressions and Statements
+----------------------------------------
 
   Pet Peeves
 
@@ -323,6 +327,7 @@ Whitespace in Expressions and Statements
 
 
 Comments
+--------
 
     Comments that contradict the code are worse than no comments.  Always make
     a priority of keeping the comments up-to-date when the code changes!
@@ -374,9 +379,10 @@ Comments
 
 
 Documentation Strings
+---------------------
 
     Conventions for writing good documentation strings (a.k.a. "docstrings")
-    are immortalized in PEP 257 [3].
+    are immortalized in PEP 257 [3]_.
 
     - Write docstrings for all public modules, functions, classes, and
       methods.  Docstrings are not necessary for non-public methods, but you
@@ -402,7 +408,10 @@ Documentation Strings
 
     - FIXME: Describe epydoc formats used in GLU
 
-Version Bookkeeping # FIXME: Describe standard file header
+Version Bookkeeping
+-------------------
+
+# FIXME: Describe standard file header
 
     If you have to have Subversion, CVS, or RCS crud in your source file, do
     it as follows::
@@ -413,8 +422,8 @@ Version Bookkeeping # FIXME: Describe standard file header
     These lines should be included after the module's docstring, before any
     other code, separated by a blank line above and below.
 
-
 Naming Conventions
+------------------
 
     The naming conventions used in GLU are not always quite consistant --
     nevertheless, here are the currently recommended naming standards.  New
@@ -443,7 +452,7 @@ Naming Conventions
     - UPPER_CASE_WITH_UNDERSCORES
 
     - CapitalizedWords (or CapWords, or CamelCase -- so named because
-      of the bumpy look of its letters[4]).  This is also sometimes known as
+      of the bumpy look of its letters[4]_).  This is also sometimes known as
       StudlyCaps.
 
       Note: When using abbreviations in CapWords, capitalize all the letters
@@ -648,8 +657,8 @@ Naming Conventions
         need to avoid accidental name clashes with potential use by
         advanced callers.
 
-
 Programming Recommendations
+---------------------------
 
     - GLU will likely be ported to other Python implementations, so code
       should be written in a way that does not disadvantage other
@@ -813,18 +822,9 @@ Programming Recommendations
 
 
 References
+----------
 
-    [1] PEP 7, Style Guide for C Code, van Rossum
-
-    [2] http://www.python.org/doc/essays/styleguide.html
-
-    [3] PEP 257, Docstring Conventions, Goodger, van Rossum
-
-    [4] http://www.wikipedia.com/wiki/CamelCase
-
-    [5] Barry's GNU Mailman style guide
-        http://barry.warsaw.us/software/STYLEGUIDE.txt
-
-    [6] PEP 20, The Zen of Python
-
-    [7] PEP 328, Imports: Multi-Line and Absolute/Relative
+  .. [1] `PEP 7 <http://www.python.org/dev/peps/pep-0007/>`_, Style Guide for C Code, van Rossum
+  .. [2] `PEP 8 <http://www.python.org/dev/peps/pep-0008/>`_, Style Guide for Python Code, van Rossum
+  .. [3] `PEP 257 <http://www.python.org/dev/peps/pep-0257/>`_, Docstring Conventions, Goodger, van Rossum
+  .. [4] http://www.wikipedia.com/wiki/CamelCase
