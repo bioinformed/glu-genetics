@@ -5,6 +5,7 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+import re
 
 from   ply    import lex,yacc
 
@@ -91,13 +92,21 @@ class TERM(object):
     return exp(self.estimate_ci(p,c,alpha=alpha))
 
 
+ident_re = re.compile('[a-zA-Z_][a-zA-Z_:.0-9]*')
+
+def quote_ident(name):
+  if not ident_re.match(name):
+    return "'%s'" % name
+  else:
+    return name
+
 
 class PHENOTERM(TERM):
   def effects(self, loci, phenos, i):
     return [phenos[self.pindex]]
 
   def term_names(self, loci=None):
-    return [self.name]
+    return [quote_ident(self.name)]
 
   def __len__(self):
     return 1
@@ -157,13 +166,13 @@ class NO_INTERCEPT(TERM):
 class GENOTERM(TERM):
   def effect_names(self, loci=None):
     if loci is None:
-      return ['%s:het' % self.name, '%s:hom' % self.name]
+      return [quote_ident('%s:het' % self.name), quote_ident('%s:hom' % self.name)]
 
     lmodel = loci[self.name]
     if lmodel.genocount < 2:
       return []
-    return [ '%s:%s%s' % (self.name,lmodel.alleles[0],lmodel.alleles[1]),
-             '%s:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1]) ]
+    return [ quote_ident('%s:%s%s' % (self.name,lmodel.alleles[0],lmodel.alleles[1])),
+             quote_ident('%s:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1])) ]
 
 
 class NULL(GENOTERM):
@@ -207,12 +216,12 @@ class GENO(GENOTERM):
 
   def term_names(self, loci=None):
     if loci is None:
-      return ['%s:het' % self.name, '%s:hom' % self.name]
+      return [quote_ident('%s:het' % self.name), quote_ident('%s:hom' % self.name)]
 
     lmodel = loci[self.name]
     if lmodel.genocount < 3:
       return []
-    return [ '%s:%s' % (self.name,''.join(g)) for g in lmodel.tests[1:] ]
+    return [ quote_ident('%s:%s' % (self.name,''.join(g))) for g in lmodel.tests[1:] ]
 
   def indices(self):
     return [self.index,self.index+1]
@@ -239,13 +248,13 @@ class ADOM(GENOTERM):
 
   def term_names(self, loci=None):
     if loci is None:
-      return ['%s:trend' % self.name, '%s:domdev' % self.name]
+      return [quote_ident('%s:trend' % self.name), quote_ident('%s:domdev' % self.name)]
 
     lmodel = loci[self.name]
     if lmodel.genocount < 3:
       return []
-    return [ '%s:trend:%s'     % (self.name,lmodel.alleles[1]),
-             '%s:domdev:%s%s'  % (self.name,lmodel.alleles[0],lmodel.alleles[1]) ]
+    return [ quote_ident('%s:trend:%s'     % (self.name,lmodel.alleles[1])),
+             quote_ident('%s:domdev:%s%s'  % (self.name,lmodel.alleles[0],lmodel.alleles[1])) ]
 
   def indices(self):
     return [self.index,self.index+1]
@@ -268,11 +277,11 @@ class TREND(GENOTERM):
 
   def term_names(self, loci=None):
     if loci is None:
-      return ['%s:trend' % self.name]
+      return [quote_ident('%s:trend' % self.name)]
     lmodel = loci[self.name]
     if lmodel.genocount < 2:
       return []
-    return ['%s:trend:%s' % (self.name,lmodel.alleles[1])]
+    return [quote_ident('%s:trend:%s' % (self.name,lmodel.alleles[1]))]
 
   def indices(self):
     return [self.index]
@@ -299,11 +308,11 @@ class DOM(GENOTERM):
 
   def term_names(self, loci=None):
     if loci is None:
-      return ['%s:dom' % self.name]
+      return [quote_ident('%s:dom' % self.name)]
     lmodel = loci[self.name]
     if lmodel.genocount < 2:
       return []
-    return ['%s:dom:%s' % (self.name,lmodel.alleles[1]) ]
+    return [quote_ident('%s:dom:%s' % (self.name,lmodel.alleles[1])) ]
 
   def indices(self):
     return [self.index]
@@ -330,11 +339,11 @@ class REC(GENOTERM):
 
   def term_names(self, loci=None):
     if loci is None:
-      return ['%s:rec' % self.name]
+      return [quote_ident('%s:rec' % self.name)]
     lmodel = loci[self.name]
     if lmodel.genocount < 2:
       return []
-    return ['%s:rec:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1]) ]
+    return [quote_ident('%s:rec:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1])) ]
 
   def indices(self):
     return [self.index]
@@ -360,7 +369,7 @@ class MISSING(GENOTERM):
   def term_names(self, loci=None):
     if loci is not None and not loci[self.name].genocount:
       return []
-    return ['%s:missing' % self.name]
+    return [quote_ident('%s:missing' % self.name)]
 
   def indices(self):
     return [self.index]
@@ -386,7 +395,7 @@ class NOT_MISSING(GENOTERM):
   def term_names(self, loci=None):
     if self.loci is not None and not loci[self.name].genocount:
       return []
-    return ['%s:not_missing' % self.name]
+    return [quote_ident('%s:not_missing' % self.name)]
 
   def indices(self):
     return [self.index]
@@ -573,7 +582,7 @@ class FormulaParser(object):
 
   tokens = ('ONE', 'ZERO',
             'PLUS','TIMES','EQUALS',
-            'LPAREN','RPAREN', 'TERM', 'VAR')
+            'LPAREN','RPAREN', 'TERM', 'IDENT', 'QUOTED')
 
   # Tokens
   t_ONE     = r'1'
@@ -584,8 +593,15 @@ class FormulaParser(object):
   t_LPAREN  = r'\('
   t_RPAREN  = r'\)'
 
-  def t_VAR(self, t):
-    r'[a-zA-Z_][a-zA-Z_0-9]*'
+  def t_IDENT(self, t):
+    r'[a-zA-Z_][a-zA-Z_:.0-9]*'
+    if t.value in termmap:
+      t.type = 'TERM'
+    return t
+
+  def t_QUOTED(self, t):
+    r'\'([^\\\n]|(\\.))*?\'|"([^\\\n]|(\\.))*?"'
+    t.value = t.value[1:-1]
     if t.value in termmap:
       t.type = 'TERM'
     return t
@@ -602,7 +618,7 @@ class FormulaParser(object):
 
   def p_formula(self, t):
     '''
-    formula : VAR EQUALS expression
+    formula : name EQUALS expression
     '''
     t[0] = t[1],t[3]
 
@@ -611,6 +627,13 @@ class FormulaParser(object):
     formula : expression
     '''
     t[0] = None,t[1]
+
+  def p_name(self, t):
+    '''
+    name : IDENT
+         | QUOTED
+    '''
+    t[0] = t[1]
 
   def p_expression_binop(self, t):
     '''
@@ -640,13 +663,13 @@ class FormulaParser(object):
 
   def p_expression_var(self, t):
     '''
-    expression : VAR
+    expression : name
     '''
     t[0] = PHENOTERM(t[1])
 
   def p_expression_func(self, t):
     '''
-    expression : TERM LPAREN VAR RPAREN
+    expression : TERM LPAREN name RPAREN
     '''
     t[0] = termmap[t[1]](t[3])
 
