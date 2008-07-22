@@ -8,6 +8,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
+import string
+
 from   itertools                 import islice,izip
 
 from   glu.lib.utils             import gcdisabled
@@ -40,6 +42,25 @@ PARENT_MAP = {'0':None}
 
 CHR_MAP    = {'0':None,'23':'X','24':'Y','25':'XY','26':'M'}
 CHR_RMAP   = {None:'0','':'0','X':'23','Y':'24','XY':'25','M':'26','MT':26}
+
+
+# Only ASCII is currently supported
+_ident_ws_trans = string.maketrans('\t\n\x0b\x0c\r ','______')
+
+
+# FIXME: Merlin also needs similar escaping (gack, I hate whitespace delimited formats)
+def escape_ident_ws(ident):
+  '''
+  Strip leading and trailing whitespace and replace all remaining whitespace
+  with _ in identifiers.  Only ASCII/Latin1 is currently supported.  This
+  will not work if Unicode identifiers are ever allowed.
+
+  >>> escape_ident_ws(' BW 012 213 ')
+  'BW_012_213'
+  >>> escape_ident_ws('foo\\tbar\\r')
+  'foo_bar'
+  '''
+  return string.translate(ident.strip(),_ident_ws_trans)
 
 
 def load_plink_map(filename,genome):
@@ -275,10 +296,15 @@ class PlinkPedWriter(object):
       if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
         parent1,parent2 = parent2,parent1
 
+    family     = escape_ident_ws(family or individual)
+    individual = escape_ident_ws(individual)
+    parent1    = escape_ident_ws(parent1 or '0')
+    parent2    = escape_ident_ws(parent2 or '0')
+
     sex   = SEX_RMAP[phenos.sex]
     pheno = PHENO_RMAP[phenos.phenoclass]
 
-    row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
+    row = [family,individual,parent1,parent2,sex,pheno]
     for g in genos:
       row += [ ALLELE_RMAP.get(a,a) for a in g ]
     out.write(' '.join(row))
@@ -1249,10 +1275,15 @@ class PlinkBedWriter(object):
           if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
             parent1,parent2 = parent2,parent1
 
+        family     = escape_ident_ws(family or individual)
+        individual = escape_ident_ws(individual)
+        parent1    = escape_ident_ws(parent1 or '0')
+        parent2    = escape_ident_ws(parent2 or '0')
+
         sex   = SEX_RMAP[phenos.sex]
         pheno = PHENO_RMAP[phenos.phenoclass]
 
-        row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
+        row = [family,individual,parent1,parent2,sex,pheno]
         out.write( ' '.join(row))
         out.write('\r\n')
 
