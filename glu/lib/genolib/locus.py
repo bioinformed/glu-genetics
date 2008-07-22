@@ -114,7 +114,7 @@ class Genome(object):
       if locus.model is None:
         locus.model = model
       elif locus.model is not model:
-        msg = 'Locus record %s incompatible models' % name
+        msg = 'Locus record %s merging incompatible models' % name
         if warn:
           sys.stderr.write('[WARNING] %s\n' % msg)
         else:
@@ -123,18 +123,14 @@ class Genome(object):
     if fixed is not None:
       if locus.fixed is None:
         locus.fixed = fixed
-      elif locus.fixed != fixed:
-        msg = 'Locus record %s incompatible fixed status of models' % name
-        if warn:
-          sys.stderr.write('[WARNING] %s\n' % msg)
-        else:
-          raise ValueError(msg)
+      else:
+        locus.fixed |= fixed
 
     if chromosome is not None:
       if locus.chromosome is None:
         locus.chromosome = chromosome
       elif locus.chromosome != chromosome:
-        msg = 'Locus record %s incompatible chromosomes (%s != %s)' % (name,locus.chromosome,chromosome)
+        msg = 'Locus record %s merging incompatible chromosomes (%s != %s)' % (name,locus.chromosome,chromosome)
         if warn:
           sys.stderr.write('[WARNING] %s\n' % msg)
         else:
@@ -144,7 +140,7 @@ class Genome(object):
       if locus.location is None:
         locus.location = location
       elif locus.location != location:
-        msg = 'Locus record %s incompatible locations (%s != %s)' % (name,locus.location,location)
+        msg = 'Locus record %s merging incompatible locations (%s != %s)' % (name,locus.location,location)
         if warn:
           sys.stderr.write('[WARNING] %s\n' % msg)
         else:
@@ -154,7 +150,7 @@ class Genome(object):
       if locus.strand is STRAND_UNKNOWN:
         locus.strand = strand
       elif locus.strand != strand:
-        msg = 'Locus record %s incompatible strands (%s != %s)' % (name,locus.strand,strand)
+        msg = 'Locus record %s merging incompatible strands (%s != %s)' % (name,locus.strand,strand)
         if warn:
           sys.stderr.write('[WARNING] %s\n' % msg)
         else:
