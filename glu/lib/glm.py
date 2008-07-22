@@ -942,7 +942,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   >>> from pkg_resources import resource_stream
   >>> D = []
   >>> indices = [0,1,2]
-  >>> for line in resource_stream(__name__,'test/heart.dat'):
+  >>> for line in resource_stream('glu','test/datasets/heart.dat'):
   ...   fields = line.split()
   ...   row = [ fields[i] for i in indices ]
   ...   row = map(float,row)
@@ -1058,7 +1058,7 @@ class GLogit(object):
   >>> from pkg_resources import resource_stream
   >>> D = []
   >>> indices = [4,5,3,6]
-  >>> for line in resource_stream(__name__,'test/cancer.dat'):
+  >>> for line in resource_stream('glu','test/datasets/cancer.dat'):
   ...   fields = line.split()
   ...   row = [ fields[i] for i in indices ]
   ...   if '.' in row:
