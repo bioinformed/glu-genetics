@@ -485,9 +485,9 @@ Naming Conventions
       import \*" does not import objects whose name starts with an underscore.
 
     - single_trailing_underscore\_: used by convention to avoid conflicts with
-      Python keyword, e.g.
+      Python keyword, e.g.::
 
-      Tkinter.Toplevel(master, class_='ClassName')
+        Tkinter.Toplevel(master, class_='ClassName')
 
     - __double_leading_underscore: when naming a class attribute, invokes name
       mangling (inside class FooBar, __boo becomes _FooBar__boo; see below).
@@ -687,7 +687,7 @@ Programming Recommendations
 
       Modules or packages should define their own domain-specific base
       exception class, which should be subclassed from the built-in Exception
-      class.  Always include a class docstring.  E.g.:
+      class.  Always include a class docstring.  E.g.::
 
         class MessageError(Exception):
           '''Base class for errors in the email package.'''
@@ -707,7 +707,7 @@ Programming Recommendations
     - When catching exceptions, mention specific exceptions
       whenever possible instead of using a bare 'except:' clause.
 
-      For example, use:
+      For example, use::
 
           try:
             import platform_specific_module

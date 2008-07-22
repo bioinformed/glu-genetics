@@ -1,33 +1,41 @@
 Contributors
 ============
 
-GLU is developed and maintained primarily by Kevin Jacobs
-<jacobske@mail.nih.gov> to support the `Cancer Genetic Markers of
-Susceptibility`_ (CGEMS) project, an intiative by the `National Cancer
-Institute`_ (NCI) to identify genetic alterations that make people
+GLU is primarily developed and maintained by Kevin Jacobs <jacobs at
+bioinformed dot com> to support the Cancer Genetic Markers of Susceptibility
+(CGEMS_) project, an initiative by the National Cancer Institute (NCI_)
+Division of Cancer Epidemiology and Genetics (DCEG_) and run by the NCI Core
+Genotyping Facility (CGF_) to identify genetic alterations that affect
 susceptible to prostate and breast cancer.
 
-.. _Cancer Genetic Markers of Susceptibility: http://cgems.cancer.gov/
-.. _National Cancer Institute: http://cancer.gov/
+CGEMS is funded by NCI under Contract N01-CO-12400 by SAIC-Frederick_, a
+subsidiary of Science Applications International Corporation (SAIC_).
 
-Additional CGEMS contributors:
+.. _CGEMS:          http://cgems.cancer.gov/
+.. _NCI:            http://cancer.gov/
+.. _DCEG:           http://dceg.cancer.gov/
+.. _CGF:            http://cgf.nci.nih.gov/
+.. _SAIC:           http://www.saic.com/
+.. _SAIC-Frederick: http://saic.ncifcrf.gov/
 
-* Stephen Chanock <chanocks at mail.nih.gov>
-* Thomas Giles <thomasgi at mail.nih.gov>
-* Zhaoming Wang <wangzha at mail.nih.gov>
-* Xiang Deng <dengx at mail.nih.gov>
-* Nick Orr <orrn at mail.nih.gov>
+GLU would not have been possible without the dedication and perseverance of
+the team at NCI and our CGEMS collaborators:
 
-GLU is also used by the NCI `Core Genotyping Facility (CGF)`_
-
-.. _Core Genotyping Facility (CGF): http://cgf.nci.nih.gov/
-
-CGF contributors:
-
-* Meredith Yeager <yeagerm at mail.nih.gov>
-* Bernice Packer <packerb at mail.nih.gov>
-* Jun Lu <lujun at mail.nih.gov>
-
-Other contributors:
-
-* Sturat Yeager <sturat at gmail.com>
+* Laurie Burdette
+* Stephen Chanock
+* Constance Chen
+* Xiang Deng
+* Thomas Giles
+* Amy Hutchinson
+* Peter Kraft
+* Chenwei Liu
+* Jun Lu
+* Dennis Meader
+* Nick Orr
+* Bernice Packer
+* Peggy Tucker
+* Zhaoming Wang
+* Robert Welch
+* Nick Xiao
+* Meredith Yeager
+* Jeff Yuenger

@@ -8,7 +8,7 @@ Last ammended: 2008-02-05
 
 Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health &
 Human Services. Funded by NCI under Contract N01-CO-12400.
- 
+
 BioInformed LLC and the U.S. Department of Health & Human Services
 (“Copyright Holders”) hereby grant to the public a perpetual, irrevocable,
 royalty-free non-exclusive, worldwide license to use, copy, distribute,

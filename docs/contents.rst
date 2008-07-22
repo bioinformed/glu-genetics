@@ -25,14 +25,14 @@ Contents
 .. toctree::
    :maxdepth: 10
 
-   whatsnew/index.rst
+   whatsnew/index
    INSTALL
    quickstart
-   user_manual/index.rst
+   user_manual/index
    modules/index
-   dev_manual/index.rst
+   dev_manual/index
 
-   license
+   LICENSE
    contributors
    glossary
    aboutdocs
