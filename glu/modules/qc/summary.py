@@ -199,7 +199,8 @@ def main():
 
   genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
                                   genome=options.loci,phenome=options.pedigree,
-                                  transform=GenoTransform.from_options(options))
+                                  transform=GenoTransform.from_options(options),
+                                  hyphen=sys.stdin)
 
   loci,locus_counts,samples,sample_counts = summarize(genos)
   sample_totals = sum(sample_counts)
