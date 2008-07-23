@@ -14,13 +14,13 @@ import time
 import select
 import fcntl
 import subprocess
-import sqlite3
 
 from   itertools                      import groupby
 from   operator                       import itemgetter
 
 from   glu.lib.fileutils              import load_list,load_table
 from   glu.modules.tagzilla.tagzilla  import locus_result_sequence
+from   glu.modules.genedb             import open_genedb
 from   glu.modules.genedb.queries     import query_snps_by_location, query_gene_by_name
 
 
@@ -342,8 +342,8 @@ def option_parser():
                     help='Design scores (optional)')
   parser.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
                     help='Default design score for any locus not found in a design file')
-  parser.add_option('-g', '--genomedb',   dest='genomedb', metavar='FILE', default=GENOMEDB,
-                      help='Genome database file')
+  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+                      help='Genedb genome annotation database name or file')
   parser.add_option('-i', '--include',   dest='include', metavar='FILE',
                       help='Obligate tags (optional)')
   parser.add_option('--upstream',   dest='upstream',   default=20000, type='int',  metavar='N',
@@ -368,7 +368,7 @@ def main():
     parser.print_help()
     return
 
-  con = sqlite3.connect(options.genomedb)
+  con    = open_genedb(options.genedb)
   outdir = args[0]
 
   if not os.path.isdir(outdir):

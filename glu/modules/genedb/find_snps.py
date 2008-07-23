@@ -8,13 +8,13 @@ __revision__  = '$Id$'
 
 
 import sys
-import sqlite3
 import bisect
 
 from   operator                        import itemgetter
 
 from   glu.lib.fileutils               import load_table,table_writer
 
+from   glu.modules.genedb              import open_genedb
 from   glu.modules.genedb.find_regions import resolve_features
 from   glu.modules.genedb.queries      import query_snps_by_location
 
@@ -29,14 +29,16 @@ def option_parser():
   usage = 'usage: %prog [options] genome_database file'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+                      help='Genedb genome annotation database name or file')
   parser.add_option('-u', '--upbases',   dest='upbases',   default=20000, type='int',  metavar='N',
-                    help='upstream margin in bases')
+                    help='upstream margin in bases (default=20000)')
   parser.add_option('-d', '--downbases', dest='downbases', default=10000, type='int',  metavar='N',
-                    help='downstream margin in bases')
+                    help='downstream margin in bases (default=10000)')
   parser.add_option('-U', '--upsnps',    dest='upsnps',                   type='int',  metavar='N',
-                    help='maximum number of upstream SNPs')
+                    help='maximum number of upstream SNPs (default=0 for no limit)')
   parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
-                    help='maximum number of downstream SNPs')
+                    help='maximum number of downstream SNPs (default=0 for no limit)')
   parser.add_option('-o', '--outfile',  dest='outfile', default='-', metavar='FILE',
                     help="the name of the output file, '-' for standard out")
   parser.add_option('-i', '--infile',   dest='infile',  default='-', metavar='FILE',
@@ -93,15 +95,15 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if len(args)<2:
+  if not args:
     parser.print_help(sys.stderr)
     return
 
-  con = sqlite3.connect(args[0])
+  con = open_genedb(options.genedb)
   out = table_writer(options.outfile,hyphen=sys.stdout)
   out.writerow(HEADER)
 
-  for infile in args[1:]:
+  for infile in args:
     features = load_table(infile,want_header=True,hyphen=sys.stdin)
     features = resolve_features(con,features,options)
 

@@ -8,10 +8,10 @@ __revision__  = '$Id$'
 
 
 import sys
-import sqlite3
 
 from   glu.lib.fileutils          import load_table,table_writer,resolve_column_headers
 
+from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood
 
 
@@ -21,15 +21,17 @@ HEADER = ['CHROMOSOME','LOCATION','GENE NEIGHBORHOOD']
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genome_database file'
+  usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+                      help='Genedb genome annotation database name or file')
   parser.add_option('-c', '--column',     dest='column',     default=0,
                     help='Column name or number in which to find SNPs')
   parser.add_option('-u', '--upstream',   dest='upstream',   default=20000, type='int',  metavar='N',
-                    help='upstream margin in bases')
+                    help='upstream margin in bases (default=20000)')
   parser.add_option('-d', '--downstream', dest='downstream', default=10000, type='int',  metavar='N',
-                    help='the downstream margin in bases')
+                    help='the downstream margin in bases (default=10000)')
   parser.add_option('-o', '--outfile',    dest='outfile',    default='-',                metavar='FILE',
                     help="name of the output file, '-' for standard out")
   return parser
@@ -69,12 +71,12 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if len(args)<2:
+  if len(args)!=1:
     parser.print_help(sys.stderr)
     return
 
-  con    = sqlite3.connect(args[0])
-  rows   = load_table(args[1],want_header=True,hyphen=sys.stdin)
+  con    = open_genedb(options.genedb)
+  rows   = load_table(args[0],want_header=True,hyphen=sys.stdin)
   out    = table_writer(options.outfile,hyphen=sys.stdout)
 
   header = rows.next() or ['']

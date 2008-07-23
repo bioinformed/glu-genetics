@@ -416,7 +416,7 @@ def get_mirbase(mfile):
 
 
 def main():
-  con = sqlite3.connect('snp128+.db')
+  con = sqlite3.connect('data/genedb_tiny.db')
 
   con.execute('PRAGMA synchronous=OFF;')
   con.execute('PRAGMA journal_mode=OFF;')
@@ -433,17 +433,17 @@ def main():
     aliases = list(filter_aliases(aliases))
     load_aliases(con,aliases)
 
-  if 0:
+  if 1:
     bands = get_cytobands('data/cytoBand.txt.gz')
     load_cytobands(con,bands)
 
-  if 0:
+  if 1:
     streams  = []
-    streams += [ get_goldenpath_dbsnp(s)  for s in DBSNP  ]
-    streams += [ get_goldenpath_arrays(a) for a in ARRAYS ]
-    streams += [ get_hapmap_snps(h)       for h in HAPMAP ]
-    streams += [ extract_illumina_snps(load_illumina_manifest(m))
-                   for m in MANIFESTS ]
+    #streams += [ get_goldenpath_dbsnp(s)  for s in DBSNP  ]
+    #streams += [ get_hapmap_snps(h)       for h in HAPMAP ]
+    #streams += [ get_goldenpath_arrays(a) for a in ARRAYS ]
+    #streams += [ extract_illumina_snps(load_illumina_manifest(m))
+    #               for m in MANIFESTS ]
 
     snps = chain(*streams)
     snps = squash_dups(snps)
