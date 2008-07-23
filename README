@@ -49,6 +49,7 @@ GLU requires the following free and open source packages:
  * SciPy    0.6.0 or newer from http://www.scipy.org/
  * PyTables 2.0.4 or newer from http://www.pytables.org/
  * SQLite   3.5.9 or newer from http://www.sqlite.org/
+ * Ply      2.5   or newer from http://www.dabeaz.com/ply/
 
 Prerequisites of the prerequisites:
 

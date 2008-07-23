@@ -18,6 +18,7 @@ min_python_version = (2,5)
 min_numpy_version  = '1.0.2'
 min_scipy_version  = '0.5.2'
 min_tables_version = '2.0'
+min_ply_version    = '2.5'
 
 if sys.version_info < min_python_version:
   sys.stderr.write('Python 2.5 or newer to required to install and run GLU!\n')
@@ -65,7 +66,8 @@ if __name__ == '__main__':
         classifiers      = filter(None, classifiers.split('\n')),
         install_requires = ['numpy>=%s'  % min_numpy_version,
                             'scipy>=%s'  % min_scipy_version,
-                            'tables>=%s' % min_tables_version],
+                            'tables>=%s' % min_tables_version,
+                            'ply>=%s'    % min_ply_version],
         setup_requires   = ['numpy>=%s'  % min_numpy_version],
         packages         = find_packages(),
         include_package_data = True,
