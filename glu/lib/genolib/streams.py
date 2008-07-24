@@ -4080,7 +4080,7 @@ def _genome_rename(old_genome, locusmap, warn=False):
 
 def _phenome_rename(old_phenome, samplemap, warn=False):
   '''
-  Helper to merge loci
+  Helper to merge phenotypes
   '''
   if not samplemap or old_phenome is None:
     return old_phenome
@@ -4137,17 +4137,35 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
   S2 L1 ('T', 'T')
   S2 L2 ('A', 'A')
   '''
-  samplemap = samplemap or {}
-  locusmap  = locusmap  or {}
+  if not samplemap and not locusmap:
+    return triples
 
-  genome,recode = _genome_rename(triples.genome,   locusmap,  warn)
-  phenome       = _phenome_rename(triples.phenome, samplemap, warn)
+  samplemap   = samplemap or {}
+  locusmap    = locusmap  or {}
+  old_genome  = triples.genome
+  new_genome  = Genome()
+  new_phenome = _phenome_rename(triples.phenome, samplemap, warn)
 
   def _rename(triples):
+    recode = {}
+
     for sample,locus,geno in triples:
-      sample = samplemap.get(sample,sample)
-      locus  = locusmap.get(locus,locus)
-      yield sample,locus,geno
+      new_sample = samplemap.get(sample,sample)
+      new_locus  = locusmap.get(locus,locus)
+
+      recode_model = recode.get(locus)
+      if recode_model is None:
+        if locus != new_locus and _genome_merge_loci(old_genome, locus, new_genome, new_locus, warn):
+          recode_model = new_genome.loci[new_locus].model
+        else:
+          recode_model = False
+
+        recode[locus] = recode_model
+
+      if recode_model:
+        geno = recode_model[geno]
+
+      yield new_sample,new_locus,geno
 
   samples = triples.samples
   if samples and samplemap:
@@ -4158,12 +4176,8 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
     loci = set(locusmap.get(l,l) for l in loci)
 
   # FIXME: We can do more to prove uniqueness
-  triples = triples.clone(_rename(triples),samples=samples,loci=loci,genome=genome,order=None,materialized=False)
-
-  if recode:
-    triples = triples.transformed(recode_models=genome)
-
-  return triples
+  return triples.clone(_rename(triples),samples=samples,loci=loci,genome=new_genome,phenome=new_phenome,
+                                        order=None,materialized=False)
 
 
 def filter_genotriples(triples,sampleset,locusset,exclude=False):
