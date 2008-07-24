@@ -895,7 +895,7 @@ class GenomatrixStream(GenotypeStream):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
 
     formats  = set(g.format for g in genos)
-    informat = formats.pop() if len(formats)==1 else None
+    informat = list(formats)[0] if len(formats)==1 else None
     headers  = [ g.columns for g in genos ] if informat in ('ldat','sdat') else None
 
     # Single input is trivial -- just merge
