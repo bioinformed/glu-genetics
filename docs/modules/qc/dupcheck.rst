@@ -8,8 +8,9 @@
 .. module:: dupcheck
    :synopsis: Find duplicate samples within a genotype data set
 
-The :mod:`qc.dupcheck` module looks at genotype data and identifies three
-categories of duplicates:
+The :mod:`qc.dupcheck` module compares all possible pairs of samples and
+classifies them into categories based on the pairwise genotype concordance
+rate:
 
   * expected duplicates
 
@@ -17,10 +18,18 @@ categories of duplicates:
 
   * expected duplicates not found.
 
-The input can be in hapmap, ldat, sdat, triple, or genotriple format. The
-user can indicate a threshold value (percent) for determining identity
-between two individuals, and the minimum number of genotypes to be
-considered informative.
+  * uninformative
+
+Only comparisons between samples with greater than a minimum number of
+concordant genotypes are considered to be informative.  Pairs of samples
+that exceed a given concordance threshold are considered duplicates.  Pairs
+of samples are expected or unexpected duplicates if the user specifies a
+mapping between sample identifiers and subject identifiers.  Expected
+duplicates map to the same subject identifier, while unexpected duplicates
+map to different subjects or do not appear in the mapping.
+
+The input can be any GLU input format, though sdat/sbat/PLINK ped formats
+are optimal.
 
 Usage::
 
@@ -40,8 +49,7 @@ Options:
                         Mapping from sample identifier to subject identifier
   -o FILE, --output=FILE
                         Output of duplicate check report
-  -T N, --threshold=N   Threshold for the percentage of identity shared
-                        between two individuals (default=85)
-  -m N, --mingenos=N, --mincount=N
-                        Minimum concordant genotypes to be considered
-                        informative for duplicate checking
+  -t N, --threshold=N   Minimum proportion genotype concordance threshold for
+                        duplicates (default=0.8)
+  -m N, --mingenos=N    Minimum number of concordant genotypes to be
+                        considered informative (default=20)
