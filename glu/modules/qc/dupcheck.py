@@ -12,7 +12,7 @@ __revision__  = '$Id$'
 import sys
 
 from   glu.lib.utils             import pair_generator
-from   glu.lib.fileutils         import table_writer
+from   glu.lib.fileutils         import load_table,table_writer
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream,geno_options
