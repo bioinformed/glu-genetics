@@ -43,14 +43,14 @@ Intended Audience :: Information Technology
 Intended Audience :: Science/Research
 License :: OSI Approved :: BSD License
 Programming Language :: Python
-Programming Language :: C 
+Programming Language :: C
 Topic :: Scientific/Engineering
-Topic :: Software Development 
+Topic :: Software Development
 Topic :: Database
 Topic :: Software Development :: Libraries :: Python Modules
 Operating System :: Unix
 Operating System :: POSIX
-Operating System :: MacOS :: MacOS X 
+Operating System :: MacOS :: MacOS X
 Operating System :: Microsoft :: Windows
 '''
 
