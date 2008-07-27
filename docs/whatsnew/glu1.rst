@@ -2,6 +2,20 @@
 What's New in GLU 1.0
 *********************
 
+Version 1.0a2 (2008-07-27)
+==========================
+
+* Rate parateters for :mod:`tagzilla` and :mod:`qc.dupcheck` now take
+  decimal rates and not integer percentages.
+
+* Fixed a missing import that prevented :mod:`qc.dupcheck` from running.
+
+* Corrected a metadata sequencing bug when recoding or merging genotriple
+  streams.
+
+* Corrected a bug in code that selects the optimal genotype merge
+  algorithm that affected merging genotriple files (tdat/tbat/PrettyBase).
+
 Version 1.0a1 (2008-07-23)
 ==========================
 
