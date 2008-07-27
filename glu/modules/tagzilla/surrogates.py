@@ -61,8 +61,8 @@ def option_parser():
                           help='Minimum minor allele frequency (MAF) for obligate tags (defaults to -a/--minmaf)')
   genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
                           help='Drop loci with less than N valid genotypes. Default=0')
-  genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N%', default=0, type='float',
-                          help='Drop loci with completion rate less than N% (0-100). Default=0')
+  genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
+                          help='Drop loci with completion rate less than N (0-1). Default=0')
   genoldgroup.add_option('-m', '--maxdist', dest='maxdist', metavar='D', type='int', default=200,
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',

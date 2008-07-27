@@ -74,7 +74,7 @@ Genotype and LD estimation options
     -c N, --mincompletion=N
                         Drop loci with less than N valid genotypes (default=0)
     --mincompletionrate=N
-                        Drop loci with completion rate less than N percent (0-100)
+                        Drop loci with completion rate less than N (0-1)
                         (default=0)
     -m D, --maxdist=D   Maximum inter-marker distance in kb for LD comparison
                         (default=200)

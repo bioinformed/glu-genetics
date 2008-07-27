@@ -1621,7 +1621,7 @@ def filter_loci(loci, include, subset, options):
     loci = filter_loci_by_range(loci, options.range)
 
   if options.mincompletion or options.mincompletionrate:
-    loci = filter_loci_by_completion(loci, options.mincompletion, options.mincompletionrate/100.)
+    loci = filter_loci_by_completion(loci, options.mincompletion, options.mincompletionrate)
 
   if options.hwp:
     loci = filter_loci_by_hwp(loci, options.hwp)
@@ -1833,8 +1833,8 @@ def option_parser():
                           help='Minimum minor allele frequency (MAF) for obligate tags (defaults to -a/--minmaf)')
   genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
                           help='Drop loci with less than N valid genotypes (default=0)')
-  genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N%', default=0, type='float',
-                          help='Drop loci with completion rate less than N% (0-100) (default=0)')
+  genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
+                          help='Drop loci with completion rate less than N (0-1) (default=0)')
   genoldgroup.add_option('-m', '--maxdist', dest='maxdist', metavar='D', type='int', default=200,
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
