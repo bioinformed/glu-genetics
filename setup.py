@@ -37,15 +37,21 @@ def get_version():
 
 classifiers = '''\
 Development Status :: 5 - Production/Stable
+Home-page: http://code.google.com/p/glu-genetics/
 Intended Audience :: Developers
 Intended Audience :: Information Technology
 Intended Audience :: Science/Research
 License :: OSI Approved :: BSD License
 Programming Language :: Python
+Programming Language :: C 
+Topic :: Scientific/Engineering
+Topic :: Software Development 
 Topic :: Database
 Topic :: Software Development :: Libraries :: Python Modules
-Operating System :: Microsoft :: Windows
 Operating System :: Unix
+Operating System :: POSIX
+Operating System :: MacOS :: MacOS X 
+Operating System :: Microsoft :: Windows
 '''
 
 #entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
