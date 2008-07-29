@@ -37,7 +37,7 @@ Version 1.0a1 (2008-07-23)
     * :mod:`genedb.find_regions`
     * :mod:`genedb.annotate`
 
-  Instead, a '-g/--genedb' option is provided.  E.g.:
+  Instead, a '-g/--genedb' option is provided.  E.g.::
 
     > glu genedb.annotate -g genome36.3 assoc.txt -o assoc_annotated.txt
 

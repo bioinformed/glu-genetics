@@ -8,5 +8,5 @@ The modules described in this chapter provide tests of assocation between phenot
 
 .. toctree::
 
-  linear1.rst
-  logit1.rst
+  linear1
+  logit1

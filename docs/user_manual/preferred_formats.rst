@@ -1,3 +1,5 @@
+.. _user_manual-preferred_formats:
+
 ++++++++++++++++++++++++++++
 Preferred Input File Formats
 ++++++++++++++++++++++++++++

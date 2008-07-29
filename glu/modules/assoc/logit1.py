@@ -38,9 +38,9 @@ def option_parser():
 
   analysis = optparse.OptionGroup(parser, 'Analysis options')
 
-  analysis.add_option('--model', dest='model', metavar='F',
+  analysis.add_option('--model', dest='model', metavar='FORMULA',
                       help='General formula for model to fit')
-  analysis.add_option('--test', dest='test', metavar='F',
+  analysis.add_option('--test', dest='test', metavar='FORMULA',
                       help='Formula terms to test.  Default is to test all genotype effects if a model is specified, '
                            'otherwise a 2df genotype test (GENO(locus)).')
   analysis.add_option('--stats', dest='stats', default='score', metavar='T1,T2,..',
@@ -64,7 +64,7 @@ def option_parser():
                     help='Output summary results to FILE')
   output.add_option('-O', '--details', dest='details', metavar='FILE',
                     help='Output detailed results to FILE')
-  output.add_option('--display', dest='display', metavar='F',
+  output.add_option('--display', dest='display', metavar='FORMULA',
                       help='Formula terms to display in the summary output table.  Defaults to all test terms.')
   output.add_option('--detailsmaxp', dest='detailsmaxp', metavar='P', type='float', default=1.0,
                     help='Output detailed results for only pvalues below P threshold')

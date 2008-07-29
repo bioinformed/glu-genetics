@@ -11,6 +11,10 @@
 Single-locus association tests of dichotomous and unordered polytomous
 outcomes with optional covariates and interactions.
 
+The :option:`--model`, :option:`--test`, and :option:`--display` options are
+specified by a formula notation.  See :ref:`user_manual-formulae` for more
+information.
+
 Usage::
 
   glu assoc.logit1 [options] phenotypes genotypes
@@ -48,8 +52,8 @@ Options:
 
   Analysis options:
 
-    --model=F           General formula for model to fit
-    --test=F            Formula terms to test.  Default is to test all
+    --model=FORMULA     General formula for model to fit
+    --test=FORMULA      Formula terms to test.  Default is to test all
                         genotype effects if a model is specified, otherwise a
                         2df genotype test (GENO(locus)).
     --stats=T           Comma separated list of test statistics to apply to
@@ -73,7 +77,7 @@ Options:
                         Output summary results to FILE
     -O FILE, --details=FILE
                         Output detailed results to FILE
-    --display=F         Formula terms to display in the summary output table.
+    --display=FORMULA   Formula terms to display in the summary output table.
                         Defaults to all test terms.
     --detailsmaxp=P     Output detailed results for only pvalues below P
                         threshold

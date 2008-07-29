@@ -26,6 +26,7 @@ the team at NCI and our CGEMS collaborators:
 * Constance Chen
 * Xiang Deng
 * Thomas Giles
+* Jesus Gonzalez-Bosquet
 * Amy Hutchinson
 * Peter Kraft
 * Chenwei Liu
@@ -37,5 +38,5 @@ the team at NCI and our CGEMS collaborators:
 * Zhaoming Wang
 * Robert Welch
 * Nick Xiao
-* Meredith Yeager
+* Meredith "Giraffe" Yeager
 * Jeff Yuenger
