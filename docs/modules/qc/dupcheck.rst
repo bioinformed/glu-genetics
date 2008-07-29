@@ -16,7 +16,7 @@ rate:
 
   * unexpected duplicates
 
-  * expected duplicates not found.
+  * expected duplicates not found
 
   * uninformative
 
@@ -27,6 +27,12 @@ of samples are expected or unexpected duplicates if the user specifies a
 mapping between sample identifiers and subject identifiers.  Expected
 duplicates map to the same subject identifier, while unexpected duplicates
 map to different subjects or do not appear in the mapping.
+
+The ``--checkexp`` option is an optimization that only checks expected
+duplicates indicated by the ``-e``/``--duplicates`` option.  It should only
+be used in specialized situations, since unexpected duplicates will not be
+detected and the presence of unexpected duplicates can be a sign of serious
+problem in data quality.
 
 The input can be any GLU input format, though sdat/sbat/PLINK ped formats
 are optimal.
@@ -47,6 +53,7 @@ Options:
                         Pedigree description file and options
   -e FILE, --duplicates=FILE
                         Mapping from sample identifier to subject identifier
+  --checkexp            Check only expected duplicate pairs
   -o FILE, --output=FILE
                         Output of duplicate check report
   -t N, --threshold=N   Minimum proportion genotype concordance threshold for
