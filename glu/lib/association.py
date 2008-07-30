@@ -184,7 +184,7 @@ def table_trend(x):
 
   >>> x = [[26,26,23,18,9],[6,7,9,14,23]]
   >>> table_trend(x)
-  22.9614677639
+  22.961467763890997
   '''
   x = asanyarray(x, dtype=int)
 
