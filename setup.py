@@ -75,6 +75,7 @@ if __name__ == '__main__':
                             'tables>=%s' % min_tables_version,
                             'ply>=%s'    % min_ply_version],
         setup_requires   = ['numpy>=%s'  % min_numpy_version],
+        tests_require    = ['nose>=0.10.3'],
         packages         = find_packages(),
         include_package_data = True,
         scripts          = ['bin/glu'],
