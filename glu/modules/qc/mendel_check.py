@@ -149,8 +149,8 @@ def main():
     parser.print_help()
     return
 
-  genos = load_genostream(args[0],format=options.format,
-                                  genorepr=options.genorepr,
+  genos = load_genostream(args[0],format=options.informat,
+                                  genorepr=options.ingenorepr,
                                   genome=options.loci,
                                   phenome=options.pedigree,
                                   transform=GenoTransform.from_options(options))

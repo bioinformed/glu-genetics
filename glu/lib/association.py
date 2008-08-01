@@ -387,7 +387,7 @@ def _load_loci(filename,options,keep):
     options.excludesamples = set(load_list(options.excludesamples))
     keep -= options.excludesamples
 
-  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr,
+  loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
                          transform=GenoTransform.from_options(options)).as_ldat()
 
   if loci.samples:

@@ -67,9 +67,9 @@ def guess_outformat(filename):
 
 def geno_options(group,input=False,output=False,merge=False,filter=False,transform=False):
   if input:
-    group.add_option('-f', '--informat', dest='format', metavar='NAME',
+    group.add_option('-f', '--informat', dest='informat', metavar='NAME',
                       help='Input genotype format')
-    group.add_option('-g', '--ingenorepr', dest='genorepr', metavar='REP',
+    group.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP',
                       help='Input genotype representation')
 
   if output:

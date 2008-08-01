@@ -325,7 +325,7 @@ def split(genos, outformat, prefix, suffix, options):
 
   if samplegroups is not None or locusgroups is not None:
     filecache = FileMap(prefix,suffix,genos.format,genos.genome,genos.phenome,outformat=outformat,
-                        genorepr=options.genorepr,maxrows=options.maxrows)
+                        genorepr=options.ingenorepr,maxrows=options.maxrows)
 
     if genos.format in ('sdat','ldat'):
       mplx = genomatrix_multiplexer(genos,samplegroups,locusgroups,
@@ -339,7 +339,7 @@ def split(genos, outformat, prefix, suffix, options):
 
   elif options.maxrows:
     writer = RollingWriter('%s.%s' % (prefix,suffix),outformat,genome=genos.genome,phenome=genos.phenome,
-                                     header=header,genorepr=options.genorepr,maxrows=options.maxrows)
+                                     header=header,genorepr=options.ingenorepr,maxrows=options.maxrows)
     with writer:
       writer.writerows(genos)
 
@@ -390,10 +390,10 @@ def main():
 
   prefix,suffix = split_fullname(filename,options.destdir)
 
-  genos = load_genostream(args[0],format=options.format,genorepr=options.genorepr,
+  genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
                                   genome=options.loci,phenome=options.pedigree,hyphen=sys.stdin)
 
-  outformat = guess_outformat(args[0]) or options.format or genos.format
+  outformat = guess_outformat(args[0]) or options.informat or genos.format
   split(genos, outformat, prefix, suffix, options)
 
 

@@ -1596,7 +1596,7 @@ def read_illumina_design_score(filename):
 
 
 def load_genotypes(filename, options):
-  loci = load_genostream(filename,format=options.format,genorepr=options.genorepr,genome=options.loci,
+  loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,genome=options.loci,
                                   transform=GenoTransform.from_options(options)).as_ldat()
 
   loci = loci.transformed(repack=True)
@@ -1699,10 +1699,10 @@ def generate_ldpairs(args, locusmap, include, subset, ldsubset, options):
 def generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, options):
   sys.stderr.write('[%s] Processing input file %s\n' % (time.asctime(),filename))
 
-  if options.format == 'festa':
+  if options.informat == 'festa':
     return load_festa_file(filename, locusmap, subset, options.r)
 
-  elif options.format == 'hapmapld':
+  elif options.informat == 'hapmapld':
     return load_hapmapld_file(filename, locusmap, subset, options.maxdist*1000, options.r, options.d)
 
   else: # generate from genotype file
