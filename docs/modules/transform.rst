@@ -36,7 +36,7 @@ Options:
                         Input genotype format
     -g REP, --ingenorepr=REP
                         Input genotype representation
-    -F string, --outformat=string
+    -F NAME, --outformat=NAME
                         Output genotype format
     -G REP, --outgenorepr=REP
                         Output genotype representation
@@ -65,21 +65,21 @@ Options:
     --excludesamples=FILE
                         List of samples to exclude
     --excludeloci=FILE  List of loci to exclude
+
+  Transformations:
+
     --renamesamples=FILE
                         Rename samples from a file containing rows of original
                         name, tab, new name
     --renameloci=FILE   Rename loci from a file containing rows of original
                         name, tab, new name
-
-  Transformations:
-
-    --ordersamples=FILE
-                        Order samples based on the order of names in FILE
-    --orderloci=FILE    Order loci based on the order of names in FILE
     --renamealleles=FILE
                         Rename alleles based on file of locus name, tab, old
                         alleles (comma separated), tab, new alleles (comma
                         separated)
+    --ordersamples=FILE
+                        Order samples based on the order of names in FILE
+    --orderloci=FILE    Order loci based on the order of names in FILE
 
 Examples
 --------

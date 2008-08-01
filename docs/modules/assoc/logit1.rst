@@ -20,13 +20,14 @@ Usage::
   glu assoc.logit1 [options] phenotypes genotypes
 
 Options:
+
   -h, --help            show this help message and exit
 
   Input options:
 
-    -f NAME, --format=NAME
+    -f NAME, --informat=NAME
                         Input genotype format
-    -g REP, --genorepr=REP
+    -g REP, --ingenorepr=REP
                         Input genotype representation
     -l FILE, --loci=FILE
                         Locus description file and options
@@ -39,11 +40,6 @@ Options:
     --excludesamples=FILE
                         List of samples to exclude
     --excludeloci=FILE  List of loci to exclude
-    --renamesamples=FILE
-                        Rename samples from a file containing rows of original
-                        name, tab, new name
-    --renameloci=FILE   Rename loci from a file containing rows of original
-                        name, tab, new name
     --fixedloci=FILE    Genotypes for fixed loci that can be included in the
                         model
     --minmaf=N          Minimum minor allele frequency filter
@@ -56,7 +52,7 @@ Options:
     --test=FORMULA      Formula terms to test.  Default is to test all
                         genotype effects if a model is specified, otherwise a
                         2df genotype test (GENO(locus)).
-    --stats=T           Comma separated list of test statistics to apply to
+    --stats=TLIST       Comma separated list of test statistics to apply to
                         each model.  Supported tests include score, Wald, and
                         likelihood ratio statistics.  Values: score, wald,
                         lrt.

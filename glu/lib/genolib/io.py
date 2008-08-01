@@ -66,16 +66,10 @@ def guess_outformat(filename):
 
 
 def geno_options(group,input=False,output=False,merge=False,filter=False,transform=False):
-  if input and output:
-    group.add_option('-f', '--informat', dest='informat', metavar='NAME',
+  if input:
+    group.add_option('-f', '--informat', dest='format', metavar='NAME',
                       help='Input genotype format')
-    group.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP',
-                      help='Input genotype representation')
-
-  elif input:
-    group.add_option('-f', '--format', dest='format', metavar='NAME',
-                      help='Input genotype format')
-    group.add_option('-g', '--genorepr', dest='genorepr', metavar='REP',
+    group.add_option('-g', '--ingenorepr', dest='genorepr', metavar='REP',
                       help='Input genotype representation')
 
   if output:
@@ -114,19 +108,18 @@ def geno_options(group,input=False,output=False,merge=False,filter=False,transfo
     group.add_option('--excludeloci', dest='excludeloci', metavar='FILE',
                       help='List of loci to exclude')
 
+  if transform:
     group.add_option('--renamesamples', dest='renamesamples', metavar='FILE',
                       help='Rename samples from a file containing rows of original name, tab, new name')
     group.add_option('--renameloci', dest='renameloci', metavar='FILE',
                       help='Rename loci from a file containing rows of original name, tab, new name')
-
-  if transform:
+    group.add_option('--renamealleles', dest='renamealleles', metavar='FILE',
+                      help='Rename alleles based on file of locus name, tab, old alleles (comma separated), '
+                           'tab, new alleles (comma separated)')
     group.add_option('--ordersamples', dest='ordersamples', metavar='FILE',
                       help='Order samples based on the order of names in FILE')
     group.add_option('--orderloci', dest='orderloci', metavar='FILE',
                       help='Order loci based on the order of names in FILE')
-    group.add_option('--renamealleles', dest='renamealleles', metavar='FILE',
-                      help='Rename alleles based on file of locus name, tab, old alleles (comma separated), '
-                           'tab, new alleles (comma separated)')
 
 
 def load_genostream(filename, transform=None, extra_args=None, **kwargs):

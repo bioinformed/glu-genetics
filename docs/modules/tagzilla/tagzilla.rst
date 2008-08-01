@@ -199,9 +199,9 @@ Notes:
 Input options
 -------------
 
-    -f NAME, --format=NAME
+    -f NAME, --informat=NAME
                         Input genotype format
-    -g REP, --genorepr=REP
+    -g REP, --ingenorepr=REP
                         Input genotype representation
     -l FILE, --loci=FILE
                         Locus description file and options
@@ -214,11 +214,6 @@ Input options
     --excludesamples=FILE
                         List of samples to exclude
     --excludeloci=FILE  List of loci to exclude
-    --renamesamples=FILE
-                        Rename samples from a file containing rows of original
-                        name, tab, new name
-    --renameloci=FILE   Rename loci from a file containing rows of original
-                        name, tab, new name
     -e FILE, --excludetag=FILE
                         File containing loci that are excluded from being a
                         tag

@@ -358,7 +358,7 @@ def option_parser():
   usage = 'usage: %prog [options] lbdfile...'
   parser = optparse.OptionParser(usage=usage)
 
-  geno_options(parser,filter=True,output=True)
+  geno_options(parser,filter=True,transform=True,output=True)
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output genotype file name')

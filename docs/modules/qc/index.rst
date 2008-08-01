@@ -9,6 +9,7 @@ summaries and to verify data quality.
 
 .. toctree::
 
-  summary.rst
-  concordance.rst
-  dupcheck.rst
+  summary
+  concordance
+  dupcheck
+  mendel_check

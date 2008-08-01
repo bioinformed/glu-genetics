@@ -18,9 +18,9 @@ Usage::
 Options:
 
   -h, --help            show this help message and exit
-  -f NAME, --format=NAME
+  -f NAME, --informat=NAME
                         Input genotype format
-  -g REP, --genorepr=REP
+  -g REP, --ingenorepr=REP
                         Input genotype representation
   -l FILE, --loci=FILE  Locus description file and options
   -p FILE, --pedigree=FILE
@@ -32,10 +32,6 @@ Options:
   --excludesamples=FILE
                         List of samples to exclude
   --excludeloci=FILE    List of loci to exclude
-  --renamesamples=FILE  Rename samples from a file containing rows of original
-                        name, tab, new name
-  --renameloci=FILE     Rename loci from a file containing rows of original
-                        name, tab, new name
   -o FILE, --output=FILE
                         Output principle components (eigenvectors) to FILE
                         (default is "-" for standard out)
