@@ -19,7 +19,8 @@ __all__ = ['autofile','namefile','hyphen',
 
 
 TABLE_FORMATS = set(['xls','csv'])
-COMPRESSED_SUFFIXES = set(['gz','Z'])
+COMPRESSED_SUFFIXES = {'gz':'gzip', 'Z'  :'gzip',
+                       'bz':'bzip2','bz2':'bzip2'}
 
 
 # Create more standard aliases for Python CSV module dialects.  'excel' is
@@ -28,10 +29,13 @@ csv.register_dialect('csv', csv.get_dialect('excel'))
 csv.register_dialect('tsv', csv.get_dialect('excel-tab'))
 
 
-def OSGzipFile(filename, mode, bufsize=-1):
+def spawn_compressor(binary, filename, mode, bufsize=-1):
   '''
-  Spawn a subprocess to run gzip and connect to input/output pipes
+  Spawn a subprocess to run a compressor like gzip or bzip2 and connect to
+  input/output pipes
 
+  @param    binary: executable name
+  @type     binary: str
   @param  filename: file name or file object
   @type   filename: str or file object
   @param      mode: determine whether the file objects should be opened for input or output,
@@ -43,19 +47,17 @@ def OSGzipFile(filename, mode, bufsize=-1):
   @return         : file object to read from or write to
   @rtype          : file object
   '''
-  from subprocess import Popen,PIPE
-
   if os.environ.get('GLU_NOSPAWN'):
     raise OSError('Spawning external processes disabled by GLU_NOSPAWN')
 
-  gzipexe = os.environ.get('GLU_GZIP','gzip')
+  from subprocess import Popen,PIPE
 
   if 'w' in mode:
     out = file(filename,mode)
-    cmd = [gzipexe,'-c']
+    cmd = [binary,'-c']
     f   = Popen(cmd, stdin=PIPE, stdout=out, bufsize=bufsize).stdin
   else:
-    cmd = [gzipexe,'-d','-c',filename]
+    cmd = [binary,'-d','-c',filename]
     f   = Popen(cmd, stdout=PIPE, universal_newlines='U' in mode, bufsize=bufsize).stdout
 
   return f
@@ -123,32 +125,33 @@ def compressed_filename(filename):
 
   @param  filename: file name or file object
   @type   filename: str or file object
-  @return         : suffix of the filename if the filename indicates a compress format,
-                    otherwise, empty string
+  @return         : compression format, if compressed, otherwise an empty string
   @rtype          : str
 
   >>> compressed_filename('subjects.sdat')
   ''
   >>> compressed_filename('subjects.sdat.gz')
-  'gz'
+  'gzip'
   >>> compressed_filename('../subjects.sdat')
   ''
   >>> compressed_filename('../subjects.sdat.gz')
-  'gz'
+  'gzip'
+  >>> compressed_filename('../subjects.sdat.bz2')
+  'bzip2'
   '''
   if not is_str(filename):
     return ''
 
   filename = os.path.expanduser(filename)
-  parts = os.path.basename(filename).split('.')
-  if parts and parts[-1] in COMPRESSED_SUFFIXES:
-    return parts[-1]
-  return ''
+  parts    = os.path.basename(filename).split('.')
+  ext      = parts[-1] if parts else ''
+  return COMPRESSED_SUFFIXES.get(ext,'')
 
 
 def autofile(filename, mode='r'):
   '''
-  Return a file object in the correct compressed format as specified, which is ready to read from or write to
+  Return a file object in the correct compressed format as specified, which
+  is ready to read from or write to
 
   @param  filename: file name or file object
   @type   filename: str or file object
@@ -163,15 +166,22 @@ def autofile(filename, mode='r'):
     return filename
 
   filename = os.path.expanduser(filename)
-  if compressed_filename(filename):
+  comp     = compressed_filename(filename)
+
+  if not comp:
+    f = file(filename, mode)
+  elif comp == 'gzip':
     try:
-      f = OSGzipFile(filename, mode)
+      f = spawn_compressor(os.environ.get('GLU_GZIP','gzip'), filename, mode)
     except _autofile_errors:
       import gzip
       f = gzip.GzipFile(filename, mode)
-
-  else:
-    f = file(filename, mode)
+  elif comp == 'bzip2':
+    try:
+      f = spawn_compressor(os.environ.get('GLU_BZIP2','bzip2'), filename, mode)
+    except _autofile_errors:
+      import bz2
+      f = bz2.BZ2File(filename, mode)
 
   return f
 
