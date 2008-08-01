@@ -2,6 +2,23 @@
 What's New in GLU 1.0
 *********************
 
+Version 1.0a3 (2008-07-31)
+==========================
+
+* Modified standard options to use -f/--informat and -g/--ingenorepr in all
+  cases to be more consistant.  Similarly, moved --renameloci and
+  --renamesamples to the transformation section, as they are somewhat out of
+  place in the filter section.
+
+* Add support for transparent bzip2 (.bz2) stream compression and decompression
+
+* Fix to logistic regression due to a change in Numpy 1.1
+
+* Added concordance rate to qc.dupcheck output and an option to check only
+  expected duplicates.
+
+* Several documentation updates
+
 Version 1.0a2 (2008-07-27)
 ==========================
 
