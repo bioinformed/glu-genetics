@@ -378,13 +378,12 @@ def save_ldpairs(filename, ldpairs):
   out = table_writer(filename,hyphen=sys.stdout)
   out.writerow(['LNAME1','LNAME2','RSQUARED','DPRIME'])
 
-  def _gen():
-    for pairs in ldpairs:
-      for p in pairs:
-        out.writerow(p)
-        yield p
+  def _write_pairs(pairs):
+    for p in pairs:
+      out.writerow(p)
+      yield p
 
-  return [_gen()]
+  return (_write_pairs(pairs) for pairs in ldpairs)
 
 
 class NullLocusOutput(object):
