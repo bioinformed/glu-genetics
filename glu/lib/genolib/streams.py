@@ -472,8 +472,9 @@ class GenotripleStream(GenotypeStream):
       raise ValueError('Ambiguous transformation specification')
 
     if transform:
-      if isinstance(transform, optparse.OptionContainer):
-        transform = GenoTransform.from_options(options)
+      # Ick.  Optparse uses old-style classes
+      if isinstance(transform, optparse.Values) or transform.__class__ is optparse.Values:
+        transform = GenoTransform.from_options(transform)
       elif isinstance(transform, dict):
         transform = GenoTransform.from_kwargs(transform)
       elif not isinstance(transform, GenoTransform):
@@ -1266,8 +1267,9 @@ class GenomatrixStream(GenotypeStream):
       raise ValueError('Ambiguous transformation specification')
 
     if transform:
-      if isinstance(transform, optparse.OptionContainer):
-        transform = GenoTransform.from_options(options)
+      # Ick.  Optparse uses old-style classes
+      if isinstance(transform, optparse.Values) or transform.__class__ is optparse.Values:
+        transform = GenoTransform.from_options(transform)
       elif isinstance(transform, dict):
         transform = GenoTransform.from_kwargs(transform)
       elif not isinstance(transform, GenoTransform):
