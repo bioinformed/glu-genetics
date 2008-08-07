@@ -13,8 +13,8 @@ from   operator  import itemgetter
 from   itertools import repeat,izip
 
 from   glu.lib.utils             import percent
-from   glu.lib.fileutils         import load_table,table_writer
-from   glu.lib.genolib           import load_genostream,geno_options,GenoTransform
+from   glu.lib.fileutils         import table_writer
+from   glu.lib.genolib           import load_genostream,geno_options
 
 
 def parent_offspring_concordance(parent1, parent2, child, locusstats):
@@ -153,7 +153,7 @@ def main():
                                   genorepr=options.ingenorepr,
                                   genome=options.loci,
                                   phenome=options.pedigree,
-                                  transform=GenoTransform.from_options(options))
+                                  transform=options)
 
   if genos.samples:
     pset = set()

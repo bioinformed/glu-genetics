@@ -38,7 +38,7 @@ from   glu.lib.stats             import mean, median
 from   glu.lib.utils             import pair_generator, percent
 from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table, table_writer
 from   glu.lib.glu_launcher      import GLUError
-from   glu.lib.genolib           import load_genostream, geno_options, GenoTransform
+from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.ld        import estimate_ld, count_haplotypes, bound_ld
 from   glu.lib.genolib.genoarray import minor_allele_from_genos
 
@@ -1596,7 +1596,7 @@ def read_illumina_design_score(filename):
 
 def load_genotypes(filename, options):
   loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,genome=options.loci,
-                                  transform=GenoTransform.from_options(options)).as_ldat()
+                                  transform=options).as_ldat()
 
   loci = loci.transformed(repack=True)
 

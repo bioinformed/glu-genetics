@@ -13,11 +13,11 @@ __all__ = ['BinaryGenomatrixWriter', 'BinaryGenotripleWriter',
 
 
 from   operator                  import itemgetter
-from   itertools                 import groupby,imap
+from   itertools                 import groupby
 
 import tables
 
-from   glu.lib.utils             import izip_exact,gcdisabled,is_str
+from   glu.lib.utils             import izip_exact,is_str
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
                                         namefile
 from   glu.lib.genolib.locus     import Genome,Locus

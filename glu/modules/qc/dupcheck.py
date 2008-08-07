@@ -18,7 +18,6 @@ from   glu.lib.fileutils         import load_table,table_writer
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream,geno_options
-from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.genoarray import genoarray_concordance
 
 

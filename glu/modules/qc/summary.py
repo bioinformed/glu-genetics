@@ -15,7 +15,7 @@ from   itertools                 import izip
 
 from   glu.lib.fileutils         import autofile,hyphen,load_list,table_writer
 from   glu.lib.hwp               import hwp_biallelic
-from   glu.lib.genolib           import load_genostream, geno_options, GenoTransform
+from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
                                         count_alleles_from_genocounts
 
@@ -199,8 +199,7 @@ def main():
 
   genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
                                   genome=options.loci,phenome=options.pedigree,
-                                  transform=GenoTransform.from_options(options),
-                                  hyphen=sys.stdin)
+                                  transform=options, hyphen=sys.stdin)
 
   loci,locus_counts,samples,sample_counts = summarize(genos)
   sample_totals = sum(sample_counts)

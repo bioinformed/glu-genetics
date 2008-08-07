@@ -19,7 +19,7 @@ except ImportError:
 
 from   glu.lib.fileutils         import table_writer
 
-from   glu.lib.genolib           import load_genostream, GenoTransform, geno_options
+from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_genocounts, \
                                         major_allele_from_allelecounts
 
@@ -246,7 +246,7 @@ def main():
 
   genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
                                   genome=options.loci,phenome=options.pedigree,
-                                  transform=GenoTransform.from_options(options)).as_ldat()
+                                  transform=options).as_ldat()
 
   n = options.vectors or None
 

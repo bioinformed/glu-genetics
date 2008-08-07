@@ -8,7 +8,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-import sys
 import pydoc
 import pkgutil
 import textwrap
@@ -18,7 +17,6 @@ try:
 except ImportError:
   from StringIO import StringIO
 
-import glu
 import glu.modules
 
 

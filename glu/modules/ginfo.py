@@ -9,8 +9,6 @@ __revision__  = '$Id$'
 
 import sys
 
-from   itertools              import chain
-
 from   glu.lib.fileutils      import table_writer,autofile,namefile,hyphen
 
 from   glu.lib.genolib.io     import load_genostream, geno_options
