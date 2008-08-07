@@ -17,7 +17,8 @@ from   scipy.linalg        import LinAlgError
 from   glu.lib.fileutils   import autofile,hyphen,load_list
 from   glu.lib.glm         import GLogit
 
-from   glu.lib.association import print_results,build_models,format_pvalue,NULL,GENO,TREND
+from   glu.lib.association import print_results,build_models,format_pvalue
+from   glu.lib.formula     import NULL,GENO,TREND
 
 
 def option_parser():

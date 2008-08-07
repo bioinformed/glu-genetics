@@ -14,7 +14,8 @@ from   scipy               import stats
 from   glu.lib.fileutils   import autofile,hyphen,load_table,table_writer
 from   glu.lib.glm         import GLogit
 
-from   glu.lib.association import build_models,print_results,get_term,format_pvalue,NULL,GENO,TREND
+from   glu.lib.association import build_models,print_results,format_pvalue
+from   glu.lib.formula     import get_term,NULL,GENO,TREND
 
 
 def option_parser():
