@@ -15,14 +15,14 @@ from   numpy               import isfinite
 from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import GLogit,LinAlgError
 
-from   glu.lib.genolib     import load_genostream, geno_options
+from   glu.lib.genolib     import geno_options
 from   glu.lib.association import build_models,print_results,format_pvalue
 
 
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] phenotypes genotypes'
+  usage = 'usage: %prog [options] phenotypes [genotypes]'
   parser = optparse.OptionParser(usage=usage)
 
   input = optparse.OptionGroup(parser, 'Input options')
@@ -144,9 +144,12 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if len(args) != 2:
+  if len(args) < 1:
     parser.print_help()
     return
+
+  phenos = args[0]
+  genos  = args[1] if len(args)==2 else None
 
   if options.ci < 0 or options.ci > 1:
     raise ValueError('Confidence interval must be between 0 and 1')
@@ -157,7 +160,7 @@ def main():
     if details is out:
       raise ValueError('Cannot send summary and detailed output to stdout')
 
-  loci,fixedloci,gterms,models = build_models(args[0], args[1], options)
+  loci,fixedloci,gterms,models = build_models(phenos, genos, options)
 
   null_model = models.build_model(options.null,fixedloci)
 
@@ -171,6 +174,9 @@ def main():
   if options.details:
     details.write('NULL MODEL:\n\n')
     print_results(details,null_model,null)
+
+  if not genos:
+    return
 
   header = summary_header(options,null)
   out.writerow(header)

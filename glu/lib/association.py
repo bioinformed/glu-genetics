@@ -18,9 +18,9 @@ from   scipy             import stats
 
 from   glu.lib.utils     import tally
 from   glu.lib.fileutils import namefile,load_list,load_map,load_table,load_table_rows,resolve_column_headers,tryint1
-from   glu.lib.genolib   import load_genostream,GenoTransform,pick
-from   glu.lib.formula   import get_term,INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
-                                NULL,TREND,GENO,FormulaParser
+from   glu.lib.genolib   import load_genostream,pick
+from   glu.lib.formula   import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
+                                GENO,FormulaParser
 
 
 LOGE_10 = log(10)
@@ -387,17 +387,29 @@ def _load_loci(filename,options,keep):
     options.excludesamples = set(load_list(options.excludesamples))
     keep -= options.excludesamples
 
-  loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
-                         transform=GenoTransform.from_options(options)).as_ldat()
-
-  if loci.samples:
+  if filename is not None:
+    loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
+                           transform=options).as_ldat()
     keep &= set(loci.samples)
 
-  return loci
+  fixedloci = None
+  if options.fixedloci:
+    fixedloci = load_genostream(options.fixedloci,format=options.informat,genorepr=options.ingenorepr,
+                                transform=options).as_ldat()
+    keep     &= set(fixedloci.samples)
+    fixedloci = fixedloci.transformed(include_samples=keep,order_samples=loci.samples)
+
+  if filename is None:
+    return None,fixedloci,list(keep)
+
+  loci        = loci.transformed(include_samples=keep)
+  samples     = loci.samples
+
+  return loci,fixedloci,loci.samples
 
 
 def parse_formulae(options,models):
-  scan = options.scan = options.scan if options.scan is not None else 'locus'
+  scan = options.scan = options.scan or 'locus'
 
   if options.test is not None:
     _,options.test = FormulaParser().parse(options.test)
@@ -463,14 +475,8 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   subjects      = set(p[0] for p in phenos)
   keep          = subjects.copy()
   phenocount1   = len(phenos)
-  loci          = _load_loci(genofile,options,keep)
-  fixedloci     = None
 
-  if options.fixedloci:
-    fixedloci   = _load_loci(options.fixedloci,options,keep)
-    fixedloci   = fixedloci.transformed(include_samples=keep,order_samples=loci.samples)
-
-  loci          = loci.transformed(include_samples=keep)
+  loci,fixedloci,samples = _load_loci(genofile,options,keep)
 
   if subjects != keep:
     phenos = [ p for p in phenos if p[0] in keep ]
@@ -483,7 +489,7 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
 
   reference_alleles = load_map(options.refalleles) if options.refalleles else None
 
-  models = LocusModelBuilder(loci.samples,header,phenos,
+  models = LocusModelBuilder(samples,header,phenos,
                              reference_alleles=reference_alleles,
                              minmaf=options.minmaf,mingenos=options.mingenos)
 

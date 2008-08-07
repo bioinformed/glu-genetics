@@ -22,7 +22,7 @@ from   glu.lib.association import build_models,print_results_linear,format_pvalu
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] phenotypes genotypes'
+  usage = 'usage: %prog [options] phenotypes [genotypes]'
   parser = optparse.OptionParser(usage=usage)
 
   input = optparse.OptionGroup(parser, 'Input options')
@@ -134,9 +134,12 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if len(args) != 2:
+  if len(args) not in (1,2):
     parser.print_help()
     return
+
+  phenos = args[0]
+  genos  = args[1] if len(args)==2 else None
 
   if options.ci < 0 or options.ci > 1:
     raise ValueError('Confidence interval must be between 0 and 1')
@@ -147,7 +150,7 @@ def main():
     if details is out:
       raise ValueError('Cannot send summary and detailed output to stdout')
 
-  loci,fixedloci,gterms,models = build_models(args[0], args[1], options, deptype=float)
+  loci,fixedloci,gterms,models = build_models(phenos, genos, options, deptype=float)
 
   if options.details:
     details.write('NULL MODEL:\n\n')
@@ -162,6 +165,9 @@ def main():
     null.fit()
 
     print_results_linear(details,null_model,null)
+
+  if not genos:
+    return
 
   header = summary_header(options)
   out.writerow(header)
