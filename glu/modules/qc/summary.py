@@ -13,6 +13,8 @@ import sys
 
 from   itertools                 import izip
 
+import numpy
+
 from   glu.lib.fileutils         import autofile,hyphen,load_list,table_writer
 from   glu.lib.hwp               import hwp_biallelic
 from   glu.lib.genolib           import load_genostream, geno_options
@@ -155,7 +157,7 @@ def count_empty(counts,n):
 
 def format_rate(numerator, denominator):
   if denominator<=0:
-    rate = ''
+    rate = 0
   else:
     rate = numerator/denominator
 
@@ -202,7 +204,7 @@ def main():
                                   transform=options, hyphen=sys.stdin)
 
   loci,locus_counts,samples,sample_counts = summarize(genos)
-  sample_totals = sum(sample_counts)
+  sample_totals = sum(sample_counts, numpy.zeros(4))
 
   assert len(loci)*len(samples) == sample_totals.sum()
 
