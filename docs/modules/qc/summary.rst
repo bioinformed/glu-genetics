@@ -15,7 +15,7 @@ tests for deviations from Hardy-Weinberg proportions.
 
 Usage::
 
-  glu qc.summary [options] file
+  glu qc.summary [options] genotypes
 
 Options:
 

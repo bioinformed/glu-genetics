@@ -1776,7 +1776,7 @@ class TagZillaOptionParser(optparse.OptionParser):
 
 
 def option_parser():
-  usage = 'usage: %prog [options] genofile... [options] genofile...'
+  usage = 'usage: %prog [options] genotypes [options] genotypes'
   parser = TagZillaOptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')

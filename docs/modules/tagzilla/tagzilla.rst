@@ -35,7 +35,7 @@ r\ :sup:`2`, completion rate and other parameters.
 
 Usage::
 
-  glu tagzilla [options] genotype_file [options] genotype_file
+  glu tagzilla [options] genotypes [options] genotypes
 
 
 Example::

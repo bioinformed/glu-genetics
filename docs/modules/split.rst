@@ -24,7 +24,7 @@ Typical applications include:
 
 Usage::
 
-  glu split [options] file
+  glu split [options] genotypes
 
 Options:
 

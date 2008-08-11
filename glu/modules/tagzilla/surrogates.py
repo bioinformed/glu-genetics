@@ -20,7 +20,7 @@ from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, epsilon, sfloa
 
 
 def option_parser():
-  usage = 'usage: %prog [options] tagfile genofile...'
+  usage = 'usage: %prog [options] tagfile genotypes...'
   parser = TagZillaOptionParser(usage=usage, add_help_option=False)
 
   parser.add_option('-h', '--help', dest='help', action='store_true',

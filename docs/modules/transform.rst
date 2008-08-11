@@ -21,7 +21,7 @@ multiple output files are desired, see the :mod:`split` module.
 
 Usage::
 
-  glu transform [options] [args]
+  glu transform [options] genotypes...
 
 Options:
 

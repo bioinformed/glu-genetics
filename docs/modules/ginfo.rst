@@ -10,7 +10,7 @@ about loci and samples.
 
 Usage::
 
-  glu ginfo [options] genofile
+  glu ginfo [options] genotypes
 
 Options:
 

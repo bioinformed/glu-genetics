@@ -39,7 +39,7 @@ are optimal.
 
 Usage::
 
-  glu qc.dupcheck [options] file
+  glu qc.dupcheck [options] geontypes
 
 Options:
 

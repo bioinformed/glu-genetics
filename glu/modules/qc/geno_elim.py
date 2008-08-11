@@ -23,7 +23,7 @@ errbypedhead  = ['FAMILY','INDIVIDUAL','LEVEL_1_ERRORS','LEVEL_2_ERRORS','LEVEL_
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genofile'
+  usage = 'usage: %prog [options] genotypes'
   parser = optparse.OptionParser(usage=usage, add_help_option=False)
 
   geno_options(parser,input=True)

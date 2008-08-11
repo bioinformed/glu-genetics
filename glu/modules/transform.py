@@ -17,7 +17,7 @@ from   glu.lib.genolib.io      import transform_files, geno_options
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] [args]'
+  usage = 'usage: %prog [options] genotypes...'
   parser = optparse.OptionParser(usage=usage)
 
   ioopts = optparse.OptionGroup(parser, 'Input/Output Options')

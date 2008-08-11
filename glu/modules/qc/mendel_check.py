@@ -129,7 +129,7 @@ def parent_offspring_concordance(parent1, parent2, child, locusstats):
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] file'
+  usage = 'usage: %prog [options] genotypes'
   parser = optparse.OptionParser(usage=usage)
 
   geno_options(parser,input=True,filter=True)

@@ -13,7 +13,7 @@ individuals and detects patterns of non-Mendelian transmission.
 
 Usage::
 
-  glu qc.mendel_check [options] file
+  glu qc.mendel_check [options] genotypes
 
 Options:
 
