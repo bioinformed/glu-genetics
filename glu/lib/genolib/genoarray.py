@@ -1363,7 +1363,7 @@ def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
   Build an UnphasedMarkerModel from the supplied alleles
 
   @param           alleles: alleles
-  @param           alleles: sequence of objects
+  @type            alleles: sequence of objects
   @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
   @param       max_alleles: maximum number of alleles allowed. Default is 2
@@ -1398,7 +1398,7 @@ def model_from_genotypes(genotypes, allow_hemizygote=None, max_alleles=None):
   supplied genotypes.
 
   @param         genotypes: genotypes
-  @param         genotypes: sequence of genotype tuples
+  @type          genotypes: sequence of genotype tuples
   @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
   @param       max_alleles: maximum number of alleles allowed. Default is 2
@@ -1417,9 +1417,9 @@ def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False,
   the supplied genotypes.
 
   @param           alleles: alleles
-  @param           alleles: sequence of objects
+  @type            alleles: sequence of objects
   @param         genotypes: genotypes
-  @param         genotypes: sequence of genotype tuples
+  @type          genotypes: sequence of genotype tuples
   @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
   @param       max_alleles: maximum number of alleles allowed. Default is 2
@@ -1473,9 +1473,9 @@ def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygo
   Only the supplied alleles and genotypes will be added to the model.
 
   @param           alleles: alleles
-  @param           alleles: sequence of objects
+  @type            alleles: sequence of objects
   @param         genotypes: genotypes
-  @param         genotypes: sequence of genotype tuples
+  @type          genotypes: sequence of genotype tuples
   @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
   @type   allow_hemizygote: bool
   @param       max_alleles: maximum number of alleles allowed. Default is 2
