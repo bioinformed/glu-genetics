@@ -350,7 +350,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
 
       strand = None
       if strand_index is not None and strand_index<n:
-        strand = intern(row[chromosome_index].strip()) or None
+        strand = intern(row[strand_index].strip()) or None
 
       yield lname,max_alleles,alleles,chromosome,location,strand
 
