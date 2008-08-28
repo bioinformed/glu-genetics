@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__abstract__  = 'WTCC Raw genotype parser'
+__abstract__  = 'WTCCC Raw genotype parser'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -18,12 +18,12 @@ from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.locus     import Genome
 
 
-__all__ = ['load_wtcc_raw']
+__all__ = ['load_wtccc_raw']
 
 
-def load_wtcc_raw(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_wtccc_raw(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
-  Load a WTCC Raw genotype data file.
+  Load a WTCCC Raw genotype data file.
 
   @param     filename: file name or file object
   @type      filename: str or file object
@@ -67,7 +67,7 @@ def load_wtcc_raw(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   if genome is None:
     genome = Genome()
 
-  def _load_wtcc_raw(rows):
+  def _load_wtccc_raw(rows):
     n = len(columns)
 
     # Micro-optimization
@@ -78,7 +78,7 @@ def load_wtcc_raw(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
     for row in rows:
       if len(row) != n:
-        raise ValueError('Invalid WTCC raw row on line %d of %s' % (rows.line_num+1,namefile(filename)))
+        raise ValueError('Invalid WTCCC raw row on line %d of %s' % (rows.line_num+1,namefile(filename)))
 
       sample = local_intern(local_strip(row[0]))
       data   = [ d.split(';') for d in islice(row,1,None) ]
@@ -90,7 +90,7 @@ def load_wtcc_raw(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
       yield sample,genos
 
-  genos = GenomatrixStream.from_strings(_load_wtcc_raw(rows),'sdat',genorepr=genorepr,loci=loci,
+  genos = GenomatrixStream.from_strings(_load_wtccc_raw(rows),'sdat',genorepr=genorepr,loci=loci,
                                                                 genome=genome,phenome=phenome,
                                                                 unique=unique)
 

@@ -227,8 +227,8 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
     genos = load_merlin(filename,extra_args=args,**kwargs)
   elif format in ('eigensoft','smartpca'):
     genos = load_eigensoft_smartpca(filename,extra_args=args,**kwargs)
-  elif format == 'wtcc-raw':
-    genos = load_wtcc_raw(filename,extra_args=args,**kwargs)
+  elif format == 'wtccc-raw':
+    genos = load_wtccc_raw(filename,extra_args=args,**kwargs)
   elif not format:
     raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
   else:
