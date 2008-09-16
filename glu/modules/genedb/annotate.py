@@ -12,10 +12,10 @@ import sys
 from   glu.lib.fileutils          import load_table,table_writer,resolve_column_headers
 
 from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood
+from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
 
 
-HEADER = ['CHROMOSOME','LOCATION','GENE NEIGHBORHOOD']
+HEADER = ['CHROMOSOME','LOCATION','CYTOBAND','GENE NEIGHBORHOOD']
 
 
 def option_parser():
@@ -62,7 +62,10 @@ def annotate(con,header,rows,options):
     else:
       lname,chromosome,location,strand = snps[0]
       near = query_gene_neighborhood(con,chromosome,location,up,dn)
-      info = [chromosome,location, ','.join(n[0] for n in near)]
+      cytoband = query_cytoband_by_location(con,chromosome,location)
+
+      info = [chromosome,location, ','.join(c[0] for c in cytoband),
+                                   ','.join(n[0] for n in near)]
 
     yield row + info
 

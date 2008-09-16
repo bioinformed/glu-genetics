@@ -57,12 +57,25 @@ def query_genes_by_location(con,chr,loc):
   sql = '''
   SELECT   featureName,featureName,chromosome,chrStart,chrEnd,orientation,featureType
   FROM     gene
-  WHERE    chromosome = %s
-    AND    %d BETWEEN chrStart AND chrEnd
+  WHERE    chromosome = ?
+    AND    ? BETWEEN chrStart AND chrEnd
   ORDER BY chromosome,MIN(chrStart,chrEnd);
   '''
   cur = con.cursor()
-  cur.execute(sql, chr, loc)
+  cur.execute(sql, (chr, loc))
+  return cur.fetchall()
+
+
+def query_cytoband_by_location(con,chr,loc):
+  sql = '''
+  SELECT   band,start,stop,color
+  FROM     cytoband
+  WHERE    chromosome = ?
+    AND    ? BETWEEN start AND stop
+  ORDER BY chromosome,MIN(start,stop);
+  '''
+  cur = con.cursor()
+  cur.execute(sql, (chr, loc))
   return cur.fetchall()
 
 
