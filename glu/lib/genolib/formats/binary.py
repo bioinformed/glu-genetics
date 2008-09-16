@@ -48,6 +48,24 @@ def _get_v_attr(gfile,names,default=None):
   return default
 
 
+def _model_key(model):
+  return (model.allow_hemizygote,model.max_alleles)+tuple(g.alleles() for g in model.genotypes[1:])
+
+def _make_modelcache(genome):
+  modelcache = {}
+
+  if not genome:
+    return modelcache
+
+  for locus in genome.loci.values():
+    model = locus.model
+    if model and model.max_alleles == len(model.alleles)-1:
+      key = _model_key(model)
+      modelcache[key] = model
+
+  return modelcache
+
+
 class BinaryGenomatrixWriter(object):
   '''
   Object to write the genotype matrix data to a compressed binary file
@@ -635,7 +653,8 @@ def load_genotriples_binary(filename,genome=None,phenome=None,extra_args=None,**
   samples = gfile.root.samples[:].tolist()
   loci    = gfile.root.loci[:].tolist()
 
-  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
+  modelcache = _make_modelcache(genome)
+  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=modelcache)
   models = list(file_models)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
@@ -731,7 +750,7 @@ def save_models(gfile, loci, genome, models, filters=None):
     loc = genome.get_locus(locus)
     assert loc.model in (None,model)
 
-    key = (model.max_alleles,model.allow_hemizygote)+tuple(g.alleles() for g in model.genotypes[1:])
+    key = _model_key(model)
     index = modelmap.get(key)
     if index is None:
       index = modelmap[key] = len(modelmap)
@@ -808,7 +827,7 @@ def save_models(gfile, loci, genome, models, filters=None):
   save_strings(gfile,'model_alleles',alleles,filters=filters)
 
 
-def load_models(gfile,loci,version,compat_version,ignoreloci):
+def load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=None):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -821,15 +840,18 @@ def load_models(gfile,loci,version,compat_version,ignoreloci):
   @param compat_version: genotype file version backward compatibility number
   @type  compat_version: int
   '''
+  if modelcache is None:
+    modelcache = {}
+
   if version == 1 or ignoreloci:
-    return load_models_v1(gfile,loci)
+    return load_models_v1(gfile,loci,modelcache)
   elif version in (2,3) or compat_version in (2,3):
-    return load_models_v2(gfile,loci)
+    return load_models_v2(gfile,loci,modelcache)
   else:
     raise ValueError('Unknown genotype file version: %s' % version)
 
 
-def load_models_v1(gfile,loci):
+def load_models_v1(gfile,loci,modelcache):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -850,17 +872,15 @@ def load_models_v1(gfile,loci):
   genome = Genome()
 
   def _models():
-    modelcache = {}
-
     for locus,lmod in izip_exact(loci,gfile.root.locus_models[:].tolist()):
-      max_alleles,allow_hemizygotes = mods[lmod[0]]
+      max_alleles,allow_hemizygote = mods[lmod[0]]
 
       genotypes = model_genotypes.get(lmod[0],())
-      key       = (allow_hemizygotes,max_alleles)+genotypes
+      key       = (allow_hemizygote,max_alleles)+genotypes
       model     = modelcache.get(key)
 
       if model is None:
-        model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
+        model = UnphasedMarkerModel(allow_hemizygote,max_alleles)
         for g in genotypes:
           model.add_genotype(g)
         if len(model.alleles)-1 == max_alleles:
@@ -874,7 +894,7 @@ def load_models_v1(gfile,loci):
 
 
 
-def load_models_v2(gfile,loci):
+def load_models_v2(gfile,loci,modelcache):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -899,20 +919,19 @@ def load_models_v2(gfile,loci):
   def _models():
     empty      = ()
     strands    = STRANDS
-    modelcache = {}
 
     lmodels = gfile.root.locus_models[:].tolist()
 
     for locus,lmod in izip_exact(loci,lmodels):
-      max_alleles,allow_hemizygotes = mods[lmod[0]]
+      max_alleles,allow_hemizygote = mods[lmod[0]]
 
       genotypes = model_genotypes.get(lmod[0],empty)
       model     = None
-      key       = (allow_hemizygotes,max_alleles)+genotypes
+      key       = (allow_hemizygote,max_alleles)+genotypes
       model     = modelcache.get(key)
 
       if model is None:
-        model = UnphasedMarkerModel(allow_hemizygotes,max_alleles)
+        model = UnphasedMarkerModel(allow_hemizygote,max_alleles)
         for g in genotypes:
           model.add_genotype(g)
         if len(model.alleles)-1 == max_alleles:
@@ -1254,7 +1273,8 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
 
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
-  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
+  modelcache = _make_modelcache(genome)
+  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=modelcache)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   if format == format_found == 'sdat':
