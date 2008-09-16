@@ -9,7 +9,6 @@ __revision__  = '$Id$'
 
 
 import sys
-import optparse
 
 from   types             import NoneType
 from   operator          import itemgetter, getitem
@@ -468,17 +467,12 @@ class GenotripleStream(GenotypeStream):
     ('s1', 'l1', ('G', 'G'))
     ('s2', 'l1', ('G', 'T'))
     '''
+    # FIXME: Allow for merging transformations
     if transform and kwargs:
       raise ValueError('Ambiguous transformation specification')
 
     if transform:
-      # Ick.  Optparse uses old-style classes
-      if isinstance(transform, optparse.Values) or transform.__class__ is optparse.Values:
-        transform = GenoTransform.from_options(transform)
-      elif isinstance(transform, dict):
-        transform = GenoTransform.from_kwargs(transform)
-      elif not isinstance(transform, GenoTransform):
-        raise ValueError('Invalid genotype transformation specification')
+      transform = GenoTransform.from_object(transform)
     elif kwargs:
       transform = GenoTransform.from_kwargs(**kwargs)
 
@@ -1263,17 +1257,12 @@ class GenomatrixStream(GenotypeStream):
     ...   print row
     ('l1', [('G', 'G'), ('G', 'T')])
     '''
+    # FIXME: Allow for merging transformations
     if transform and kwargs:
       raise ValueError('Ambiguous transformation specification')
 
     if transform:
-      # Ick.  Optparse uses old-style classes
-      if isinstance(transform, optparse.Values) or transform.__class__ is optparse.Values:
-        transform = GenoTransform.from_options(transform)
-      elif isinstance(transform, dict):
-        transform = GenoTransform.from_kwargs(transform)
-      elif not isinstance(transform, GenoTransform):
-        raise ValueError('Invalid genotype transformation specification')
+      transform = GenoTransform.from_object(transform)
     elif kwargs:
       transform = GenoTransform.from_kwargs(**kwargs)
 
@@ -2005,7 +1994,8 @@ def recode_genomatrixstream(genos, genome, warn=False):
         for sample,row in genos:
           # Unpack row to speed access -- both updates and GenotypeArray will
           # need to unpack
-          row = row[:]
+          if updates:
+            row = row[:]
 
           # Try to yield updated genotype array, hoping that all alleles are represented
           try:

@@ -6,6 +6,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
+import optparse
+
 from   types             import NoneType
 from   collections       import defaultdict
 from   itertools         import izip
@@ -15,7 +17,7 @@ from   glu.lib.fileutils import namefile,get_arg,trybool,load_list,load_map,load
 
 
 seq_type = (NoneType,set,dict,list,tuple)
-map_type  = (NoneType,dict)
+map_type = (NoneType,dict)
 
 
 def load_rename_alleles_file(filename):
@@ -177,6 +179,78 @@ class GenoTransform(object):
     return transform
 
 
+  @staticmethod
+  def from_object(transform):
+    if isinstance(transform, optparse.Values) or transform.__class__ is optparse.Values:
+      transform = GenoTransform.from_options(transform)
+    elif isinstance(transform, dict):
+      transform = GenoTransform.from_kwargs(transform)
+    elif not isinstance(transform, GenoTransform):
+      raise ValueError('Invalid genotype transformation specification')
+
+    return transform
+
+
+  def merge(self, other):
+    samples = self.samples.merge(other.samples)
+    loci    = self.loci.merge(other.loci)
+
+    rename_alleles           = _merge_rename_alleles(self.rename_alleles, other.rename_alleles)
+    recode_models            = _merge_genome(self.recode_models, other.recode_models)
+    rename_alleles           = _merge_map(self.rename_alleles, other.rename_alleles)
+    repack                   = self.repack or other.repack
+    filter_missing_genotypes = self.filter_missing_genotypes or other.filter_missing_genotypes
+
+    return GenoTransform(include_samples=samples.include,
+                         exclude_samples=samples.exclude,
+                          rename_samples=samples.rename,
+                           order_samples=samples.order,
+                            include_loci=loci.include,
+                            exclude_loci=loci.exclude,
+                             rename_loci=loci.rename,
+                              order_loci=loci.order,
+                           recode_models=recode_models,
+                          rename_alleles=rename_alleles,
+                                  repack=repack,
+                          filter_missing=filter_missing_genotypes)
+
+
+def _merge_rename_alleles(amap1, amap2):
+  if amap1 is None:
+    return amap2
+  if amap2 is None:
+    return amap1
+
+  raise NotImplementedError
+
+
+def _merge_genome(genome1, genome2):
+  if genome1 is None:
+    return genome2
+  if genome2 is None:
+    return genome1
+
+  raise NotImplementedError
+
+
+def _merge_map(map1, map2):
+  if map1 is None:
+    return map2
+  if map2 is None:
+    return map1
+
+  raise NotImplementedError
+
+
+def _merge_set(set1,set2):
+  if set1 is None:
+    return set2
+  if set2 is None:
+    return set1
+
+  raise as_set(set1)|as_set(set2)
+
+
 class GenoSubTransform(object):
   '''
   A GenoSubTransform object with metadata related to samples or loci transformation
@@ -215,6 +289,14 @@ class GenoSubTransform(object):
     self.exclude = exclude
     self.rename  = rename
     self.order   = order
+
+  def merge(self, other):
+    include = _merge_set(self.include, other.include)
+    exclude = _merge_set(self.exclude, other.exclude)
+    rename  = _merge_map(self.rename,  other.rename)
+    order   = self.order or other.order
+
+    return GenoSubTransform(include, exclude, rename, order)
 
 
 def prove_bijective_mapping(items,transform):

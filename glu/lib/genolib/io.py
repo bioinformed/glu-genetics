@@ -243,8 +243,9 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
 
   if len(args) != transform_args:
     if transform:
-      raise ValueError('Ambiguous transformation specification')
-    transform = more_transform
+      transform = GenoTransform.from_object(transform).merge(more_transform)
+    else:
+      transform = more_transform
 
   if transform:
     genos = genos.transformed(transform)
