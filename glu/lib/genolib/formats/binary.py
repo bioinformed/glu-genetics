@@ -789,8 +789,8 @@ def save_models(gfile, loci, genome, models, filters=None):
 
   model_row = mods.row
   for model in models:
-    model_row['max_alleles']      = model[0]
-    model_row['allow_hemizygote'] = model[1]
+    model_row['max_alleles']      = model[1]
+    model_row['allow_hemizygote'] = model[0]
     model_row.append()
 
   mods.flush()
@@ -926,7 +926,6 @@ def load_models_v2(gfile,loci,modelcache):
       max_alleles,allow_hemizygote = mods[lmod[0]]
 
       genotypes = model_genotypes.get(lmod[0],empty)
-      model     = None
       key       = (allow_hemizygote,max_alleles)+genotypes
       model     = modelcache.get(key)
 
