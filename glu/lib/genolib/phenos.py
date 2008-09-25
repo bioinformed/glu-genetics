@@ -239,7 +239,7 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
       pheno  = PHENO_UNKNOWN
 
       if family_index is not None and family_index<n:
-        family = intern(row[family].strip()) or None
+        family = intern(row[family_index].strip()) or None
 
       if parent1_index is not None and parent1_index<n:
         parent1 = intern(row[parent1_index].strip()) or None
