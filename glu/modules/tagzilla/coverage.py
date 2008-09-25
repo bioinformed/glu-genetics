@@ -50,7 +50,7 @@ def option_parser():
 
   outputgroup = optparse.OptionGroup(parser, 'Output options')
 
-  outputgroup.add_option('-o', '--output', dest='outfile', metavar='FILE', default='-',
+  outputgroup.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                           help="Output tabular LD information for bins to FILE ('-' for standard out)")
 
   genoldgroup = optparse.OptionGroup(parser, 'Genotype and LD estimation options')
@@ -132,7 +132,7 @@ def main():
             besttag[l1] = l2,r2
           break
 
-  outfile = table_writer(options.outfile, hyphen=sys.stdout)
+  outfile = table_writer(options.output, hyphen=sys.stdout)
   outfile.writerow(['LNAME','TAG','BEST RSQUARED'])
   missing = '',sfloat(0)
   for lname in loci:

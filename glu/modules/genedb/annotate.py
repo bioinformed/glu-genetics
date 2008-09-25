@@ -32,7 +32,7 @@ def option_parser():
                     help='upstream margin in bases (default=20000)')
   parser.add_option('-d', '--downstream', dest='downstream', default=10000, type='int',  metavar='N',
                     help='the downstream margin in bases (default=10000)')
-  parser.add_option('-o', '--outfile',    dest='outfile',    default='-',                metavar='FILE',
+  parser.add_option('-o', '--output',    dest='output',    default='-',                metavar='FILE',
                     help="name of the output file, '-' for standard out")
   return parser
 
@@ -80,7 +80,7 @@ def main():
 
   con    = open_genedb(options.genedb)
   rows   = load_table(args[0],want_header=True,hyphen=sys.stdin)
-  out    = table_writer(options.outfile,hyphen=sys.stdout)
+  out    = table_writer(options.output,hyphen=sys.stdout)
 
   header = rows.next() or ['']
 

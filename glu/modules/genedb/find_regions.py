@@ -35,7 +35,7 @@ def option_parser():
                     help='maximum number of upstream SNPs (default=0 for no limit)')
   parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
                     help='maximum number of downstream SNPs (default=0 for no limit)')
-  parser.add_option('-o', '--outfile',   dest='outfile',   default='-',                metavar='FILE',
+  parser.add_option('-o', '--output',   dest='output',   default='-',                metavar='FILE',
                     help="output file name, '-' for standard out")
   return parser
 
@@ -106,7 +106,7 @@ def main():
     return
 
   con = open_genedb(options.genedb)
-  out = table_writer(options.outfile,hyphen=sys.stdout)
+  out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(HEADER)
 
   for infile in args:

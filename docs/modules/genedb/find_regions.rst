@@ -26,5 +26,5 @@ Options:
                         limit)
   -D N, --downsnps=N    maximum number of downstream SNPs (default=0 for no
                         limit)
-  -o FILE, --outfile=FILE
+  -o FILE, --output=FILE
                         output file name, '-' for standard out

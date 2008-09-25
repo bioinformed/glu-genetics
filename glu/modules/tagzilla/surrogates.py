@@ -50,7 +50,7 @@ def option_parser():
 
   outputgroup = optparse.OptionGroup(parser, 'Output options')
 
-  outputgroup.add_option('-o', '--output', dest='outfile', metavar='FILE', default='-',
+  outputgroup.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                           help="Output tabular LD information for bins to FILE ('-' for standard out)")
 
   genoldgroup = optparse.OptionGroup(parser, 'Genotype and LD estimation options')
@@ -128,7 +128,7 @@ def main():
         if r2 > best_r2:
           best_surrogate[lname1] = lname2,r2
 
-  outfile = table_writer(options.outfile, hyphen=sys.stdout)
+  outfile = table_writer(options.output, hyphen=sys.stdout)
   outfile.writerow(['LNAME','SURROGATE','RSQUARED'])
   for lname,(surrogate,r2) in best_surrogate.iteritems():
     r2 = sfloat(r2)

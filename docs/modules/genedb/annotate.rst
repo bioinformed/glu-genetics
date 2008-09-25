@@ -22,5 +22,5 @@ Options:
                         Column name or number in which to find SNPs
   -u N, --upstream=N    upstream margin in bases (default=20000)
   -d N, --downstream=N  the downstream margin in bases (default=10000)
-  -o FILE, --outfile=FILE
+  -o FILE, --output=FILE
                         name of the output file, '-' for standard out

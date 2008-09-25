@@ -1815,7 +1815,7 @@ def option_parser():
                           help='Largest bin size output in summary histogram output (default=10)')
   outputgroup.add_option('-k', '--skip', dest='skip', default=0, action='count',
                           help='Skip output of untagged or excluded loci')
-  outputgroup.add_option('-o', '--output', dest='outfile', metavar='FILE', default=None,
+  outputgroup.add_option('-o', '--output', dest='output', metavar='FILE', default=None,
                           help="Output tabular LD information for bins to FILE ('-' for standard out)")
   outputgroup.add_option('-O', '--locusinfo', dest='locusinfo', metavar='FILE',
                           help='Output locus information to FILE')
@@ -1890,8 +1890,8 @@ def do_tagging(ldpairs, locusmap, includes, exclude, designscores, options):
 
 def build_output(options, exclude):
   pairinfofile = None
-  if options.outfile:
-    pairinfofile = table_writer(options.outfile,hyphen=sys.stdout)
+  if options.output:
+    pairinfofile = table_writer(options.output,hyphen=sys.stdout)
     pairinfo = PairwiseBinOutput(pairinfofile, exclude)
   else:
     pairinfo = NullPairwiseBinOutput()

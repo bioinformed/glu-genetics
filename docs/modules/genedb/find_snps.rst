@@ -13,7 +13,7 @@ Find SNPs near SNPs, genes or regions
 
 Usage::
 
-  glu genedb.find_snps [options] genome_database file
+  glu genedb.find_snps [options] file
 
 Options:
   -h, --help            show this help message and exit
@@ -25,7 +25,7 @@ Options:
                         limit)
   -D N, --downsnps=N    maximum number of downstream SNPs (default=0 for no
                         limit)
-  -o FILE, --outfile=FILE
+  -o FILE, --output=FILE
                         the name of the output file, '-' for standard out
   -i FILE, --infile=FILE
                         the name of the feature file containing list of

@@ -26,7 +26,7 @@ HEADER = ['SNP_NAME','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] genome_database file'
+  usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
@@ -39,7 +39,7 @@ def option_parser():
                     help='maximum number of upstream SNPs (default=0 for no limit)')
   parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
                     help='maximum number of downstream SNPs (default=0 for no limit)')
-  parser.add_option('-o', '--outfile',  dest='outfile', default='-', metavar='FILE',
+  parser.add_option('-o', '--output',  dest='output', default='-', metavar='FILE',
                     help="the name of the output file, '-' for standard out")
   parser.add_option('-i', '--infile',   dest='infile',  default='-', metavar='FILE',
                     help="the name of the feature file containing list of features, '-' for standard in")
@@ -100,7 +100,7 @@ def main():
     return
 
   con = open_genedb(options.genedb)
-  out = table_writer(options.outfile,hyphen=sys.stdout)
+  out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(HEADER)
 
   for infile in args:

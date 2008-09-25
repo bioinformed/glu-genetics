@@ -20,7 +20,7 @@ def option_parser():
   usage = 'usage: %prog [options] file'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-o', '--outfile',   dest='outfile',   metavar='FILE',   default= '-',
+  parser.add_option('-o', '--output',   dest='output',   metavar='FILE',   default= '-',
                     help='Output file for formatted data')
   parser.add_option('-m', '--measure',  dest='measure', default='r2',
                     help="Measure of LD: r2 (default) or D'")
@@ -43,7 +43,7 @@ def main():
     parser.print_help()
     return
 
-  out = table_writer(options.outfile,hyphen=sys.stdout)
+  out = table_writer(options.output,hyphen=sys.stdout)
 
   datain = [ islice(load_table(arg,hyphen=sys.stdin),1,None) for arg in args ]
   datain = chain(*datain)
