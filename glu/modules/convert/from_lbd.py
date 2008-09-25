@@ -149,6 +149,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       raise ValueError(msg)
 
   indelmap = {'D':'-','I':'+'}
+  NA = ('N','A')
   targetstrand = targetstrand.lower()
   assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
 
@@ -203,8 +204,13 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
     if loc:
       loc = int(loc)
 
+    # Handle CNV probes, which can simply be skipped
+    if (a,b) == NA:
+      genome.merge_locus(locus, chromosome=chr, location=loc)
+      continue
+
     # Handle indels, which are strand neutral
-    if cstrand in 'pm' and dstrand in 'pm':
+    elif cstrand in 'pm' and dstrand in 'pm':
       a = indelmap[a]
       b = indelmap[b]
       genome.merge_locus(locus, chromosome=chr, location=loc)
@@ -212,12 +218,13 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       continue
 
     # Otherwise, we have a SNP with A and B alleles on the design strand
-    if None not in (probea_idx,probeb_idx):
+    elif None not in (probea_idx,probeb_idx):
       probea = assay[probea_idx]
       probeb = assay[probeb_idx]
       if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
         errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
                          % (a,b,probea[-1],probeb[-1],locus))
+        genome.merge_locus(locus, chromosome=chr, location=loc)
         continue
 
     try:
@@ -225,6 +232,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       tstrand       = tstrand.lower()
       if tstrand != 'top':
         errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % locus)
+        genome.merge_locus(locus, chromosome=chr, location=loc)
         continue
 
     except ValueError:
@@ -236,6 +244,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
     # a,b and aa,bb should both be normalized to tstrand and must be equal
     if (a,b) != (aa,bb):
       errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,locus))
+      genome.merge_locus(locus, chromosome=chr, location=loc)
       continue
 
     if gstrand != 'U':
