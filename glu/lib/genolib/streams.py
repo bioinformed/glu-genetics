@@ -1821,11 +1821,12 @@ def recode_genomatrixstream(genos, genome, warn=False):
   >>> for locus,model in genos2.model_pairs:
   ...   assert genome.get_model(locus) is model
   '''
-  # Fastpath for null recoding
-  if genos.genome is genome:
-    return genos
+  # Fastpath for null recoding -- DISABLED due to some operations leaving
+  # streams with inconsistant encoding (like renaming ldat rows)
+  #if genos.genome is genome:
+  #  return genos
 
-  # Slowpath
+  # Data for slowpath
   models = []
 
   # All loci and models are known
@@ -1835,7 +1836,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
       # Get the new model or fix the old model
       old_model = genos.models[i]
       old_locus = genos.genome.loci[locus]
-      assert old_locus.model is old_model or None in (old_model,old_locus.model)
+      #assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
       if locus not in genome.loci and old_locus.model is not None:
         loc = genome.loci[locus] = old_locus
@@ -1918,7 +1919,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
         # Get the new model or fix the old model
         old_model = genos.models[i]
         old_locus = genos.genome.loci[locus]
-        assert old_locus.model is old_model or None in (old_model,old_locus.model)
+        #assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
         genome.merge_locus(locus, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
                                   location=old_locus.location, strand=old_locus.strand, warn=warn)
@@ -1962,7 +1963,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
 
   # sdat format
   elif genos.format=='sdat':
-    assert genome is not genos.genome
+    #assert genome is not genos.genome
     assert genos.loci is not None and len(genos.loci) == len(genos.models) == len(models)
 
     # Find all models that must be updated
@@ -3782,6 +3783,7 @@ def rename_genomatrixstream_alleles(genos, rename_alleles, warn=False):
 
         if locus in rename_alleles:
           r = rename_alleles[locus]
+          # FIXME: Needs better error handling recovery
           row = [ ((r[g[0]],r[g[1]]) if g else g.alleles()) for g in row ]
 
         yield locus,row
@@ -3795,6 +3797,7 @@ def rename_genomatrixstream_alleles(genos, rename_alleles, warn=False):
 
       remaps = [ rename_alleles.get(h) for h in genos.loci ]
       for sample,row in genos:
+        # FIXME: Needs better error handling recovery
         row = [ ((r[g[0]],r[g[1]]) if g and r else g.alleles()) for g,r in izip_exact(row,remaps) ]
         yield sample,row
 
@@ -4028,7 +4031,7 @@ def build_genotriples_from_genomatrix(genos):
                                    order=order, unique=genos.unique)
 
 
-def _genome_merge_loci(old_genome, old_name, new_genome, new_name, warn):
+def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
   '''
   Helper to merge loci
   '''
@@ -4065,7 +4068,7 @@ def _genome_rename(old_genome, locusmap, warn=False):
 
   for old_name in old_genome.loci:
     new_name = locusmap.get(old_name,old_name)
-    recode |= _genome_merge_loci(old_genome, old_name, new_genome, new_name, warn)
+    recode |= _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn)
 
   return new_genome,recode
 
@@ -4147,7 +4150,7 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
 
       recode_model = recode.get(locus)
       if recode_model is None:
-        if locus != new_locus and _genome_merge_loci(old_genome, locus, new_genome, new_locus, warn):
+        if locus != new_locus and _genome_rename_loci(old_genome, locus, new_genome, new_locus, warn):
           recode_model = new_genome.loci[new_locus].model
         else:
           recode_model = False
@@ -4317,15 +4320,12 @@ def rename_genomatrixstream_column(genos,colmap,warn=False):
   else:
     genome = Genome()
 
-    recode = False
     for old_name in genos.columns:
       new_name = colmap.get(old_name,old_name)
-      recode |= _genome_merge_loci(genos.genome, old_name, genome, new_name, warn)
+      _genome_rename_loci(genos.genome, old_name, genome, new_name, warn)
 
     genos = genos.clone(genos.use_stream(), loci=new_columns, genome=genome, unique=unique)
-
-    if recode:
-      genos = genos.transformed(recode_models=genome)
+    genos = genos.transformed(recode_models=genome)
 
   return genos
 
@@ -4603,25 +4603,23 @@ def rename_genomatrixstream_row(genos,rowmap,warn=False):
   ('S3', [('G', 'G'), ('T', 'T')])
   '''
   if genos.rows is not None:
-    rows = tuple(rowmap.get(label,label) for label in genos.rows)
+    rows   = tuple(rowmap.get(label,label) for label in genos.rows)
+    unique = len(set(rows)) == len(rows)
   else:
-    rows = None
+    rows   = None
+    unique = False
 
   if genos.format=='ldat':
     genome = Genome()
 
-    recode = [False]
     def _rename():
       for locus,row in genos:
         new_locus = rowmap.get(locus,locus)
-        recode[0] |= _genome_merge_loci(genos.genome, locus, genome, new_locus, warn)
-
+        _genome_rename_loci(genos.genome, locus, genome, new_locus, warn)
         yield new_locus,row
 
-    new_genos = genos.clone(_rename(),loci=rows,genome=genome,materialized=False)
-
-    if recode[0]:
-      new_genos = new_genos.transformed(recode_models=genome)
+    new_genos = genos.clone(_rename(),loci=rows,genome=genome,materialized=False,unique=unique)
+    new_genos = new_genos.transformed(recode_models=genome)
 
   else:
     phenome = Phenome()
@@ -4633,7 +4631,7 @@ def rename_genomatrixstream_row(genos,rowmap,warn=False):
 
         yield new_name,row
 
-    new_genos = genos.clone(_rename(),samples=rows,phenome=phenome,materialized=False)
+    new_genos = genos.clone(_rename(),samples=rows,phenome=phenome,materialized=False,unique=unique)
 
   return new_genos
 
