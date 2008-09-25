@@ -1612,7 +1612,8 @@ genoarray_data_set(GenotypeArrayObject *self, PyObject *new_data, void *closure)
 
 	if(PyArray_NBYTES(new_data) != self->descriptor->byte_size)
 	{
-		PyErr_SetString(PyExc_ValueError,"new data must be same size as current");
+		PyErr_Format(PyExc_ValueError,"new data must be same size as current (%zd != %d)",
+		                               PyArray_NBYTES(new_data), self->descriptor->byte_size);
 		return -1;
 	}
 
@@ -3309,7 +3310,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		if(genofound->model != model)
 		{
 			PyErr_Format(GenotypeRepresentationError,
-			    "invalid genotype object in genos at index %zd", 0L);
+			    "invalid genotype model in genos at index %zd", 0L);
 			goto error;
 		}
 		if(genofound->index != 0)
@@ -3335,10 +3336,17 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 	{
 		GenotypeObject *geno = (GenotypeObject *)items[i];
 
-		if(!geno || !Genotype_CheckExact(geno) || geno->model != model)
+		if(!geno || !Genotype_CheckExact(geno))
 		{
 			PyErr_Format(GenotypeRepresentationError,
 			    "invalid genotype object in genos at index %zd", i);
+			goto error;
+		}
+
+		if(geno->model != model)
+		{
+			PyErr_Format(GenotypeRepresentationError,
+			    "invalid genotype model in genos at index %zd", i);
 			goto error;
 		}
 
