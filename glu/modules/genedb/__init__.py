@@ -12,7 +12,9 @@ import sys
 import sqlite3
 
 
-DEFAULT_GENEDB = ['genedb_ncbi36.3_huge',
+DEFAULT_GENEDB = ['genedb_ncbi36.3_dbsnp129',
+                  'genedb_ncbi36.3_dbsnp128',
+                  'genedb_ncbi36.3_huge',
                   'genedb_ncbi36.3_hapmap23a'
                   'genedb_ncbi36.3_gwas '
                   'genedb_ncbi36.3_tiny',
