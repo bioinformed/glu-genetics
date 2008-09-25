@@ -256,7 +256,7 @@ Version 0.93 (2008-04-02)
 =========================
 
 * New PCA analysis module for population structure in :mod:`struct.pca`.
-  Functionality is rather complete, except for proper Tracy-Wisdom pvalues
+  Functionality is rather complete, except for proper Tracy-Widom pvalues
   and outlier removal.
 
 * Support for EIGENSOFT's SmartPCA genotype, locus, and subject file
