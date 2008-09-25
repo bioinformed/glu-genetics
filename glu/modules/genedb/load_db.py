@@ -16,10 +16,11 @@ from   glu.lib.fileutils import autofile, load_table, tryint
 from   glu.modules.convert.from_lbd import load_illumina_manifest
 
 
-DBSNP     = ['data/snp128.txt.gz', 'data/snp126.txt.gz']
+DBSNP     = ['data/snp129.txt.gz', 'data/snp128.txt.gz', 'data/snp126.txt.gz']
 ARRAYS    = glob.glob('data/snpArray*')
 HAPMAP    = glob.glob('/usr/local/share/hapmap/build23/rs_strand/non-redundant/geno*')
-MANIFESTS = ['/usr/local/share/manifests/Human1Mv1_C.csv',
+MANIFESTS = ['/usr/local/share/manifests/Human1M-Duov3_B.csv',
+             '/usr/local/share/manifests/Human1Mv1_C.csv',
              '/usr/local/share/manifests/Human610-Quadv1_B.csv']
 
 
@@ -416,7 +417,7 @@ def get_mirbase(mfile):
 
 
 def main():
-  con = sqlite3.connect('data/genedb_tiny.db')
+  con = sqlite3.connect('db/b2/genedb_ncbi36.3_huge.db')
 
   con.execute('PRAGMA synchronous=OFF;')
   con.execute('PRAGMA journal_mode=OFF;')
@@ -424,7 +425,7 @@ def main():
 
   if 1:
     genes = [ get_genes('data/seq_gene.md.b36.3.gz'),
-              get_mirbase('data/hsa.gff') ]
+              get_mirbase('data/hsa-v12.gff') ]
     genes = list(chain(*genes))
     load_genes(con,genes)
 
@@ -439,11 +440,11 @@ def main():
 
   if 1:
     streams  = []
-    #streams += [ get_goldenpath_dbsnp(s)  for s in DBSNP  ]
-    #streams += [ get_hapmap_snps(h)       for h in HAPMAP ]
-    #streams += [ get_goldenpath_arrays(a) for a in ARRAYS ]
-    #streams += [ extract_illumina_snps(load_illumina_manifest(m))
-    #               for m in MANIFESTS ]
+    streams += [ get_goldenpath_dbsnp(s)  for s in DBSNP  ]
+    streams += [ get_hapmap_snps(h)       for h in HAPMAP ]
+    streams += [ get_goldenpath_arrays(a) for a in ARRAYS ]
+    streams += [ extract_illumina_snps(load_illumina_manifest(m))
+                   for m in MANIFESTS ]
 
     snps = chain(*streams)
     snps = squash_dups(snps)
