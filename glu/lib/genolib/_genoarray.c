@@ -3375,7 +3375,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 	}
 	else if(found == 1)
 		*status = MERGE_UNAMBIGUOUS;
-	else
+	else /* found > 1 */
 		*status = MERGE_CONCORDANT;
 
 	Py_XDECREF(genoseq);
@@ -3589,7 +3589,6 @@ genomerger_merge_sample(GenotypeMergerObject *self, PyObject *args)
 
 	if(!PyArg_ParseTuple(args, "OOOO", &sample, &loci, &models, &genos))
 		return NULL;
-
 
 	/* Add checks temporarily to find slow code. */
 	if(!FastSequenceCheck(loci))
