@@ -64,6 +64,12 @@ class Phenotypes(object):
     self.sex        = sex
     self.phenoclass = phenoclass
 
+  def founder(self):
+    return self.parent1 is None and self.parent2 is None
+
+  def nonfounder(self):
+    return self.parent1 is not None or self.parent2 is not None
+
 
 class Phenome(object):
   '''

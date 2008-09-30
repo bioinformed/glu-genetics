@@ -1595,10 +1595,12 @@ def read_illumina_design_score(filename):
 
 
 def load_genotypes(filename, options):
-  loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,genome=options.loci,
+  loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
+                                  genome=options.loci,phenome=options.pedigree,
                                   transform=options).as_ldat()
 
-  loci = loci.transformed(repack=True)
+  founders = set(f.name for f in loci.phenome.phenos.itervalues() if f.founder())
+  loci = loci.transformed(includesamples=founders,repack=True)
 
   genome = loci.genome
   for lname,genos in loci:

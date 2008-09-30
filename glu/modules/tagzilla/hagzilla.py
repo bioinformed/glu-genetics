@@ -36,22 +36,22 @@ POPS = {'CEU'    : 'hapmap',
 #FIXME: Make configurable
 if 1:
   GENOMEDB      = '/usr/local/share/genedb/genome36.3.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
+  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build23/rs_strand/non-redundant/genotypes_chr%s_%s_r23a_nr.b36.txt.gz'
   HAP_FORMAT    = 'hapmap'
 elif 1:
   GENOMEDB      = '/usr/local/share/genedb/genome36.3.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
+  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build22/rs_strand/non-redundant/genotypes_chr%s_%s_r22_nr.b36.txt.gz'
   HAP_FORMAT    = 'hapmap'
 elif 0:
   GENOMEDB      = '/usr/local/share/genedb/genome35-1.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
+  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build21a/rs_strand/non-redundant/genotypes_chr%s_%s_r21a_nr.txt.gz'
   HAP_FORMAT    = 'hapmap'
 else:
   GENOMEDB      = '/usr/local/share/genedb/genome35-1.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/peds'
+  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
   HAP_GENOTYPES = '/usr/local/share/hapmap/build19/non-redundant/genotypes_chr%s_%s.txt.gz'
   HAP_FORMAT    = 'hapmap'
 

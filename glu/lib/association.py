@@ -389,12 +389,14 @@ def _load_loci(filename,options,keep):
 
   if filename is not None:
     loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
+                           genome=options.loci,phenome=options.pedigree,
                            transform=options).as_ldat()
     keep &= set(loci.samples)
 
   fixedloci = None
   if options.fixedloci:
     fixedloci = load_genostream(options.fixedloci,format=options.informat,genorepr=options.ingenorepr,
+                                genome=options.loci,phenome=options.pedigree,
                                 transform=options).as_ldat()
     keep     &= set(fixedloci.samples)
     fixedloci = fixedloci.transformed(include_samples=keep,order_samples=loci.samples)

@@ -170,12 +170,14 @@ def output_locus_concordstat(filename, locusconcord, allelemaps):
 
 
 def load_reference_genotypes(filename, format, locusset, sampleset):
+  # FIXME: needs genome and phenome pass-through
   genos = load_genostream(filename,format=format)
   genos = genos.transformed(include_samples=sampleset, include_loci=locusset)
   return genos
 
 
 def load_comparison_genotypes(filename, format, locusset, sampleset, lmapfile, smapfile):
+  # FIXME: needs genome and phenome pass-through
   genos = load_genostream(filename,format=format)
   genos = genos.transformed(rename_samples=smapfile,   include_samples=smapfile,
                             rename_loci=lmapfile,      include_loci=lmapfile)
