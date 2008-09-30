@@ -220,6 +220,7 @@ def main():
     test_indices = options.test.indices()
 
     sp = wp = lp = None
+    df = None
 
     if 'score' in options.stats:
       try:
@@ -252,7 +253,7 @@ def main():
         result.extend( ['%.5f' % lt, lps ] )
 
     if options.stats:
-      result.append('%d' % df)
+      result.append(df)
 
     # FIXME: SEs are optional
     display = options.display
@@ -278,11 +279,11 @@ def main():
       if options.stats:
         details.write('Testing: %s\n\n' % options.test.formula())
 
-      if 'score' in options.stats and st is not None:
+      if 'score' in options.stats and sp is not None:
         details.write('Score test           : X2=%9.5f, df=%d, p=%s\n' % (st,df,sps))
-      if 'wald' in options.stats and wt is not None:
+      if 'wald' in options.stats and wp is not None:
         details.write('Wald test            : X2=%9.5f, df=%d, p=%s\n' % (wt,df,wps))
-      if 'lrt' in options.stats and lt is not None:
+      if 'lrt' in options.stats and lp is not None:
         details.write('Likelihood ratio test: X2=%9.5f, df=%d, p=%s\n' % (lt,df,lps))
 
       details.write('\n')
