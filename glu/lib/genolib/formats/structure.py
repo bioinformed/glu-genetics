@@ -10,7 +10,7 @@ __revision__  = '$Id$'
 
 from   itertools                 import chain
 
-from   glu.lib.fileutils         import autofile,related_file,load_map,   \
+from   glu.lib.fileutils         import autofile,related_file,map_reader,   \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
@@ -330,7 +330,7 @@ class StructureWriter(object):
 
     populations = None
     if popfile is not None:
-      populations = load_map(popfile)
+      populations = map_reader(popfile)
 
     if defpop is None:
       defpop = '1'

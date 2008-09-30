@@ -11,7 +11,7 @@ import sys
 
 from collections               import defaultdict
 
-from glu.lib.fileutils         import namefile,load_table
+from glu.lib.fileutils         import namefile,table_reader
 
 
 SEX_UNKNOWN,SEX_MALE,SEX_FEMALE               = None,0,1
@@ -201,7 +201,7 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
     args = extra_args
     args.update(kwargs)
 
-  rows   = load_table(filename,want_header=True,extra_args=args)
+  rows   = table_reader(filename,want_header=True,extra_args=args)
   header = rows.next()
 
   if extra_args is None and args:

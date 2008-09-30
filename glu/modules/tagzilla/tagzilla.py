@@ -36,7 +36,7 @@ from   itertools                 import chain, groupby, izip, dropwhile
 from   glu.lib.hwp               import hwp_biallelic
 from   glu.lib.stats             import mean, median
 from   glu.lib.utils             import pair_generator, percent
-from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table, table_writer
+from   glu.lib.fileutils         import autofile, hyphen, list_reader, table_reader, table_writer
 from   glu.lib.glu_launcher      import GLUError
 from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.ld        import estimate_ld, count_haplotypes, bound_ld
@@ -590,7 +590,7 @@ def locus_result_sequence(filename, locusmap, exclude):
         to unparse tagzilla output and is included as a utility function
         for when tagzilla is used as a module.
   '''
-  locusfile = load_table(filename)
+  locusfile = table_reader(filename)
 
   header = locusfile.next()
 
@@ -1943,19 +1943,19 @@ def tagzilla_single(options,args):
   ldsubset        = set()
 
   if options.subset:
-    subset = set(load_list(options.subset))
+    subset = set(list_reader(options.subset))
 
   if options.ldsubset:
-    ldsubset = set(load_list(options.ldsubset))
+    ldsubset = set(list_reader(options.ldsubset))
 
   if options.include_untyped:
-    include_untyped = set(load_list(options.include_untyped))
+    include_untyped = set(list_reader(options.include_untyped))
 
   if options.include_typed:
-    include_typed = set(load_list(options.include_typed))
+    include_typed = set(list_reader(options.include_typed))
 
   if options.exclude:
-    exclude = set(load_list(options.exclude))
+    exclude = set(list_reader(options.exclude))
 
   includes     = Includes(include_typed, include_untyped)
   designscores = build_design_score(options.designscores,options.designdefault)
@@ -2042,19 +2042,19 @@ def tagzilla_multi(options,args):
   exclude         = set()
 
   if options.subset:
-    subset = set(load_list(options.subset))
+    subset = set(list_reader(options.subset))
 
   if options.ldsubset:
-    ldsubset = set(load_list(options.ldsubset))
+    ldsubset = set(list_reader(options.ldsubset))
 
   if options.include_untyped:
-    include_untyped = set(load_list(options.include_untyped))
+    include_untyped = set(list_reader(options.include_untyped))
 
   if options.include_typed:
-    include_typed = set(load_list(options.include_typed))
+    include_typed = set(list_reader(options.include_typed))
 
   if options.exclude:
-    exclude = set(load_list(options.exclude))
+    exclude = set(list_reader(options.exclude))
 
   includes     = Includes(include_typed, include_untyped)
   designscores = build_design_score(options.designscores,options.designdefault)

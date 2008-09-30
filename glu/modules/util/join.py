@@ -12,7 +12,7 @@ import sys
 from   collections       import defaultdict
 
 from   glu.lib.utils     import pick,unique
-from   glu.lib.fileutils import load_table,tryint1,table_writer,resolve_column_headers
+from   glu.lib.fileutils import table_reader,tryint1,table_writer,resolve_column_headers
 
 
 def option_parser():
@@ -238,8 +238,8 @@ def main():
   if join_type not in ('left','inner'):
     raise ValueError('Invalid join type specified: %s' % join_type)
 
-  table1 = load_table(args[0],hyphen=sys.stdin,want_header=True)
-  table2 = load_table(args[1],hyphen=sys.stdin,want_header=True)
+  table1 = table_reader(args[0],hyphen=sys.stdin,want_header=True)
+  table2 = table_reader(args[1],hyphen=sys.stdin,want_header=True)
 
   table  = left_join(table1,table2,key1=options.key1,key2=options.key2,
                     unique=options.unique,inner=(join_type=='inner'),

@@ -11,7 +11,7 @@ import sys
 from   itertools         import izip,chain
 from   collections       import defaultdict
 
-from   glu.lib.fileutils import load_table,table_writer
+from   glu.lib.fileutils import table_reader,table_writer
 from   glu.lib.genolib   import load_genostream,geno_options
 
 
@@ -116,7 +116,7 @@ def build_nuclear_families(pedfile,individuals):
   for individual in individuals:
     typed[individual] = 1
 
-  peds = load_table(pedfile)
+  peds = table_reader(pedfile)
 
   nfam = defaultdict(list)
   famset = set()

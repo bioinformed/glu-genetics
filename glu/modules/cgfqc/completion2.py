@@ -60,7 +60,7 @@ from   textwrap             import fill
 from   collections          import defaultdict
 
 from   glu.lib.utils        import percent
-from   glu.lib.fileutils    import load_map,autofile,hyphen
+from   glu.lib.fileutils    import map_reader,autofile,hyphen
 from   glu.lib.genolib      import load_genostream
 from   glu.lib.regionparser import load_regions
 from   glu.lib.sections     import save_section, SectionWriter, save_metadata_section
@@ -430,12 +430,12 @@ def main():
   output_detail(outfile,'Loci', loccomp)
 
   if options.samplegroup:
-    samplegroup = load_map(options.samplegroup)
+    samplegroup = map_reader(options.samplegroup)
     groupcomp   = completion_group(samcomp,samplegroup)
     output_group(outfile,'Sample Group', groupcomp)
 
   if options.locusgroup:
-    locusgroup = load_map(options.locusgroup)
+    locusgroup = map_reader(options.locusgroup)
     groupcomp  = completion_group(loccomp,locusgroup)
     output_group(outfile,'Locus Group', groupcomp)
 
@@ -450,12 +450,12 @@ def main():
     save_summary(sw,loccomp,locempty,droppedloc,'loci')
 
     if options.samplegroup:
-      samplegroup = load_map(options.samplegroup)
+      samplegroup = map_reader(options.samplegroup)
       groupcomp = completion_group(samcomp,samplegroup)
       save_group(sw, groupcomp, 'samples')
 
     if options.locusgroup:
-      locusgroup = load_map(options.locusgroup)
+      locusgroup = map_reader(options.locusgroup)
       groupcomp = completion_group(loccomp,locusgroup)
       save_group(sw, groupcomp, 'loci')
 

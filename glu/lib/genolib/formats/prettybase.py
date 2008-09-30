@@ -11,7 +11,7 @@ __revision__  = '$Id$'
 import re
 
 from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg, \
-                                        get_csv_dialect,trybool,load_list
+                                        get_csv_dialect,trybool,list_reader
 
 from   glu.lib.genolib.streams   import GenotripleStream
 
@@ -59,10 +59,10 @@ def load_prettybase(filename,genome=None,phenome=None,extra_args=None,**kwargs):
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   if samples:
-    samples = set(load_list(samples,**dialect))
+    samples = set(list_reader(samples,**dialect))
 
   if loci:
-    loci = set(load_list(loci,**dialect))
+    loci = set(list_reader(loci,**dialect))
 
   re_spaces = re.compile('[\t ,]+')
   gfile = autofile(filename)

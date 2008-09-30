@@ -8,7 +8,7 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils import load_table,table_writer
+from   glu.lib.fileutils import table_reader,table_writer
 
 
 def option_parser():
@@ -30,7 +30,7 @@ def main():
     parser.print_help()
     return
 
-  table = load_table(args[0],hyphen=sys.stdin,want_header=True)
+  table = table_reader(args[0],hyphen=sys.stdin,want_header=True)
   out   = table_writer(options.output,hyphen=sys.stdout)
 
   out.writerows(table)

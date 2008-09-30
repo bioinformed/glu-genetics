@@ -12,7 +12,7 @@ import bisect
 
 from   operator                        import itemgetter
 
-from   glu.lib.fileutils               import load_table,table_writer
+from   glu.lib.fileutils               import table_reader,table_writer
 
 from   glu.modules.genedb              import open_genedb
 from   glu.modules.genedb.find_regions import resolve_features
@@ -104,7 +104,7 @@ def main():
   out.writerow(HEADER)
 
   for infile in args:
-    features = load_table(infile,want_header=True,hyphen=sys.stdin)
+    features = table_reader(infile,want_header=True,hyphen=sys.stdin)
     features = resolve_features(con,features,options)
 
     for name,chr,strand,start,end,mup,mdown,nup,ndown,featuretype in features:

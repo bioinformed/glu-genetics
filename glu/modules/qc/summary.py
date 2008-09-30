@@ -15,7 +15,7 @@ from   itertools                 import izip
 
 import numpy
 
-from   glu.lib.fileutils         import autofile,hyphen,load_list,table_writer
+from   glu.lib.fileutils         import autofile,hyphen,list_reader,table_writer
 from   glu.lib.hwp               import hwp_biallelic
 from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
@@ -193,8 +193,8 @@ def main():
 
   # Include lists are used to communicate the universe of attempted samples/loci
   # Any not observed in the genotype data are classified as "missing"
-  includeloci    = set(load_list(options.includeloci))    if options.includeloci    else None
-  includesamples = set(load_list(options.includesamples)) if options.includesamples else None
+  includeloci    = set(list_reader(options.includeloci))    if options.includeloci    else None
+  includesamples = set(list_reader(options.includesamples)) if options.includesamples else None
 
   options.includeloci    =   includeloci
   options.includesamples = includesamples

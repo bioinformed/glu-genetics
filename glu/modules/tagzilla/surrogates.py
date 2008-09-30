@@ -12,7 +12,7 @@ __revision__  = '$Id$'
 import sys
 import optparse
 
-from   glu.lib.fileutils             import load_list, table_writer
+from   glu.lib.fileutils             import list_reader, table_writer
 from   glu.lib.genolib               import geno_options
 
 from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, epsilon, sfloat, \
@@ -96,10 +96,10 @@ def main():
   exclude = set()
 
   if options.subset:
-    subset = set(load_list(options.subset))
+    subset = set(list_reader(options.subset))
 
   if options.exclude:
-    exclude = set(load_list(options.exclude))
+    exclude = set(list_reader(options.exclude))
 
   if options.designscores:
     designscores = build_design_score(options.designscores)

@@ -9,7 +9,7 @@ __revision__  = '$Id$'
 import sys
 
 from   glu.lib.utils             import izip_exact
-from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table
+from   glu.lib.fileutils         import autofile, hyphen, list_reader, table_reader
 from   glu.lib.hwp               import hwp_exact_biallelic, hwp_chisq_biallelic, biallelic_counts, HWP_EXACT_THRESHOLD
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
@@ -104,7 +104,7 @@ def geno_counts(loci):
 
 
 def read_counts(filename):
-  loci = load_table(filename)
+  loci = table_reader(filename)
   for locus in loci:
     if len(locus) < 4 or not locus[0]:
       continue
@@ -171,11 +171,11 @@ def main():
     counts = read_counts(args[0])
 
     if options.includeloci:
-      includeloci = set(load_list(options.includeloci))
+      includeloci = set(list_reader(options.includeloci))
       counts = [ c for c in counts if c[0] in includeloci ]
 
     if options.excludeloci:
-      excludeloci = set(load_list(options.excludeloci))
+      excludeloci = set(list_reader(options.excludeloci))
       counts = [ c for c in counts if c[0] not in excludeloci ]
 
   print >> sys.stderr, 'Checking HWP...',

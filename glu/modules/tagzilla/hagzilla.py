@@ -18,7 +18,7 @@ import subprocess
 from   itertools                      import groupby
 from   operator                       import itemgetter
 
-from   glu.lib.fileutils              import load_list,load_table
+from   glu.lib.fileutils              import list_reader,table_reader
 from   glu.modules.tagzilla.tagzilla  import locus_result_sequence
 from   glu.modules.genedb             import open_genedb
 from   glu.modules.genedb.queries     import query_snps_by_location, query_gene_by_name
@@ -163,7 +163,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
 
     if include and includefile:
       command.append('-i include')
-      incs = (set(load_list(includefile)) | set(include)) & set(snps)
+      incs = (set(list_reader(includefile)) | set(include)) & set(snps)
       file('include','w').write('\n'.join(sorted(incs)))
     elif includefile:
       command.append('-i %s' % escape_spaces(includefile))
@@ -374,7 +374,7 @@ def main():
   if not os.path.isdir(outdir):
     sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % outdir)
 
-  taskfile   = load_table(args[1])
+  taskfile   = table_reader(args[1])
   header     = taskfile.next()
   tasks      = sorted( extend(strip(t),12) for t in taskfile )
   tasks      = sorted(clean_tasks(con,tasks,options))

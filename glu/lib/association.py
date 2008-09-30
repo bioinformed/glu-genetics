@@ -17,7 +17,7 @@ from   numpy             import array,matrix,asarray,asanyarray,zeros, \
 from   scipy             import stats
 
 from   glu.lib.utils     import tally
-from   glu.lib.fileutils import namefile,load_list,load_map,load_table,load_table_rows,resolve_column_headers,tryint1
+from   glu.lib.fileutils import namefile,list_reader,map_reader,table_reader,table_columns,resolve_column_headers,tryint1
 from   glu.lib.genolib   import load_genostream,pick
 from   glu.lib.formula   import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
                                 GENO,FormulaParser
@@ -295,7 +295,7 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,allowdups=False,
         schemes where subject genotypes may be included in a model multiple
         times with potentially different phenotypes.
   '''
-  phenos = load_table(filename,want_header=True)
+  phenos = table_reader(filename,want_header=True)
 
   try:
     header = strip_trailing_empty(phenos.next())
@@ -310,7 +310,7 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,allowdups=False,
     indices.extend(i for i in range(len(header)) if i not in used)
 
   if indices != range(len(header)):
-    phenos = load_table_rows(phenos, columns=indices, header=header, want_header=True)
+    phenos = table_columns(phenos, columns=indices, header=header, want_header=True)
     header = phenos.next()
 
   # Assign default names to missing headers to ensure that output code
@@ -380,11 +380,11 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,allowdups=False,
 
 def _load_loci(filename,options,keep):
   if options.includesamples:
-    options.includesamples = set(load_list(options.includesamples))
+    options.includesamples = set(list_reader(options.includesamples))
     keep &= options.includesamples
 
   if options.excludesamples:
-    options.excludesamples = set(load_list(options.excludesamples))
+    options.excludesamples = set(list_reader(options.excludesamples))
     keep -= options.excludesamples
 
   if filename is not None:
@@ -487,7 +487,7 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
       for pid in sorted(subjects-keep):
         errs.write(warn_msg % pid)
 
-  reference_alleles = load_map(options.refalleles) if options.refalleles else None
+  reference_alleles = map_reader(options.refalleles) if options.refalleles else None
 
   models = LocusModelBuilder(samples,header,phenos,
                              reference_alleles=reference_alleles,

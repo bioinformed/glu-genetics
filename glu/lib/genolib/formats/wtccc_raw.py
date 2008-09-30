@@ -8,7 +8,6 @@ __revision__  = '$Id$'
 import csv
 
 from   itertools                 import islice
-from   operator                  import itemgetter
 
 from   glu.lib.utils             import is_str
 from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg

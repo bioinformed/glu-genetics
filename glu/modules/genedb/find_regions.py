@@ -9,7 +9,7 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils          import load_table,table_writer,tryint
+from   glu.lib.fileutils          import table_reader,table_writer,tryint
 
 from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name
@@ -110,7 +110,7 @@ def main():
   out.writerow(HEADER)
 
   for infile in args:
-    features = load_table(infile,want_header=True,hyphen=sys.stdin)
+    features = table_reader(infile,want_header=True,hyphen=sys.stdin)
     results  = resolve_features(con,features,options)
     out.writerows(results)
 

@@ -14,7 +14,7 @@ import sys
 from   itertools                 import chain
 
 from   glu.lib.utils             import pair_generator
-from   glu.lib.fileutils         import load_table,table_writer
+from   glu.lib.fileutils         import table_reader,table_writer
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream,geno_options
@@ -90,7 +90,7 @@ def main():
   observed_dupset = union_find()
 
   if options.duplicates:
-    for dupset in load_table(options.duplicates):
+    for dupset in table_reader(options.duplicates):
       dupset = [ d for d in dupset if d ]
       for dup in dupset:
         expected_dupset.union(dupset[0],dup)

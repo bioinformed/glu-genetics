@@ -11,7 +11,7 @@ import sys
 from   operator                  import itemgetter
 
 from   glu.lib.utils             import percent
-from   glu.lib.fileutils         import autofile, hyphen, load_list, load_table
+from   glu.lib.fileutils         import autofile, hyphen, list_reader, table_reader
 from   glu.lib.genolib           import load_genostream
 from   glu.lib.sections          import save_section, SectionWriter, save_metadata_section
 
@@ -93,7 +93,7 @@ def geno_counts(samples):
 
 
 def read_counts(filename):
-  loci = load_table(filename)
+  loci = table_reader(filename)
   for sample in loci:
     if len(sample) < 3 or not sample[0]:
       continue
@@ -136,11 +136,11 @@ def main():
     counts = read_counts(args[0])
 
     if options.includesamples:
-      includesamples = set(load_list(options.includesamples))
+      includesamples = set(list_reader(options.includesamples))
       counts = [ c for c in counts if c[0] in includesamples ]
 
     if options.excludesamples:
-      excludesamples = set(load_list(options.excludesamples))
+      excludesamples = set(list_reader(options.excludesamples))
       counts = [ c for c in counts if c[0] not in excludesamples ]
 
   if options.mingenos:

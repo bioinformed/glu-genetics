@@ -15,7 +15,7 @@ from   itertools                 import islice,chain,izip,groupby
 from   numpy                     import array,zeros
 
 from   glu.lib.utils             import izip_exact, is_str
-from   glu.lib.fileutils         import autofile,load_table,table_writer
+from   glu.lib.fileutils         import autofile,table_reader,table_writer
 from   glu.lib.sections          import read_sections
 from   glu.lib.sequence          import norm_snp_seq,complement_base
 
@@ -88,7 +88,7 @@ def load_abmap(file_or_name,skip=0):
   Creates a dictionary representing a mapping from A and B probes for each
   locus to allele names.
   '''
-  f = load_table(file_or_name,skip=skip)
+  f = table_reader(file_or_name,skip=skip)
 
   for row in f:
     if len(row) < 3 or '' in row[:3]:

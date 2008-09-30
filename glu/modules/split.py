@@ -13,7 +13,7 @@ import sys
 
 from   collections               import defaultdict
 
-from   glu.lib.fileutils         import load_map
+from   glu.lib.fileutils         import map_reader
 from   glu.lib.genolib.io        import load_genostream, guess_outformat, geno_options, \
                                         TextGenomatrixWriter, TextGenotripleWriter,     \
                                         BinaryGenomatrixWriter, BinaryGenotripleWriter
@@ -320,8 +320,8 @@ def split_fullname(filename,destdir):
 
 def split(genos, outformat, prefix, suffix, options):
   header       = genos.columns if genos.format in ('sdat','ldat') else None
-  locusgroups  = load_map(options.locusgroups, unique=False,default=options.defaultlocusgroup)  if options.locusgroups  else None
-  samplegroups = load_map(options.samplegroups,unique=False,default=options.defaultsamplegroup) if options.samplegroups else None
+  locusgroups  = map_reader(options.locusgroups, unique=False,default=options.defaultlocusgroup)  if options.locusgroups  else None
+  samplegroups = map_reader(options.samplegroups,unique=False,default=options.defaultsamplegroup) if options.samplegroups else None
 
   if samplegroups is not None or locusgroups is not None:
     filecache = FileMap(prefix,suffix,genos.format,genos.genome,genos.phenome,outformat=outformat,

@@ -10,12 +10,12 @@ import csv
 
 from   itertools     import islice,izip
 
-from   glu.lib.utils import is_str,peekfirst
+from   glu.lib.utils import is_str,peekfirst,deprecated_by
 
 
 __all__ = ['autofile','namefile','hyphen',
            'guess_format','related_file','guess_related_file',
-           'load_list','load_map','load_table','table_writer']
+           'list_reader', 'map_reader', 'table_reader', 'table_writer']
 
 
 TABLE_FORMATS = set(['xls','csv'])
@@ -498,7 +498,7 @@ def get_arg(args, names, default=None):
   return default
 
 
-def load_list(filename,extra_args=None,**kwargs):
+def list_reader(filename,extra_args=None,**kwargs):
   '''
   Load list of values from a file or literal list.
 
@@ -506,10 +506,10 @@ def load_list(filename,extra_args=None,**kwargs):
   first field considered.  Blank lines are skipped, whitespace is stripped
   from the beginning and end of each field selected.  These settings can be
   modified via function arguments or by appending additional options to the
-  filename.  File loading is delegated to the load_table function, so refer
-  to load_table for details on supported arguments.
+  filename.  File loading is delegated to the table_reader function, so refer
+  to table_reader for details on supported arguments.
 
-  The column number or name may be specified as per the load_table function.
+  The column number or name may be specified as per the table_reader function.
   However, for backward compatibility the 'index' parameter is also
   supported as a synonym to 'columns'.
 
@@ -518,12 +518,12 @@ def load_list(filename,extra_args=None,**kwargs):
   (including skip!).  No escaping or quoting is allowed.
 
   The following parameters and aliases are accepted as part of the augmented
-  filename (all but the first from load_table):
+  filename (all but the first from table_reader):
 
-  [by load_list]
+  [by list_reader]
        index, i: column index or header name
 
-  [by load_table]
+  [by table_reader]
      columns, c: indices, names, or ranges of columns to select, comma delimited
        skip,  s: number of header lines to skip
         dialect: csv module dialect name (typically 'csv' or 'tsv')
@@ -558,48 +558,48 @@ def load_list(filename,extra_args=None,**kwargs):
   @rtype:                  list or str
 
   >>> from StringIO import StringIO
-  >>> load_list(StringIO("loc1\\tsample1\\nloc2\\n\\n loc3\\n"))
+  >>> list_reader(StringIO("loc1\\tsample1\\nloc2\\n\\n loc3\\n"))
   ['loc1', 'loc2', 'loc3']
-  >>> load_list(StringIO("loc1,sample1\\nloc2\\n\\n loc3\\n"),dialect='csv')
+  >>> list_reader(StringIO("loc1,sample1\\nloc2\\n\\n loc3\\n"),dialect='csv')
   ['loc1', 'loc2', 'loc3']
-  >>> load_list(StringIO("loc1\\tsample1\\nloc2\\n\\n loc3\\n"),index=1)
+  >>> list_reader(StringIO("loc1\\tsample1\\nloc2\\n\\n loc3\\n"),index=1)
   ['sample1']
-  >>> load_list(':loc1, loc2, loc3')
+  >>> list_reader(':loc1, loc2, loc3')
   ['loc1', 'loc2', 'loc3']
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
   >>> f.write('H1\\tH2\\nv11\\tv12\\nv21\\n\\tv32')
   >>> f.flush()
-  >>> load_list(f.name + ':skip=1')
+  >>> list_reader(f.name + ':skip=1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':skip=1:index=1')
+  >>> list_reader(f.name + ':skip=1:index=1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':delimiter=\\t:index=H1')
+  >>> list_reader(f.name + ':delimiter=\\t:index=H1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':dialect=excel-tab:skip=1:index=2')
+  >>> list_reader(f.name + ':dialect=excel-tab:skip=1:index=2')
   ['v12', 'v32']
-  >>> load_list(f.name + ':index=H2')
+  >>> list_reader(f.name + ':index=H2')
   ['v12', 'v32']
-  >>> load_list(f.name + ':c=H2')
+  >>> list_reader(f.name + ':c=H2')
   ['v12', 'v32']
-  >>> load_list(f.name + ':c=2:skip=1')
+  >>> list_reader(f.name + ':c=2:skip=1')
   ['v12', 'v32']
-  >>> load_list(f.name + ':i=2:c=1:skip=1')
+  >>> list_reader(f.name + ':i=2:c=1:skip=1')
   Traceback (most recent call last):
      ...
   ValueError: Invalid specification of both index and columns
   >>> f = tempfile.NamedTemporaryFile()
   >>> f.write('H1,H2\\nv11,v12\\nv21\\n,v32')
   >>> f.flush()
-  >>> load_list(f.name + ':delimiter=,:skip=1')
+  >>> list_reader(f.name + ':delimiter=,:skip=1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':delimiter=,:skip=1:index=1')
+  >>> list_reader(f.name + ':delimiter=,:skip=1:index=1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':delimiter=,:index=H1')
+  >>> list_reader(f.name + ':delimiter=,:index=H1')
   ['v11', 'v21']
-  >>> load_list(f.name + ':dialect=excel:skip=1:index=2')
+  >>> list_reader(f.name + ':dialect=excel:skip=1:index=2')
   ['v12', 'v32']
-  >>> load_list(f.name + ':dialect=excel:index=H2')
+  >>> list_reader(f.name + ':dialect=excel:index=H2')
   ['v12', 'v32']
   '''
   if extra_args is None:
@@ -628,7 +628,7 @@ def load_list(filename,extra_args=None,**kwargs):
   elif index is None:
     index = columns
 
-  items = load_table(name, columns=[index], extra_args=args)
+  items = table_reader(name, columns=[index], extra_args=args)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -640,7 +640,7 @@ def load_list(filename,extra_args=None,**kwargs):
 _nothing = object()
 
 
-def load_map(filename,unique=True,extra_args=None,**kwargs):
+def map_reader(filename,unique=True,extra_args=None,**kwargs):
   '''
   Creates a dictionary representing a list or mapping from a text file.
 
@@ -651,11 +651,11 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
   number of lines (e.g., headers) at the beginning of the file.  A default
   parameter may be specified to assign values to keys with empty or
   non-existant value fields.  Otherwise, the value will be set equal to the
-  key.  File loading is delegated to the load_table function, so refer
-  to load_table for details on supported arguments.
+  key.  File loading is delegated to the table_reader function, so refer
+  to table_reader for details on supported arguments.
 
   The key and value column number or name may be specified as per the
-  load_table function using the 'columns' argument.  The first and second
+  table_reader function using the 'columns' argument.  The first and second
   columns returned are taken as keys and values, respectively.  This is the
   recommended mode of operation.  For backward compatibility, the the index
   or name of key and value columns can be overridden with the key_index and
@@ -692,12 +692,12 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
   The following parameters and aliases are accepted as part of the augmented
   filename:
 
-  [by load_map]
+  [by map_reader]
       key_index, i: index of field to select or name of header for keys
     value_index, v: index of field to select or name of header for values
      default,def,d: default value for keys with no or empty value
 
-  [by load_table]
+  [by table_reader]
         columns, c: indices, names, or ranges of columns to select, comma delimited
           skip,  s: number of header lines to skip
            dialect: csv module dialect name ('csv' or 'tsv')
@@ -736,7 +736,7 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
                        list of value strings.
   @rtype             : dict
 
-  >>> def test(f,**kw): return sorted(load_map(f,**kw).iteritems())
+  >>> def test(f,**kw): return sorted(map_reader(f,**kw).iteritems())
   >>> from StringIO import StringIO
   >>> test(StringIO("loc1\\tlocA \\nloc2\\n\\n\\t\\n loc3 \\tlocC\\n\\tfoo\\nloc4\\t\\n"))
   [('loc1', 'locA'), ('loc2', 'loc2'), ('loc3', 'locC'), ('loc4', 'loc4')]
@@ -811,13 +811,13 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
     if columns is None:
       columns = [key_index,value_index]
 
-    rows = load_table(name,columns=columns,extra_args=args)
+    rows = table_reader(name,columns=columns,extra_args=args)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   # Parse the data file
-  def _load_map():
+  def _map_reader():
     for row in rows:
       n = len(row)
 
@@ -838,7 +838,7 @@ def load_map(filename,unique=True,extra_args=None,**kwargs):
 
   m = {}
   unique_fails = []
-  for key,value in _load_map():
+  for key,value in _map_reader():
     if unique:
       fail = m.get(key,value) != value
       if fail:
@@ -1008,7 +1008,7 @@ def resolve_column_headers(header,columns):
   return indices
 
 
-def load_table_rows(rows, columns, header=None, want_header=False):
+def table_columns(rows, columns, header=None, want_header=False):
   '''
   Return a rows from a sequence for columns specified by name or number. A
   single row of column headers may be embedded within the row sequence or
@@ -1042,38 +1042,38 @@ def load_table_rows(rows, columns, header=None, want_header=False):
   @return            : sequence of rows containing the columns requested
   @rtype             : generator
 
-  >>> list(load_table_rows([['loc1','locA '],['loc2'],[''],['',''],[' loc3 ','locC'],['','foo'],['loc4','']],None))
+  >>> list(table_columns([['loc1','locA '],['loc2'],[''],['',''],[' loc3 ','locC'],['','foo'],['loc4','']],None))
   [['loc1', 'locA'], ['loc2', ''], ['', ''], ['', ''], ['loc3', 'locC'], ['', 'foo'], ['loc4', '']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[0,1]))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[0,1]))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[1,0]))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[1,0]))
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
-  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2']))
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2']))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')]))
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')]))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')]))
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')]))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('1','c2')]))
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('1','c2')]))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1']))
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1']))
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2'],header=['c1','c2']))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2'],header=['c1','c2']))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')],header=['c1','c2']))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')],header=['c1','c2']))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')],header=['c1','c2'],want_header=True))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')],header=['c1','c2'],want_header=True))
   [['c1', 'c2'], ['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('1','c2')],header=['c1','c2']))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('1','c2')],header=['c1','c2']))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
-  >>> list(load_table_rows([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1'],header=['c1','c2']))
+  >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1'],header=['c1','c2']))
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
   '''
   rows = iter(rows)
 
   # All columns are to be returned
   if not columns:
-    def _load_table_all(header):
+    def _table_reader_all(header):
       if header is None:
         try:
           row = rows.next()
@@ -1096,7 +1096,7 @@ def load_table_rows(rows, columns, header=None, want_header=False):
         result += ['']*(n-len(result))
         yield result
 
-    return _load_table_all(header)
+    return _table_reader_all(header)
 
   # Otherwise, resolve column heading names into indices
   if header is None:
@@ -1114,7 +1114,7 @@ def load_table_rows(rows, columns, header=None, want_header=False):
   if not want_header:
     header = None
 
-  def _load_table_columns():
+  def _table_reader_columns():
     if header is not None:
       yield [ header[j] for j in indices ]
 
@@ -1124,10 +1124,10 @@ def load_table_rows(rows, columns, header=None, want_header=False):
       result  = [ (row[j].strip() if j<m else '') for j in indices ]
       yield result
 
-  return _load_table_columns()
+  return _table_reader_columns()
 
 
-def load_table(filename,want_header=False,extra_args=None,**kwargs):
+def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   '''
   Return a table of data read from a delimited file as a list of rows, based
   on several parameters.
@@ -1210,7 +1210,7 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   @return            : sequence of rows containing the columns requested
   @rtype             : generator
 
-  >>> def test(f,**kw): return list(load_table(f,**kw))
+  >>> def test(f,**kw): return list(table_reader(f,**kw))
   >>> from StringIO import StringIO
   >>> test(StringIO("loc1\\tlocA \\nloc2\\n\\n\\t\\n loc3 \\tlocC\\n\\tfoo\\nloc4\\t\\n"))
   [['loc1', 'locA'], ['loc2', ''], ['', ''], ['', ''], ['loc3', 'locC'], ['', 'foo'], ['loc4', '']]
@@ -1274,11 +1274,11 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   if header is not None and isinstance(header,str):
     header = map(str.strip,header.split(','))
 
-  format  = format.lower()
+  format = format.lower()
   if format in ('xls','excel'):
-    rows = load_table_excel(name, extra_args=args)
+    rows = table_reader_excel(name, extra_args=args)
   elif format in ('delimited','tsv','csv'):
-    rows = load_table_delimited(name, extra_args=args)
+    rows = table_reader_delimited(name, extra_args=args)
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
 
@@ -1288,8 +1288,7 @@ def load_table(filename,want_header=False,extra_args=None,**kwargs):
   if skip:
     rows = islice(rows,skip,None)
 
-  return load_table_rows(rows,columns,header=header,want_header=want_header)
-
+  return table_columns(rows,columns,header=header,want_header=want_header)
 
 
 class TableWriter(object):
@@ -1333,6 +1332,32 @@ class TableWriter(object):
     m = len(row)
     row = [ (row[j] if j<m else '') for j in indices ]
     self.writer.writerow(row)
+
+
+##########################################################################
+# Preserve deprecated load_* APIs until just before 1.0 release
+
+@deprecated_by('list_reader')
+def load_list(*args, **kwargs):
+  return list_reader(*args, **kwargs)
+load_list.__doc__ = list_reader.__doc__
+
+@deprecated_by('map_reader')
+def load_map(*args, **kwargs):
+  return map_reader(*args, **kwargs)
+load_map.__doc__ = map_reader.__doc__
+
+@deprecated_by('table_columns')
+def load_table_rows(*args, **kwargs):
+  return table_columns(*args, **kwargs)
+load_table_rows.__doc__ = table_columns.__doc__
+
+@deprecated_by('table_reader')
+def load_table(*args, **kwargs):
+  return table_reader(*args, **kwargs)
+load_table.__doc__ = table_reader.__doc__
+
+##########################################################################
 
 
 def table_writer(filename,extra_args=None,**kwargs):
@@ -1453,7 +1478,7 @@ def table_writer(filename,extra_args=None,**kwargs):
   return writer
 
 
-def load_table_delimited(filename, extra_args=None, **kwargs):
+def table_reader_delimited(filename, extra_args=None, **kwargs):
   '''
   Return a configured delimited table reader
   '''
@@ -1569,7 +1594,7 @@ try:
     return row
 
 
-  def load_table_excel(filename,strdata=True,extra_args=None,**kwargs):
+  def table_reader_excel(filename,strdata=True,extra_args=None,**kwargs):
     '''
     Load rows from a Microsoft Excel (XLS) file using the xlrd module
 
@@ -1605,7 +1630,7 @@ try:
       except (xlrd.XLRDError,TypeError,IndexError):
         raise ValueError('Cannot open Excel sheet %s:%s' % (namefile(name),sheet))
 
-    def _load_table_excel(book,sheet,strdata):
+    def _table_reader_excel(book,sheet,strdata):
       if strdata:
         rowfunc = _xlate_xls_row_str
       else:
@@ -1616,11 +1641,11 @@ try:
         types  = sheet.row_types(i)
         yield rowfunc(book,values,types)
 
-    return _load_table_excel(book,sheet,strdata)
+    return _table_reader_excel(book,sheet,strdata)
 
 
 except ImportError:
-  def load_table_excel(filename,strdata=True,extra_args=None,**kwargs):
+  def table_reader_excel(filename,strdata=True,extra_args=None,**kwargs):
     raise ValueError('Missing xlrd module to read Microsoft Excel file')
 
 

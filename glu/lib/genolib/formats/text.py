@@ -10,7 +10,7 @@ __revision__  = '$Id$'
 
 import csv
 
-from   glu.lib.fileutils         import autofile,load_list,table_writer,namefile,trybool,\
+from   glu.lib.fileutils         import autofile,list_reader,table_writer,namefile,trybool,\
                                         parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
@@ -381,10 +381,10 @@ def load_genotriples_text(filename,genome=None,phenome=None,extra_args=None,**kw
     raise ValueError('genotype representation must be specified when reading a text format')
 
   if samples:
-    samples = set(load_list(samples,**dialect))
+    samples = set(list_reader(samples,**dialect))
 
   if loci:
-    loci = set(load_list(loci,**dialect))
+    loci = set(list_reader(loci,**dialect))
 
   rows = csv.reader(autofile(filename),**dialect)
 

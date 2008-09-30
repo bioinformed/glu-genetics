@@ -13,7 +13,7 @@ from   collections       import defaultdict
 from   itertools         import izip
 
 from   glu.lib.utils     import as_set
-from   glu.lib.fileutils import namefile,get_arg,trybool,load_list,load_map,load_table
+from   glu.lib.fileutils import namefile,get_arg,trybool,list_reader,map_reader,table_reader
 
 
 seq_type = (NoneType,set,dict,list,tuple)
@@ -35,7 +35,7 @@ def load_rename_alleles_file(filename):
   l3 [(None, None), ('A', 'C')]
   l5 [(None, None), ('A', 'C'), ('B', 'T')]
   '''
-  rows = load_table(filename)
+  rows = table_reader(filename)
 
   rename = {}
   for i,row in enumerate(rows):
@@ -270,20 +270,20 @@ class GenoSubTransform(object):
     @type    order: str
     '''
     if not isinstance(include, seq_type):
-      include = set(load_list(include))
+      include = set(list_reader(include))
     elif include is not None:
       include = as_set(include)
 
     if not isinstance(exclude, seq_type):
-      exclude = set(load_list(exclude))
+      exclude = set(list_reader(exclude))
     elif exclude is not None:
       exclude = as_set(exclude)
 
     if not isinstance(rename, map_type):
-      rename = load_map(rename)
+      rename = map_reader(rename)
 
     if not isinstance(order, seq_type):
-      order = load_list(order)
+      order = list_reader(order)
 
     self.include = include
     self.exclude = exclude

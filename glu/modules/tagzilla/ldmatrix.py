@@ -12,7 +12,7 @@ import optparse
 from   operator          import itemgetter
 from   itertools         import islice, chain, izip
 
-from   glu.lib.fileutils import load_table,table_writer
+from   glu.lib.fileutils import table_reader,table_writer
 from   glu.lib.xtab      import xtab
 
 
@@ -45,7 +45,7 @@ def main():
 
   out = table_writer(options.output,hyphen=sys.stdout)
 
-  datain = [ islice(load_table(arg,hyphen=sys.stdin),1,None) for arg in args ]
+  datain = [ islice(table_reader(arg,hyphen=sys.stdin),1,None) for arg in args ]
   datain = chain(*datain)
 
   if options.measure.lower() == 'r2':

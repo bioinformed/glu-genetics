@@ -9,7 +9,7 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils          import load_table,table_writer,resolve_column_headers
+from   glu.lib.fileutils          import table_reader,table_writer,resolve_column_headers
 
 from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
@@ -79,7 +79,7 @@ def main():
     return
 
   con    = open_genedb(options.genedb)
-  rows   = load_table(args[0],want_header=True,hyphen=sys.stdin)
+  rows   = table_reader(args[0],want_header=True,hyphen=sys.stdin)
   out    = table_writer(options.output,hyphen=sys.stdout)
 
   header = rows.next() or ['']

@@ -17,7 +17,7 @@ from   itertools                 import izip, groupby
 from   operator                  import itemgetter
 
 from   glu.lib.utils             import percent, pair_generator, pick
-from   glu.lib.fileutils         import autofile, hyphen, load_table, table_writer
+from   glu.lib.fileutils         import autofile, hyphen, table_reader, table_writer
 from   glu.lib.union_find        import union_find
 
 from   glu.lib.genolib.io        import load_genostream
@@ -60,7 +60,7 @@ def write_dupsets(filename, dupsets):
 def load_sample_phenos(file,phenos):
   phenos = [it.lower() for it in phenos.split(',')]
 
-  rows = load_table(file,want_header=True)
+  rows = table_reader(file,want_header=True)
   header = rows.next()
   pos = [i for (i,it) in enumerate(header) if it.lower() in phenos]
 
@@ -343,7 +343,7 @@ def main():
     print >> sys.stderr, 'Loading expected duplicates data...'
     expected_dupsets = load_expected_dupsets(options.duplicates)
 
-  # FIXME: Replace with load_table
+  # FIXME: Replace with table_reader
   sample_phenos = None
   if options.phenos:
     if options.phenofile is not None:

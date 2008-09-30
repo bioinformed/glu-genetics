@@ -11,7 +11,7 @@ import sys
 from   operator                  import itemgetter
 from   collections               import defaultdict
 
-from   glu.lib.fileutils         import load_map, table_writer
+from   glu.lib.fileutils         import map_reader, table_writer
 from   glu.lib.remap             import remap_alleles, remap_category
 from   glu.lib.hwp               import hwp_exact_biallelic
 from   glu.lib.genolib           import GenotripleStream, load_genostream
@@ -325,12 +325,12 @@ def main():
   #        equivalence sets.
   locuseq = eqlocus = None
   if options.locuseq:
-    locuseq = load_map(options.locuseq)
+    locuseq = map_reader(options.locuseq)
     eqlocus = invert_dict(locuseq)
 
   sampleeq = eqsample = None
   if options.sampleeq:
-    sampleeq = load_map(options.sampleeq)
+    sampleeq = map_reader(options.sampleeq)
     eqsample = invert_dict(sampleeq)
 
   refgenos  = load_reference_genotypes(args[0],options.refformat,locuseq,sampleeq)

@@ -11,7 +11,7 @@ import sqlite3
 
 from   itertools         import chain,islice
 
-from   glu.lib.fileutils import autofile, load_table, tryint
+from   glu.lib.fileutils import autofile, table_reader, tryint
 
 from   glu.modules.convert.from_lbd import load_illumina_manifest
 
@@ -39,7 +39,7 @@ def get_aliases(con,filename):
   cur.execute(sql)
   geneids = dict( (tryint(geneid),symbol) for geneid,symbol in cur.fetchall() )
 
-  aliasfile = load_table(filename,want_header=True)
+  aliasfile = table_reader(filename,want_header=True)
   aliasfile.next()
 
   updates = []
@@ -66,7 +66,7 @@ def get_aliases(con,filename):
       yield symbol.upper(),geneid,symbol.upper()
     yield str(geneid),geneid,symbol
 
-  aliasfile = load_table(filename,want_header=True)
+  aliasfile = table_reader(filename,want_header=True)
   aliasfile.next()
 
   for record in aliasfile:
@@ -102,7 +102,7 @@ def filter_aliases(aliases):
 
 
 def get_genes(filename):
-  genes  = load_table(filename,want_header=True)
+  genes  = table_reader(filename,want_header=True)
   header = genes.next()
 
   for taxid,chromosome,chrStart,chrEnd,orientation,contig,cnt_start,     \
@@ -293,7 +293,7 @@ def extract_illumina_snps(manifest):
 
 def get_goldenpath_dbsnp(snpfile):
   print 'LOADING DBSNP:',snpfile
-  for row in load_table(snpfile):
+  for row in table_reader(snpfile):
     rs         = row[4]
     chromosome = row[1]
     position   = tryint(row[2])
@@ -312,7 +312,7 @@ def get_goldenpath_dbsnp(snpfile):
 
 def get_goldenpath_arrays(arrayfile):
   print 'LOADING ARRAY:',arrayfile
-  for row in load_table(arrayfile):
+  for row in table_reader(arrayfile):
     name       = row[4]
     chromosome = row[1]
     position   = tryint(row[2])
@@ -337,7 +337,7 @@ def get_goldenpath_arrays(arrayfile):
 def get_cytobands(cytofile):
   print 'LOADING CYTOBANDS:',cytofile
   seen = set()
-  for row in load_table(cytofile):
+  for row in table_reader(cytofile):
     band       = row[3]
     chromosome = row[0]
     start      = tryint(row[1])
@@ -391,7 +391,7 @@ def load_cytobands(con,bands):
 
 def get_mirbase(mfile):
   print 'LOADING MIRBASE'
-  for row in load_table(mfile):
+  for row in table_reader(mfile):
     if not row or row[0].startswith('#'):
       continue
 

@@ -10,7 +10,7 @@ import sys
 
 from   collections               import defaultdict
 
-from   glu.lib.fileutils         import namefile,load_table,get_arg,parse_augmented_filename
+from   glu.lib.fileutils         import namefile,table_reader,get_arg,parse_augmented_filename
 from   glu.lib.genolib.genoarray import model_from_alleles
 
 
@@ -270,7 +270,7 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
     filename = parse_augmented_filename(filename,args)
     assert not filename
   elif filename:
-    rows = load_table(filename,want_header=True,extra_args=args)
+    rows = table_reader(filename,want_header=True,extra_args=args)
     header = rows.next()
 
   default_alleles     = get_arg(args, ['alleles'], None)

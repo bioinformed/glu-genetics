@@ -13,7 +13,7 @@ import sys
 import optparse
 
 from   glu.lib.imerge                import imerge
-from   glu.lib.fileutils             import autofile, hyphen, load_list
+from   glu.lib.fileutils             import autofile, hyphen, list_reader
 
 from   glu.modules.tagzilla.tagzilla import BinInfo, NullBinInfo, locus_result_sequence, bin_qualifier
 
@@ -69,7 +69,7 @@ def main():
   exclude = set()
 
   if options.subset:
-    subset = set(load_list(options.subset))
+    subset = set(list_reader(options.subset))
 
   locusmap = {}
   results = [ locus_result_sequence(filename, locusmap, exclude) for filename in args ]
