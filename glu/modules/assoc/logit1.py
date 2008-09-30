@@ -233,25 +233,37 @@ def main():
     test_indices = [ j*n+i for j in range(c)
                            for i in options.test.indices() ]
 
-    sp = wp = lp = 1
+    sp = wp = lp = None
 
     if 'score' in options.stats:
-      st,df = g.score_test(indices=test_indices).test()
-      sp    = scipy.stats.distributions.chi2.sf(st,df)
-      sps   = format_pvalue(sp)
-      result.extend( ['%.5f' % st, sps ] )
+      try:
+        st,df = g.score_test(indices=test_indices).test()
+      except LinAlgError:
+        result.extend( ['',''] )
+      else:
+        sp    = scipy.stats.distributions.chi2.sf(st,df)
+        sps   = format_pvalue(sp)
+        result.extend( ['%.5f' % st, sps ] )
 
     if 'wald' in options.stats:
-      wt,df = g.wald_test(indices=test_indices).test()
-      wp    = scipy.stats.distributions.chi2.sf(wt,df)
-      wps   = format_pvalue(wp)
-      result.extend( ['%.5f' % wt, wps ] )
+      try:
+        wt,df = g.wald_test(indices=test_indices).test()
+      except LinAlgError:
+        result.extend( ['',''] )
+      else:
+        wp    = scipy.stats.distributions.chi2.sf(wt,df)
+        wps   = format_pvalue(wp)
+        result.extend( ['%.5f' % wt, wps ] )
 
     if 'lrt' in options.stats:
-      lt,df = g.lr_test(indices=test_indices).test()
-      lp    = scipy.stats.distributions.chi2.sf(lt,df)
-      lps   = format_pvalue(lp)
-      result.extend( ['%.5f' % lt, lps ] )
+      try:
+        lt,df = g.lr_test(indices=test_indices).test()
+      except LinAlgError:
+        result.extend( ['',''] )
+      else:
+        lp    = scipy.stats.distributions.chi2.sf(lt,df)
+        lps   = format_pvalue(lp)
+        result.extend( ['%.5f' % lt, lps ] )
 
     if options.stats:
       result.append('%d' % df)
@@ -287,11 +299,11 @@ def main():
       if options.stats:
         details.write('Testing: %s\n\n' % options.test.formula())
 
-      if 'score' in options.stats:
+      if 'score' in options.stats and st is not None:
         details.write('Score test           : X2=%9.5f, df=%d, p=%s\n' % (st,df,sps))
-      if 'wald' in options.stats:
+      if 'wald' in options.stats and wt is not None:
         details.write('Wald test            : X2=%9.5f, df=%d, p=%s\n' % (wt,df,wps))
-      if 'lrt' in options.stats:
+      if 'lrt' in options.stats and lt is not None:
         details.write('Likelihood ratio test: X2=%9.5f, df=%d, p=%s\n' % (lt,df,lps))
 
       details.write('\n')

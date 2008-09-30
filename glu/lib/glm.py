@@ -16,6 +16,7 @@ from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgErro
 
 CONV = 1e-8
 COND = 1e-8
+EPS  = 1e-5
 
 
 def bmat2d(data):
@@ -1196,7 +1197,11 @@ class GLogit(object):
         break
 
       # Form weights in block form
-      w  = self.update_weights(mu)
+      w = self.update_weights(mu)
+      w_min = min(e.min() for row in w for e in row)
+
+      if w_min < EPS:
+        raise LinAlgError('glogit estimator failed due to extreme ill-conditioning')
 
       # Compute upper Cholesky factor and inverse weights
       ww = block_cholesky(w,lower=False)
