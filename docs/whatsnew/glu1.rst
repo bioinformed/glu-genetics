@@ -2,6 +2,38 @@
 What's New in GLU 1.0
 *********************
 
+Version 1.0a5 (2008-10-01)
+==========================
+
+* Added support for raw WTCCC genotype files
+
+* Fix bugs in locus and pedigree file readers
+
+* Performance optimizations to binary file reader
+
+* Add support for dbSNP 129 to genedb
+
+* Support new Illumina manifest format strangeness
+
+* Renamed --outfile options to --output in the following modules:
+
+  :mod:`genedb.annotate`
+  :mod:`genedb.find_snps`
+  :mod:`genedb.find_regions`
+  :mod:`tagzilla.coverage`
+  :mod:`tagzilla.surrogates`
+  :mod:`tagzilla.ldmatrix`
+  :mod:`tagzilla.tagzilla`
+
+* Rename fileutils internal APIs, with backwardly compatibile aliases
+
+* Add checks to prevent pathological weights in GLM iterations.  This
+  prevents infinite loops in the LAPACK fitting code for extremely sparse or
+  ill-conditioned data.  Improve :mod:`assoc.logit1` and
+  :mod:`assoc.linear1` to be robust to these new failure conditions.
+
+* Add non-founder filter to :mod:`tagzilla` and related modules.
+
 Version 1.0a4 (2008-08-11)
 ==========================
 
