@@ -1198,7 +1198,7 @@ class GLogit(object):
 
       # Form weights in block form
       w = self.update_weights(mu)
-      w_min = min(e.min() for row in w for e in row)
+      w_min = abs(min(e.min() for row in w for e in row))
 
       if w_min < EPS:
         raise LinAlgError('glogit estimator failed due to extreme ill-conditioning')
