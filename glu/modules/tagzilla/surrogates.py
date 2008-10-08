@@ -105,8 +105,12 @@ def main():
     designscores = build_design_score(options.designscores)
     exclude.update(lname for lname,d in designscores.iteritems() if d <= epsilon)
 
+  if options.subset is not None:
+    subset.update(exclude)
+
   locusmap = {}
   options.multipopulation = None
+  # exclude is the ldsubset
   ldpairs = generate_ldpairs(args, locusmap, set(), subset, exclude, options)
 
   missing = '',0
@@ -131,8 +135,7 @@ def main():
   outfile = table_writer(options.output, hyphen=sys.stdout)
   outfile.writerow(['LNAME','SURROGATE','RSQUARED'])
   for lname,(surrogate,r2) in best_surrogate.iteritems():
-    r2 = sfloat(r2)
-    outfile.writerow([lname,surrogate,r2])
+    outfile.writerow([lname,surrogate,sfloat(r2)])
 
 
 if __name__ == '__main__':
