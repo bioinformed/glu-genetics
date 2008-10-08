@@ -55,9 +55,9 @@ def geno_counts(loci):
 def compute_frequencies(model,counts):
   n = sum(counts[1:])
 
-  as   = model.alleles[1:]
+  ass  = model.alleles[1:]
   fs   = [ float(f)/n for f in counts[1:] ]
-  afs  = sorted(izip(as,fs),key=itemgetter(1),reverse=True)
+  afs  = sorted(izip(ass,fs),key=itemgetter(1),reverse=True)
   miss = float(counts[0])/sum(counts)
   return miss,afs
 
