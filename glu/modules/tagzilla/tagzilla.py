@@ -1599,8 +1599,8 @@ def load_genotypes(filename, options):
                                   genome=options.loci,phenome=options.pedigree,
                                   transform=options).as_ldat()
 
-  founders = set(f.name for f in loci.phenome.phenos.itervalues() if f.founder())
-  loci = loci.transformed(includesamples=founders,repack=True)
+  nonfounders = set(f.name for f in loci.phenome.phenos.itervalues() if f.nonfounder())
+  loci = loci.transformed(excludesamples=nonfounders,repack=True)
 
   genome = loci.genome
   for lname,genos in loci:
