@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __gluindex__  = True
 __abstract__  = 'Fit single-SNP generalized logistic genotype-phenotype association models'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
@@ -8,15 +10,17 @@ __revision__  = '$Id$'
 
 import sys
 
+from   itertools           import izip
+
 import scipy.stats
 
-from   numpy               import isfinite
+from   numpy               import zeros,isfinite
 
 from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import GLogit,LinAlgError
 
 from   glu.lib.genolib     import geno_options
-from   glu.lib.association import build_models,print_results,format_pvalue
+from   glu.lib.association import build_models,print_results,format_pvalue,TREND,NO_INTERCEPT
 
 
 def option_parser():
@@ -70,6 +74,8 @@ def option_parser():
                     help='Output detailed results for only pvalues below P threshold')
   output.add_option('-v', '--verbose', dest='verbose', metavar='LEVEL', type='int', default=1,
                     help='Verbosity level of diagnostic output.  O for none, 1 for some (default), 2 for exhaustive.')
+  output.add_option('--se', dest='se', action='store_true', default=False,
+                    help='Show standard errors around each estimate')
   output.add_option('--ci', dest='ci', default=0, type='float', metavar='N',
                     help='Show confidence interval around each estimate of width N.  Set to zero to inhibit '
                          'output.  Default=0')
@@ -125,6 +131,8 @@ def summary_header(options,null):
         if name.startswith('locus:'):
           name = name[6:]
         header.append( '%s%d OR' % (name,i) )
+        if options.se:
+          header += ['%s%d SE' % (name,i) ]
         if ci:
           header += [ '%s%d OR %d%% CI_l' % (name,i,ci),
                       '%s%d OR %d%% CI_u' % (name,i,ci) ]
@@ -133,6 +141,8 @@ def summary_header(options,null):
       if name.startswith('locus:'):
         name = name[6:]
       header.append('%s OR' % name)
+      if options.se:
+        header += ['%s SE' % name]
       if ci:
         header += [ '%s OR %d%% CI_l' % (name,ci),
                     '%s OR %d%% CI_u' % (name,ci) ]
@@ -183,8 +193,11 @@ def main():
 
   # For each locus
   for lname,genos in loci:
+    result = [lname]
+
     # Skip fixed terms
     if lname in fixedloci:
+      out.writerow(result)
       continue
 
     lmap = fixedloci.copy()
@@ -193,9 +206,31 @@ def main():
     for t in gterms:
       t.name = lname
 
+    base_model = NO_INTERCEPT()+TREND(lname)
+    for fixed in fixedloci:
+      base_model += TREND(fixed)
+    base = models.build_model(base_model,lmap,mingenos=0)
+
+    if not base:
+      out.writerow(result)
+      continue
+
+    counts = zeros( (len(null.categories),3), dtype=int )
+    for pheno,geno in izip(base.y,base.X):
+      counts[pheno[0,0],geno[0,0]] += 1
+
+    mafs = (counts*[0.,0.5,1.]).sum(axis=1)/counts.sum(axis=1)
+
+    m = base.model_loci[lname]
+    result += ['|'.join(m.alleles),
+               '|'.join('%.3f' % m for m in mafs),
+               '/'.join('|'.join('%d' % c for c in row) for row in counts),
+               '|'.join('%d' % c for c in counts.sum(axis=1))]
+
     model = models.build_model(options.model,lmap)
 
     if not model:
+      out.writerow(result)
       continue
 
     g = GLogit(model.y,model.X,vars=model.vars)
@@ -203,7 +238,7 @@ def main():
     try:
       g.fit()
     except LinAlgError:
-      # FIXME: Output bad fit line
+      out.writerow(result)
       continue
 
     # Design matrix debugging output
@@ -218,19 +253,10 @@ def main():
 
     assert len(null.categories) >= len(g.categories)
 
-    m = model.model_loci[lname]
-
-    result = [lname,
-              ','.join(m.alleles),
-              '%.3f' % m.maf,
-              '|'.join(map(str,m.counts)),
-              '|'.join(str((g.y==cat).sum()) for cat in g.categories) ]
-
     n = model.X.shape[1]
-    c = len(g.categories)-1
 
     # Construct genotype parameter indices
-    test_indices = [ j*n+i for j in range(c)
+    test_indices = [ j*n+i for j in range(len(g.categories)-1)
                            for i in options.test.indices() ]
 
     sp = wp = lp = None
@@ -269,27 +295,28 @@ def main():
     if options.stats:
       result.append(df)
 
-    # FIXME: No longer true for interactions
-    # FIXME: SEs are optional
-    ors = []
-    for cat in range(c):
-      beta = g.beta[cat*n:(cat+1)*n,0]
-      W    = g.W[cat*n:(cat+1)*n,:][:,cat*n:(cat+1)*n]
-
-      if options.ci:
-        for orr,(ci_l,ci_u) in zip(options.display.odds_ratios(beta),
-                                   options.display.odds_ratio_ci(beta,W,alpha=options.ci)):
-          ors.extend( [orr,ci_l,ci_u] )
+    res = []
+    for categ in null.categories[1:]:
+      try:
+        cat  = g.categories.tolist().index(categ)-1
+      except ValueError:
+        res += ['']*(1+bool(options.se)+2*bool(options.ci))
       else:
-        ors.extend( options.display.odds_ratios(beta) )
+        beta = g.beta[cat*n:(cat+1)*n,0]
+        W    = g.W[cat*n:(cat+1)*n,:][:,cat*n:(cat+1)*n]
 
-    result.extend('%.4f' % orr if isfinite(orr) else '' for orr in ors)
+        ors  = options.display.odds_ratios(beta)
+        ses  = options.display.standard_errors(W)
+        cis  = options.display.odds_ratio_ci(beta,W,alpha=options.ci)
 
-    # FIXME: This does not align the categories -- just the blank headers
-    # FIXME: Wrong constant
-    if len(null.categories) < len(g.categories):
-      short = len(g.categories)-len(null.categories)
-      result.extend( ['']*(short*6) )
+        for i in range(len(ors)):
+          res.append(ors[i])
+          if options.se:
+            res.append(ses[i])
+          if options.ci:
+            res += list(cis[i])
+
+    result.extend('%.4f' % v if isfinite(v) else '' for v in res)
 
     out.writerow(result)
 

@@ -80,13 +80,13 @@ class TERM(object):
   def odds_ratios(self,p):
     return exp(self.estimates(p))
 
-  def se(self,c):
+  def standard_errors(self,c):
     return sqrt(self.var(c))
 
   def estimate_ci(self,p,c,alpha=0.95):
     a = stats.distributions.norm.ppf( (1+alpha)/2 )
     return [ (p-a*e,p+a*e) for p,e in
-                        zip(self.estimates(p),self.se(c)) ]
+                        zip(self.estimates(p),self.standard_errors(c)) ]
 
   def odds_ratio_ci(self,p,c,alpha=0.95):
     return exp(self.estimate_ci(p,c,alpha=alpha))

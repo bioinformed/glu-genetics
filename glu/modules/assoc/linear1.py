@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __gluindex__  = True
 __abstract__  = 'Fit single-SNP linear genotype-phenotype association models'
 __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
@@ -70,6 +72,8 @@ def option_parser():
                     help='Output detailed results for only pvalues below P threshold')
   output.add_option('-v', '--verbose', dest='verbose', metavar='LEVEL', type='int', default=1,
                     help='Verbosity level of diagnostic output.  O for none, 1 for some (default), 2 for exhaustive.')
+  output.add_option('--se', dest='se', action='store_true', default=False,
+                      help='Show standard errors around each estimate')
   output.add_option('--ci', dest='ci', default=0, type='float', metavar='N',
                     help='Show confidence interval around each estimate of width N.  Set to zero to inhibit '
                          'output.  Default=0')
@@ -122,7 +126,9 @@ def summary_header(options):
   for name in options.display.effect_names():
     if name.startswith('locus:'):
       name = name[6:]
-    header += [ '%s' % name, '%s SE' % name ]
+    header += [ '%s' % name ]
+    if options.se:
+      header += [ '%s SE' % name ]
     if ci:
       header += [ '%s %d%% CI_l' % (name,ci),
                   '%s %d%% CI_u' % (name,ci) ]
@@ -174,8 +180,11 @@ def main():
 
   # For each locus
   for lname,genos in loci:
+    result = [lname]
+
     # Skip fixed terms
     if lname in fixedloci:
+      out.writerow(result)
       continue
 
     lmap = fixedloci.copy()
@@ -187,14 +196,23 @@ def main():
     model = models.build_model(options.model,lmap)
 
     if not model:
+      out.writerow(result)
       continue
+
+    m = model.model_loci[lname]
+    n = model.X.shape[0]
+
+    result += [','.join(m.alleles),
+               '%.3f' % m.maf,
+               '|'.join(map(str,m.counts)),
+               str(n) ]
 
     g = Linear(model.y,model.X,vars=model.vars)
 
     try:
       g.fit()
     except LinAlgError:
-      # FIXME: Output bad fit line
+      out.writerow(result)
       continue
 
     # Design matrix debugging output
@@ -206,15 +224,6 @@ def main():
     # R model verfication debugging code
     if 0:
       check_R(model,g)
-
-    m = model.model_loci[lname]
-    n = model.X.shape[0]
-
-    result = [lname,
-              ','.join(m.alleles),
-              '%.3f' % m.maf,
-              '|'.join(map(str,m.counts)),
-              str(n) ]
 
     # Construct genotype parameter indices
     test_indices = options.test.indices()
@@ -255,20 +264,19 @@ def main():
     if options.stats:
       result.append(df)
 
-    # FIXME: SEs are optional
-    display = options.display
-    estimates = []
-    if options.ci:
-      for b,se,(ci_l,ci_u) in zip(display.estimates(g.beta),
-                                  display.se(g.W),
-                                  display.estimate_ci(g.beta,g.W,options.ci)):
-        estimates.extend( [b,se,ci_l,ci_u] )
-    else:
-      for b,se in zip(display.estimates(g.beta),
-                                  display.se(g.W)):
-        estimates.extend( [b,se] )
+    ors  = options.display.odds_ratios(g.beta)
+    ses  = options.display.standard_errors(g.W)
+    cis  = options.display.odds_ratio_ci(g.beta,g.W,alpha=options.ci)
 
-    result.extend('%.4f' % e if isfinite(e) else '' for e in estimates)
+    res = []
+    for i in range(len(ors)):
+      res.append(ors[i])
+      if options.se:
+        res.append(ses[i])
+      if options.ci:
+        res += list(cis[i])
+
+    result.extend('%.4f' % e if isfinite(e) else '' for e in res)
 
     out.writerow(result)
 

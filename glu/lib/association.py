@@ -20,7 +20,7 @@ from   glu.lib.utils     import tally
 from   glu.lib.fileutils import namefile,list_reader,map_reader,table_reader,table_columns,resolve_column_headers,tryint1
 from   glu.lib.genolib   import load_genostream,pick
 from   glu.lib.formula   import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
-                                GENO,FormulaParser
+                                GENO,TREND,FormulaParser
 
 
 LOGE_10 = log(10)
@@ -636,7 +636,7 @@ class LocusModelBuilder(object):
     self.geno_indices = dict( (pid,i) for i,pid in enumerate(locus_header) if pid in pidset )
     self.phenos       = [ p for p in phenos if p[0] in self.geno_indices ]
 
-  def build_model(self,term,loci):
+  def build_model(self,term,loci,mingenos=None):
     genoterms    = []
     phenoterms   = []
     interactions = []
@@ -703,8 +703,9 @@ class LocusModelBuilder(object):
     if k != len(term):
       return None
 
-    X = []
-    y = []
+    X    = []
+    y    = []
+    pids = []
     for row in self.phenos:
       pid  = row[0]
       stat = row[1]
@@ -724,8 +725,11 @@ class LocusModelBuilder(object):
     if len(set(y.A.ravel())) < 2:
       return None
 
+    if mingenos is None:
+      mingenos = self.mingenos
+
     # FIXME: What does mingenos mean in a world with arbitrary formulae?
-    if geno_indices and self.mingenos:
+    if geno_indices and mingenos:
       colcounts0 = (X.A[:,geno_indices]==0).sum(axis=0)
       colcounts1 = (X.A[:,geno_indices]!=0).sum(axis=0)
       colcounts  = minimum(colcounts0, colcounts1)
