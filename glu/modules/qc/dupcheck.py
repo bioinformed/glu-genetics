@@ -82,6 +82,9 @@ def main():
 
   threshold = options.threshold
 
+  if threshold < 0 or threshold > 1:
+    raise ValueError('Invalid threshold %s given.  Must be between 0 and 1.' % threshold)
+
   if len(args) != 1:
     parser.print_help()
     return
