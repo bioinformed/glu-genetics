@@ -72,7 +72,7 @@ Table 1: Genotype encoding models
 | TREND    |    AA    | 0  |    |   0    | Fit an additive model based on the number   |
 |          +----------+----+----+--------+ of rare alleles present for each genotype.  |
 |          |    AB    | 1  |    |   β1   | This model is a more general form of the    |
-|          +----------+----+----+--------+ model used by the Cochran-Amitage trend     |
+|          +----------+----+----+--------+ model used by the Cochran-Armitage trend    |
 |          |    BB    | 2  |    | 2xβ1   | test.                                       |
 +----------+----------+----+----+--------+---------------------------------------------+
 | DOM      |    AA    | 0  |    |   0    | Fit a dominant genetic model                |
