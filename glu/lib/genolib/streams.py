@@ -146,6 +146,24 @@ class GenotripleStream(GenotypeStream):
     self.unique       = bool(unique)
     self.materialized = materialized or isinstance(triples, (list,tuple))
 
+  if DEBUG:
+    def __iter__(self):
+      '''
+      Returns the embedded genotriple stream and marks it as used (ie
+      unavailable for further operations) if not already used.  Otherwise,
+      raises a RuntimeError exception.
+
+      @return: genotriple stream
+      @rtype :  sequence of sample, locus, and genotype
+      '''
+      def _check(rows):
+        for sample,locus,geno in rows:
+          assert isinstance(geno,Genotype)
+          assert locus in self.genome.loci
+          assert geno.model is self.genome.loci[locus].model
+          yield sample,locus,geno
+      return _check(self.use_stream())
+
   def _model_pairs(self):
     get_model = self.genome.get_model
     return ( (locus,get_model(locus)) for locus in self.genome.loci or [] )
@@ -4150,7 +4168,7 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
 
       recode_model = recode.get(locus)
       if recode_model is None:
-        if locus != new_locus and _genome_rename_loci(old_genome, locus, new_genome, new_locus, warn):
+        if _genome_rename_loci(old_genome, locus, new_genome, new_locus, warn):
           recode_model = new_genome.loci[new_locus].model
         else:
           recode_model = False
