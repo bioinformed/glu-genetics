@@ -17,7 +17,7 @@ from   itertools                 import groupby
 
 import tables
 
-from   glu.lib.utils             import izip_exact,is_str
+from   glu.lib.utils             import izip_exact,is_str,gcdisabled
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
                                         namefile
 from   glu.lib.genolib.locus     import Genome,Locus
@@ -893,7 +893,6 @@ def load_models_v1(gfile,loci,modelcache):
   return genome,_models()
 
 
-
 def load_models_v2(gfile,loci,modelcache):
   '''
   Load models from an HDF5 binary genotype file
@@ -919,8 +918,7 @@ def load_models_v2(gfile,loci,modelcache):
   def _models():
     empty      = ()
     strands    = STRANDS
-
-    lmodels = gfile.root.locus_models[:].tolist()
+    lmodels    = gfile.root.locus_models[:].tolist()
 
     for locus,lmod in izip_exact(loci,lmodels):
       max_alleles,allow_hemizygote = mods[lmod[0]]
@@ -1277,7 +1275,8 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   if format == format_found == 'sdat':
-    models = list(file_models)
+    with gcdisabled():
+      models = list(file_models)
 
     def _load():
       descr = GenotypeArrayDescriptor(models)
