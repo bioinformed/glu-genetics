@@ -378,9 +378,9 @@ PyTypeObject GenotypeType = {
 	0,					/* tp_descr_set      */
 	0,					/* tp_dictoffset     */
 	(initproc)genotype_init,		/* tp_init           */
-	PyType_GenericAlloc,			/* tp_alloc          */
-	PyType_GenericNew,			/* tp_new            */
-	PyObject_Del,				/* tp_free           */
+	0,					/* tp_alloc          */
+	0,					/* tp_new            */
+	0,					/* tp_free           */
 };
 
 /******************************************************************************************************/
@@ -561,9 +561,9 @@ PyTypeObject GenotypeArrayDescriptorType = {
 	0,					/* tp_descr_set      */
 	0,					/* tp_dictoffset     */
 	(initproc)descr_init,			/* tp_init           */
-	PyType_GenericAlloc,			/* tp_alloc          */
-	PyType_GenericNew,			/* tp_new            */
-	PyObject_Del,				/* tp_free           */
+	0,					/* tp_alloc          */
+	0,					/* tp_new            */
+	0,					/* tp_free           */
 };
 
 /* UnphasedMarkerModelObject object implementation*/
@@ -939,7 +939,7 @@ PyDoc_STRVAR(genomodel_doc,
 "UnphasedMarkerModelObject(allow_hemizygote=False, max_alleles=2)\n");
 
 PyTypeObject UnphasedMarkerModelType = {
-	PyObject_HEAD_INIT(&PyType_Type)
+	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size           */
 	"UnphasedMarkerModel",                  /* tp_name           */
 	sizeof(UnphasedMarkerModelObject),      /* tp_basicsize      */
@@ -956,7 +956,7 @@ PyTypeObject UnphasedMarkerModelType = {
 	0,					/* tp_hash           */
 	0,					/* tp_call           */
 	0,					/* tp_str            */
-	PyObject_GenericGetAttr,		/* tp_getattro       */
+	0,		/* tp_getattro       */
 	0,					/* tp_setattro       */
 	0,					/* tp_as_buffer      */
 	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,	/* tp_flags          */
@@ -976,9 +976,9 @@ PyTypeObject UnphasedMarkerModelType = {
 	0,					/* tp_descr_set      */
 	0,					/* tp_dictoffset     */
 	(initproc)genomodel_init,		/* tp_init           */
-	PyType_GenericAlloc,			/* tp_alloc          */
-	PyType_GenericNew,			/* tp_new            */
-	PyObject_Del,				/* tp_free           */
+	0,					/* tp_alloc          */
+	0,					/* tp_new            */
+	0,					/* tp_free           */
 };
 
 /***************************************/
@@ -1063,7 +1063,7 @@ genoarray_alloc(PyTypeObject *type, Py_ssize_t nitems)
 	PyObject_INIT(obj, type);
 
 	if(PyType_IS_GC(type))
-		_PyObject_GC_TRACK(obj);
+		PyObject_GC_Track(obj);
 	return obj;
 }
 
@@ -2009,7 +2009,7 @@ static PyMethodDef genoarray_methods[] = {
 };
 
 PyTypeObject GenotypeArrayType = {
-	PyObject_HEAD_INIT(&PyType_Type)
+	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size           */
 	"GenotypeArray",                        /* tp_name           */
 	sizeof(GenotypeArrayObject),            /* tp_basicsize      */
@@ -2026,7 +2026,7 @@ PyTypeObject GenotypeArrayType = {
 	genoarray_nohash,			/* tp_hash           */
 	0,					/* tp_call           */
 	0,					/* tp_str            */
-	PyObject_GenericGetAttr,		/* tp_getattro       */
+	0,					/* tp_getattro       */
 	0,					/* tp_setattro       */
 	&genoarray_as_buffer,			/* tp_as_buffer      */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags          */
@@ -2048,7 +2048,7 @@ PyTypeObject GenotypeArrayType = {
 	0,					/* tp_init           */
 	genoarray_alloc,			/* tp_alloc          */
 	genoarray_new,				/* tp_new            */
-	PyObject_Del,				/* tp_free           */
+	0,					/* tp_free           */
 };
 
 int
@@ -3816,68 +3816,64 @@ PyTypeObject GenotypeMergerType = {
 	0,					/* tp_descr_set      */
 	0,					/* tp_dictoffset     */
 	(initproc)genomerger_init,		/* tp_init           */
-	PyType_GenericAlloc,			/* tp_alloc          */
-	PyType_GenericNew,			/* tp_new            */
-	PyObject_Del,				/* tp_free           */
+	0,					/* tp_alloc          */
+	0,					/* tp_new            */
+	0,					/* tp_free           */
 };
 
 /******************************************************************************************************/
-
-static PyMethodDef genoarraymodule_methods[] = {
-	{"genotype_indices",            (PyCFunction)genotype_indices_func,	METH_KEYWORDS,
-	 "Return an array of integer genotype indices"},
-	{"count_genotypes",	(PyCFunction)count_genotypes_func,	METH_KEYWORDS,
-	 "Return an array of genotype counts by index"},
-	{"genotype_categories",	(PyCFunction)genotypes_categories_func,	METH_KEYWORDS,
-	 "Count the number of occurances of each genotypes category"},
-	{"locus_summary",	(PyCFunction)locus_summary_func,	METH_KEYWORDS,
-	 "Count genotypes and categories for genotypes at a single locus"},
-	{"sample_summary",	(PyCFunction)sample_summary_func,	METH_KEYWORDS,
-	 "Count genotypes and categories for genotypes for a single sample"},
-	{"genoarray_concordance",	genoarray_concordance,	METH_VARARGS,
-	 "Generate simple concordance statistics from two genotype arrays"},
-	{"genoarray_concordance_8bit",	genoarray_concordance_8bit,	METH_VARARGS,
-	 "Generate simple concordance statistics from two genotype arrays stored in 8-bit format"},
-	{"genoarray_concordance_4bit",genoarray_concordance_4bit,	METH_VARARGS,
-	 "Generate simple concordance statistics from two genotype arrays stored in 4-bit format"},
-	{"genoarray_concordance_2bit",	genoarray_concordance_2bit,	METH_VARARGS,
-	 "Generate simple concordance statistics from two genotype arrays stored in 2-bit format"},
-	{"pick",	pick,	METH_VARARGS,
-	 "Pick items from a sequence given indices"},
-	{"pick_columns",	pick_columns,	METH_VARARGS,
-	 "Pick one or more columns from a two dimensional sequence"},
-	{"place",	place,	METH_VARARGS,
-	 "Place items from a sequence at indices into a destination sequence"},
-	{"place_list",	place_list,	METH_VARARGS,
-	 "Place items from a sequence at indices into a destination sequence concatenating into lists if items are not None"},
-	{"merge_unanimous",	merge_unanimous_func,	METH_VARARGS,
-	 "Merge a list of genotypes requiring non-missing genotypes to be unanimous or they are setting to missing"},
-	{"count_haplotypes",	count_haplotypes,	METH_VARARGS, "Count haplotypes at two loci"},
-	{"estimate_ld",	estimate_ld,	METH_VARARGS, "Compute LD statistics from haplotype counts"},
-	{NULL}  /* Sentinel */
-};
-
 
 PyMODINIT_FUNC
 init_genoarray(void)
 {
 	PyObject *m;
 
+	static PyMethodDef genoarraymodule_methods[] = {
+		{"genotype_indices",            (PyCFunction)genotype_indices_func,	METH_KEYWORDS,
+		 "Return an array of integer genotype indices"},
+		{"count_genotypes",	(PyCFunction)count_genotypes_func,	METH_KEYWORDS,
+		 "Return an array of genotype counts by index"},
+		{"genotype_categories",	(PyCFunction)genotypes_categories_func,	METH_KEYWORDS,
+		 "Count the number of occurances of each genotypes category"},
+		{"locus_summary",	(PyCFunction)locus_summary_func,	METH_KEYWORDS,
+		 "Count genotypes and categories for genotypes at a single locus"},
+		{"sample_summary",	(PyCFunction)sample_summary_func,	METH_KEYWORDS,
+		 "Count genotypes and categories for genotypes for a single sample"},
+		{"genoarray_concordance",	genoarray_concordance,	METH_VARARGS,
+		 "Generate simple concordance statistics from two genotype arrays"},
+		{"genoarray_concordance_8bit",	genoarray_concordance_8bit,	METH_VARARGS,
+		 "Generate simple concordance statistics from two genotype arrays stored in 8-bit format"},
+		{"genoarray_concordance_4bit",genoarray_concordance_4bit,	METH_VARARGS,
+		 "Generate simple concordance statistics from two genotype arrays stored in 4-bit format"},
+		{"genoarray_concordance_2bit",	genoarray_concordance_2bit,	METH_VARARGS,
+		 "Generate simple concordance statistics from two genotype arrays stored in 2-bit format"},
+		{"pick",	pick,	METH_VARARGS,
+		 "Pick items from a sequence given indices"},
+		{"pick_columns",	pick_columns,	METH_VARARGS,
+		 "Pick one or more columns from a two dimensional sequence"},
+		{"place",	place,	METH_VARARGS,
+		 "Place items from a sequence at indices into a destination sequence"},
+		{"place_list",	place_list,	METH_VARARGS,
+		 "Place items from a sequence at indices into a destination sequence concatenating into lists if items are not None"},
+		{"merge_unanimous",	merge_unanimous_func,	METH_VARARGS,
+		 "Merge a list of genotypes requiring non-missing genotypes to be unanimous or they are setting to missing"},
+		{"count_haplotypes",	count_haplotypes,	METH_VARARGS, "Count haplotypes at two loci"},
+		{"estimate_ld",	estimate_ld,	METH_VARARGS, "Compute LD statistics from haplotype counts"},
+		{NULL}  /* Sentinel */
+	};
+
 	import_array();
 
-	if(PyType_Ready(&GenotypeType) < 0)
-		return;
+	GenotypeType.tp_new                = PyType_GenericNew;
+	UnphasedMarkerModelType.tp_new     = PyType_GenericNew;
+	GenotypeArrayDescriptorType.tp_new = PyType_GenericNew;
+	GenotypeMergerType.tp_new          = PyType_GenericNew;
 
-	if(PyType_Ready(&GenotypeArrayType) < 0)
-		return;
-
-	if(PyType_Ready(&UnphasedMarkerModelType) < 0)
-		return;
-
-	if(PyType_Ready(&GenotypeArrayDescriptorType) < 0)
-		return;
-
-	if(PyType_Ready(&GenotypeMergerType) < 0)
+	if(PyType_Ready(&GenotypeType)                < 0 ||
+	   PyType_Ready(&GenotypeArrayType)           < 0 ||
+	   PyType_Ready(&UnphasedMarkerModelType)     < 0 ||
+	   PyType_Ready(&GenotypeArrayDescriptorType) < 0 ||
+	   PyType_Ready(&GenotypeMergerType)          < 0)
 		return;
 
 	m = Py_InitModule3("_genoarray", genoarraymodule_methods,
@@ -3908,5 +3904,5 @@ init_genoarray(void)
 	PyModule_AddObject(m, "UnphasedMarkerModel",        (PyObject *)&UnphasedMarkerModelType);
 	PyModule_AddObject(m, "GenotypeArray",              (PyObject *)&GenotypeArrayType);
 	PyModule_AddObject(m, "Genotype",                   (PyObject *)&GenotypeType);
-	PyModule_AddObject(m, "GenotypeMerger",              (PyObject *)&GenotypeMergerType);
+	PyModule_AddObject(m, "GenotypeMerger",             (PyObject *)&GenotypeMergerType);
 }

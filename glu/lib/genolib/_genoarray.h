@@ -70,11 +70,11 @@ typedef struct {
 } GenotypeMergerObject;
 
 /* Forward declaration */
-PyAPI_DATA(PyTypeObject) GenotypeArrayDescriptorType;
-PyAPI_DATA(PyTypeObject) UnphasedMarkerModelType;
-PyAPI_DATA(PyTypeObject) GenotypeArrayType;
-PyAPI_DATA(PyTypeObject) GenotypeType;
-PyAPI_DATA(PyTypeObject) GenotypeMergerType;
+PyTypeObject GenotypeArrayDescriptorType;
+PyTypeObject UnphasedMarkerModelType;
+PyTypeObject GenotypeArrayType;
+PyTypeObject GenotypeType;
+PyTypeObject GenotypeMergerType;
 
 #define GenotypeArray_Check(op)                PyObject_TypeCheck(op, &GenotypeArrayType)
 #define GenotypeArray_CheckExact(op)           ((op)->ob_type == &GenotypeArrayType)
@@ -86,14 +86,14 @@ PyAPI_DATA(PyTypeObject) GenotypeMergerType;
 
 typedef int (*geno_foreach)(Py_ssize_t i, GenotypeObject *geno, void *state);
 
-PyAPI_FUNC(int) for_each_genotype_genoarray(GenotypeArrayObject *genos, geno_foreach func, void *state);
-PyAPI_FUNC(int) for_each_genotype(PyObject *genos, geno_foreach func, void *state);
+int for_each_genotype_genoarray(GenotypeArrayObject *genos, geno_foreach func, void *state);
+int for_each_genotype(PyObject *genos, geno_foreach func, void *state);
 
-PyAPI_FUNC(PyObject *) count_haplotypes(PyObject *self, PyObject *args);
-PyAPI_FUNC(PyObject *) estimate_ld(PyObject *self, PyObject *args);
+PyObject *count_haplotypes(PyObject *self, PyObject *args);
+PyObject *estimate_ld(PyObject *self, PyObject *args);
 
 /* Exceptions */
-PyAPI_DATA(PyObject *) GenotypeLookupError;
-PyAPI_DATA(PyObject *) GenotypeRepresentationError;
+PyObject *GenotypeLookupError;
+PyObject *GenotypeRepresentationError;
 
 #endif
