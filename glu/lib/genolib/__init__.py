@@ -6,8 +6,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 from glu.lib.genolib.genoarray import genoarray_concordance, pick
-from glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream, \
-                                      GenotypeLookupError, GenotypeRepresentationError
+from glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
+from glu.lib.genolib.encode    import GenotypeLookupError, GenotypeRepresentationError
 from glu.lib.genolib.io        import load_genostream, save_genostream, geno_options
 from glu.lib.genolib.reprs     import get_genorepr, snp
 from glu.lib.genolib.merge     import get_genomerger
