@@ -517,15 +517,16 @@ class GenotripleStream(GenotypeStream):
     # Determine if resulting triples will be unique (before renaming samples and loci)
     triples.unique = prove_unique_transform(transform=transform,loci=triples.loci,samples=triples.samples,unique=self.unique)
 
-    # Sample and locus renaming
-    if transform.samples.rename is not None or transform.loci.rename is not None:
-      triples = rename_genotriples(triples,transform.samples.rename,transform.loci.rename)
-
+    # Apply model updates
     # FIXME: recoding and renaming can be combined
     if transform.rename_alleles is not None:
       triples = rename_genotriples_alleles(triples, transform.rename_alleles)
     if transform.recode_models is not None:
       triples = recode_genotriples(triples, transform.recode_models)
+
+    # Sample and locus renaming
+    if transform.samples.rename is not None or transform.loci.rename is not None:
+      triples = rename_genotriples(triples,transform.samples.rename,transform.loci.rename)
 
     # FIXME: I'm not sure what I meant here, but it doesn't look quite right
     if transform.samples.order is not None and transform.loci.order is not None:
@@ -1326,6 +1327,13 @@ class GenomatrixStream(GenotypeStream):
 
     genos.unique = prove_unique_transform(transform=transform,loci=genos.loci,samples=genos.samples,unique=genos.unique)
 
+    # Apply model updates
+    # FIXME: recoding and renaming can be combined
+    if transform.rename_alleles:
+      genos = rename_genomatrixstream_alleles(genos,transform.rename_alleles)
+    if transform.recode_models is not None:
+      genos = recode_genomatrixstream(genos, transform.recode_models)
+
     # Apply renamings
     if rowtransform.rename:
       genos = rename_genomatrixstream_row(genos,rowtransform.rename)
@@ -1335,12 +1343,6 @@ class GenomatrixStream(GenotypeStream):
     # Filter rows and columns with all missing data
     if transform.filter_missing_genotypes:
       genos = filter_genomatrixstream_missing(genos)
-
-    if transform.rename_alleles:
-      genos = rename_genomatrixstream_alleles(genos,transform.rename_alleles)
-
-    if transform.recode_models is not None:
-      genos = recode_genomatrixstream(genos, transform.recode_models)
 
     # Ordering by [] and None are distinct cases: the first will order in lexicographical order
     # as a side-effect, while the latter should not alter order.
