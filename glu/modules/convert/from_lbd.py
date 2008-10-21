@@ -304,6 +304,7 @@ def build_models(loci,abmap,genome):
     if not model:
       model = modelcache[key] = model_from_alleles(key,max_alleles=2)
 
+    # FIXME: The semantics of the fixed flag are broken
     genome.merge_locus(locus, model, fixed=True)
     models.append(model)
 
