@@ -217,13 +217,16 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
   for i,h in enumerate(header):
     hmap[h].append(i)
 
-  # FIXME: Add aliases (MOTHER AND FATHER!!!)
-  ind_index     = _get_header(filename,hmap,'NAME',required=True)
+  name_index    = _get_header(filename,hmap,'NAME')
+  ind_index     = _get_header(filename,hmap,'INDIVIDUAL')
   family_index  = _get_header(filename,hmap,'FAMILY')
   parent1_index = _get_header(filename,hmap,'PARENT1')
   parent2_index = _get_header(filename,hmap,'PARENT2')
   sex_index     = _get_header(filename,hmap,'SEX')
   pheno_index   = _get_header(filename,hmap,'PHENO')
+
+  if name_index is None and ind_index is None:
+    raise ValueError('Cannot find a NAME or INDIVIDUAL header in locus file %s' % namefile(filename))
 
   def _phenos():
     for i,row in enumerate(rows):
@@ -232,15 +235,13 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
 
       n = len(row)
 
-      if ind_index >= n:
-        ind = ''
-      else:
-        ind = intern(row[ind_index].strip())
+      name = intern(row[name_index].strip()) if name_index < n else ''
+      ind  = intern(row[ind_index].strip())  if ind_index  < n else name
 
-      if not ind:
+      if not name and not ind:
         raise ValueError('Invalid phenotype record %d in %s (blank individual name)' % (i+1,namefile(filename)))
 
-      family = individual = parent1 = parent2 = None
+      family = parent1 = parent2 = None
       sex    = SEX_UNKNOWN
       pheno  = PHENO_UNKNOWN
 
@@ -260,13 +261,14 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
         pheno = PHENO_MAP.get(row[pheno_index].upper(),PHENO_UNKNOWN)
 
       if family is not None:
-        name    = '%s:%s' % (family,ind)
+        ind     = '%s:%s' % (family,ind)
         parent1 = '%s:%s' % (family,parent1) if parent1 else None
         parent2 = '%s:%s' % (family,parent2) if parent2 else None
-      else:
+
+      if not name:
         name = ind
 
-      yield name,family,individual,parent1,parent2,sex,pheno
+      yield name,family,ind,parent1,parent2,sex,pheno
 
   return _phenos()
 
