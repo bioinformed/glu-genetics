@@ -9,6 +9,8 @@
    :synopsis: Add genomic annotation to SNPs
 
 Add columns of genomic annotation to a file containing a list of SNP names.
+These include chromosome, cytoband, physical location, strand, and gene
+neighborhood.
 
 Usage::
 

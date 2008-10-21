@@ -15,7 +15,7 @@ from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
 
 
-HEADER = ['CHROMOSOME','LOCATION','CYTOBAND','GENE NEIGHBORHOOD']
+HEADER = ['CHROMOSOME','CYTOBAND','LOCATION','STRAND','GENE NEIGHBORHOOD']
 
 
 def option_parser():
@@ -37,6 +37,15 @@ def option_parser():
   return parser
 
 
+def normalize(row,n):
+  m = len(row)
+  if m>n:
+    row = row[:n]
+  elif m<n:
+    row += ['']*(n-m)
+  return row
+
+
 def annotate(con,header,rows,options):
   up = options.upstream   or 0
   dn = options.downstream or 0
@@ -47,25 +56,32 @@ def annotate(con,header,rows,options):
     raise ValueError('Invalid SNP column')
 
   column = column[0]
+  n = len(header)
 
   for row in rows:
-    if len(row) <= column:
-      yield row + ['']*3
+    if row.count('') == len(row):
       continue
 
-    snps = query_snps_by_name(con,row[column])
+    row = normalize(row,n)
+    snp = row[column]
+    results = query_snps_by_name(con,snp) if snp else None
 
-    if not snps:
+    if results is None:
+      info = ['']*3
+    elif not results:
       info = ['UNKNOWN','','']
-    elif len(snps) > 1:
+    elif len(results) > 1:
       info = ['Multiple mappings','','']
     else:
-      lname,chromosome,location,strand = snps[0]
+      lname,chromosome,location,strand = results[0]
       near = query_gene_neighborhood(con,chromosome,location,up,dn)
       cytoband = query_cytoband_by_location(con,chromosome,location)
 
-      info = [chromosome,location, ','.join(c[0] for c in cytoband),
-                                   ','.join(n[0] for n in near)]
+      info = [chromosome,
+              ','.join(c[0] for c in cytoband),
+              location,
+              strand,
+              ','.join(n[0] for n in near)]
 
     yield row + info
 
@@ -78,11 +94,16 @@ def main():
     parser.print_help(sys.stderr)
     return
 
-  con    = open_genedb(options.genedb)
-  rows   = table_reader(args[0],want_header=True,hyphen=sys.stdin)
-  out    = table_writer(options.output,hyphen=sys.stdout)
+  con  = open_genedb(options.genedb)
+  rows = table_reader(args[0],want_header=True,hyphen=sys.stdin)
+  out  = table_writer(options.output,hyphen=sys.stdout)
 
-  header = rows.next() or ['']
+  try:
+    header = rows.next()
+  except StopIteration:
+    header = []
+
+  header = header or ['']
 
   out.writerow(header + HEADER)
   out.writerows( annotate(con,header,rows,options) )
