@@ -399,7 +399,8 @@ def _load_loci(filename,options,keep):
                                 genome=options.loci,phenome=options.pedigree,
                                 transform=options).as_ldat()
     keep     &= set(fixedloci.samples)
-    fixedloci = fixedloci.transformed(include_samples=keep,order_samples=loci.samples)
+    samples   = loci.samples if filename is not None else None
+    fixedloci = fixedloci.transformed(include_samples=keep,order_samples=samples)
 
   if filename is None:
     return None,fixedloci,list(keep)
