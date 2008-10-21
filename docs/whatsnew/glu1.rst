@@ -17,15 +17,15 @@ Version 1.0a5 (2008-10-01)
 
 * Renamed --outfile options to --output in the following modules:
 
-  :mod:`genedb.annotate`
-  :mod:`genedb.find_snps`
-  :mod:`genedb.find_regions`
-  :mod:`tagzilla.coverage`
-  :mod:`tagzilla.surrogates`
-  :mod:`tagzilla.ldmatrix`
-  :mod:`tagzilla.tagzilla`
+  * :mod:`genedb.annotate`
+  * :mod:`genedb.find_snps`
+  * :mod:`genedb.find_regions`
+  * :mod:`tagzilla.coverage`
+  * :mod:`tagzilla.surrogates`
+  * :mod:`tagzilla.ldmatrix`
+  * :mod:`tagzilla.tagzilla`
 
-* Rename fileutils internal APIs, with backwardly compatibile aliases
+* Rename fileutils internal APIs, with backwardly compatible aliases
 
 * Add checks to prevent pathological weights in GLM iterations.  This
   prevents infinite loops in the LAPACK fitting code for extremely sparse or
