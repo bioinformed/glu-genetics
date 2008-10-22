@@ -8,3 +8,4 @@ LD estimation and tagging
   :maxdepth: 2
 
   tagzilla
+  surrogates

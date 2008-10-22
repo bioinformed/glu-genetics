@@ -5,25 +5,181 @@ Installation Guide
 Installation the easy way (binary installation)
 ===============================================
 
-*Instructions for binary installation will be available soon...*
-
 Major GLU releases will be available in the form of binary installation
 packages for the following operating systems:
 
-  ========================== ====== =====
-     Operating system        bits   CPU
-  ========================== ====== =====
-  Microsoft Windows XP/Vista 32 bit Intel
-  Microsoft Windows XP/Vista 32 bit AMD
-  Fedora Linux 7             64 bit Intel
-  Fedora Linux 7             64 bit AMD
-  Apple OS X 10.4.6 (Tiger)         Intel
-  ========================== ====== =====
+  ============================ ====== =====
+     Operating system          bits   CPU
+  ============================ ====== =====
+  Microsoft Windows XP/Vista   32 bit Intel
+  Microsoft Windows XP/Vista   32 bit AMD
+  Fedora Linux 7               64 bit Intel
+  Fedora Linux 7               64 bit AMD
+  Apple OS X 10.4.6 (Tiger)    32 bit Intel
+  ============================ ====== =====
 
 Additional platforms can be added by request, although limited by my access
 to suitable systems.  Contributed binary versions for additional platforms
 are gratefully accepted, though only from contributors who are willing to
 track and provide builds for major releases in a timely fashion.
+
+All-in-one binary installer for Windows XP and Vista (32 bit)
+-------------------------------------------------------------
+
+1. Download zip archive for your CPU:
+
+   * `Intel CPU`__
+
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-win32_Intel.zip&can=2&q=
+
+   * AMD CPU *(coming soon)*
+
+2. Double-clock on the ZIP archive and extract the contents an accessible location.
+   Here we use ``C:\glu-1.0a5-win32_Intel``.
+
+3. Add GLU to your executable path (recommended)
+
+   * Right click on your ``My Computer`` icon on your desktop or in your ``Start Menu``.
+
+   * Select ``Properties`` | ``Advanced`` or ``System Settings`` | ``Enviroment Variables``
+
+   * Under ``System variables`` select ``Path`` and click ``Edit...``
+
+   * **Append** the directory name where you installed GLU, prefixed by a semi-colon ';'::
+
+       ;C:\glu-1.0a5-win32_Intel
+
+     (remember, enter the directory where GLU was extracted)
+
+4. Create a short-cut for GLU (optional)
+
+   * On your desktop or in your data directory, create a shortcut (right click | New | Shortcut)
+
+   * Set the location to ``cmd`` and name to ``Command prompt for GLU``
+
+   * Click ``Next`` and then ``Finish``
+
+   * Right click the new ``cmd.exe`` icon
+
+   * Select ``Properties`` and then on the Shorcut tab
+
+   * Replace the contents of the ``Start in`` box with a default directory, if you have one
+
+   * Click ``OK``
+
+5. Test your settings
+
+   * Open a command shell
+
+     - Use the icon you created in step 4 to open a Windows command prompt
+     - Or click on ``Start`` | ``Run...`` and enter ``cmd``
+
+   * Type::
+
+      glu
+
+     You should see::
+
+      Usage: glu [options] [module] [args...]
+
+      Options:
+        --version          show program's version number and exit
+        -h, --help         show this help message, then exit
+        -s, --stats        display program runtime statistics
+        -v, --verbose      verbose error output
+
+        Options for software developers & power users:
+          --path           Display GLU package installation path
+          -p, --profile    Profile GLU code to find performance bottlenecks
+          --profiler=P     Set the profiler to use when -p is specified
+          --gcstats        Generate statistics from the runtime object garbage
+                           collector
+          --gcthreshold=N  Set the threshold for triggering collection of
+                           generation-0 objects
+
+      For information on how to get started run the "intro" module,
+      usually as "glu intro".  For a list of available modules run
+      "glu list".
+
+  If you see the above help message, then you are in business!
+
+
+All-in-one binary archive for Linux and OS X
+--------------------------------------------
+
+1. Download binary archive from the main project site for your operating system and CPU:
+
+   * `Linux 64 bit with an Intel CPU`__
+
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_Intel_EM64T.tar.gz&can=2&q=
+
+   * `Linux 64 bit with an AMD CPU`__
+
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_AMD_EM64T.tar.gz&can=2&q=
+
+   * `Apple OS X with an Intel CPU`__
+
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-OSX_Intel.tar.gz&can=2&q=
+
+
+   Below we will assume the Linux 64 bit version for Intel CPUs.
+
+2. Extract the GLU binary archive to an an accessible location.  Here we use ``/opt/glu`` as a base directory::
+
+     cd /opt
+     mkdir glu
+     tar xzf /path/to/glu-1.0a5-Linux_Intel_EM64T.tar.gz
+
+   GLU will be extracted to a new directory named ``glu-1.0a5-Linux_Intel_EM64T``.
+
+3. Add GLU to your executable path (recommended)
+
+   * In **bash** or similar shells::
+
+       export PATH=$PATH:/opt/glu/glu-1.0a5-Linux_Intel_EM64T
+
+   * In **tcsh** or similar shells::
+
+       setenv PATH $PATH:/opt/glu/glu-1.0a5-Linux_Intel_EM64T
+
+   NOTE: The exact GLU directory name will depend on the version of GLU, so use
+   the one appropriate for your installation.  Also, these settings are only
+   temporary.  Please consult your local system administrator on how to save
+   these settings into your login scripts.
+
+4. Test your settings
+
+   * Open a command shell
+
+   * Type::
+
+      glu
+
+     You should see::
+
+      Usage: glu [options] [module] [args...]
+
+      Options:
+        --version          show program's version number and exit
+        -h, --help         show this help message, then exit
+        -s, --stats        display program runtime statistics
+        -v, --verbose      verbose error output
+
+        Options for software developers & power users:
+          --path           Display GLU package installation path
+          -p, --profile    Profile GLU code to find performance bottlenecks
+          --profiler=P     Set the profiler to use when -p is specified
+          --gcstats        Generate statistics from the runtime object garbage
+                           collector
+          --gcthreshold=N  Set the threshold for triggering collection of
+                           generation-0 objects
+
+      For information on how to get started run the "intro" module,
+      usually as "glu intro".  For a list of available modules run
+      "glu list".
+
+  If you see the above help message, then you are in business!
+
 
 Installation from source
 ========================
