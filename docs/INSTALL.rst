@@ -228,18 +228,9 @@ To build and install GLU, run::
 
         python setup.py install
 
-To run GLU::
+Need help?
+==========
 
-        glu -h
-        glu <module>
-
-For information on getting started::
-
-        glu intro
-
-Please contact me if you have any questions, suggestions, or would like to
-help improve GLU.
-
-| *Kevin Jacobs*
-| *BioInformed LLC*
-| *jacobs@bioinformed.com*
+Please use the GLU User Group mailing list if you have any questions,
+suggestions, or would like to help improve GLU.  See the accompanying README
+file for information on how to do so.
