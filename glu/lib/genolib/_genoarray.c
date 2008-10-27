@@ -402,7 +402,7 @@ descr_init(GenotypeArrayDescriptorObject *self, PyObject *args, PyObject *kwds)
 	Py_ssize_t n,i;
 	unsigned int initial_offset = 0;
 	unsigned int *offset_data;
-	int dims;
+	npy_intp dims;
 	static char *kwlist[] = {"models", "initial_offset", NULL};
 
 	descr_clear(self);
@@ -422,7 +422,7 @@ descr_init(GenotypeArrayDescriptorObject *self, PyObject *args, PyObject *kwds)
 	if(n == -1) return -1;
 
 	dims = n+1;
-	offsets = (PyArrayObject *)PyArray_FromDims(1, &dims, PyArray_UINT);
+	offsets = (PyArrayObject *)PyArray_SimpleNew(1, &dims, NPY_UINT);
 	if(!offsets) return -1;
 
 	offset_data = (unsigned int *)PyArray_DATA(offsets);
@@ -1577,13 +1577,13 @@ static PyObject *
 genoarray_data_get(GenotypeArrayObject *self, void *closure)
 {
 	PyArrayObject *data;
-	int dims;
+	npy_intp dims;
 
 	if( genoarray_checkstate(self) == -1 )
 		return NULL;
 
 	dims = self->descriptor->byte_size;
-	data = (PyArrayObject *)PyArray_FromDimsAndData(1,&dims,PyArray_UBYTE,self->data);
+	data = (PyArrayObject *)PyArray_SimpleNewFromData(1,&dims,NPY_UBYTE,self->data);
 	if(!data) return NULL;
 
 	data->base = (PyObject *)self;
@@ -1682,7 +1682,7 @@ genotype_indices(PyObject *genos, UnphasedMarkerModelObject *model)
 {
 	genotype_indices_state state;
 	PyObject *index_array;
-	int len;
+	npy_intp len;
 
 	len = PyObject_Size(genos);
 	if(len==-1) return NULL;
@@ -1693,7 +1693,7 @@ genotype_indices(PyObject *genos, UnphasedMarkerModelObject *model)
 		return NULL;
 	}
 
-	index_array = PyArray_FromDims(1,&len,PyArray_UINT);
+	index_array = PyArray_SimpleNew(1,&len,NPY_UINT);
 	if(!index_array) return NULL;
 
 	state.model = model;
@@ -1753,7 +1753,7 @@ static PyObject *
 count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 {
 	genotype_counts_state state;
-	int model_len;
+	npy_intp model_len;
 	int len;
 
 	if(count_array==Py_None) count_array=NULL;
@@ -1808,7 +1808,7 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 	}
 	else
 	{
-		count_array = PyArray_FromDims(1,&model_len,PyArray_LONG);
+		count_array = PyArray_SimpleNew(1,&model_len,NPY_LONG);
 		if(!count_array) return NULL;
 		PyArray_FILLWBYTE(count_array, 0);
 	}
@@ -1892,7 +1892,7 @@ static int category_foreach(Py_ssize_t i, GenotypeObject *geno, void *state)
 static PyObject *
 genotype_categories(PyObject *genos, PyObject *count_array)
 {
-	int count_len=4;
+	npy_intp count_len=4;
 	int len;
 
 	if(count_array==Py_None) count_array=NULL;
@@ -1911,7 +1911,7 @@ genotype_categories(PyObject *genos, PyObject *count_array)
 	}
 	else
 	{
-		count_array = PyArray_FromDims(1,&count_len,PyArray_LONG);
+		count_array = PyArray_SimpleNew(1,&count_len,NPY_LONG);
 		if(!count_array) return NULL;
 		PyArray_FILLWBYTE(count_array, 0);
 	}
@@ -2249,9 +2249,9 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 {
 	locus_summary_state state;
 	PyObject *ret = NULL;
-	int model_len;
+	npy_intp model_len;
 	Py_ssize_t geno_len;
-	int category_len[2];
+	npy_intp category_len[2];
 	int len;
 
 	if(sample_counts==Py_None) sample_counts = NULL;
@@ -2314,7 +2314,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 	}
 	else
 	{
-		locus_counts = PyArray_FromDims(1,&model_len,PyArray_LONG);
+		locus_counts = PyArray_SimpleNew(1,&model_len,NPY_LONG);
 		if(!locus_counts) goto error;
 		PyArray_FILLWBYTE(locus_counts, 0);
 	}
@@ -2331,7 +2331,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 	{
 		category_len[0] = len;
 		category_len[1] = 4;
-		sample_counts = PyArray_FromDims(2,(int*)&category_len,PyArray_LONG);
+		sample_counts = PyArray_SimpleNew(2,category_len,NPY_LONG);
 		if(!sample_counts) goto error;
 		PyArray_FILLWBYTE(sample_counts, 0);
 	}
@@ -2390,8 +2390,8 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 {
 	sample_summary_state state;
 	PyObject *ret = NULL;
-	int category_len=4;
-	int locus_len[2];
+	npy_intp category_len=4;
+	npy_intp locus_len[2];
 	int len;
 
 	if(locus_counts==Py_None)  locus_counts  = NULL;
@@ -2413,7 +2413,7 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 	}
 	else
 	{
-		sample_counts = PyArray_FromDims(1,&category_len,PyArray_LONG);
+		sample_counts = PyArray_SimpleNew(1,&category_len,NPY_LONG);
 		if(!sample_counts) goto error;
 		PyArray_FILLWBYTE(sample_counts, 0);
 	}
@@ -2460,7 +2460,7 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 		}
 		locus_len[0] = len;
 		locus_len[1] = state.max_genos;
-		locus_counts = PyArray_FromDims(2,(int*)&locus_len,PyArray_LONG);
+		locus_counts = PyArray_SimpleNew(2,locus_len,NPY_LONG);
 		if(!locus_counts) goto error;
 		PyArray_FILLWBYTE(locus_counts, 0);
 	}
@@ -3506,9 +3506,9 @@ genomerger_get_stats(PyObject *sdict, PyObject *key)
 
 	if(!stats)
 	{
-		int dims = 5;
+		npy_intp dims = 5;
 
-		stats = PyArray_FromDims(1, &dims, PyArray_LONG);
+		stats = PyArray_SimpleNew(1, &dims, NPY_LONG);
 		if(!stats) return NULL;
 		PyArray_FILLWBYTE(stats, 0);
 
@@ -3881,18 +3881,15 @@ init_genoarray(void)
 
 	GenotypeLookupError = PyErr_NewException("_genoarray.GenotypeLookupError",
 		PyExc_KeyError, NULL);
-
 	if(GenotypeLookupError == NULL)
 		return;
 
 	GenotypeRepresentationError = PyErr_NewException("_genoarray.GenotypeRepresentationError",
 		PyExc_ValueError, NULL);
-
 	if(GenotypeRepresentationError == NULL)
 		return;
 
-	Py_INCREF(GenotypeLookupError);
-	Py_INCREF(GenotypeRepresentationError);
+	/* Increment reference counts on all static types to ensure they are not freed */
 	Py_INCREF(&GenotypeArrayDescriptorType);
 	Py_INCREF(&UnphasedMarkerModelType);
 	Py_INCREF(&GenotypeArrayType);
