@@ -235,11 +235,14 @@ trace for clues as to what may have gone wrong.  When in doubt, please send
 this message and a complete description of the analysis you are attempting
 to perform to the software developers.
 
+Command line:
+  %s
+
 Traceback:
   %s
 
 [%s] Execution aborted due to unhandled error
-''' % (traceback.format_exc().replace('\n','\n  '),time.asctime()))
+''' % (' '.join(sys.argv),traceback.format_exc().replace('\n','\n  '),time.asctime()))
 
   else:
     if glu_options.stats:
