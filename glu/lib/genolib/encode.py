@@ -538,6 +538,9 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   if genome is None:
     genome = Genome()
 
+  if not columns:
+    return columns,[],genome,[]
+
   models = []
 
   if format=='ldat':

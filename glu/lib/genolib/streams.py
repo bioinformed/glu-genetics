@@ -1499,12 +1499,20 @@ class GenomatrixStream(GenotypeStream):
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
     '''
     genos = self.materialize()
+    columns = genos.columns
+    models = genos.models
     rows,tgenos = transpose_generator(genos.columns, genos.use_stream())
 
+    if not rows or not columns:
+      rows = columns = ()
+      models = []
+
     if genos.format == 'ldat':
-      return genos.clone(tgenos, format='sdat', loci=tuple(rows),    packed=False, materialized=False)
+      return genos.clone(tgenos, format='sdat', loci=tuple(rows), samples=columns, models=models,
+                                                packed=False, materialized=False)
     else:
-      return genos.clone(tgenos, format='ldat', samples=tuple(rows), packed=False, materialized=False)
+      return genos.clone(tgenos, format='ldat', samples=tuple(rows), loci=columns, models=models,
+                                                packed=False, materialized=False)
 
 
   def as_genotriples(self):
@@ -2658,7 +2666,10 @@ def rename_genomatrixstream_alleles(genos, rename_alleles, warn=False):
         if locus in rename_alleles:
           r = rename_alleles[locus]
           # FIXME: Needs better error handling recovery
-          row = [ ((r[g[0]],r[g[1]]) if g else g.alleles()) for g in row ]
+          try:
+            row = [ ((r[g[0]],r[g[1]]) if g else g.alleles()) for g in row ]
+          except KeyError:
+            raise ValueError('Invalid remapping for locus %s genotype %s' % (locus,g))
 
         yield locus,row
 
@@ -2672,7 +2683,11 @@ def rename_genomatrixstream_alleles(genos, rename_alleles, warn=False):
       remaps = [ rename_alleles.get(h) for h in genos.loci ]
       for sample,row in genos:
         # FIXME: Needs better error handling recovery
-        row = [ ((r[g[0]],r[g[1]]) if g and r else g.alleles()) for g,r in izip_exact(row,remaps) ]
+        try:
+          row = [ ((r[g[0]],r[g[1]]) if g and r else g.alleles()) for locus,g,r in izip_exact(genos.loci,row,remaps) ]
+        except KeyError:
+          raise ValueError('Invalid remapping for locus %s genotype %s' % (locus,g))
+
         yield sample,row
 
     else:
@@ -3486,26 +3501,26 @@ def rename_genomatrixstream_row(genos,rowmap,warn=False):
   if genos.format=='ldat':
     genome = Genome()
 
-    def _rename():
+    def _rename_loci():
       for locus,row in genos:
         new_locus = rowmap.get(locus,locus)
         _genome_rename_loci(genos.genome, locus, genome, new_locus, warn)
         yield new_locus,row
 
-    new_genos = genos.clone(_rename(),loci=rows,genome=genome,materialized=False,unique=unique)
+    new_genos = genos.clone(_rename_loci(),loci=rows,genome=genome,materialized=False,unique=unique)
     new_genos = new_genos.transformed(recode_models=genome)
 
   else:
     phenome = Phenome()
 
-    def _rename():
+    def _rename_samples():
       for sample,row in genos:
         new_name = rowmap.get(sample,sample)
         _phenome_merge_individuals(genos.phenome, sample, phenome, new_name, warn)
 
         yield new_name,row
 
-    new_genos = genos.clone(_rename(),samples=rows,phenome=phenome,materialized=False,unique=unique)
+    new_genos = genos.clone(_rename_samples(),samples=rows,phenome=phenome,materialized=False,unique=unique)
 
   return new_genos
 
