@@ -128,7 +128,7 @@ HETEROZYGOSITY          ratio of heterozygote genotypes to total obeserved genot
 ======================= ===================================================================
 
 Example
--------
+=======
 
 Run::
 

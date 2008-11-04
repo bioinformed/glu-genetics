@@ -98,7 +98,7 @@ CONCORDANCE_RATE        genotype concordance rate between reference and comparis
 ======================= ===================================================================
 
 Example
--------
+=======
 
 Run::
 

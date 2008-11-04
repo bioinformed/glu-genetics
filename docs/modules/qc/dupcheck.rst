@@ -31,15 +31,14 @@ map to different subjects or do not appear in the mapping.
 The ``--checkexp`` option is an optimization that only checks expected
 duplicates indicated by the ``-e``/``--duplicates`` option.  It should only
 be used in specialized situations, since unexpected duplicates will not be
-detected and the presence of unexpected duplicates can be a sign of serious
-problem in data quality.
+detected and these can be a sign of serious data quality problem.
 
 The input can be any GLU input format, though sdat/sbat/PLINK ped formats
 are optimal.
 
 Usage::
 
-  glu qc.dupcheck [options] geontypes
+  glu qc.dupcheck [options] genotypes
 
 Options:
 
@@ -60,3 +59,55 @@ Options:
                         duplicates (default=0.8)
   -m N, --mingenos=N    Minimum number of concordant genotypes to be
                         considered informative (default=20)
+
+Methods
+=======
+
+This algorithm is relatively expensive in terms of both computer memory and
+computing time.  Unlike many other modules, all genotypes are materialized
+and must fit in the available RAM or virtual memory space.  GLU uses
+efficient representations, using as little as two bits per biallelic
+autosomal SNP, but for large data sets the amount of memory required can
+still be quite large.
+
+This algorithm compares all possible pairs of samples, which results in
+quadratic growth in processing time in the number of samples.  Increasing
+the number of loci increases the amount of memory requires and processing
+time linearly in the number of loci.
+
+Genotype comparisons are only considered between pairs of non-missing
+genotypes and concordance requires that both alleles match.  Thus genotype
+concordance rates are estimates of the probability of the pair sharing two
+alleles identical by state (IBS).
+
+Output
+======
+
+======================= ===================================================================
+Column                  Description
+======================= ===================================================================
+SAMPLE1                 name of the first sample
+SAMPLE2                 name of the second sample
+CONCORDANT_GENOTYPES    count of concordant genotypes
+COMPARISONS             count of informative genotype comparisons
+CONCORDANCE_RATE        genotype concordance rate
+EXPECTED_DUPLICATE      indicator if the pair is expected to be a duplicate
+OBSERVED_DUPLICATE      indicator if the pair is found to be a duplicate (based on the
+                        specified threshold)
+======================= ===================================================================
+
+
+Example
+=======
+
+Run::
+
+    glu qc.dupcheck mydat.sbat -o dupcheck.out
+
+.. seealso::
+
+  :mod:`qc.summary`
+    Genotype summary statistics
+
+  :mod:`qc.concordance`
+    Compute concordance between two sets of genotypes
