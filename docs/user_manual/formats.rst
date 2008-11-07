@@ -63,7 +63,7 @@ Columns:
 
   3. Genotype:
        Two character genotype with alleles ' ACGT'.  Genotypes containing one
-       blank are treated as hemizygous, while genotpes composed of an empty
+       blank are treated as hemizygous, while genotypes composed of an empty
        string or two blanks are treated as missing.
 
 Example::
@@ -111,13 +111,13 @@ contains a matrix of genotypes with a sample per row and a locus per
 column.
 
 Row 1: 'sdat' in the first column, each locus name in subsequent columns
-Row 2: sample name in the first column, genotypes for that sanple for each locus in the subsequent columns
+Row 2: sample name in the first column, genotypes for that sample for each locus in the subsequent columns
 
 Column 1: 'sdat' in the first row, each sample name in subsequent rows
 Column 2: locus name in the first row, genotypes for that locus for each sample in subsequent rows
 
 Genotypes are coded as a two character string with alleles ' ACGT'.
-Genotypes containing one blank are treated as hemizygous, while genotpes
+Genotypes containing one blank are treated as hemizygous, while genotypes
 composed of an empty string or two blanks are treated as missing.
 
 Example::

@@ -29,7 +29,7 @@ Glossary
 
   completion rate
     For a set of genotype data (either by SNP or for a single individual),
-    the percentage of genotypes completed successfuly compared to genotypes
+    the percentage of genotypes completed successfully compared to genotypes
     attempted.
 
   dbSNP identifier
@@ -65,10 +65,10 @@ Glossary
     this independence property, the probability of a phased genotypes is
     the product of the probabilities of each allele.  The frequency of
     genotypes at a locus that occur in Hardy Weinberg proportions can be
-    prediced given the frequency of each allele.  Loci may deviate from HWP
+    predicted given the frequency of each allele.  Loci may deviate from HWP
     for many reasons, including non-random mating (inbreeding, assortative
-    mating, finite population size), selection, mutation, and problemtic
-    genotye assays.
+    mating, finite population size), selection, mutation, and problematic
+    genotype assays.
 
   Hardy Weinberg equilibrium (HWE)
     A locus that maintains the same genotype frequencies at a locus in Hardy

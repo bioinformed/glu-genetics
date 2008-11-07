@@ -41,7 +41,7 @@ All-in-one binary installer for Windows XP and Vista (32 bit)
 
    * Right click on your ``My Computer`` icon on your desktop or in your ``Start Menu``.
 
-   * Select ``Properties`` | ``Advanced`` or ``System Settings`` | ``Enviroment Variables``
+   * Select ``Properties`` | ``Advanced`` or ``System Settings`` | ``Environment Variables``
 
    * Under ``System variables`` select ``Path`` and click ``Edit...``
 
@@ -61,7 +61,7 @@ All-in-one binary installer for Windows XP and Vista (32 bit)
 
    * Right click the new ``cmd.exe`` icon
 
-   * Select ``Properties`` and then on the Shorcut tab
+   * Select ``Properties`` and then on the Shortcut tab
 
    * Replace the contents of the ``Start in`` box with a default directory, if you have one
 

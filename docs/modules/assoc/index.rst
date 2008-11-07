@@ -4,7 +4,7 @@
 Association Tests
 *****************
 
-The modules described in this chapter provide tests of assocation between phenotypes and SNP markers.
+The modules described in this chapter provide tests of association between phenotypes and SNP markers.
 
 .. toctree::
 

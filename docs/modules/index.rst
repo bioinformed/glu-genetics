@@ -8,7 +8,7 @@
 :Date: |today|
 
 Genotype Library and Utilities (GLU) is a suite of tools for statistical
-geneticists, epidemiologists, statisticicians and analysis working with
+geneticists, epidemiologists, statisticians and analysis working with
 large sets of Single Nucleotide Polymorphism (SNP) in order to find
 associations between specific variants and specific phenotypes.
 

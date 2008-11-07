@@ -120,11 +120,11 @@ MISSING_COUNT           count of missing genotypes for all attempted loci
 HEMIZYGOTE_COUNT        count of hemizygote genotypes
 HOMOZYGOTE_COUNT        count of homozygote genotypes
 HETEROZYGOTE_COUNT      count of heterozygote genotypes
-INFORMATIVE_COUNT       counts of obeserved genotypes
+INFORMATIVE_COUNT       counts of observed genotypes
 ATTEMPTED_MISSING_RATE  missing rates calculated for attempted loci
 OBSERVED_MISSING_RATE   missing rates calculated for observed loci
 NONEMPTY_MISSING_RATE   missing rates calculated for non-empty loci
-HETEROZYGOSITY          ratio of heterozygote genotypes to total obeserved genotypes
+HETEROZYGOSITY          ratio of heterozygote genotypes to total observed genotypes
 ======================= ===================================================================
 
 Example

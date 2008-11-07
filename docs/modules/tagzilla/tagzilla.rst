@@ -79,7 +79,7 @@ Genotype and LD estimation options
     -m D, --maxdist=D   Maximum inter-marker distance in kb for LD comparison
                         (default=200)
     -P p, --hwp=p       Filter out loci that fail to meet a minimum
-                        signficance level (pvalue) for a test Hardy-Weignberg
+                        significance level (pvalue) for a test Hardy-Weinberg
                         proportion (no default)
 	
 Notes:
@@ -174,7 +174,7 @@ Notes:
   Both are used as cut-off criteria so that only locus pairs satisfying
   these thresholds are considered in the binning process.
 
--t/--targetbins and -T/--targetloic:
+-t/--targetbins and -T/--targetloci:
 
   Both options are used as stopping criteria. In either case, once the
   criteria are met, Tagzilla produces residual bins instead of maximal bins.
@@ -186,7 +186,7 @@ Notes:
   with genotypes from different populations and thus generate a set of tags
   applicable for all the populations.
 
--z/--loicpertag and -Z/--loglocipertag:
+-z/--locipertag and -Z/--loglocipertag:
 
   Both options control the ratio between the tags and loci.If the size of
   the bin is too large and thus the number of loci per tag is too big, the
@@ -230,7 +230,7 @@ Input options
                         will be analyzed (see -d/--maxdist)
     -R RANGE, --range=RANGE
                         Ranges of genomic locations to analyze, specified as a
-                        comma seperated list of start and end coordinates
+                        comma separated list of start and end coordinates
                         "S-E".  If either S or E is not specified, then the
                         ranges are assumed to be open.  The end coordinate is
                         exclusive and not included in the range.
@@ -688,7 +688,7 @@ first and then non tags::
 Bin summary statistics output file
 ----------------------------------
 
-There are four types of bins: obligate-include, maximal-bin, residualand obligate-exclude.
+There are four types of bins: obligate-include, maximal-bin, residual and obligate-exclude.
 
   * Obligate-include bin is a bin with an obligatorily included locus.
   * Obligate-exclude bin is a bin with an obligatorily excluded locus chosen as a tag for the bin.

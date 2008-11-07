@@ -31,7 +31,7 @@ the team at NCI and our CGEMS collaborators:
 * Peter Kraft
 * Chenwei Liu
 * Jun Lu
-* Dennis Meader
+* Dennis Maeder
 * Nick Orr
 * Bernice Packer
 * Peggy Tucker

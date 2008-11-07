@@ -62,7 +62,7 @@ Code lay-out
     abstractions.
 
     For really old code that you don't want to mess up, you may continue to
-    use the original intendation.  However, plan to normalize it before
+    use the original indentation.  However, plan to normalize it before
     undergoing any major surgery.
 
   Tabs or Spaces?
@@ -256,7 +256,7 @@ Whitespace in Expressions and Statements
       comparisons (==, <, >, !=, <>, <=, >=, in, not in, is, is not),
       Booleans (and, or, not).
 
-    - Break the previous rule when spaces help to clarify precidence and
+    - Break the previous rule when spaces help to clarify precedence and
       grouping
 
       Yes::
@@ -425,7 +425,7 @@ Version Bookkeeping
 Naming Conventions
 ------------------
 
-    The naming conventions used in GLU are not always quite consistant --
+    The naming conventions used in GLU are not always quite consistent --
     nevertheless, here are the currently recommended naming standards.  New
     modules and packages (including third party modules) should be
     written to these standards, but where an existing library has a
@@ -552,7 +552,7 @@ Naming Conventions
       as necessary to improve readability.
 
       mixedCase is allowed only in contexts where that's already the
-      prevailing style (e.g. threading.py), to retain backwards compatibility.
+      prevailing style (e.g. threading.py), to retain backward compatibility.
 
     Function and method arguments
 
@@ -727,7 +727,7 @@ Programming Recommendations
             error has occurred.
 
          2) If the code needs to do some cleanup work, but then lets
-            the exception propagate upwards with 'raise'.
+            the exception propagate upward with 'raise'.
             'try...finally' is a better way to handle this case.
 
     - Additionally, for all try/except clauses, limit the 'try' clause

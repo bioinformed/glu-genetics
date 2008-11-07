@@ -15,7 +15,7 @@ Typical applications include:
 
   1. splitting loci by chromosome or region of interest
 
-  2. splitting large datasets (whole genome or large choromsomes) into more
+  2. splitting large datasets (whole genome or large chromosomes) into more
      manageable chunks (e.g., no more than 500 loci per file)
 
   3. splitting samples by population or phenotype

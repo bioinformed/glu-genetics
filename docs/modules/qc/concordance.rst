@@ -65,7 +65,7 @@ REFKEY		        locus name of reference genotype
 COMPKEY                 locus name of comparison genotype
 CONCORD                 count of concordant genotypes
 DISCORD_HET_HET         count of discordant genotypes where both reference and comparison are heterozygous
-DISCORD_HET_HOM         count of discordant genotypes where the reference is heterzygous and comparison is homozygous
+DISCORD_HET_HOM         count of discordant genotypes where the reference is heterozygous and comparison is homozygous
 DISCORD_HOM_HET         count of discordant genotypes where the reference is homozygous and comparison is heterozygous
 DISCORD_HOM_HOM         count of discordant genotypes where both reference and comparison are homozygous
 CONCORDANCE_RATE        genotype concordance rate between reference and comparison for samples
@@ -91,7 +91,7 @@ REFKEY                  sample name of reference genotype
 COMPKEY                 sample name of comparison genotype
 CONCORD                 count of concordant genotypes
 DISCORD_HET_HET         count of discordant genotypes where both reference and comparison are heterozygous
-DISCORD_HET_HOM         count of discordant genotypes where the reference is heterzygous and comparison is homozygous
+DISCORD_HET_HOM         count of discordant genotypes where the reference is heterozygous and comparison is homozygous
 DISCORD_HOM_HET         count of discordant genotypes where the reference is homozygous and comparison is heterozygous
 DISCORD_HOM_HOM         count of discordant genotypes where both reference and comparison are homozygous
 CONCORDANCE_RATE        genotype concordance rate between reference and comparison for loci

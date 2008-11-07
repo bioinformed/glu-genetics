@@ -10,7 +10,7 @@ by locus.  For example, :mod:`qc.dupcheck` performs operations over samples,
 while :mod:`assoc.logit1` iterates over loci.  Both modules will transform
 the data provided into the appropriate format, but such transformations can
 be extremely memory- and time-intensive.  It may be better to use the
-:mod:`transform` module to generate data in the prefered formats of the
+:mod:`transform` module to generate data in the preferred formats of the
 modules you wish to use to avoid unnecessary overhead.
 
 +----------------------------+------------------------------------------------------+

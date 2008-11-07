@@ -140,7 +140,7 @@ Version 0.96 (2008-06-09)
   THIS INTERFACE IS STILL UNDER REVIEW AND THE FORMULA SYNTAX MAY CHANGE.
 
 * NEW FEATURE: New module :mod:`qc.summary` that streamlines and will
-  eventually superceed :mod:`qc.completion`, :mod:`qc.completion2`,
+  eventually supersede :mod:`qc.completion`, :mod:`qc.completion2`,
   :mod:`qc.hets`, :mod:`qc.maf`, :mod:`qc.hwp`. (r639)
 
 * NEW DEV FEATURE: Fast binary iterators in C (r639)
@@ -231,7 +231,7 @@ Version 0.94 (2008-04-28)
   columns. The previous syntax (i/index and k/key,v/value) is retained for
   backward-compatibility.
 
-* Improved support for augmented paramters to stdin/stdout, file extension
+* Improved support for augmented parameters to stdin/stdout, file extension
   detection, and other corner-cases.
 
 * Add a new module util.table to expose the flexibility of GLU's
@@ -243,7 +243,7 @@ Version 0.94 (2008-04-28)
   is now considered near-production grade pending only feedback from usage
   in the wild.
 
-* Major optimizations when merging genotype matricies with identical
+* Major optimizations when merging genotype matrices with identical
   columns and disjoint rows.
 
 * Association output from :mod:`assoc.logit1` and :mod:`assoc.linear1` now includes
@@ -387,9 +387,9 @@ Version 0.68 (2007-11-19)
 
 * Several modules.assoc bug fixes and output improvements
 
-* Improved modules.genedb handling of alises and official gene symbols.
+* Improved modules.genedb handling of aliases and official gene symbols.
 
-* Rework of locus model and medata management:
+* Rework of locus model and metadata management:
 
   * Track chromosome, location, and strand per locus
   * Streams derived from HapMap files will now include locus metadata
@@ -399,7 +399,7 @@ Version 0.68 (2007-11-19)
 * Update of modules.qc.completion as a precursor to the eventual
   (soon!) merge with completion2.
 
-* Updates to modules.qc.{maf,hwp,hets}, including parameter renamings
+* Updates to modules.qc.{maf,hwp,hets}, including parameter renaming
 
 * lib.fileutils.load_table now pads data rows to match the length of file
   headers
@@ -459,7 +459,7 @@ Version 0.63 (2007-10-05)
 
 * Preliminary support for reading LINKAGE format genotypes
 
-* Added a preminary GLU coding style guide to the doc tree
+* Added a preliminary GLU coding style guide to the doc tree
 
 * Read and write genotriples in prettybase (SeattleSNP) format
 
@@ -474,7 +474,7 @@ Version 0.62 (2007-09-18)
   are now using to generate their documentation.  It uses reST
   (restructured text) format.
 
-* Initial version of ginfo script to extract metadata from gentoype files
+* Initial version of ginfo script to extract metadata from genotype files
 
 Version 0.61 (2007-09-04)
 =========================
@@ -502,7 +502,7 @@ Version 0.60 (2007-09-03)
   now.
 
 * Improved genotype stream checking and debugging mode added.  Many bugs
-  were detectected and fixed.
+  were detected and fixed.
 
 * Allow parsing of slightly mangled Illumina manifests, like those run
   through Excel, which adds extra comma delimiters in the header.
@@ -512,7 +512,7 @@ Version 0.60 (2007-09-03)
 * Taught :mod:`from_lbd` how to create locus models and other minor updates
   to support the new stream APIs.
 
-* dupcheck and dupcheck2 were updated to worki efficiently with the new
+* dupcheck and dupcheck2 were updated to work efficiently with the new
   bit-packed genotype representations, including optimized genoarray
   comparison functions for 2-bit and 4-bit homogeneous binary arrays for
   speedups of 100-1000x.
@@ -532,7 +532,7 @@ Version 0.60 (2007-09-03)
 Version 0.54 (2007-08-07)
 =========================
 
-* This is the first bold step towards four major refactorings needed to
+* This is the first bold step toward four major refactorings needed to
   bring in-memory and on-disk heterogeneous binary representations to GLU.
 
 To recap, the advantages:
