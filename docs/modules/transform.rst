@@ -87,7 +87,7 @@ Examples
 Convert an LDAT file to an SDAT file, including only those samples listed in
 the "controls" file::
 
-  > glu transform samples.ldat --includesamples=controls -o controls.ldat
+  > glu transform samples.ldat --includesamples=controls -o controls.sdat
 
 Convert samples.ldat file to subjects.ldat, renaming samples according
 to the mapping in the sampleid2subjectid file, sending sample concordance
