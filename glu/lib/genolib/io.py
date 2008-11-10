@@ -23,6 +23,7 @@ from   glu.lib.genolib.formats   import *
 
 
 INPUT_FORMATS  = ['ldat','sdat','tdat','trip','genotriple',
+                  'imat',
                   'prettybase','pb',
                   'lbat','sbat','tbat',
                   'ped','tped','bed',
@@ -30,6 +31,7 @@ INPUT_FORMATS  = ['ldat','sdat','tdat','trip','genotriple',
                   'eigensoft','smartpca']
 
 OUTPUT_FORMATS = ['ldat','sdat','tdat','trip','genotriple',
+                  'imat',
                   'prettybase','pb',
                   'lbat','sbat','tbat',
                   'ped','tped','bed',
@@ -203,14 +205,10 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
 
   if format == 'hapmap':
     genos = load_hapmap(filename,extra_args=args,**kwargs)
-  elif format == 'ldat':
-    genos = load_genomatrix_text(filename,format,extra_args=args,**kwargs)
-  elif format == 'sdat':
-    genos = load_genomatrix_text(filename,format,extra_args=args,**kwargs)
-  elif format == 'lbat':
-    genos = load_genomatrix_binary(filename,'ldat',extra_args=args,**kwargs)
-  elif format == 'sbat':
-    genos = load_genomatrix_binary(filename,'sdat',extra_args=args,**kwargs)
+  elif format in ('ldat','imat','sdat'):
+    genos = load_genomatrix_text(filename,format=format,extra_args=args,**kwargs)
+  elif format in ('ldat','lbat'):
+    genos = load_genomatrix_binary(filename,format=format,extra_args=args,**kwargs)
   elif format in ('tdat','trip','genotriple'):
     genos = load_genotriples_text(filename,extra_args=args,**kwargs)
   elif format in ('pb','prettybase'):
@@ -302,18 +300,14 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   if format is None:
     format = guess_outformat(filename)
 
-  if format == 'ldat':
-    save_genomatrix_text(filename, genos, format='ldat', extra_args=args)
-  elif format == 'sdat':
-    save_genomatrix_text(filename, genos, format='sdat', extra_args=args)
+  if format in ('ldat','imat','sdat'):
+    save_genomatrix_text(filename, genos, format=format, extra_args=args)
   elif format in ('tdat','trip','genotriple'):
     save_genotriples_text(filename, genos, extra_args=args)
   elif format in ('pb','prettybase'):
-    genos = save_prettybase(filename, genos, extra_args=args)
-  elif format == 'lbat':
-    save_genomatrix_binary(filename, genos, format='ldat', extra_args=args)
-  elif format == 'sbat':
-    save_genomatrix_binary(filename, genos, format='sdat', extra_args=args)
+    save_prettybase(filename, genos, extra_args=args)
+  elif format in ('lbat','sbat'):
+    save_genomatrix_binary(filename, genos, format=format, extra_args=args)
   elif format == 'tbat':
     save_genotriples_binary(filename, genos, extra_args=args)
   elif format in ('plink_ped','ped'):
@@ -331,7 +325,7 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   elif format == 'wtccc':
     save_wtccc(filename, genos, extra_args=args)
   elif format in ('eigensoft','smartpca'):
-    genos = save_eigensoft_smartpca(filename, genos, extra_args=args)
+    save_eigensoft_smartpca(filename, genos, extra_args=args)
   elif not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
   else:
@@ -423,7 +417,7 @@ def transform_files(infiles,informat,ingenorepr,
     outformat = informat
 
   # FIXME: Refactor preferred output classes
-  if outformat in ('ldat','lbat','plink_tped','tped','plink_bed','bed','wtccc','eigensoft','smartpca'):
+  if outformat in ('ldat','lbat','imat','plink_tped','tped','plink_bed','bed','wtccc','eigensoft','smartpca'):
     genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
   elif outformat in ('sdat','sbat','plink_ped','ped','plink_bed_ind','merlin','mach','structure','phase'):
     genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)

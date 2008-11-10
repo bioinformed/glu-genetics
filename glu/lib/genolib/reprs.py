@@ -304,12 +304,21 @@ class UnphasedMarkerRepresentation(object):
       return map(self.from_string, genos)
 
 
+# GLU native SNP format
 snp    = UnphasedMarkerRepresentation(delimiter='', missing_geno_str='  ',missing_geno_strs=['','  '],
                                       missing_allele_str=' ',missing_allele_strs=['',' '])
+# Illumina SNP data from BeadStudio
+isnp   = UnphasedMarkerRepresentation(delimiter='', missing_geno_str='--',missing_geno_strs=['','--'],
+                                      missing_allele_str='-',missing_allele_strs=['-'])
+
+# HapMap SNP format
 hapmap = UnphasedMarkerRepresentation(delimiter='',missing_geno_str='NN',missing_geno_strs=['','NN'],
                                       missing_allele_str='N',missing_allele_strs=['N'],)
+
+# Delimited marker format using a slash
 marker = UnphasedMarkerRepresentation(delimiter='/',missing_geno_str='',missing_geno_strs=['','/'],
                                       missing_allele_str='',missing_allele_strs=['',' '])
+
 
 def get_genorepr(reprname):
   '''
@@ -322,6 +331,7 @@ def get_genorepr(reprname):
   '''
 
   reprs = { 'snp'    : snp,
+            'isnp'   : isnp,
             'hapmap' : hapmap,
             'marker' : marker }
 

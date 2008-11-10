@@ -1156,9 +1156,9 @@ def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  if format == 'ldat':
+  if format in ('ldat','lbat'):
     genos = genos.as_ldat(mergefunc)
-  elif format == 'sdat':
+  elif format in ('sdat','sbat'):
     genos = genos.as_sdat(mergefunc)
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
@@ -1249,11 +1249,11 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   version        = _get_v_attr(gfile,['GLU_VERSION','version'],1)
   compat_version = _get_v_attr(gfile,['GLU_COMPAT_VERSION'],version)
 
-  if format not in ('ldat','sdat'):
+  if format not in ('ldat','sdat','lbat','sbat'):
     raise ValueError('Unknown format: %s' % format)
 
   if compat_version > GENOMATRIX_VERSION:
-    raise ValueError('Unknown Genomatrix file version: %s' % version)
+    raise ValueError('Unknown genomatrix file version: %s' % version)
 
   if version > GENOMATRIX_VERSION:
     version = compat_version
@@ -1261,12 +1261,16 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   columns = tuple(gfile.root.cols[:].tolist())
   rows    = tuple(gfile.root.rows[:].tolist())
 
-  if format_found == 'sdat':
-    samples  = rows
-    loci     = columns
+  if format_found in ('sdat','sbat'):
+    format_found = 'sdat'
+    samples      = rows
+    loci         = columns
+  elif format_found in ('ldat','lbat'):
+    format_found = 'ldat'
+    samples      = columns
+    loci         = rows
   else:
-    samples  = columns
-    loci     = rows
+    raise ValueError('Unknown genomatrix format: %s' % format_found)
 
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 

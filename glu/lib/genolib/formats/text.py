@@ -65,14 +65,8 @@ def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=Non
 
   filename = parse_augmented_filename(filename,args)
 
-  genorepr = get_arg(args, ['genorepr']) or 'snp'
+  genorepr = get_arg(args, ['genorepr'])
   unique   = trybool(get_arg(args, ['unique'], True))
-
-  if isinstance(genorepr,basestring):
-    genorepr = get_genorepr(genorepr)
-
-  if genorepr is None:
-    raise ValueError('genotype representation must be specified when reading a text format')
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -95,6 +89,18 @@ def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=Non
     raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
                         % (namefile(filename),format,format_found))
 
+  if not genorepr:
+    if format == 'imat':
+      genorepr = 'isnp'
+    else:
+      genorepr = 'snp'
+
+  if isinstance(genorepr,basestring):
+    genorepr = get_genorepr(genorepr)
+
+  if genorepr is None:
+    raise ValueError('genotype representation must be specified when reading a text format')
+
   columns = tuple(intern(h.strip()) for h in columns)
   format = format_found or format
 
@@ -114,12 +120,14 @@ def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=Non
 
       yield label,genos
 
-  if format=='ldat':
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,samples=columns,
+  if format in ('ldat','imat'):
+    genos = GenomatrixStream.from_strings(_load(rows),'ldat',genorepr,samples=columns,
+                                                      genome=genome,phenome=phenome,unique=unique)
+  elif format=='sdat':
+    genos = GenomatrixStream.from_strings(_load(rows),'sdat',genorepr,loci=columns,
                                                       genome=genome,phenome=phenome,unique=unique)
   else:
-    genos = GenomatrixStream.from_strings(_load(rows),format,genorepr,loci=columns,
-                                                      genome=genome,phenome=phenome,unique=unique)
+    raise ValueError('Invalid genotype matrix format')
 
   if unique:
     genos = genos.unique_checked()
@@ -188,11 +196,17 @@ class TextGenomatrixWriter(object):
 
     filename = parse_augmented_filename(filename,args)
 
-    genorepr = get_arg(args, ['genorepr']) or 'snp'
+    genorepr = get_arg(args, ['genorepr'])
     dialect  = get_csv_dialect(args,'tsv')
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+    if not genorepr:
+      if format == 'imat':
+        genorepr = 'isnp'
+      else:
+        genorepr = 'snp'
 
     if isinstance(genorepr,basestring):
       genorepr = get_genorepr(genorepr)
@@ -311,14 +325,14 @@ def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
   format    = get_arg(args, ['format']) or genos.format
   mergefunc = get_arg(args, ['mergefunc'])
 
-  if format == 'ldat':
+  if format in ('ldat','imat'):
     genos = genos.as_ldat(mergefunc)
   elif format == 'sdat':
     genos = genos.as_sdat(mergefunc)
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
 
-  with TextGenomatrixWriter(filename,genos.format,genos.columns,
+  with TextGenomatrixWriter(filename,format,genos.columns,
                                      extra_args=args) as writer:
 
     if extra_args is None and args:
