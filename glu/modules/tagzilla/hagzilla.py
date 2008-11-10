@@ -186,7 +186,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
     command  = ' '.join(command)
     #print command
 
-    return subprocess.Popen(command, cwd=os.getcwd(), shell=True, stdout=subprocess.PIPE)
+    return subprocess.Popen(command, cwd=os.getcwd(), shell=True, stdout=subprocess.PIPE, bufsize=1)
   finally:
     os.chdir(cwd)
 
@@ -445,7 +445,7 @@ def main():
 
     pdir = project_path(outdir,project)
     command = 'glu tagzilla.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
-    print >> sys.stderr, subprocess.Popen(command, shell=True, stdout=subprocess.PIPE).stdout.read()
+    print >> sys.stderr, subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, bufsize=1).stdout.read()
 
     sumfile = file(project_file(outdir,project,'genesum.out'),'w')
     for gene,n in sorted(genecounts.iteritems()):
