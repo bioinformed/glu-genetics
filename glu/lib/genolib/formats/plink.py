@@ -93,7 +93,7 @@ def load_plink_map(filename,genome):
     yield lname
 
 
-def load_plink_ped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_plink_ped(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK PED format genotype data file.
 
@@ -212,7 +212,7 @@ class PlinkPedWriter(object):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> m = StringIO()
-  >>> with PlinkPedWriter(o,genos.loci,genos.genome,genos.phenome,mapfile=m) as w:
+  >>> with PlinkPedWriter(o,'ped',genos.loci,genos.genome,genos.phenome,mapfile=m) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -226,7 +226,7 @@ class PlinkPedWriter(object):
   0 l2 0 0
   0 l3 0 0
   '''
-  def __init__(self,filename,loci,genome,phenome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,loci,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -390,7 +390,7 @@ class PlinkPedWriter(object):
     self.close()
 
 
-def save_plink_ped(filename,genos,extra_args=None,**kwargs):
+def save_plink_ped(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -406,7 +406,7 @@ def save_plink_ped(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_plink_ped(o,genos)
+  >>> save_plink_ped(o,genos,'ped')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1 s1 0 0 0 0 A A 0 0 C T
   s2 s2 0 0 0 0 A G C G C C
@@ -424,7 +424,7 @@ def save_plink_ped(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_sdat(mergefunc)
 
-  with PlinkPedWriter(filename, genos.loci, genos.genome, genos.phenome,
+  with PlinkPedWriter(filename, format, genos.loci, genos.genome, genos.phenome,
                                 extra_args=args) as writer:
 
     if extra_args is None and args:
@@ -474,7 +474,7 @@ def load_plink_tfam(filename,phenome):
     yield ename
 
 
-def load_plink_tped(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_plink_tped(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK TPED format genotype data file.
 
@@ -579,7 +579,7 @@ class PlinkTPedWriter(object):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> m = StringIO()
-  >>> with PlinkTPedWriter(o,genos.samples,genos.genome,genos.phenome,tfamfile=m) as w:
+  >>> with PlinkTPedWriter(o,'tped',genos.samples,genos.genome,genos.phenome,tfamfile=m) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -593,7 +593,7 @@ class PlinkTPedWriter(object):
   s2 s2 0 0 0 0
   s3 s3 0 0 0 0
   '''
-  def __init__(self,filename,samples,genome,phenome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,samples,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -738,7 +738,7 @@ class PlinkTPedWriter(object):
     self.close()
 
 
-def save_plink_tped(filename,genos,extra_args=None,**kwargs):
+def save_plink_tped(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -754,7 +754,7 @@ def save_plink_tped(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_plink_tped(o,genos)
+  >>> save_plink_tped(o,genos,'tped')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   0 l1 0 0 A A A G G G
   0 l2 0 0 0 0 C G 0 0
@@ -772,7 +772,7 @@ def save_plink_tped(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_ldat(mergefunc)
 
-  with PlinkTPedWriter(filename, genos.samples, genos.genome, genos.phenome,
+  with PlinkTPedWriter(filename, format, genos.samples, genos.genome, genos.phenome,
                                  extra_args=args) as writer:
 
     if extra_args is None and args:
@@ -884,7 +884,7 @@ def _plink_update_encoding(model, genos, shift):
     genos[ model.add_genotype( (a1,a2) ).index ] = 2<<shift
 
 
-def load_plink_bed(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_plink_bed(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a PLINK BED format genotype data file.
 
@@ -1030,13 +1030,13 @@ class PlinkBedWriter(object):
   >>> bed = tempfile.NamedTemporaryFile()
   >>> bim = tempfile.NamedTemporaryFile()
   >>> fam = tempfile.NamedTemporaryFile()
-  >>> with PlinkBedWriter(bed.name,genos.format,genos.columns,genos.genome,genos.phenome,
+  >>> with PlinkBedWriter(bed.name,'sbed',genos.columns,genos.genome,genos.phenome,
   ...                     bim=bim.name,fam=fam.name) as writer:
   ...   genos=iter(genos)
   ...   writer.writerow(*genos.next())
   ...   writer.writerow(*genos.next())
   ...   writer.writerows(genos)
-  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> genos = load_plink_bed(bed.name,'bed',bim=bim.name,fam=fam.name)
   >>> genos.format
   'sdat'
   >>> genos.loci
@@ -1054,13 +1054,13 @@ class PlinkBedWriter(object):
   ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
   ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
   >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
-  >>> with PlinkBedWriter(bed.name,genos.format,genos.columns,genos.genome,genos.phenome,
+  >>> with PlinkBedWriter(bed.name,'lbed',genos.columns,genos.genome,genos.phenome,
   ...                     bim=bim.name,fam=fam.name) as writer:
   ...   genos=iter(genos)
   ...   writer.writerow(*genos.next())
   ...   writer.writerow(*genos.next())
   ...   writer.writerows(genos)
-  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> genos = load_plink_bed(bed.name,'bed',bim=bim.name,fam=fam.name)
   >>> genos.format
   'ldat'
   >>> genos.samples
@@ -1084,7 +1084,7 @@ class PlinkBedWriter(object):
     @param      phenome: phenome descriptor
     @type       phenome: Phenome instance
     '''
-    if format not in ('ldat','sdat'):
+    if format not in ('sbed','lbed'):
       raise IOError('format must be either ldat or sdat')
 
     if extra_args is None:
@@ -1123,7 +1123,7 @@ class PlinkBedWriter(object):
     self.out.write( ''.join( map(chr,[0x6c,0x1b]) ) )
 
     # Write magic number and mode=1
-    if format=='ldat':
+    if format=='lbed':
       # Write BED mode
       self.out.write( chr(1) )
     else:
@@ -1172,7 +1172,7 @@ class PlinkBedWriter(object):
     rowbytes = (n*2+7)//8
     row      = [0]*rowbytes
 
-    if self.format == 'ldat':
+    if self.format == 'lbed':
       # Build encodings for each of the 4 shift values for each model
       model  = self.genome.get_model(rowkey)
       values = [ _plink_encode(model,shift) for shift in [0,2,4,6] ]
@@ -1209,7 +1209,7 @@ class PlinkBedWriter(object):
     n = len(self.columns)
     rowbytes = (n*2+7)//8
 
-    if self.format=='sdat':
+    if self.format=='sbed':
       values = self.genovalues
 
     for rowkey,genos in rows:
@@ -1218,7 +1218,7 @@ class PlinkBedWriter(object):
 
       row = [0]*rowbytes
 
-      if self.format=='ldat':
+      if self.format=='lbed':
         # Build encodings for each of the 4 shift values for each model
         model  = self.genome.get_model(rowkey)
         values = [ _plink_encode(model,shift) for shift in [0,2,4,6] ]
@@ -1253,7 +1253,7 @@ class PlinkBedWriter(object):
     self.out.close()
     self.out = None
 
-    if self.format=='ldat':
+    if self.format=='lbed':
       loci,samples = self.rowkeys,self.columns
     else:
       loci,samples = self.columns,self.rowkeys
@@ -1312,7 +1312,7 @@ class PlinkBedWriter(object):
     self.close()
 
 
-def save_plink_bed(filename,genos,extra_args=None,**kwargs):
+def save_plink_bed(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -1332,8 +1332,8 @@ def save_plink_bed(filename,genos,extra_args=None,**kwargs):
   >>> bed = tempfile.NamedTemporaryFile()
   >>> bim = tempfile.NamedTemporaryFile()
   >>> fam = tempfile.NamedTemporaryFile()
-  >>> save_plink_bed(bed.name,genos,bim=bim.name,fam=fam.name)
-  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> save_plink_bed(bed.name,genos,'bed',bim=bim.name,fam=fam.name)
+  >>> genos = load_plink_bed(bed.name,'bed',bim=bim.name,fam=fam.name)
   >>> genos.format
   'sdat'
   >>> genos.loci
@@ -1351,8 +1351,8 @@ def save_plink_bed(filename,genos,extra_args=None,**kwargs):
   ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
   ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
   >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
-  >>> save_plink_bed(bed.name,genos,bim=bim.name,fam=fam.name)
-  >>> genos = load_plink_bed(bed.name,bim=bim.name,fam=fam.name)
+  >>> save_plink_bed(bed.name,genos,'bed',bim=bim.name,fam=fam.name)
+  >>> genos = load_plink_bed(bed.name,'bed',bim=bim.name,fam=fam.name)
   >>> genos.format
   'ldat'
   >>> genos.samples
@@ -1373,12 +1373,28 @@ def save_plink_bed(filename,genos,extra_args=None,**kwargs):
 
   mergefunc = get_arg(args, ['mergefunc'])
 
-  if genos.format not in ('sdat','ldat'):
-    genos = genos.as_ldat(mergefunc)
-  elif mergefunc is not None:
-    genos = genos.merged(mergefunc)
+  if format=='bed':
+    if genos.format=='genotriple':
+      genos = genos.as_ldat(mergefunc)
+      format = 'lbed'
+    elif genos.format=='sdat':
+      format = 'sbed'
+    elif genos.format=='ldat':
+      format = 'lbed'
+    else:
+      raise ValueError('Invalid genotype format')
 
-  with PlinkBedWriter(filename, genos.format, genos.columns, genos.genome, genos.phenome,
+    if mergefunc is not None:
+      genos = genos.merged(mergefunc)
+
+  elif format=='lbed':
+    genos = genos.as_ldat(mergefunc)
+  elif format=='sbed':
+    genos = genos.as_sdat(mergefunc)
+  else:
+    raise ValueError('Invalid genotype format')
+
+  with PlinkBedWriter(filename, format, genos.columns, genos.genome, genos.phenome,
                                 extra_args=args) as writer:
 
     if extra_args is None and args:

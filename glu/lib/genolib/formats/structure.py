@@ -263,7 +263,7 @@ class StructureWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with StructureWriter(o,genos.loci,genos.genome) as w:
+  >>> with StructureWriter(o,'structure',genos.loci,genos.genome,genos.phenome) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -277,7 +277,7 @@ class StructureWriter(object):
   s3 2 -9 1
   s3 2 -9 2
   '''
-  def __init__(self,filename,loci,genome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,loci,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -469,7 +469,7 @@ class StructureWriter(object):
     self.close()
 
 
-def save_structure(filename,genos,extra_args=None,**kwargs):
+def save_structure(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -485,7 +485,7 @@ def save_structure(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_structure(o,genos)
+  >>> save_structure(o,genos,'structure')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   l1 l2 l3
   s1 1 -9 1
@@ -507,7 +507,7 @@ def save_structure(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_sdat(mergefunc)
 
-  with StructureWriter(filename, genos.loci, genos.genome, extra_args=args) as writer:
+  with StructureWriter(filename, format, genos.loci, genos.genome, genos.phenome, extra_args=args) as writer:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))

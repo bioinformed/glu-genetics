@@ -23,7 +23,7 @@ HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID 
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
 
-def load_hapmap(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_hapmap(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a HapMap genotype data file.
 

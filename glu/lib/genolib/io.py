@@ -124,6 +124,119 @@ def geno_options(group,input=False,output=False,merge=False,filter=False,transfo
                       help='Order loci based on the order of names in FILE')
 
 
+def get_genostream_loader(format):
+  if format == 'hapmap':
+    loader = load_hapmap
+  elif format in ('ldat','imat','sdat'):
+    loader = load_genomatrix_text
+  elif format in ('lbat','sbat'):
+    loader = load_genomatrix_binary
+  elif format in ('tdat','trip','genotriple'):
+    loader = load_genotriples_text
+  elif format in ('pb','prettybase'):
+    loader = load_prettybase
+  elif format=='tbat':
+    loader = load_genotriples_binary
+  elif format in ('plink_ped','ped'):
+    loader = load_plink_ped
+  elif format in ('plink_tped','tped'):
+    loader = load_plink_tped
+  elif format in ('plink_bed','bed','lbed','sbed'):
+    loader = load_plink_bed
+  elif format in ('merlin','mach'):
+    loader = load_merlin
+  elif format in ('eigensoft','smartpca'):
+    loader = load_eigensoft_smartpca
+  elif format == 'wtccc-raw':
+    loader = load_wtccc_raw
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  return loader
+
+
+def get_genostream_saver(format):
+  if format in ('ldat','imat','sdat'):
+    saver = save_genomatrix_text
+  elif format in ('tdat','trip','genotriple'):
+    saver = save_genotriples_text
+  elif format in ('pb','prettybase'):
+    saver = save_prettybase
+  elif format in ('lbat','sbat'):
+    saver = save_genomatrix_binary
+  elif format == 'tbat':
+    saver = save_genotriples_binary
+  elif format in ('plink_ped','ped'):
+    saver = save_plink_ped
+  elif format in ('plink_tped','tped'):
+    saver = save_plink_tped
+  elif format in ('plink_bed','bed','lbed','sbed'):
+    saver = save_plink_bed
+  elif format in ('merlin','mach'):
+    saver = save_merlin
+  elif format == 'structure':
+    saver = save_structure
+  elif format == 'phase':
+    saver = save_phase
+  elif format == 'wtccc':
+    saver = save_wtccc
+  elif format in ('eigensoft','smartpca'):
+    saver = save_eigensoft_smartpca
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  return saver
+
+
+def get_genostream_writer(format):
+  if format in ('ldat','imat','sdat'):
+    writer = TextGenomatrixWriter
+  elif format in ('tdat','trip','genotriple'):
+    writer = TextGenotripleWriter
+  elif format in ('pb','prettybase'):
+    writer = PrettybaseWriter
+  elif format in ('lbat','sbat'):
+    writer = BinaryGenomatrixWriter
+  elif format == 'tbat':
+    writer = BinaryGenotripleWriter
+  elif format in ('plink_ped','ped'):
+    writer = PlinkPedWriter
+  elif format in ('plink_tped','tped'):
+    writer = PlinkTPedWriter
+  elif format in ('plink_bed','bed','lbed','sbed'):
+    writer = PlinkBedWriter
+  elif format in ('merlin','mach'):
+    writer = MerlinWriter
+  elif format == 'structure':
+    writer = StructureWriter
+  elif format == 'phase':
+    writer = PhaseWriter
+  elif format == 'wtccc':
+    writer = WTCCCWriter
+  elif format in ('eigensoft','smartpca'):
+    writer = EigensoftSmartPCAWriter
+  elif not format:
+    raise ValueError("Output file format for must be specified")
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  return writer
+
+
+def genostream_preferred_format(genos,format,mergefunc):
+  if format in ('ldat','lbat','imat','plink_tped','tped','plink_bed','bed','lbed','wtccc','eigensoft','smartpca'):
+    genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
+  elif format in ('sdat','sbat','plink_ped','ped','plink_bed_ind','sbed','merlin','mach','structure','phase'):
+    genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
+  elif format in ('tdat','trip','genotriple','pb','prettybase','tbat'):
+    genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
+  else:
+    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  return genos
+
+########################################################################################################
+
 def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   '''
   Load genomatrix file depending on matrix format and return a GenotripleMatrix object
@@ -190,6 +303,9 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   if format is None:
     format = guess_informat(filename)
 
+  if not format:
+    raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
+
   # FIXME: Check genome is None behavior
   if genome is None:
     genome = Genome()
@@ -203,34 +319,8 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
 
   kwargs = dict(genome=genome,phenome=phenome)
 
-  if format == 'hapmap':
-    genos = load_hapmap(filename,extra_args=args,**kwargs)
-  elif format in ('ldat','imat','sdat'):
-    genos = load_genomatrix_text(filename,format=format,extra_args=args,**kwargs)
-  elif format in ('ldat','lbat'):
-    genos = load_genomatrix_binary(filename,format=format,extra_args=args,**kwargs)
-  elif format in ('tdat','trip','genotriple'):
-    genos = load_genotriples_text(filename,extra_args=args,**kwargs)
-  elif format in ('pb','prettybase'):
-    genos = load_prettybase(filename,extra_args=args,**kwargs)
-  elif format=='tbat':
-    genos = load_genotriples_binary(filename,extra_args=args,**kwargs)
-  elif format in ('plink_ped','ped'):
-    genos = load_plink_ped(filename,extra_args=args,**kwargs)
-  elif format in ('plink_tped','tped'):
-    genos = load_plink_tped(filename,extra_args=args,**kwargs)
-  elif format in ('plink_bed','bed'):
-    genos = load_plink_bed(filename,extra_args=args,**kwargs)
-  elif format in ('merlin','mach'):
-    genos = load_merlin(filename,extra_args=args,**kwargs)
-  elif format in ('eigensoft','smartpca'):
-    genos = load_eigensoft_smartpca(filename,extra_args=args,**kwargs)
-  elif format == 'wtccc-raw':
-    genos = load_wtccc_raw(filename,extra_args=args,**kwargs)
-  elif not format:
-    raise ValueError("Input file format for '%s' must be specified" % namefile(filename))
-  else:
-    raise NotImplementedError("File format '%s' is not supported" % format)
+  loader = get_genostream_loader(format)
+  genos  = loader(filename, format, extra_args=args, **kwargs)
 
   # Apply any requested transformations
   # FIXME: The length checking code is there because transformed may not be
@@ -300,36 +390,12 @@ def save_genostream(filename, genos, extra_args=None, **kwargs):
   if format is None:
     format = guess_outformat(filename)
 
-  if format in ('ldat','imat','sdat'):
-    save_genomatrix_text(filename, genos, format=format, extra_args=args)
-  elif format in ('tdat','trip','genotriple'):
-    save_genotriples_text(filename, genos, extra_args=args)
-  elif format in ('pb','prettybase'):
-    save_prettybase(filename, genos, extra_args=args)
-  elif format in ('lbat','sbat'):
-    save_genomatrix_binary(filename, genos, format=format, extra_args=args)
-  elif format == 'tbat':
-    save_genotriples_binary(filename, genos, extra_args=args)
-  elif format in ('plink_ped','ped'):
-    save_plink_ped(filename, genos, extra_args=args)
-  elif format in ('plink_tped','tped'):
-    save_plink_tped(filename, genos, extra_args=args)
-  elif format in ('plink_bed','bed'):
-    save_plink_bed(filename, genos, extra_args=args)
-  elif format in ('merlin','mach'):
-    save_merlin(filename, genos, extra_args=args)
-  elif format == 'structure':
-    save_structure(filename, genos, extra_args=args)
-  elif format == 'phase':
-    save_phase(filename, genos, extra_args=args)
-  elif format == 'wtccc':
-    save_wtccc(filename, genos, extra_args=args)
-  elif format in ('eigensoft','smartpca'):
-    save_eigensoft_smartpca(filename, genos, extra_args=args)
-  elif not format:
+  if not format:
     raise ValueError("Output file format for '%s' must be specified" % namefile(filename))
-  else:
-    raise NotImplementedError("File format '%s' is not supported" % format)
+
+  saver = get_genostream_saver(format)
+
+  saver(filename, genos, format, extra_args=args)
 
 
 def transform_files(infiles,informat,ingenorepr,
@@ -416,17 +482,11 @@ def transform_files(infiles,informat,ingenorepr,
   if outformat is None:
     outformat = informat
 
-  # FIXME: Refactor preferred output classes
-  if outformat in ('ldat','lbat','imat','plink_tped','tped','plink_bed','bed','wtccc','eigensoft','smartpca'):
-    genos = GenomatrixStream.from_streams(genos,'ldat',mergefunc=mergefunc)
-  elif outformat in ('sdat','sbat','plink_ped','ped','plink_bed_ind','merlin','mach','structure','phase'):
-    genos = GenomatrixStream.from_streams(genos,'sdat',mergefunc=mergefunc)
-  elif outformat in ('tdat','trip','genotriple','pb','prettybase','tbat'):
-    genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
-  elif not outformat:
+  if not outformat:
     raise ValueError("Output file format for '%s' must be specified" % namefile(outfile))
-  else:
-    raise NotImplementedError("File format '%s' is not supported" % outformat)
+
+  # FIXME: Refactor preferred output classes
+  genos = genostream_preferred_format(genos,outformat,mergefunc)
 
   # Order again after merging, if necessary
   if n>1 and (transform.loci.order or transform.samples.order):

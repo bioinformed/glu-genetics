@@ -55,7 +55,7 @@ def load_merlin_dat(filename,genome):
     yield lname
 
 
-def load_merlin(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_merlin(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a Merlin format genotype data file.
 
@@ -172,7 +172,7 @@ class MerlinWriter(object):
   >>> from cStringIO import StringIO
   >>> o = StringIO()
   >>> m = StringIO()
-  >>> with MerlinWriter(o,genos.loci,genos.genome,genos.phenome,datfile=m) as w:
+  >>> with MerlinWriter(o,'merlin',genos.loci,genos.genome,genos.phenome,datfile=m) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -186,7 +186,7 @@ class MerlinWriter(object):
   M l2
   M l3
   '''
-  def __init__(self,filename,loci,genome,phenome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,loci,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -340,7 +340,7 @@ class MerlinWriter(object):
     self.close()
 
 
-def save_merlin(filename,genos,extra_args=None,**kwargs):
+def save_merlin(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -356,7 +356,7 @@ def save_merlin(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_merlin(o,genos)
+  >>> save_merlin(o,genos,'merlin')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1 s1 0 0 0 A A 0 0 C T
   s2 s2 0 0 0 A G C G C C
@@ -374,8 +374,8 @@ def save_merlin(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_sdat(mergefunc)
 
-  with MerlinWriter(filename, genos.loci, genos.genome, genos.phenome,
-                                          extra_args=args) as writer:
+  with MerlinWriter(filename, format, genos.loci, genos.genome, genos.phenome,
+                                      extra_args=args) as writer:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))

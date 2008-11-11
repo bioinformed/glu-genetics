@@ -42,7 +42,7 @@ class PhaseWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with PhaseWriter(o,genos.loci,genos.genome) as w:
+  >>> with PhaseWriter(o,'phase',genos.loci,genos.genome,genos.phenome) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -61,7 +61,7 @@ class PhaseWriter(object):
   G?C
   G?T
   '''
-  def __init__(self,filename,loci,genome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,loci,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -190,7 +190,7 @@ class PhaseWriter(object):
     self.close()
 
 
-def save_phase(filename,genos,extra_args=None,**kwargs):
+def save_phase(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to PHASE format.
 
@@ -220,7 +220,7 @@ def save_phase(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_phase(o,genos)
+  >>> save_phase(o,genos,'phase')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   00000003
   00000003
@@ -247,7 +247,7 @@ def save_phase(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_sdat(mergefunc)
 
-  with PhaseWriter(filename, genos.loci, genos.genome, extra_args=args) as writer:
+  with PhaseWriter(filename, format, genos.loci, genos.genome, genos.phenome, extra_args=args) as writer:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))

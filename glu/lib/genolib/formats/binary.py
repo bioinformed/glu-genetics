@@ -70,6 +70,8 @@ class BinaryGenomatrixWriter(object):
   '''
   Object to write the genotype matrix data to a compressed binary file
 
+  Currently requires packed genotypes, which is a bit of a problem and
+  should be corrected.
   '''
   def __init__(self,filename,format,header,genome,phenome,extra_args=None,**kwargs):
     '''
@@ -99,9 +101,9 @@ class BinaryGenomatrixWriter(object):
     >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
     >>> import tempfile
     >>> f = tempfile.NamedTemporaryFile()
-    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.loci,genos.genome,genos.phenome) as writer:
+    >>> with BinaryGenomatrixWriter(f.name,'sbat',genos.loci,genos.genome,genos.phenome) as writer:
     ...   writer.writerows(genos)
-    >>> genos = load_genomatrix_binary(f.name,'sdat')
+    >>> genos = load_genomatrix_binary(f.name,'sbat')
     >>> genos.format
     'sdat'
     >>> genos.loci
@@ -119,9 +121,9 @@ class BinaryGenomatrixWriter(object):
     ...            ('l2', ((None,None),  ('T','T'),   ('G','T'))),
     ...            ('l3', ( ('A', 'T'),  ('T','A'),   ('T','T')))]
     >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
-    >>> with BinaryGenomatrixWriter(f.name,genos.format,genos.samples,genos.genome,genos.phenome) as writer:
+    >>> with BinaryGenomatrixWriter(f.name,'lbat',genos.samples,genos.genome,genos.phenome) as writer:
     ...   writer.writerows(genos)
-    >>> genos = load_genomatrix_binary(f.name,'ldat')
+    >>> genos = load_genomatrix_binary(f.name,'lbat')
     >>> genos.format
     'ldat'
     >>> genos.samples
@@ -146,8 +148,8 @@ class BinaryGenomatrixWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-    if format not in ('ldat','sdat'):
-      raise IOError('format must be either ldat or sdat')
+    if format not in ('lbat','sbat'):
+      raise IOError('format must be either lbat or sbat')
 
     if not is_str(filename):
       raise ValueError('Invalid filename')
@@ -165,18 +167,20 @@ class BinaryGenomatrixWriter(object):
     self.state    = NOTOPEN
 
     if compress:
-      self.filters = tables.Filters(complevel=5,complib='zlib',shuffle=(format=='sdat'),fletcher32=True)
+      self.filters = tables.Filters(complevel=5,complib='zlib',shuffle=(format=='sbat'),fletcher32=True)
     else:
       self.filters = tables.Filters(fletcher32=True)
 
   def _open(self,row1):
     self.gfile  = tables.openFile(self.filename,mode='w')
 
+    format = {'lbat':'ldat','sbat':'sdat'}[self.format]
+
     # V1 attributes
-    self.gfile.root._v_attrs.format      = self.format
+    self.gfile.root._v_attrs.format = format
 
     # V2 attributes
-    self.gfile.root._v_attrs.GLU_FORMAT         = self.format
+    self.gfile.root._v_attrs.GLU_FORMAT         = format
     self.gfile.root._v_attrs.GLU_VERSION        = GENOMATRIX_VERSION
     self.gfile.root._v_attrs.GLU_COMPAT_VERSION = GENOMATRIX_COMPAT_VERSION
 
@@ -189,9 +193,9 @@ class BinaryGenomatrixWriter(object):
                                'Matrix of binary encoded genotypes values',
                                chunkshape=(crows,ccols), filters=self.filters, expectedrows=50000)
 
-    if self.format == 'sdat':
+    if format == 'sdat':
       self.models = row1.descriptor.models
-    elif self.format == 'ldat':
+    elif format == 'ldat':
       self.models = []
 
     self.chunkrows = crows
@@ -218,7 +222,7 @@ class BinaryGenomatrixWriter(object):
     assert self.state == OPEN
 
     # FIXME: Check schema constraints!!!
-    if self.format == 'ldat':
+    if self.format == 'lbat':
       self.models.append(genos.descriptor.models[0])
 
     self.rowkeys.append(rowkey)
@@ -258,7 +262,7 @@ class BinaryGenomatrixWriter(object):
     chunk   = self.chunk
 
     # FIXME: Check schema constraints!!!
-    if self.format == 'sdat':
+    if self.format == 'sbat':
       for rowkey,genos in rows:
         rowkeys.append(rowkey)
         chunk.append(genos.data)
@@ -266,7 +270,7 @@ class BinaryGenomatrixWriter(object):
           self.genotypes.append(chunk)
           chunk[:] = []
 
-    elif self.format == 'ldat':
+    elif self.format == 'lbat':
       for rowkey,genos in rows:
         rowkeys.append(rowkey)
         chunk.append(genos.data)
@@ -306,7 +310,7 @@ class BinaryGenomatrixWriter(object):
     save_strings(gfile, 'rows', self.rowkeys, filters=self.filters)
     save_strings(gfile, 'cols', self.header,  filters=self.filters)
 
-    if self.format == 'ldat':
+    if self.format == 'lbat':
       loci    = self.rowkeys
       samples = self.header
     else:
@@ -361,18 +365,18 @@ class BinaryGenotripleWriter(object):
   ...            ('s2', 'l2', ('C','C'))]
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> trips = iter(triples)
-  >>> with BinaryGenotripleWriter(f.name,triples.genome,triples.phenome) as w:
+  >>> with BinaryGenotripleWriter(f.name,'tbat',None,triples.genome,triples.phenome) as w:
   ...   w.writerow(*trips.next())
   ...   w.writerow(*trips.next())
   ...   w.writerows(trips)
-  >>> for row in load_genotriples_binary(f.name):
+  >>> for row in load_genotriples_binary(f.name,'tbat'):
   ...   print row
   ('s1', 'l1', ('C', 'T'))
   ('s1', 'l2', (None, None))
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  def __init__(self,filename,genome,phenome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,header,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: a file name or file object
     @type      filename: str or file object
@@ -552,7 +556,7 @@ class BinaryGenotripleWriter(object):
       self.close()
 
 
-def save_genotriples_binary(filename,genos,extra_args=None,**kwargs):
+def save_genotriples_binary(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype triple data to file.
 
@@ -573,20 +577,20 @@ def save_genotriples_binary(filename,genos,extra_args=None,**kwargs):
   ...            ('s1', 'l3', ('A','A')),
   ...            ('s2', 'l2', ('C','C'))]
   >>> triples = GenotripleStream.from_tuples(triples)
-  >>> save_genotriples_binary(f.name, triples)
-  >>> for row in load_genotriples_binary(f.name):
+  >>> save_genotriples_binary(f.name, triples, 'tbat')
+  >>> for row in load_genotriples_binary(f.name, 'tbat'):
   ...   print row
   ('s1', 'l1', ('C', 'T'))
   ('s1', 'l2', (None, None))
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
-  with BinaryGenotripleWriter(filename,genos.genome,genos.phenome,
+  with BinaryGenotripleWriter(filename,format,None,genos.genome,genos.phenome,
                                        extra_args=extra_args,**kwargs) as writer:
     writer.writerows(genos.as_genotriples())
 
 
-def load_genotriples_binary(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_genotriples_binary(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -606,8 +610,8 @@ def load_genotriples_binary(filename,genome=None,phenome=None,extra_args=None,**
   ...            ('s1', 'l3', ('A','A')),
   ...            ('s2', 'l2', ('C','C'))]
   >>> triples = GenotripleStream.from_tuples(triples)
-  >>> save_genotriples_binary(f.name, triples)
-  >>> for row in load_genotriples_binary(f.name):
+  >>> save_genotriples_binary(f.name, triples, 'tbat')
+  >>> for row in load_genotriples_binary(f.name, 'tbat'):
   ...   print row
   ('s1', 'l1', ('C', 'T'))
   ('s1', 'l2', (None, None))
@@ -1087,7 +1091,7 @@ def load_phenos_v3(gfile,samples):
 #######################################################################################
 
 
-def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
+def save_genomatrix_binary(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -1110,8 +1114,8 @@ def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
-  >>> save_genomatrix_binary(f.name,genos)
-  >>> genos = load_genomatrix_binary(f.name,'sdat')
+  >>> save_genomatrix_binary(f.name,genos,'sbat')
+  >>> genos = load_genomatrix_binary(f.name,'sbat')
   >>> genos.format
   'sdat'
   >>> genos.loci
@@ -1130,8 +1134,8 @@ def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
   ...            ('l3', ( ('A', 'T'), ('T','A'),   ('T','T')))]
   >>> genos = GenomatrixStream.from_tuples(rows,'ldat',samples=samples)
   >>> f = tempfile.NamedTemporaryFile()
-  >>> save_genomatrix_binary(f.name,genos)
-  >>> genos = load_genomatrix_binary(f.name,'ldat')
+  >>> save_genomatrix_binary(f.name,genos,'lbat')
+  >>> genos = load_genomatrix_binary(f.name,'lbat')
   >>> genos.samples
   ('s1', 's2', 's3')
   >>> genos.format
@@ -1150,20 +1154,21 @@ def save_genomatrix_binary(filename,genos,extra_args=None,**kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  format    = get_arg(args, ['format']) or genos.format
   mergefunc = get_arg(args, ['mergefunc'])
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
   if format in ('ldat','lbat'):
-    genos = genos.as_ldat(mergefunc)
+    genos  = genos.as_ldat(mergefunc)
+    format = 'lbat'
   elif format in ('sdat','sbat'):
-    genos = genos.as_sdat(mergefunc)
+    genos  = genos.as_sdat(mergefunc)
+    format = 'sbat'
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
 
-  with BinaryGenomatrixWriter(filename,genos.format,genos.columns,
+  with BinaryGenomatrixWriter(filename,format,genos.columns,
                                        genos.genome,genos.phenome,
                                        extra_args=args) as writer:
     writer.writerows(genos.transformed(repack=True))
@@ -1197,8 +1202,8 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> import tempfile
   >>> f = tempfile.NamedTemporaryFile()
-  >>> save_genomatrix_binary(f.name,genos)
-  >>> genos = load_genomatrix_binary(f.name,'sdat')
+  >>> save_genomatrix_binary(f.name,genos,'sbat')
+  >>> genos = load_genomatrix_binary(f.name,'sbat')
   >>> genos.format
   'sdat'
   >>> genos.columns
@@ -1210,7 +1215,7 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   ('s3', [('A', 'T'), ('C', 'T'), ('G', 'G')])
 
   # Disabled for now
-  #>>> genos = load_genomatrix_binary(f.name,'ldat')
+  #>>> genos = load_genomatrix_binary(f.name,'lbat')
   #>>> genos.format
   #'ldat'
   #>>> genos.columns
@@ -1262,11 +1267,11 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   rows    = tuple(gfile.root.rows[:].tolist())
 
   if format_found in ('sdat','sbat'):
-    format_found = 'sdat'
+    format_found = 'sbat'
     samples      = rows
     loci         = columns
   elif format_found in ('ldat','lbat'):
-    format_found = 'ldat'
+    format_found = 'lbat'
     samples      = columns
     loci         = rows
   else:
@@ -1278,7 +1283,9 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=modelcache)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
-  if format == format_found == 'sdat':
+  if format == format_found == 'sbat':
+    gformat = 'sdat'
+
     with gcdisabled():
       models = list(file_models)
 
@@ -1300,8 +1307,9 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
 
       gfile.close()
 
-  elif format == format_found == 'ldat':
-    models = []
+  elif format == format_found == 'lbat':
+    gformat = 'ldat'
+    models  = []
 
     def _load():
       descrcache = {}
@@ -1330,7 +1338,7 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
     raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
                         % (namefile(filename),format,format_found))
 
-  genos = GenomatrixStream(_load(),format,samples=samples,loci=loci,models=models,genome=file_genome,
+  genos = GenomatrixStream(_load(),gformat,samples=samples,loci=loci,models=models,genome=file_genome,
                                          phenome=phenome,unique=unique,packed=True)
 
   if genome:

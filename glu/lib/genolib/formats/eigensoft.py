@@ -116,7 +116,7 @@ def load_eigensoft_inds(filename,phenome):
   return samples
 
 
-def load_eigensoft_smartpca(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_eigensoft_smartpca(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a SMARTPCA format genotype data.
 
@@ -137,7 +137,7 @@ def load_eigensoft_smartpca(filename,genome=None,phenome=None,extra_args=None,**
   >>> genos = StringIO('012\\n919\\n101\\n')
   >>> snp   = StringIO('l1 1 0 0 G A\\nl2 1 0 0 G C\\nl3 1 0 0 C T\\n')
   >>> ind   = StringIO('s1 U\\ns2 U\\ns3 U\\n')
-  >>> genos = load_eigensoft_smartpca(genos,ind=ind,snp=snp)
+  >>> genos = load_eigensoft_smartpca(genos,'eigensoft',ind=ind,snp=snp)
   >>> genos.format
   'ldat'
   >>> genos.loci
@@ -231,7 +231,7 @@ class EigensoftSmartPCAWriter(object):
   >>> o = StringIO()
   >>> s = StringIO()
   >>> i = StringIO()
-  >>> with EigensoftSmartPCAWriter(o,genos.samples,genos.genome,genos.phenome,
+  >>> with EigensoftSmartPCAWriter(o,'eigensoft',genos.samples,genos.genome,genos.phenome,
   ...                                ind=i,snp=s) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
@@ -250,7 +250,7 @@ class EigensoftSmartPCAWriter(object):
   s2 U UNKNOWN
   s3 U UNKNOWN
   '''
-  def __init__(self,filename,samples,genome,phenome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,samples,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -397,7 +397,7 @@ class EigensoftSmartPCAWriter(object):
     self.close()
 
 
-def save_eigensoft_smartpca(filename,genos,extra_args=None,**kwargs):
+def save_eigensoft_smartpca(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write Eigensoft SMARTPCA genotype data
 
@@ -415,7 +415,7 @@ def save_eigensoft_smartpca(filename,genos,extra_args=None,**kwargs):
   ...         ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...         ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_eigensoft_smartpca(o,genos,ind=i,snp=s)
+  >>> save_eigensoft_smartpca(o,genos,'eigensoft',ind=i,snp=s)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   210
   919
@@ -440,7 +440,7 @@ def save_eigensoft_smartpca(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_ldat(mergefunc)
 
-  with EigensoftSmartPCAWriter(filename,genos.samples,genos.genome,genos.phenome,
+  with EigensoftSmartPCAWriter(filename,format,genos.samples,genos.genome,genos.phenome,
                                         extra_args=args) as writer:
 
     if extra_args is None and args:

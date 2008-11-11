@@ -20,7 +20,7 @@ from   glu.lib.genolib.locus     import Genome
 __all__ = ['load_wtccc_raw']
 
 
-def load_wtccc_raw(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_wtccc_raw(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load a WTCCC Raw genotype data file.
 

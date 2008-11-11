@@ -15,18 +15,23 @@ from   collections               import defaultdict
 
 from   glu.lib.fileutils         import map_reader
 from   glu.lib.genolib.io        import load_genostream, guess_outformat, geno_options, \
-                                        TextGenomatrixWriter, TextGenotripleWriter,     \
-                                        BinaryGenomatrixWriter, BinaryGenotripleWriter
+                                        get_genostream_writer
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor, GenotypeArray, pick
 
 
-def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup, defaultlocusgroup):
+# FIXME: This function exists only to pander to limitations in the binary
+# matrix writer class and should go away once that is fixed
+def genomatrix_multiplexer_packed(genos, samplegroups, locusgroups, defaultsamplegroup, defaultlocusgroup):
   '''
   Sequentially split the contents of a genotype matrix into groups of rows
   and columns based on supplied mappings from row and column labels to group
   identifiers.  No buffering is performed, so partial results are returned
   tagged by the row and column group keys.
+
+  Version that ensures genotypes are packed upon output for writers that require it
   '''
+  genos = genos.transformed(repack=True)
+
   if genos.format == 'ldat':
     rowgroups          = locusgroups
     columngroups       = samplegroups
@@ -110,6 +115,75 @@ def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup,
       yield key,header,row
 
 
+def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup, defaultlocusgroup):
+  '''
+  Sequentially split the contents of a genotype matrix into groups of rows
+  and columns based on supplied mappings from row and column labels to group
+  identifiers.  No buffering is performed, so partial results are returned
+  tagged by the row and column group keys.
+  '''
+  if genos.format == 'ldat':
+    rowgroups          = locusgroups
+    columngroups       = samplegroups
+    defaultrowgroup    = defaultlocusgroup
+    defaultcolumngroup = defaultsamplegroup
+  elif genos.format == 'sdat':
+    rowgroups          = samplegroups
+    columngroups       = locusgroups
+    defaultrowgroup    = defaultsamplegroup
+    defaultcolumngroup = defaultlocusgroup
+  else:
+    raise ValueError('Unknown genotype matrix format')
+
+  header = genos.columns
+
+  rdefault = [defaultrowgroup   ] if defaultrowgroup    else []
+  cdefault = [defaultcolumngroup] if defaultcolumngroup else []
+
+  if columngroups is not None:
+    groupcols = defaultdict(list)
+    for i,colkey in enumerate(genos.columns):
+      for columngroup in columngroups.get(colkey, cdefault):
+        if columngroup:
+          groupcols[columngroup].append(i)
+
+    if genos.format == 'sdat':
+      groupcols = [ (key,indices,pick(genos.columns,indices))
+                    for key,indices in groupcols.iteritems() ]
+    else:
+      descrcache = {}
+      groupcols = [ (key,indices,pick(genos.columns,indices))
+                    for key,indices in groupcols.iteritems() ]
+
+  # This used to be a single loop, but performance is an issue and breaking
+  # out the cases helps significantly.  One day Python will have a JIT and
+  # take care of this for me...
+  if columngroups and rowgroups:
+    for rowkey,row in genos:
+      for rowgroup in rowgroups.get(rowkey) or rdefault:
+        if not rowgroup:
+          continue
+        for columngroup,indices,header in groupcols:
+          grow = pick(row,indices)
+          yield (rowgroup,columngroup),header,(rowkey,pick(row,indices))
+
+  elif columngroups:
+    for rowkey,row in genos:
+      for columngroup,indices,header in groupcols:
+        yield (None,columngroup),header,(rowkey,pick(row,indices))
+
+  elif rowgroups:
+    for rowkey,row in genos:
+      for rowgroup in rowgroups.get(rowkey) or rdefault:
+        if rowgroup:
+          yield (rowgroup,None),header,(rowkey,row)
+
+  elif defaultrowgroup or defaultcolumngroup:
+    key = (defaultrowgroup,defaultcolumngroup)
+    for row in genos:
+      yield key,header,row
+
+
 def genotriple_multiplexer(triples, samplegroups, locusgroups, sampledefault, locusdefault):
   '''
   Sequentially split the contents of a genotype triple stream into groups
@@ -150,18 +224,13 @@ def getWriter(filename,format,genome=None,phenome=None,header=None,genorepr=None
   # many new formats not currently supported.
   if maxrows:
     return RollingWriter(filename,format,genome,phenome,maxrows,header,genorepr)
-  elif format in ('ldat','sdat'):
-    return TextGenomatrixWriter(filename,format,header,genorepr=genorepr)
-  elif format == 'lbat':
-    return BinaryGenomatrixWriter(filename,'ldat',header,genome,phenome)
-  elif format == 'sbat':
-    return BinaryGenomatrixWriter(filename,'sdat',header,genome,phenome)
-  elif format in ('tdat','trip','genotriple'):
-    return TextGenotripleWriter(filename,genorepr=genorepr)
-  elif format == 'tbat':
-    return BinaryGenotripleWriter(filename,genome,phenome)
+
+  writer = get_genostream_writer(format)
+
+  if genorepr:
+    return writer(filename,format,header,genome,phenome,genorepr=genorepr)
   else:
-    raise ValueError('Unknown format or format not supported by glu.split')
+    return writer(filename,format,header,genome,phenome)
 
 
 class RollingWriter(object):
@@ -327,7 +396,11 @@ def split(genos, outformat, prefix, suffix, options):
     filecache = FileMap(prefix,suffix,genos.format,genos.genome,genos.phenome,outformat=outformat,
                         genorepr=options.ingenorepr,maxrows=options.maxrows)
 
-    if genos.format in ('sdat','ldat'):
+    # Binary matrix writer currently requires packed genotypes
+    if genos.format in ('sdat','ldat') and outformat in ('lbat','sbat'):
+      mplx = genomatrix_multiplexer_packed(genos,samplegroups,locusgroups,
+                                    options.defaultsamplegroup,options.defaultlocusgroup)
+    elif genos.format in ('sdat','ldat'):
       mplx = genomatrix_multiplexer(genos,samplegroups,locusgroups,
                                     options.defaultsamplegroup,options.defaultlocusgroup)
     else:

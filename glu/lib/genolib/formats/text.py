@@ -163,7 +163,7 @@ class TextGenomatrixWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenomatrixWriter(o,genos.format,genos.columns,genorepr=snp) as w:
+  >>> with TextGenomatrixWriter(o,'sdat',genos.columns,genos.genome,genos.phenome,genorepr=snp) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -174,7 +174,7 @@ class TextGenomatrixWriter(object):
   s2    AG      CG      CC
   s3    GG              CT
   '''
-  def __init__(self,filename,format,header,extra_args=None,**kwargs):
+  def __init__(self,filename,format,header,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -288,7 +288,7 @@ class TextGenomatrixWriter(object):
     self.close()
 
 
-def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
+def save_genomatrix_text(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype matrix data to file.
 
@@ -307,12 +307,30 @@ def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_genomatrix_text(o,genos,genorepr=snp)
+  >>> save_genomatrix_text(o,genos,'sdat')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   sdat	l1	l2	l3
   s1	AA	  	CT
   s2	AG	CG	CC
   s3	GG	  	CT
+
+  >>> o = StringIO()
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> save_genomatrix_text(o,genos,'ldat')
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  ldat  s1      s2      s3
+  l1    AA      AG      GG
+  l2            CG
+  l3    CT      CC      CT
+
+  >>> o = StringIO()
+  >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
+  >>> save_genomatrix_text(o,genos,'imat')
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  imat  s1      s2      s3
+  l1    AA      AG      GG
+  l2    --      CG      --
+  l3    CT      CC      CT
   '''
   if extra_args is None:
     args = kwargs
@@ -322,7 +340,6 @@ def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
 
   filename = parse_augmented_filename(filename,args)
 
-  format    = get_arg(args, ['format']) or genos.format
   mergefunc = get_arg(args, ['mergefunc'])
 
   if format in ('ldat','imat'):
@@ -332,7 +349,7 @@ def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
   else:
     raise NotImplementedError("File format '%s' is not supported" % format)
 
-  with TextGenomatrixWriter(filename,format,genos.columns,
+  with TextGenomatrixWriter(filename,format,genos.columns,genos.genome,genos.phenome,
                                      extra_args=args) as writer:
 
     if extra_args is None and args:
@@ -341,7 +358,7 @@ def save_genomatrix_text(filename,genos,extra_args=None,**kwargs):
     writer.writerows(genos)
 
 
-def load_genotriples_text(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_genotriples_text(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -361,7 +378,7 @@ def load_genotriples_text(filename,genome=None,phenome=None,extra_args=None,**kw
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriples_text(data,genorepr=snp)
+  >>> triples = load_genotriples_text(data,'tdat',genorepr=snp)
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -445,10 +462,11 @@ class TextGenotripleWriter(object):
 
   >>> triples = [('s1','l1',('C','T')), ('s1','l2',(None,None)),
   ...            ('s1','l3',('A','A')), ('s2','l2', ('C','C'))]
-  >>> triples = iter(GenotripleStream.from_tuples(triples))
+  >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenotripleWriter(o,genorepr=snp) as w:
+  >>> with TextGenotripleWriter(o,'tdat',None,triples.genome,triples.phenome,genorepr=snp) as w:
+  ...   triples = iter(triples)
   ...   w.writerow(*triples.next())
   ...   w.writerow(*triples.next())
   ...   w.writerows(triples)
@@ -458,7 +476,7 @@ class TextGenotripleWriter(object):
   s1	l3	AA
   s2	l2	CC
   '''
-  def __init__(self,filename,extra_args=None,**kwargs):
+  def __init__(self,filename,format,header,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -551,7 +569,7 @@ class TextGenotripleWriter(object):
     self.close()
 
 
-def save_genotriples_text(filename,genos,extra_args=None,**kwargs):
+def save_genotriples_text(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype stream to a text genotriple file.
 
@@ -571,7 +589,7 @@ def save_genotriples_text(filename,genos,extra_args=None,**kwargs):
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> save_genotriples_text(o,triples,genorepr=snp)
+  >>> save_genotriples_text(o,triples,'tdat',genorepr=snp)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1	l1      CT
   s1	l2
@@ -590,7 +608,7 @@ def save_genotriples_text(filename,genos,extra_args=None,**kwargs):
   if mergefunc:
     genos = genos.merged(mergefunc)
 
-  with TextGenotripleWriter(filename,extra_args=args) as w:
+  with TextGenotripleWriter(filename,format,None,genos.genome,genos.phenome,extra_args=args) as w:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))

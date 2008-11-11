@@ -19,7 +19,7 @@ from   glu.lib.genolib.streams   import GenotripleStream
 __all__ = ['PrettybaseWriter', 'save_prettybase', 'load_prettybase']
 
 
-def load_prettybase(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_prettybase(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   Load genotype triples from file
 
@@ -33,7 +33,7 @@ def load_prettybase(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
   >>> from StringIO import StringIO
   >>> data = StringIO('l1 s1 A A\\nl2 s1 G G\\nl1 s2 N N\\nl2 s2 C C\\n')
-  >>> triples = load_prettybase(data)
+  >>> triples = load_prettybase(data,'pb')
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -110,10 +110,11 @@ class PrettybaseWriter(object):
 
   >>> triples = [('s1','l1',('C','T')), ('s1','l2',(None,None)),
   ...            ('s1','l3',('A','A')), ('s2','l2', ('C','C'))]
-  >>> triples = iter(GenotripleStream.from_tuples(triples))
+  >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with PrettybaseWriter(o) as w:
+  >>> with PrettybaseWriter(o,'pb',None,triples.genome,triples.phenome) as w:
+  ...   triples = iter(triples)
   ...   w.writerow(*triples.next())
   ...   w.writerow(*triples.next())
   ...   w.writerows(triples)
@@ -123,7 +124,7 @@ class PrettybaseWriter(object):
   l3 s1 A A
   l2 s2 C C
   '''
-  def __init__(self,filename,extra_args=None,**kwargs):
+  def __init__(self,filename,format,header,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -201,7 +202,7 @@ class PrettybaseWriter(object):
     self.close()
 
 
-def save_prettybase(filename,genos,extra_args=None,**kwargs):
+def save_prettybase(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write the genotype triple data to file.
 
@@ -216,13 +217,13 @@ def save_prettybase(filename,genos,extra_args=None,**kwargs):
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> save_prettybase(o,triples)
+  >>> save_prettybase(o,triples,'pb')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   l1 s1 C T
   l2 s1 N N
   l3 s1 A A
   '''
-  with PrettybaseWriter(filename,extra_args=extra_args,**kwargs) as w:
+  with PrettybaseWriter(filename,format,None,genos.genome,genos.phenome,extra_args=extra_args,**kwargs) as w:
     w.writerows(genos.as_genotriples())
 
 

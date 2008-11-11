@@ -55,7 +55,7 @@ class WTCCCWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).as_ldat()
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with WTCCCWriter(o,genos.samples,genos.genome) as w:
+  >>> with WTCCCWriter(o,'wtccc',genos.samples,genos.genome,genos.phenome) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -65,7 +65,7 @@ class WTCCCWriter(object):
   0 l2 0 C G 0 0 0 0 1 0 0 0 0
   0 l3 0 C T 0 1 0 1 0 0 0 1 0
   '''
-  def __init__(self,filename,samples,genome,extra_args=None,**kwargs):
+  def __init__(self,filename,format,samples,genome,phenome,extra_args=None,**kwargs):
     '''
     @param     filename: file name or file object
     @type      filename: str or file object
@@ -172,7 +172,7 @@ class WTCCCWriter(object):
     self.close()
 
 
-def save_wtccc(filename,genos,extra_args=None,**kwargs):
+def save_wtccc(filename,genos,format,extra_args=None,**kwargs):
   '''
   Write genotype data to a WTCCC file
 
@@ -190,7 +190,7 @@ def save_wtccc(filename,genos,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_wtccc(o,genos)
+  >>> save_wtccc(o,genos,'wtccc')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   0 l1 0 A G 1 0 0 0 1 0 0 0 1
   0 l2 0 C G 0 0 0 0 1 0 0 0 0
@@ -208,7 +208,7 @@ def save_wtccc(filename,genos,extra_args=None,**kwargs):
 
   genos = genos.as_ldat(mergefunc)
 
-  with WTCCCWriter(filename, genos.samples, genos.genome, extra_args=args) as writer:
+  with WTCCCWriter(filename, format, genos.samples, genos.genome, genos.phenome, extra_args=args) as writer:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
