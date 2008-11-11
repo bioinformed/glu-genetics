@@ -26,7 +26,7 @@ def option_parser():
 
   parser = optparse.OptionParser(usage=usage)
 
-  geno_options(parser,input=True)
+  geno_options(parser,input=True,filter=True)
 
   parser.add_option('-z', '--lazy', dest='lazy', action='store_true', default=False,
                     help='Be lazy and never materialize the genotypes.  Some results may come back unknown')
@@ -48,7 +48,8 @@ def main():
     return
 
   genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                  genome=options.loci,phenome=options.pedigree,hyphen=sys.stdin)
+                                  genome=options.loci,phenome=options.pedigree,
+                                  transform=options,hyphen=sys.stdin)
 
   out = autofile(hyphen(options.output,sys.stdout),'w')
 

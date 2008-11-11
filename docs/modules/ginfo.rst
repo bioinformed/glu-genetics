@@ -22,6 +22,13 @@ Options:
   -l FILE, --loci=FILE  Locus description file and options
   -p FILE, --pedigree=FILE
                         Pedigree description file and options
+  --filtermissing       Filters out the samples or loci with missing genotypes
+  --includesamples=FILE
+                        List of samples to include
+  --includeloci=FILE    List of loci to include
+  --excludesamples=FILE
+                        List of samples to exclude
+  --excludeloci=FILE    List of loci to exclude
   -z, --lazy            Be lazy and never materialize the genotypes.  Some
                         results may come back unknown
   -o FILE, --output=FILE
