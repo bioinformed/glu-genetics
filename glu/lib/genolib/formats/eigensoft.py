@@ -7,6 +7,13 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['load_eigensoft_smartpca','save_eigensoft_smartpca','EigensoftSmartPCAWriter']
+
+__genoformats__ = [
+  #        LOADER                      SAVER                    WRITER            PFORMAT   ALIAS   EXTS
+  ('load_eigensoft_smartpca','save_eigensoft_smartpca','EigensoftSmartPCAWriter', 'ldat',
+     ['eigensoft','eigenstrat','smartpca'],  None) ]
+
 
 from   itertools                 import izip
 
@@ -20,9 +27,6 @@ from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_geno
                                         GenotypeArrayDescriptor, GenotypeArray, UnphasedMarkerModel
 from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
-
-
-__all__ = ['load_eigensoft_smartpca','save_eigensoft_smartpca','EigensoftSmartPCAWriter']
 
 
 SEX_MAP  = {'M':SEX_MALE,'m':SEX_MALE,'F':SEX_FEMALE,'f':SEX_FEMALE,'U':SEX_UNKNOWN}

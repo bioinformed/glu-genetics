@@ -5,6 +5,13 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['load_wtccc_raw']
+
+__genoformats__ = [
+  #      LOADER       SAVER  WRITER  PFORMAT     ALIAS     EXTS
+  ('load_wtccc_raw',  None,   None,   'sdat', 'wtccc-raw', None) ]
+
+
 import csv
 
 from   itertools                 import islice
@@ -15,9 +22,6 @@ from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filena
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.reprs     import get_genorepr
 from   glu.lib.genolib.locus     import Genome
-
-
-__all__ = ['load_wtccc_raw']
 
 
 def load_wtccc_raw(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):

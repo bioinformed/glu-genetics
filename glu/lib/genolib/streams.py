@@ -8,14 +8,12 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-import sys
-
 from   types                     import NoneType
 from   operator                  import itemgetter
 from   collections               import defaultdict
 from   itertools                 import izip,ifilter,imap,chain,groupby
 
-from   glu.lib.utils             import as_set,tally,izip_exact,gcdisabled,is_str
+from   glu.lib.utils             import as_set,tally,izip_exact,gcdisabled
 from   glu.lib.imerge            import imerge
 from   glu.lib.xtab              import xtab,rowsby
 

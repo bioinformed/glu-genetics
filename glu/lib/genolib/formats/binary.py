@@ -11,6 +11,12 @@ __all__ = ['BinaryGenomatrixWriter', 'BinaryGenotripleWriter',
            'save_genotriples_binary','load_genotriples_binary',
            'save_genomatrix_binary', 'load_genomatrix_binary']
 
+__genoformats__ = [
+  #      LOADER                      SAVER                    WRITER            PFORMAT   ALIAS   EXTS
+  ('load_genotriples_binary','save_genotriples_binary','BinaryGenotripleWriter', 'trip',  None,  'tbat'),
+  ('load_genomatrix_binary', 'save_genomatrix_binary', 'BinaryGenomatrixWriter', 'ldat',  None,  'lbat'),
+  ('load_genomatrix_binary', 'save_genomatrix_binary', 'BinaryGenomatrixWriter', 'sdat',  None,  'sbat') ]
+
 
 from   operator                  import itemgetter
 from   itertools                 import groupby

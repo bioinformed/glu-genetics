@@ -7,6 +7,16 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['TextGenomatrixWriter',  'TextGenotripleWriter',
+                 'save_genotriples_text', 'load_genotriples_text',
+                 'save_genomatrix_text',  'load_genomatrix_text']
+
+__genoformats__ = [
+  #       LOADER                    SAVER                  WRITER           PFORMAT      ALIAS          EXTS
+  ('load_genotriples_text', 'save_genotriples_text', 'TextGenotripleWriter', 'trip', 'genotriple', ['trip','tdat']),
+  ('load_genomatrix_text',  'save_genomatrix_text',  'TextGenomatrixWriter', 'ldat',     None,     ['ldat','imat']),
+  ('load_genomatrix_text',  'save_genomatrix_text',  'TextGenomatrixWriter', 'sdat',     None,         'sdat') ]
+
 
 import csv
 
@@ -14,12 +24,7 @@ from   glu.lib.fileutils         import autofile,list_reader,table_writer,namefi
                                         parse_augmented_filename,get_arg,get_csv_dialect
 
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
-from   glu.lib.genolib.reprs     import get_genorepr,snp
-
-
-__all__ = ['TextGenomatrixWriter',  'TextGenotripleWriter',
-           'save_genotriples_text', 'load_genotriples_text',
-           'save_genomatrix_text',  'load_genomatrix_text']
+from   glu.lib.genolib.reprs     import get_genorepr
 
 
 def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
@@ -47,7 +52,7 @@ def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=Non
 
   >>> from StringIO import StringIO
   >>> data = StringIO("ldat\\ts1\\ts2\\ts3\\nl1\\tAA\\tAG\\tGG\\nl2\\tCC\\tCT\\tTT\\n")
-  >>> genos = load_genomatrix_text(data,'ldat',genorepr=snp)
+  >>> genos = load_genomatrix_text(data,'ldat')
   >>> genos.format
   'ldat'
   >>> genos.columns
@@ -163,7 +168,7 @@ class TextGenomatrixWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenomatrixWriter(o,'sdat',genos.columns,genos.genome,genos.phenome,genorepr=snp) as w:
+  >>> with TextGenomatrixWriter(o,'sdat',genos.columns,genos.genome,genos.phenome) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
@@ -378,7 +383,7 @@ def load_genotriples_text(filename,format,genome=None,phenome=None,extra_args=No
 
   >>> from StringIO import StringIO
   >>> data = StringIO('s1\\tl1\\tAA\\ns1\\tl2\\tGG\\ns2\\tl1\\tAG\\ns2\\tl2\\tCC\\n')
-  >>> triples = load_genotriples_text(data,'tdat',genorepr=snp)
+  >>> triples = load_genotriples_text(data,'tdat')
   >>> for triple in triples:
   ...   print triple
   ('s1', 'l1', ('A', 'A'))
@@ -465,7 +470,7 @@ class TextGenotripleWriter(object):
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with TextGenotripleWriter(o,'tdat',None,triples.genome,triples.phenome,genorepr=snp) as w:
+  >>> with TextGenotripleWriter(o,'tdat',None,triples.genome,triples.phenome) as w:
   ...   triples = iter(triples)
   ...   w.writerow(*triples.next())
   ...   w.writerow(*triples.next())
@@ -589,7 +594,7 @@ def save_genotriples_text(filename,genos,format,extra_args=None,**kwargs):
   >>> triples = GenotripleStream.from_tuples(triples)
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> save_genotriples_text(o,triples,'tdat',genorepr=snp)
+  >>> save_genotriples_text(o,triples,'tdat')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
   s1	l1      CT
   s1	l2

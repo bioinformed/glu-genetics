@@ -7,6 +7,12 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['StructureWriter', 'save_structure']
+
+__genoformats__ = [
+#  LOADER    SAVER              WRITER        PFORMAT    ALIAS     EXTS
+  (None, 'save_structure', 'StructureWriter', 'sdat', 'structure', None) ]
+
 
 from   itertools                 import chain
 
@@ -15,8 +21,6 @@ from   glu.lib.fileutils         import autofile,related_file,map_reader,   \
 
 from   glu.lib.genolib.streams   import GenomatrixStream
 
-
-__all__ = ['StructureWriter', 'save_structure']
 
 mainparam_template = '''\
 KEY PARAMETERS FOR THE PROGRAM structure.  YOU WILL NEED TO SET THESE

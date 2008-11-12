@@ -5,6 +5,13 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['load_hapmap']
+
+__genoformats__ = [
+  #    LOADER     SAVER   WRITER  PFORMAT    ALIAS    EXTS
+  ('load_hapmap', None,    None,   'ldat', 'hapmap',  None) ]
+
+
 import sys
 
 from   itertools                 import islice,dropwhile
@@ -15,8 +22,6 @@ from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.reprs     import hapmap
 from   glu.lib.genolib.locus     import Genome
-
-__all__ = ['load_hapmap']
 
 
 HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID assayLSID panelLSID QC_code',

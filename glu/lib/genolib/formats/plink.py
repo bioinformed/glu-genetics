@@ -7,6 +7,18 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['PlinkPedWriter',  'save_plink_ped',  'load_plink_ped',
+                 'PlinkTPedWriter', 'save_plink_tped', 'load_plink_tped',
+                 'PlinkBedWriter',  'save_plink_bed',  'load_plink_bed']
+
+__genoformats__ = [
+  #      LOADER           SAVER             WRITER        PFORMAT   ALIAS                      EXTS
+  ('load_plink_ped', 'save_plink_ped', 'PlinkPedWriter',  'sdat',  'plink_ped',               'ped'),
+  ('load_plink_tped','save_plink_tped','PlinkTPedWriter', 'ldat',  'plink_tped',             'tped'),
+  ('load_plink_bed', 'save_plink_bed', 'PlinkBedWriter',  'ldat', ['plink_bed','lbed',
+                                                                   'plink_lbed'],             'bed'),
+  ('load_plink_bed', 'save_plink_bed', 'PlinkBedWriter',  'sdat', ['plink_sbed','sbed'],      None ) ]
+
 
 import string
 
@@ -22,11 +34,6 @@ from   glu.lib.genolib.genoarray import model_from_alleles
 from   glu.lib.genolib.locus     import Genome,load_locus_records,populate_genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN, \
                                         PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
-
-
-__all__ = ['PlinkPedWriter',  'save_plink_ped',  'load_plink_ped',
-           'PlinkTPedWriter', 'save_plink_tped', 'load_plink_tped',
-           'PlinkBedWriter',  'save_plink_bed',  'load_plink_bed']
 
 
 ALLELE_MAP  = {'0':None,'1':'1','2':'2','A':'A','C':'C','G':'G','T':'T','B':'B','+':'+','-':'-'}
@@ -1084,8 +1091,12 @@ class PlinkBedWriter(object):
     @param      phenome: phenome descriptor
     @type       phenome: Phenome instance
     '''
-    if format not in ('sbed','lbed'):
+    if format not in ('bed','sbed','lbed'):
+      raise ValueError('format must be either bed, sbed, or lbed, found %s' % format)
       raise IOError('format must be either ldat or sdat')
+
+    if format=='bed':
+      format=='lbed'
 
     if extra_args is None:
       args = kwargs
@@ -1124,10 +1135,10 @@ class PlinkBedWriter(object):
 
     # Write magic number and mode=1
     if format=='lbed':
-      # Write BED mode
+      # Write BED normal mode (ldat)
       self.out.write( chr(1) )
     else:
-      # Write BED mode
+      # Write BED transposed-mode (sdat)
       self.out.write( chr(0) )
       models = [ self.genome.get_model(locus) for locus in self.columns ]
 

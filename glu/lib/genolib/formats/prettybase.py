@@ -7,6 +7,12 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['PrettybaseWriter', 'save_prettybase', 'load_prettybase']
+
+__genoformats__ = [
+  #     LOADER             SAVER              WRITER        PFORMAT     ALIAS      EXTS
+  ('load_prettybase', 'save_prettybase', 'PrettybaseWriter', 'trip', 'prettybase', 'pb') ]
+
 
 import re
 
@@ -14,9 +20,6 @@ from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filena
                                         get_csv_dialect,trybool,list_reader
 
 from   glu.lib.genolib.streams   import GenotripleStream
-
-
-__all__ = ['PrettybaseWriter', 'save_prettybase', 'load_prettybase']
 
 
 def load_prettybase(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):

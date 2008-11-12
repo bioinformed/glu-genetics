@@ -7,14 +7,17 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['PhaseWriter', 'save_phase']
+
+__genoformats__ = [
+#  LOADER    SAVER          WRITER     PFORMAT  ALIAS   EXTS
+  ( None, 'save_phase', 'PhaseWriter', 'sdat',  None,  'phase') ]
+
 
 from   glu.lib.fileutils         import autofile,compressed_filename,  \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-
-
-__all__ = ['PhaseWriter', 'save_phase']
 
 
 class PhaseWriter(object):

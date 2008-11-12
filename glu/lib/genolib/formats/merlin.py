@@ -7,6 +7,12 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['MerlinWriter', 'save_merlin', 'load_merlin']
+
+__genoformats__ = [
+  #   LOADER         SAVER          WRITER       PFORMAT           ALIAS              EXTS
+  ('load_merlin', 'save_merlin', 'MerlinWriter', 'sdat', ['merlin','mach','linkage'], None) ]
+
 
 from   itertools                 import islice
 
@@ -18,9 +24,6 @@ from   glu.lib.fileutils         import autofile,namefile,               \
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.locus     import Genome, load_locus_records, populate_genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
-
-
-__all__ = ['MerlinWriter', 'save_merlin', 'load_merlin']
 
 
 ALLELE_MAP  = {'0':None}

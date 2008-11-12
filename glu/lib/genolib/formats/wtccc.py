@@ -7,13 +7,16 @@ __copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+__all__       = ['WTCCCWriter', 'save_wtccc']
+
+__genoformats__ = [
+#  LOADER     SAVER         WRITER      PFORMAT  ALIAS   EXTS
+  ( None,  'save_wtccc', 'WTCCCWriter', 'ldat', 'wtccc', None) ]
+
 
 from   glu.lib.fileutils         import autofile,parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-
-
-__all__ = ['WTCCCWriter', 'save_wtccc']
 
 
 GENOS = [ ['0','0','0'],
