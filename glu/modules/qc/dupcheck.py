@@ -86,7 +86,7 @@ def main():
     raise ValueError('Invalid threshold %s given.  Must be between 0 and 1.' % threshold)
 
   if len(args) != 1:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   expected_dupset = union_find()

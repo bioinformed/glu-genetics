@@ -395,7 +395,7 @@ def main():
   options,args = parser.parse_args()
 
   if not args:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   genome = Genome()
@@ -415,13 +415,13 @@ def main():
   errorhandler = None
   if options.warnings:
     def errorhandler(msg):
-      print >> sys.stderr, 'WARNING: %s' % msg
+      sys.stderr.write('WARNING: %s\n' % msg)
 
   if options.manifest:
-    print >> sys.stderr, 'Processing Illumina manifest file...',
+    sys.stderr.write('Processing Illumina manifest file...')
     manifest = load_illumina_manifest(options.manifest)
     parse_manifest(manifest,genome,abmap,targetstrand=options.targetstrand,errorhandler=errorhandler)
-    print >> sys.stderr, 'done.'
+    sys.stderr.write('done.\n')
 
   if options.abmap:
     abmap.update(load_abmap(options.abmap))

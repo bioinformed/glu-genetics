@@ -41,7 +41,7 @@ except ImportError:
 
   from   glu.lib.genolib.bitarray  import getbits,setbits
 
-  print >> sys.stderr, '[WARNING] Using slow Python genoarray'
+  sys.stderr.write('[WARNING] Using slow Python genoarray\n')
 
   def _hemi(geno):
     return (geno[0] is None) ^ (geno[1] is None)

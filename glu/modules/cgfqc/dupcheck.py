@@ -200,7 +200,7 @@ def main():
   threshold = float(options.threshold)/100
 
   if len(args) != 1:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   out = autofile(hyphen(options.output,sys.stdout), 'w')

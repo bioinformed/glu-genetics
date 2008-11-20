@@ -258,15 +258,15 @@ def clean_tasks(con,tasks,options):
       try:
         alias,qgene,qchromosome,qstart,qstop,qstrand,qtype = query_gene_by_name(con, gene)
       except KeyError,e:
-        print >> sys.stderr, 'Invalid gene: %s' % e.args[0]
+        sys.stderr.write('Invalid gene: %s\n' % e.args[0])
         continue
 
       if chromosome and chromosome != qchromosome:
-        print >> sys.stderr, 'Warning: Chromosome does not match for %s (%s != %s)' % \
-                                     (gene,chromosome,qchromosome)
+        sys.stderr.write('Warning: Chromosome does not match for %s (%s != %s)\n' % 
+                                     (gene,chromosome,qchromosome))
 
       if None in (qstart,qstop):
-        print >> sys.stderr, 'Gene not mapped: %s' % gene
+        sys.stderr.write('Gene not mapped: %s\n' % gene)
         continue
 
       start,stop = gene_margin(qstart,qstop,qstrand,upstream=options.upstream,
@@ -365,7 +365,7 @@ def main():
   options,args = parser.parse_args()
 
   if len(args) != 2:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   con    = open_genedb(options.genedb)
@@ -445,7 +445,8 @@ def main():
 
     pdir = project_path(outdir,project)
     command = 'glu tagzilla.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
-    print >> sys.stderr, subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, bufsize=1).stdout.read()
+    binsum = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, bufsize=1)
+    sys.stderr.write(binsum.stdout.read())
 
     sumfile = file(project_file(outdir,project,'genesum.out'),'w')
     for gene,n in sorted(genecounts.iteritems()):

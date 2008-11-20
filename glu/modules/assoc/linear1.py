@@ -141,7 +141,7 @@ def main():
   options,args = parser.parse_args()
 
   if len(args) not in (1,2):
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   phenos = args[0]

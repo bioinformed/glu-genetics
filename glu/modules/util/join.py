@@ -231,7 +231,7 @@ def main():
   options,args = parser.parse_args()
 
   if len(args) != 2:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   join_type = options.join.lower()

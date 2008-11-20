@@ -47,7 +47,7 @@ def main():
   options,args = parser.parse_args()
 
   if not args:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   infofile = None
@@ -62,7 +62,7 @@ def main():
   sumfile = autofile(hyphen(options.sumfile,sys.stdout), 'w')
 
   if [infofile,sumfile].count(sys.stdout) > 1:
-    print >> sys.stderr, 'ERROR: More than one output file directed to standad out.'
+    sys.stderr.write('ERROR: More than one output file directed to standad out.\n')
     return
 
   subset  = set()

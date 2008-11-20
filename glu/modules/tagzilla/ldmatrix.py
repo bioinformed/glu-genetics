@@ -40,7 +40,7 @@ def main():
   options,args = parser.parse_args()
 
   if not args:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   out = table_writer(options.output,hyphen=sys.stdout)

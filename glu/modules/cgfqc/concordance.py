@@ -323,7 +323,7 @@ def main():
   options,args = parser.parse_args()
 
   if len(args) < 2:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   # Load equivalence maps as many-to-many mappings between final reference

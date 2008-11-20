@@ -126,7 +126,6 @@ def load_merlin(filename,format,genome=None,phenome=None,extra_args=None,**kwarg
         fields = line.split()
 
         if len(fields) != n:
-          print len(fields)
           raise ValueError('Invalid record on line %d of %s' % (line_num+1,namefile(filename)))
 
         family,name,father,mother,sex = [ s.strip() for s in fields[:5] ]

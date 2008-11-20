@@ -113,7 +113,7 @@ def main():
   options,args = parser.parse_args()
 
   if len(args) != 1:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   out = autofile(hyphen(options.output,sys.stdout), 'w')

@@ -89,7 +89,7 @@ def main():
   options,args = parser.parse_args()
 
   if not args:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   subset  = set()

@@ -313,7 +313,7 @@ def main():
   options,args = parser.parse_args()
 
   if len(args) < 2:
-    parser.print_help()
+    parser.print_help(sys.stderr)
     return
 
   # Load equivalence maps as many-to-many mappings between final reference
@@ -353,10 +353,10 @@ def main():
   concordance(refgenos,compgenos,eqsample,eqlocus,sampleconcord,locusconcord)
 
   if options.remap:
-    print >> sys.stderr, 'Computing best allele mappings...',
+    sys.stderr.write('Computing best allele mappings...')
     amap = compute_allele_maps(locusconcord)
     output_allele_maps(amap,options.remap)
-    print >> sys.stderr, 'Done.'
+    sys.stderr.write('Done.\n')
     # FIXME: Until multipass analysis is implemented, we must stop here.
     return
 
