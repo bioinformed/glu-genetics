@@ -20,7 +20,7 @@ except ImportError:
 import glu.modules
 
 
-def main():
+def find_glu_modules():
   path     = glu.modules.__path__
   prefix   = glu.modules.__name__ + '.'
   descrs   = {():glu.modules.__abstract__}
@@ -67,24 +67,31 @@ def main():
     else:
       index = descrs[base]
 
-    # Add only module indexed modules
+    # Add only indexed modules
     if ismodule and index:
       order = getattr(module,'__order__', 50)
       orders[parts] = min(orders.get(parts,100),order)
       modules.append( (index,parts,name,module) )
 
-  # FIXME: Figure out what to do when width is too large
-  width   = max(len(m[2]) for m in modules)+4
   modules = sorted((orders.get(m[0],50),orders.get(m[1],50))+m for m in modules)
+  modules = [ (m[2],)+m[4:] for m in modules ]
+  return modules
+
+
+def main():
+  modules = find_glu_modules()
+
+  # FIXME: Figure out what to do when width is too large
+  width   = max(len(m[1]) for m in modules)+4
 
   out = StringIO()
   out.write('Welcome to GLU: The Genotype Library and Utilities\n')
 
-  inindex = None
-  for o11,o2,index,parts,name,module in modules:
-    if index != inindex:
-      inindex = index
-      out.write('\n%s:\n\n' % index)
+  inheading = None
+  for heading,name,module in modules:
+    if heading != inheading:
+      inheading = heading
+      out.write('\n%s:\n\n' % heading)
 
     abstract = getattr(module,'__abstract__','')
 
