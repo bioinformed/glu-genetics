@@ -81,10 +81,9 @@ def genostream_preferred_format(format):
 
 ########################################################################################################
 # Format discovery function
-def discover_formats():
-  import pkgutil
 
-  from   glu.lib.utils import is_str
+def discover_modules():
+  import pkgutil
 
   path     = __path__
   prefix   = __name__ + '.'
@@ -103,11 +102,16 @@ def discover_formats():
     if name.startswith(prefix):
       name = name[len(prefix):]
 
-    # Construct package path and determine base package
-    parts = tuple(name.split('.'))
-    base  = parts[:-1]
-
     formats = getattr(module,'__genoformats__')
+
+    yield name,module
+
+
+def discover_formats():
+  from   glu.lib.utils import is_str
+
+  for name,module in discover_modules():
+    formats = module.__genoformats__
 
     for loader,saver,writer,pformat,aliases,extensions in formats:
       loader = getattr(module,loader,None) if loader else None
