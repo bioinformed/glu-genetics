@@ -350,10 +350,15 @@ class PlinkPedWriter(object):
         if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
           parent1,parent2 = parent2,parent1
 
+      family     = escape_ident_ws(family or individual)
+      individual = escape_ident_ws(individual)
+      parent1    = escape_ident_ws(parent1 or '0')
+      parent2    = escape_ident_ws(parent2 or '0')
+
       sex   = SEX_RMAP[phenos.sex]
       pheno = PHENO_RMAP[phenos.phenoclass]
 
-      row = [family or individual,individual,parent1 or '0',parent2 or '0',sex,pheno]
+      row = [family,individual,parent1,parent2,sex,pheno]
 
       for g in genos:
         row += [ ALLELE_RMAP.get(a,a) for a in g ]

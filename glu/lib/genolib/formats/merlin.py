@@ -25,6 +25,8 @@ from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.locus     import Genome, load_locus_records, populate_genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
 
+from   glu.lib.genolib.formats.plink import escape_ident_ws
+
 
 ALLELE_MAP  = {'0':None}
 ALLELE_RMAP = {None:'0'}
@@ -257,8 +259,13 @@ class MerlinWriter(object):
       if p1.sex is SEX_FEMALE or p2.sex is SEX_MALE:
         parent1,parent2 = parent2,parent1
 
+    family     = escape_ident_ws(family or individual)
+    individual = escape_ident_ws(individual)
+    parent1    = escape_ident_ws(parent1 or '0')
+    parent2    = escape_ident_ws(parent2 or '0')
+
     sex = SEX_RMAP[phenos.sex]
-    row = [family or individual,individual,parent1 or '0',parent2 or '0',sex]
+    row = [family,individual,parent1,parent2,sex]
 
     for g in genos:
       row += [ ALLELE_RMAP.get(a,a) for a in g ]
@@ -301,7 +308,12 @@ class MerlinWriter(object):
 
       sex = SEX_RMAP[phenos.sex]
 
-      row = [family or individual,individual,parent1 or '0',parent2 or '0',sex]
+      family     = escape_ident_ws(family or individual)
+      individual = escape_ident_ws(individual)
+      parent1    = escape_ident_ws(parent1 or '0')
+      parent2    = escape_ident_ws(parent2 or '0')
+
+      row = [family,individual,parent1,parent2,sex]
 
       for g in genos:
         row += [ ALLELE_RMAP.get(a,a) for a in g ]
