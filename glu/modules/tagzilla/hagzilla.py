@@ -262,7 +262,7 @@ def clean_tasks(con,tasks,options):
         continue
 
       if chromosome and chromosome != qchromosome:
-        sys.stderr.write('Warning: Chromosome does not match for %s (%s != %s)\n' % 
+        sys.stderr.write('Warning: Chromosome does not match for %s (%s != %s)\n' %
                                      (gene,chromosome,qchromosome))
 
       if None in (qstart,qstop):
