@@ -843,7 +843,7 @@ class GenomatrixStream(GenotypeStream):
         def _check(rows):
           for (locus,row),model in izip_exact(rows,self.models):
             assert not self.packed or isinstance(row,GenotypeArray)
-            assert not self.packed or model is row.descriptor.models[0]
+            assert not self.packed or model is row.descriptor[0]
             assert all(g.model is model for g in row)
             assert model is self.genome.loci[locus].model
             assert all(isinstance(g,Genotype) for g in row)

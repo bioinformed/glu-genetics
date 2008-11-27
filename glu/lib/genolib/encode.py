@@ -285,7 +285,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
       for (lname,row),old_model,model in izip(genos,genos.models,models):
         # Cache the descriptor for this model, since we're likely to see it again
         if packed:
-          assert old_model is row.descriptor.models[0]
+          assert old_model is row.descriptor[0]
           descr = descrcache[old_model] = row.descriptor
 
         # Get or build the new descriptor
@@ -343,7 +343,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
 
         # Cache the descriptor for this model, since we're likely to see it again
         if packed:
-          assert old_model is row.descriptor.models[0]
+          assert old_model is row.descriptor[0]
           descr = descrcache[old_model] = row.descriptor
 
         # Get or build the new descriptor
@@ -595,7 +595,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
         if not descr:
           descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
 
-        assert descr.models[0] is model
+        assert descr[0] is model
         models.append(model)
         yield lname,GenotypeArray(descr,row)
 

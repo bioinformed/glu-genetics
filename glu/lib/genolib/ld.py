@@ -16,7 +16,7 @@ from   math        import log
 from   itertools   import izip
 from   collections import defaultdict
 
-from   glu.lib.genolib.genoarray import GenotypeLookupError
+from   glu.lib.genolib.genoarray import GenotypeLookupError,GENO_ARRAY_VERSION
 
 epsilon = 10e-10
 
@@ -304,6 +304,9 @@ def bound_ld_native(c11,c12,c21,c22,dh):
 
 
 try:
+  if GENO_ARRAY_VERSION != 'C':
+    raise ImportError('Using Python version')
+
   # Load the optimized C versions, if available
   from glu.lib.genolib._genoarray import count_haplotypes as count_haplotypes_fast, \
                                          estimate_ld      as estimate_ld_fast

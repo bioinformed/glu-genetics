@@ -495,10 +495,182 @@ descr_length(GenotypeArrayDescriptorObject *self)
 	return n;
 }
 
+static PyObject *
+descr_iter(GenotypeArrayDescriptorObject *self)
+{
+	if(!self->models)
+	{
+		PyErr_SetString(PyExc_ValueError,"invalid descriptor state");
+		return NULL;
+	}
+
+	return PyObject_GetIter(self->models);
+}
+
+static PyObject *
+descr_item(GenotypeArrayDescriptorObject *self, Py_ssize_t i)
+{
+	if(!self->models)
+	{
+		PyErr_SetString(PyExc_ValueError,"invalid descriptor state");
+		return NULL;
+	}
+	return PySequence_GetItem( (PyObject *)self->models, i);
+}
+
+static PyObject *
+descr_subscript(GenotypeArrayDescriptorObject *self, PyObject *item)
+{
+	if(!self->models)
+	{
+		PyErr_SetString(PyExc_ValueError,"invalid descriptor state");
+		return NULL;
+	}
+	return PyObject_GetItem( (PyObject *)self->models, item);
+}
+
+static int
+descr_ass_item(GenotypeArrayDescriptorObject *self, Py_ssize_t item, UnphasedMarkerModelObject *new_model)
+{
+	UnphasedMarkerModelObject *old_model;
+	Py_ssize_t old_len, new_len;
+	int ret;
+
+	if(!new_model || !UnphasedMarkerModel_Check(new_model))
+	{
+		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
+		return -1;
+	}
+
+	old_model = (UnphasedMarkerModelObject *)PyList_GetItem(self->models, item);
+
+	if(!old_model) return -1;
+
+
+	if(old_model->bit_size != new_model->bit_size)
+	{
+		PyErr_SetString(GenotypeRepresentationError,"Model may not be replaced due to incompatible size");
+		return -1;
+	}
+
+	old_len = PyList_Size(old_model->alleles);
+	if(old_len == -1) return -1;
+	new_len = PyList_Size(new_model->alleles);
+	if(new_len == -1) return -1;
+
+	if(old_len > new_len)
+	{
+		PyErr_SetString(GenotypeRepresentationError,"Model may not be replaced since new model defines too few alleles");
+		return -1;
+	}
+
+	old_len = PyList_Size(old_model->genotypes);
+	if(old_len == -1) return -1;
+	new_len = PyList_Size(new_model->genotypes);
+	if(new_len == -1) return -1;
+
+	if(old_len > new_len)
+	{
+		PyErr_SetString(GenotypeRepresentationError,"Model may not be replaced since new model defines too few genotypes");
+		return -1;
+	}
+
+	ret = PyList_SetItem(self->models, item, (PyObject *)new_model);
+
+	if(ret==0) Py_INCREF(new_model);
+
+	return ret;
+}
+
+static int
+descr_ass_slice(GenotypeArrayDescriptorObject *self, PySliceObject *slice, PyObject *value)
+{
+	Py_ssize_t i, j, n;
+	Py_ssize_t start, stop, step, slicelength;
+	UnphasedMarkerModelObject *new_model;
+	PyObject *seq;
+	int ret = -1;
+
+	if(!value)
+	{
+		/* delete slice */
+		PyErr_SetString(PyExc_TypeError, "GenotypeArrayDescriptor objects do not support model deletion");
+		return -1;
+	}
+
+	n = PyList_Size(self->models);
+	if(n==-1) return -1;
+
+	if(PySlice_GetIndicesEx(slice, n, &start, &stop, &step, &slicelength) < 0)
+		return -1;
+
+	seq = PyObject_GetIter(value);
+	if(seq == NULL) goto error;
+
+	for (i=start, j=0; j<slicelength; i+=step, ++j)
+	{
+		new_model = (UnphasedMarkerModelObject *)PyIter_Next(seq);
+
+		if(!new_model) break;
+
+		if( descr_ass_item(self, i, new_model) == -1 )
+		{
+			Py_DECREF(new_model);
+			goto error;
+		}
+		Py_DECREF(new_model);
+	}
+
+	if(PyErr_Occurred())
+	{
+		if(j<slicelength && PyErr_ExceptionMatches(PyExc_StopIteration))
+		{
+			PyErr_Clear();
+			PyErr_SetString(PyExc_ValueError,"attempt to assign too short sequence");
+		}
+		goto error;
+	}
+	else if(j!=slicelength)
+	{
+		PyErr_SetString(PyExc_ValueError,"attempt to assign too long a sequence");
+		goto error;
+	}
+
+	ret = 0;
+
+error:
+	Py_XDECREF(seq);
+	return ret;
+}
+
+static int
+descr_ass_subscript(GenotypeArrayDescriptorObject *self, PyObject *item, PyObject *value)
+{
+	if(!self->models)
+	{
+		PyErr_SetString(PyExc_ValueError,"invalid descriptor state");
+		return -1;
+	}
+	else if(PyIndex_Check(item))
+	{
+		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+		if(i == -1 && PyErr_Occurred())
+			return -1;
+
+		return descr_ass_item(self, i, (UnphasedMarkerModelObject *)value);
+	}
+	else if(PySlice_Check(item))
+		return descr_ass_slice(self, (PySliceObject *)item, value);
+	else
+	{
+		PyErr_SetString(PyExc_TypeError, "indices must be integers or slices");
+		return -1;
+	}
+}
+
 static PyMemberDef descr_members[] = {
-	{"models",	T_OBJECT_EX, offsetof(GenotypeArrayDescriptorObject, models),      RO, "UnphasedMarkerModels"},
+	{"_models",	T_OBJECT_EX, offsetof(GenotypeArrayDescriptorObject, models),      RO, "UnphasedMarkerModels"},
 	{"offsets",	T_OBJECT_EX, offsetof(GenotypeArrayDescriptorObject, offsets),     RO, "offsets"},
-	{"bit_size",	T_UINT,      offsetof(GenotypeArrayDescriptorObject, bit_size),    RO, "bit_size"},
 	{"bit_size",	T_UINT,      offsetof(GenotypeArrayDescriptorObject, bit_size),    RO, "bit_size"},
 	{"homogeneous",	T_UINT,      offsetof(GenotypeArrayDescriptorObject, homogeneous), RO, "homogeneous"},
 	{"max_bit_size",T_UINT,      offsetof(GenotypeArrayDescriptorObject, max_bit_size),RO, "max_bit_size"},
@@ -510,13 +682,19 @@ static PyMethodDef descr_methods[] = {
 	{NULL}  /* Sentinel */
 };
 
+static PyMappingMethods descr_as_mapping = {
+	(lenfunc)descr_length,
+	(binaryfunc)descr_subscript,
+	(objobjargproc)descr_ass_subscript,
+};
+
 static PySequenceMethods descr_as_sequence = {
 	(lenfunc)descr_length,			/* sq_length */
 	0,					/* sq_concat */
 	0,					/* sq_repeat */
-	0,					/* sq_item */
+	(ssizeargfunc)descr_item,		/* sq_item */
 	0,					/* sq_slice */
-	0,					/* sq_ass_item */
+	(ssizeobjargproc)descr_ass_item,	/* sq_ass_item */
 	0,					/* sq_ass_slice */
 	0,					/* sq_contains */
 	0,					/* sq_inplace_concat */
@@ -537,7 +715,7 @@ PyTypeObject GenotypeArrayDescriptorType = {
 	0,					/* tp_repr           */
 	0,					/* tp_as_number      */
 	&descr_as_sequence,			/* tp_as_sequence    */
-	0,					/* tp_as_mapping     */
+	&descr_as_mapping,			/* tp_as_mapping     */
 	0,					/* tp_hash           */
 	0,					/* tp_call           */
 	0,					/* tp_str            */
@@ -1561,7 +1739,7 @@ genoarray_ass_subscript(GenotypeArrayObject *self, PyObject *item, PyObject *val
 		return genoarray_ass_slice(self, (PySliceObject *)item, value);
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "indices must be integers");
+		PyErr_SetString(PyExc_TypeError, "indices must be integers or slices");
 		return -1;
 	}
 }
@@ -3107,7 +3285,7 @@ pick_columns(PyObject *self, PyObject *args)
 		return pick_columns_indices(rows, index);
 	else
 	{
-		PyErr_SetString(PyExc_TypeError, "indices must be an None, integer, sequence, or slice");
+		PyErr_SetString(PyExc_TypeError, "indices must be None, integer, sequence, or slice");
 		return NULL;
 	}
 }

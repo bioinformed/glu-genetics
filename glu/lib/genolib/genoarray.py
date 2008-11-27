@@ -35,7 +35,11 @@ try:
                                             GenotypeLookupError, GenotypeRepresentationError,
                                             pick, pick_columns, place, place_list)
 
+  GENO_ARRAY_VERSION='C'
+
 except ImportError:
+  GENO_ARRAY_VERSION='Python'
+
   import sys
   from   math      import log, ceil
 
@@ -59,7 +63,7 @@ except ImportError:
     possible genotype within a model.
     '''
 
-    __slots__ = ('model','allele1','allele2','allele1_index','allele2_index','index','category')
+    __slots__ = ('model','allele1_index','allele2_index','index','category')
 
     def __init__(self, model, allele1, allele2, index):
       '''
@@ -76,8 +80,6 @@ except ImportError:
       @type     index: int
       '''
       self.model   = model
-      self.allele1 = allele1
-      self.allele2 = allele2
       self.index   = index
 
       self.allele1_index = model.alleles.index(allele1)
@@ -97,11 +99,22 @@ except ImportError:
           raise GenotypeRepresentationError('Attempt to add non-singleton alleles')
         self.category = HETEROZYGOTE
 
+    @property
+    def allele1(self):
+      return self.model.alleles[self.allele1_index]
+
+    @property
+    def allele2(self):
+      return self.model.alleles[self.allele2_index]
+
     def alleles(self):
       '''
       Return a tuple of alleles
       '''
-      return (self.allele1,self.allele2)
+      alleles = self.model.alleles
+      allele1 = alleles[self.allele1_index]
+      allele2 = alleles[self.allele2_index]
+      return (allele1,allele2)
 
     def heterozygote(self):
       '''
@@ -277,7 +290,7 @@ except ImportError:
 
 
   class GenotypeArrayDescriptor(object):
-    __slots__ = ('models','offsets','byte_size','bit_size','max_bit_size','homogeneous')
+    __slots__ = ('_models','offsets','byte_size','bit_size','max_bit_size','homogeneous')
 
     def __init__(self, models, initial_offset=0):
       '''
@@ -297,7 +310,7 @@ except ImportError:
         if m.bit_size != homogeneous:
           homogeneous = 0
 
-      self.models       = models
+      self._models      = models
       self.offsets      = offsets
       self.bit_size     = offsets[-1]
       self.byte_size    = byte_array_size(self.bit_size)
@@ -305,7 +318,58 @@ except ImportError:
       self.homogeneous  = homogeneous
 
     def __len__(self):
-      return len(self.models)
+      return len(self._models)
+
+    def __iter__(self):
+      return iter(self._models)
+
+    def __getitem__(self, i):
+      return self._models[i]
+
+    def __setitem__(self, i, new_model):
+      '''
+      Replace a genotype model with another provided that:
+
+        1. bit size is identical between new and old models
+        2. new model defines an equal or greater number of alleles as the old
+        3. new model defines an equal or greater number of genotypes as the old
+
+      Replacing a model will change the decoding of all genotypes and
+      genotype arrays that refer to this descriptor
+
+      @param         i: index of model to replace
+      @type          i: index type
+      @param new_model: new model
+      @type  new_model: UnphasedMarkerModel
+      '''
+      if isinstance(i,slice):
+        x = xrange(*i.indices(len(self)))
+        try:
+          n    = len(new_model)
+        except TypeError:
+          new_model = list(new_model)
+          n         = len(new_model)
+
+        if len(x) != n:
+          raise IndexError('Invalid slice')
+
+        for j,n in izip(x,new_model):
+          self[j] = n
+
+        return
+
+      old_model = self._models[i]
+
+      if not old_model.bit_size != new_model.bit_size:
+        raise GenotypeRepresentationError('Model may not be replaced due to incompatible size')
+
+      if len(old_model.alleles) > len(new_model.alleles):
+        raise GenotypeRepresentationError('Model may not be replaced since new model defines too few alleles')
+
+      if len(old_model.genotypes) > len(new_model.genotypes):
+        raise GenotypeRepresentationError('Model may not be replaced since new model defines too few genotypes')
+
+      self._models[i] = new_model
 
 
   class GenotypeArray(object):
@@ -338,7 +402,7 @@ except ImportError:
       @return: array length
       @rtype : int
       '''
-      return len(self.descriptor.models)
+      return len(self.descriptor)
 
     def __getitem__(self, i):
       '''
@@ -353,12 +417,12 @@ except ImportError:
       descr = self.descriptor
 
       if isinstance(i,slice):
-        x = xrange(*i.indices(len(descr.models)))
+        x = xrange(*i.indices(len(descr)))
         return [ self[i] for i in x ]
       elif isinstance(i,(list,tuple)):
         return [ self[j] for j in i ]
 
-      model    = descr.models[i]
+      model    = descr[i]
       startbit = descr.offsets[i]
       width    = model.bit_size
       j        = getbits(self.data, startbit, width)
@@ -378,7 +442,7 @@ except ImportError:
       descr = self.descriptor
 
       if isinstance(i,slice):
-        x = xrange(*i.indices(len(descr.models)))
+        x = xrange(*i.indices(len(descr)))
         try:
           n    = len(geno)
         except TypeError:
@@ -394,11 +458,11 @@ except ImportError:
         return
 
       elif isinstance(geno,tuple) and len(geno) == 2:
-        geno = descr.models[i][geno]
+        geno = descr[i][geno]
       elif not isinstance(geno,Genotype):
         raise GenotypeRepresentationError('Invalid genotype: %s' % geno)
 
-      model    = descr.models[i]
+      model    = descr[i]
       startbit = descr.offsets[i]
       width    = model.bit_size
 
@@ -2090,7 +2154,7 @@ def main():
   if 1:
     model   = model_from_alleles('ACGT',allow_hemizygote=True)
     descr   = GenotypeArrayDescriptor( [model]*len(genos) )
-    genomap = dict( (g,m.get_genotype(parse_geno(g))) for m,g in izip(descr.models,genos) )
+    genomap = dict( (g,m.get_genotype(parse_geno(g))) for m,g in izip(descr,genos) )
     print descr.bit_size,descr.byte_size, float(descr.bit_size)/len(descr)
 
   if 1:

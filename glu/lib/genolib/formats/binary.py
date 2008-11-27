@@ -200,7 +200,7 @@ class BinaryGenomatrixWriter(object):
                                chunkshape=(crows,ccols), filters=self.filters, expectedrows=50000)
 
     if format == 'sdat':
-      self.models = row1.descriptor.models
+      self.models = list(row1.descriptor)
     elif format == 'ldat':
       self.models = []
 
@@ -229,7 +229,7 @@ class BinaryGenomatrixWriter(object):
 
     # FIXME: Check schema constraints!!!
     if self.format == 'lbat':
-      self.models.append(genos.descriptor.models[0])
+      self.models.append(genos.descriptor[0])
 
     self.rowkeys.append(rowkey)
     chunk = self.chunk
@@ -280,7 +280,7 @@ class BinaryGenomatrixWriter(object):
       for rowkey,genos in rows:
         rowkeys.append(rowkey)
         chunk.append(genos.data)
-        models.append(genos.descriptor.models[0])
+        models.append(genos.descriptor[0])
         if len(chunk) >= self.chunkrows:
           self.genotypes.append(chunk)
           chunk[:] = []
