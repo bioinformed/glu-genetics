@@ -121,7 +121,7 @@ genotype_traverse(GenotypeObject *self, visitproc visit, void *arg)
 static PyObject *
 genotype_allele1_get(GenotypeObject *self)
 {
-	PyObject *allele1 = PyList_GetItem(self->model->alleles, self->allele1_index);
+	PyObject *allele1 = PyList_GetItem(self->model->alleles, self->allele1_index); /* borrowed ref */
 	Py_XINCREF(allele1);
 	return allele1;
 
@@ -130,7 +130,7 @@ genotype_allele1_get(GenotypeObject *self)
 static PyObject *
 genotype_allele2_get(GenotypeObject *self)
 {
-	PyObject *allele2 = PyList_GetItem(self->model->alleles, self->allele2_index);
+	PyObject *allele2 = PyList_GetItem(self->model->alleles, self->allele2_index); /* borrowed ref */
 	Py_XINCREF(allele2);
 	return allele2;
 }
@@ -138,7 +138,7 @@ genotype_allele2_get(GenotypeObject *self)
 static PyObject *
 genotype_alleles(GenotypeObject *self)
 {
-	PyObject *result = PyList_GetItem(self->model->genotuples, self->index);
+	PyObject *result = PyList_GetItem(self->model->genotuples, self->index); /* borrowed ref */
 	Py_XINCREF(result);
 	return result;
 }
@@ -219,16 +219,15 @@ genotype_item(GenotypeObject *self, Py_ssize_t item)
 {
 	PyObject *allele;
 	if(item == 0)
-		allele = PyList_GetItem(self->model->alleles, self->allele1_index);
+		allele = PyList_GetItem(self->model->alleles, self->allele1_index); /* borrowed ref */
 	else if(item == 1)
-		allele = PyList_GetItem(self->model->alleles, self->allele2_index);
+		allele = PyList_GetItem(self->model->alleles, self->allele2_index); /* borrowed ref */
 	else
 	{
 		PyErr_SetString(PyExc_IndexError,"genotype index out of range");
 		return NULL;
 	}
-	if(allele)
-		Py_INCREF(allele);
+	Py_XINCREF(allele);
 	return allele;
 }
 
@@ -238,11 +237,11 @@ genotype_contains(GenotypeObject *self, PyObject *allele)
 	int cmp;
 	PyObject *allele1, *allele2;
 
-	allele1 = PyList_GetItem(self->model->alleles, self->allele1_index);
+	allele1 = PyList_GetItem(self->model->alleles, self->allele1_index); /* borrowed ref */
 	cmp = PyObject_RichCompareBool(allele, allele1, Py_EQ);
 	if(cmp == 0)
 	{
-		allele2 = PyList_GetItem(self->model->alleles, self->allele2_index);
+		allele2 = PyList_GetItem(self->model->alleles, self->allele2_index); /* borrowed ref */
 		cmp = PyObject_RichCompareBool(allele, allele2, Py_EQ);
 	}
 	return cmp;
@@ -276,16 +275,14 @@ genotype_richcompare(PyObject *self, PyObject *other, int op)
 	if(geno_self)
 	{
 		self=genotype_alleles( (GenotypeObject *)self );
-		if(!self)
-			return NULL;
+		if(!self) return NULL;
 		Py_DECREF(self);  /* SAFE: borrowed reference that belongs to self */
 	}
 
 	if(geno_other)
 	{
 		other=genotype_alleles( (GenotypeObject *)other );
-		if(!other)
-			return NULL;
+		if(!other) return NULL;
 		Py_DECREF(other); /* SAFE: borrowed reference that belongs to other*/
 	}
 
@@ -430,7 +427,7 @@ descr_init(GenotypeArrayDescriptorObject *self, PyObject *args, PyObject *kwds)
 
 	for(i=0; i<n; ++i)
 	{
-		model = (UnphasedMarkerModelObject *)PyList_GetItem(models, i);
+		model = (UnphasedMarkerModelObject *)PyList_GetItem(models, i); /* borrowed ref */
 		if(!model) goto error;
 		if(!UnphasedMarkerModel_Check(model) || model->bit_size > 32)
 		{
@@ -515,7 +512,7 @@ descr_item(GenotypeArrayDescriptorObject *self, Py_ssize_t i)
 		PyErr_SetString(PyExc_ValueError,"invalid descriptor state");
 		return NULL;
 	}
-	return PySequence_GetItem( (PyObject *)self->models, i);
+	return PySequence_GetItem( (PyObject *)self->models, i); /* new ref */
 }
 
 static PyObject *
@@ -526,7 +523,7 @@ descr_subscript(GenotypeArrayDescriptorObject *self, PyObject *item)
 		PyErr_SetString(PyExc_ValueError,"invalid descriptor state");
 		return NULL;
 	}
-	return PyObject_GetItem( (PyObject *)self->models, item);
+	return PyObject_GetItem( (PyObject *)self->models, item); /* new ref */
 }
 
 static int
@@ -542,7 +539,7 @@ descr_ass_item(GenotypeArrayDescriptorObject *self, Py_ssize_t item, UnphasedMar
 		return -1;
 	}
 
-	old_model = (UnphasedMarkerModelObject *)PyList_GetItem(self->models, item);
+	old_model = (UnphasedMarkerModelObject *)PyList_GetItem(self->models, item); /* borrowed ref */
 
 	if(!old_model) return -1;
 
@@ -779,7 +776,7 @@ genomodel_traverse(UnphasedMarkerModelObject *self, visitproc visit, void *arg)
 static PyObject *
 genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 {
-	PyObject *index;
+	Py_ssize_t index;
 
 	if(allele != Py_None && !PyString_Check(allele))
 	{
@@ -787,21 +784,20 @@ genomodel_get_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 		return NULL;
 	}
 
-	index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
+	index = PySequence_Index(self->alleles, allele);
 
-	if(PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
+	if(index==-1)
 	{
-		PyErr_Clear();
 		PyErr_SetObject(GenotypeLookupError, allele);
+		return NULL;
 	}
-	return index;
+	return PyInt_FromSsize_t(index);
 }
 
 static Py_ssize_t
 genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 {
-	PyObject *index;
-	Py_ssize_t result;
+	Py_ssize_t index;
 
 	assert(!PyErr_Occurred());
 
@@ -811,43 +807,35 @@ genomodel_add_allele_internal(UnphasedMarkerModelObject *self, PyObject *allele)
 		return -1;
 	}
 
-	index = PyObject_CallMethod(self->alleles, "index", "(O)", allele);
+	index = PySequence_Index(self->alleles, allele);
 
-	if(PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_ValueError))
+	if(index==-1)
 	{
-		Py_ssize_t n;
-
-		PyErr_Clear();
-
 		/* Note: alleles[0] is always the missing allele */
-		n = PyList_Size(self->alleles);
-		if(n==-1) return -1;
+		index = PyList_Size(self->alleles);
+		if(index==-1) return -1;
 
-		if(n > self->max_alleles)
+		if(index > self->max_alleles)
 		{
 			PyErr_SetString(GenotypeRepresentationError,"genotype model cannot accomodate additional alleles");
 			return -1;
 		}
 
+		/* clear index error and append the new allele */
+		PyErr_Clear();
 		if(PyList_Append(self->alleles, allele) == -1)
 			return -1;
-
-		return n;
 	}
-	result = PyInt_AsSsize_t(index);
-	Py_DECREF(index);
-	return result;
+	return index;
 }
 
 static PyObject *
 genomodel_add_allele(UnphasedMarkerModelObject *self, PyObject *allele)
 {
 	Py_ssize_t result = genomodel_add_allele_internal(self, allele);
+	if(result == -1) return NULL;
 
-	if(result == -1)
-		return NULL;
-	else
-		return PyInt_FromSsize_t(result);
+	return PyInt_FromSsize_t(result);
 }
 
 static PyObject *
@@ -883,7 +871,7 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 	}
 
 	/* Fast path: Genotype already exists */
-	g = PyDict_GetItem(self->genomap, geno);
+	g = PyDict_GetItem(self->genomap, geno); /* borrowed ref */
 	if(g)
 	{
 		Py_INCREF(g);
@@ -891,8 +879,8 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 	}
 
 	/* Slow path: Add alleles and index the genotype */
-	allele1 = PyTuple_GET_ITEM(geno, 0);
-	allele2 = PyTuple_GET_ITEM(geno, 1);
+	allele1 = PyTuple_GET_ITEM(geno, 0); /* borrowed ref */
+	allele2 = PyTuple_GET_ITEM(geno, 1); /* borrowed ref */
 
 	if( !self->allow_hemizygote && ((allele1 == Py_None) ^ (allele2 == Py_None)) )
 	{
@@ -914,17 +902,17 @@ genomodel_add_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 	index2 = genomodel_add_allele_internal(self,allele2);
 	if(index2==-1) return NULL;
 
-	/* Replace alleles with internal representations to avoid immortalizing them */
-	allele1 = PyList_GET_ITEM(self->alleles, index1);
+	/* Replace alleles with internal representations to avoid immortalizing new reps */
+	allele1 = PyList_GET_ITEM(self->alleles, index1); /* borrowed ref */
 	if(!allele1) return NULL;
-	allele2 = PyList_GET_ITEM(self->alleles, index2);
+	allele2 = PyList_GET_ITEM(self->alleles, index2); /* borrowed ref */
 	if(!allele2) return NULL;
 
 	/* Create new genotype */
 	n = PyList_Size(self->genotypes);
 	if(n==-1) return NULL;
 
-	g = PyObject_CallFunction( (PyObject *)&GenotypeType, "(Onnn)", self, index1, index2, n);
+	g = PyObject_CallFunction( (PyObject *)&GenotypeType, "(Onnn)", self, index1, index2, n); /* new ref */
 	if(!g) return NULL;
 
 	/* Add it to the genotype list */
@@ -996,7 +984,9 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 		return NULL;
 	}
 
-	g = PyDict_GetItem(self->genomap, geno);
+	g = PyDict_GetItem(self->genomap, geno); /* borrowed ref */
+
+	/* FIXME: Implicit model updates need to be reviewed very carefully */
 
 	/* If genotype contains both alleles, then create it implicitly.
 	   This is the most obvious behavior and deals with a slew of tricky
@@ -1006,8 +996,8 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 		int c1,c2;
 		PyObject *allele1, *allele2;
 
-		allele1 = PyTuple_GET_ITEM(geno, 0);
-		allele2 = PyTuple_GET_ITEM(geno, 1);
+		allele1 = PyTuple_GET_ITEM(geno, 0); /* borrowed ref */
+		allele2 = PyTuple_GET_ITEM(geno, 1); /* borrowed ref */
 
 		/* Do not implicitly try to add hemizygotes if they are not allowed */
 		if( !self->allow_hemizygote && ((allele1 == Py_None) ^ (allele2 == Py_None)) )
@@ -1302,7 +1292,7 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 	UnphasedMarkerModelObject *model;
 	char *status;
 
-	model = (UnphasedMarkerModelObject *)PyList_GetItem(models, i);
+	model = (UnphasedMarkerModelObject *)PyList_GetItem(models, i); /* borrowed ref */
 
 	if(!model)
 		return NULL;
@@ -1324,7 +1314,7 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 		return NULL;
 	}
 
-	geno = PyList_GetItem(model->genotypes, k);
+	geno = PyList_GetItem(model->genotypes, k); /* borrowed ref */
 	Py_XINCREF(geno);
 
 	return geno;
@@ -1529,7 +1519,7 @@ genoarray_inner_set(PyObject *models, PyObject *geno, unsigned char *data, Py_ss
 	Py_ssize_t offset1, offset2;
 	char *status;
 
-	model = (UnphasedMarkerModelObject *)PyList_GET_ITEM(models, i);
+	model = (UnphasedMarkerModelObject *)PyList_GET_ITEM(models, i); /* borrowed ref */
 
 	if(!model || !UnphasedMarkerModel_Check(model))
 	{
@@ -1950,7 +1940,7 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 	if(len && !model && GenotypeArray_Check(genos))
 	{
 		GenotypeArrayObject *garray = (GenotypeArrayObject *)genos;
-		model = PyList_GetItem(garray->descriptor->models, 0);
+		model = PyList_GetItem(garray->descriptor->models, 0); /* borrowed ref */
 	}
 
 	if(len && !model)
@@ -1963,7 +1953,7 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 			Py_XDECREF(geno);
 			return NULL;
 		}
-		model = (PyObject *)geno->model;
+		model = (PyObject *)geno->model; /* borrowed ref */
 		Py_DECREF(geno);
 	}
 
@@ -1991,8 +1981,8 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 		PyArray_FILLWBYTE(count_array, 0);
 	}
 
-	state.model  = (UnphasedMarkerModelObject *)model;
-	state.counts = (unsigned long *)PyArray_DATA(count_array);
+	state.model  = (UnphasedMarkerModelObject *)model; /* borrowed ref */
+	state.counts = (unsigned long *)PyArray_DATA(count_array); /* borrowed ref */
 
 	if(for_each_genotype(genos, (geno_foreach)counts_foreach, &state) < 0)
 	{
@@ -2452,11 +2442,11 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 	if(len && !model && GenotypeArray_Check(genos))
 	{
 		GenotypeArrayObject *garray = (GenotypeArrayObject *)genos;
-		model = PyList_GetItem(garray->descriptor->models, 0);
+		model = PyList_GetItem(garray->descriptor->models, 0); /* borrowed ref */
 	}
 	else if(len && !model)
 	{
-		GenotypeObject *geno = (GenotypeObject *)PySequence_GetItem(genos, 0);
+		GenotypeObject *geno = (GenotypeObject *)PySequence_GetItem(genos, 0); /* new ref */
 		if(!geno || !Genotype_CheckExact(geno))
 		{
 			PyErr_Format(GenotypeRepresentationError,
@@ -2464,7 +2454,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 			Py_XDECREF(geno);
 			goto error;
 		}
-		model = (PyObject *)geno->model;
+		model = (PyObject *)geno->model; /* borrowed ref */
 		Py_DECREF(geno);
 	}
 
@@ -2621,7 +2611,7 @@ sample_summary(PyObject *genos, PyObject *locus_counts, PyObject *sample_counts)
 
 			for(i = 0; i<len; ++i)
 			{
-				GenotypeObject *geno = (GenotypeObject *)PySequence_GetItem(genos, i);
+				GenotypeObject *geno = (GenotypeObject *)PySequence_GetItem(genos, i); /* new ref */
 
 				if(!geno || !Genotype_CheckExact(geno))
 				{
@@ -3119,9 +3109,9 @@ pick_columns_index(PyObject *rows, Py_ssize_t index)
 
 	for(i=0; i<len; i++)
 	{
-		item = PySequence_GetItem(items[i], index);
+		item = PySequence_GetItem(items[i], index); /* new ref */
 		if(!item) goto error;
-		PyList_SET_ITEM(result, i, item);
+		PyList_SET_ITEM(result, i, item); /* steal ref */
 	}
 
 	Py_DECREF(rows);
@@ -3190,9 +3180,9 @@ pick_columns_slice(PyObject *rows, PyObject *slice)
 	for(j=0; j<rowlen; j++)
 		for (k=start, i=0; i<slicelen; k+=step, i++)
 		{
-			item = PySequence_GetItem(rowitems[j], k);
+			item = PySequence_GetItem(rowitems[j], k); /* new ref */
 			if(!item) goto error;
-			PyList_SET_ITEM(resultitems[i], j, item);
+			PyList_SET_ITEM(resultitems[i], j, item); /* steal ref */
 		}
 
 done:
@@ -3245,9 +3235,9 @@ pick_columns_indices(PyObject *rows, PyObject *indices)
 	for(j=0; j<rowlen; j++)
 		for(i=0; i<indexlen; i++)
 		{
-			item = PySequence_GetItem(rowitems[j], indexarray[i]);
+			item = PySequence_GetItem(rowitems[j], indexarray[i]); /* new ref */
 			if(!item) goto error;
-			PyList_SET_ITEM(resultitems[i], j, item);
+			PyList_SET_ITEM(resultitems[i], j, item); /* steal ref */
 		}
 
 	free(indexarray);
@@ -3385,7 +3375,7 @@ place_list(PyObject *self, PyObject *args)
 		if(j==-1 && PyErr_Occurred()) goto error;
 
 		srcitem  = srcitems[i];
-		destitem = PySequence_GetItem(dest, j);
+		destitem = PySequence_GetItem(dest, j); /* new ref */
 
 		if(!destitem)
 		{
@@ -3400,12 +3390,14 @@ place_list(PyObject *self, PyObject *args)
 		{
 			Py_DECREF(destitem);
 			if(PyList_CheckExact(srcitem) && PyList_GET_SIZE(srcitem)==1)
-				srcitem = PyList_GET_ITEM(srcitem,0);
-			if( PySequence_SetItem(dest, j, srcitem) < 0) goto error;
+				srcitem = PyList_GET_ITEM(srcitem,0); /* borrowed ref */
+			if( PySequence_SetItem(dest, j, srcitem) < 0)
+				goto error;
 		}
 		else if(PyList_CheckExact(destitem) && PyList_CheckExact(srcitem))
 		{
 			PyObject *items = PySequence_InPlaceConcat(destitem, srcitem);
+			/* items should equal destitem */
 			Py_DECREF(destitem);
 			if(!items || PySequence_SetItem(dest, j, items) < 0)
 			{
@@ -3427,7 +3419,7 @@ place_list(PyObject *self, PyObject *args)
 			if(ret < 0 || PySequence_SetItem(dest, j, srcitem) < 0)
 				goto error;
 		}
-		else
+		else /* neither None or lists */
 		{
 			PyObject *items = PyList_New(2);
 			if(!items)
@@ -3477,7 +3469,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 
 	if(genos==Py_None)
 	{
-		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0);
+		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0); /* borrowed ref */
 		Py_XINCREF(genofound);
 		return genofound;
 	}
@@ -3549,7 +3541,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		if(missing)
 			genofound = missing;
 		else
-			genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0);
+			genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0); /* borrowed ref */
 	}
 	else if(found == 1)
 		*status = MERGE_UNAMBIGUOUS;
@@ -3642,7 +3634,7 @@ genomerger_merge_genotype_py(GenotypeMergerObject *self, PyObject *model, PyObje
 	PyObject *result;
 	GenotypeObject *geno;
 
-	result = PyObject_CallFunction(self->pymergefunc, "(OO)", model, genos);
+	result = PyObject_CallFunction(self->pymergefunc, "(OO)", model, genos); /* new ref */
 	if(!result) return NULL;
 
 	if(!PyTuple_Check(result) || PyTuple_GET_SIZE(result) != 2
@@ -3658,7 +3650,7 @@ genomerger_merge_genotype_py(GenotypeMergerObject *self, PyObject *model, PyObje
 		Py_DECREF(result);
 		return NULL;
 	}
-	geno = (GenotypeObject *)PyTuple_GET_ITEM(result,1);
+	geno = (GenotypeObject *)PyTuple_GET_ITEM(result,1); /* borrowed ref */
 	Py_INCREF(geno);
 	Py_DECREF(result);
 	return (PyObject *)geno;
@@ -3678,7 +3670,7 @@ genomerger_get_stats(PyObject *sdict, PyObject *key)
 {
 	PyObject *stats;
 
-	stats = PyDict_GetItem(sdict, key);
+	stats = PyDict_GetItem(sdict, key); /* borrwed ref */
 
 	if(!stats && PyErr_Occurred()) return NULL;
 
