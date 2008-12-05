@@ -42,7 +42,7 @@ Intended Audience :: Developers
 Intended Audience :: Information Technology
 Intended Audience :: Science/Research
 License :: OSI Approved :: BSD License
-Programming Language :: Python
+Programming Language :: Python :: 2.5
 Programming Language :: C
 Topic :: Scientific/Engineering
 Topic :: Software Development

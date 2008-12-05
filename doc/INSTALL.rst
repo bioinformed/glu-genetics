@@ -30,7 +30,7 @@ All-in-one binary installer for Windows XP and Vista (32 bit)
 
    * `Intel CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-win32_Intel.zip&can=2&q=
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-win32_Intel.zip
 
    * AMD CPU *(coming soon)*
 
@@ -111,15 +111,15 @@ All-in-one binary archive for Linux and OS X
 
    * `Linux 64 bit with an Intel CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_Intel_EM64T.tar.gz&can=2&q=
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_Intel_EM64T.tar.gz
 
    * `Linux 64 bit with an AMD CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_AMD_EM64T.tar.gz&can=2&q=
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_AMD_EM64T.tar.gz
 
    * `Apple OS X with an Intel CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-OSX_Intel.tar.gz&can=2&q=
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-OSX_Intel.tar.gz
 
 
    Below we will assume the Linux 64 bit version for Intel CPUs.
