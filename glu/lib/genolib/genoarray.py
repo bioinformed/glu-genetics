@@ -164,6 +164,9 @@ except ImportError:
       '''
       return repr(self.alleles())
 
+    def __hash__(self):
+      return hash(self.alleles())
+
     def __eq__(self,other):
       '''
       Compare this genotype with another genotype or tuple for equality.
@@ -177,9 +180,6 @@ except ImportError:
       geno_self  = isinstance(self,Genotype)
       geno_other = isinstance(other,Genotype)
 
-      if geno_self and geno_other:
-        return self is other
-
       if geno_self:
         self = self.alleles()
       if geno_other:
@@ -189,7 +189,7 @@ except ImportError:
          not isinstance(other,tuple) or len(other)!=2:
         return NotImplemented
 
-      return self==other
+      return sorted(self)==sorted(other)
 
     def __ne__(self,other):
       '''
@@ -204,9 +204,6 @@ except ImportError:
       geno_self  = isinstance(self,Genotype)
       geno_other = isinstance(other,Genotype)
 
-      if geno_self and geno_other:
-        return self is not other
-
       if geno_self:
         self = self.alleles()
       if geno_other:
@@ -216,7 +213,7 @@ except ImportError:
          not isinstance(other,tuple) or len(other)!=2:
         return NotImplemented
 
-      return self!=other
+      return sorted(self)!=sorted(other)
 
     def __lt__(self,other):
       '''
@@ -235,7 +232,7 @@ except ImportError:
          not isinstance(other,tuple) or len(other)!=2:
         return NotImplemented
 
-      return self<other
+      return sorted(self)<sorted(other)
 
     def __le__(self,other):
       '''
@@ -255,7 +252,7 @@ except ImportError:
          not isinstance(other,tuple) or len(other)!=2:
         return NotImplemented
 
-      return self<=other
+      return sorted(self)<=sorted(other)
 
   def genotype_bit_size(n,allow_hemizygote):
     '''
@@ -1020,10 +1017,7 @@ except ImportError:
     @rtype         : sequence
 
     >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
-    [None, 'A', ['A', 'A', 'B'], None]
-
-    >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
-    [None, 'A', ['A', 'A', 'B'], None]
+    [None, 'A', ['A', 'B', 'A'], None]
     '''
     if len(src) != len(indices):
       raise ValueError('source data and index length mismatch')
@@ -1032,23 +1026,25 @@ except ImportError:
       d = dest[i]
 
       if s is None:
-        s = []
-      elif not isinstance(s,list):
-        s = [s]
+        continue
+
+      s_list = isinstance(s,list)
+      d_list = isinstance(d,list)
 
       if d is None:
-        d = []
-      elif not isinstance(d,list):
-        d = [d]
-
-      res = d+s
-
-      if not res:
-        res = None
-      elif len(res) == 1:
-        res = res[0]
-
-      dest[i] = res
+        if s_list and len(s)==1:
+          dest[i] = s[0]
+        else:
+          dest[i] = s
+      elif s_list and d_list:
+        dest[i] += s
+      elif d_list:
+        dest[i].append(s)
+      elif s_list:
+        s.append(d)
+        dest[i] = s
+      else:
+        dest[i] = [d,s]
 
     return dest
 
@@ -1583,7 +1579,54 @@ def test_genotypes():
   [0, 1, 2, 3, 4, 5]
   >>> [ g.category for g in model.genotypes ]
   [0, 1, 1, 2, 3, 2]
+
+  # Test EQ
+
+  >>> model2 = model_from_alleles('AB')
+  >>> all(model[geno]==geno for geno in model2.genotypes)
+  True
+  >>> model['A','B'] == ('B','A')
+  True
+  >>> model['A','B'] == ('A','B')
+  True
+  >>> model['B','B'] == ('A','A')
+  False
+  >>> model['B','B'] == ('A','B')
+  False
+  >>> model['A','B'] == model2['B','A']
+  True
+  >>> model['A','B'] == model2['A','B']
+  True
+  >>> model['B','B'] == model2['A','A']
+  False
+  >>> model['B','B'] == model2['A','B']
+  False
+
+  # Test NE
+  >>> model['A','B'] != ('B','A')
+  False
+  >>> model['A','B'] != ('A','B')
+  False
+  >>> model['B','B'] != ('A','A')
+  True
+  >>> model['B','B'] != ('A','B')
+  True
+  >>> model['A','B'] != model2['B','A']
+  False
+  >>> model['A','B'] != model2['A','B']
+  False
+  >>> model['B','B'] != model2['A','A']
+  True
+  >>> model['B','B'] != model2['A','B']
+  True
+
+  # Test hash
+  >>> all(hash(model[geno])==hash(geno) for geno in model2.genotypes)
+  True
+  >>> all( not ((g1==g2) ^ (hash(g1)==hash(g2))) for g1 in model.genotypes for g2 in model2.genotypes)
+  True
   '''
+
 
 def test_tolist():
   '''
@@ -1973,9 +2016,6 @@ def test_place():
 
 def test_place_list():
   '''
-  >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
-  [None, 'A', ['A', 'B', 'A'], None]
-
   >>> place_list([None]*4, ['A',['A','B'],None,['A']], [2,2,0,1])
   [None, 'A', ['A', 'B', 'A'], None]
   '''

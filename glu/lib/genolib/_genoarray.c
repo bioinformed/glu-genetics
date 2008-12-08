@@ -250,49 +250,56 @@ genotype_contains(GenotypeObject *self, PyObject *allele)
 static long
 genotype_hash(GenotypeObject *self)
 {
-	return _Py_HashPointer(self);
+	PyObject *alleles = PyList_GetItem(self->model->genotuples, self->index); /* borrowed ref */
+	if(!alleles) return -1;
+	return PyObject_Hash(alleles);
+}
+
+static PyObject *
+genotype_normalized_tuple(PyObject *geno)
+{
+	PyObject *allele1, *allele2;
+	int res;
+
+	if(Genotype_CheckExact(geno))
+		return genotype_alleles( (GenotypeObject *)geno );
+
+	if(!PyTuple_Check(geno)  || PyTuple_GET_SIZE(geno)  != 2)
+	{
+		PyErr_SetString(GenotypeRepresentationError,"genotype must be specified as a 2-tuple");
+		return NULL;
+	}
+
+	allele1 = PyTuple_GET_ITEM(geno, 0); /* borrowed ref */
+	allele2 = PyTuple_GET_ITEM(geno, 1); /* borrowed ref */
+	res = PyObject_RichCompareBool(allele1, allele2, Py_GT);
+
+	if(res == -1) return NULL;
+	else if(res == 1)
+		return PyTuple_Pack(2, allele2, allele1);
+	else
+	{
+		Py_INCREF(geno);
+		return geno;
+	}
 }
 
 static PyObject *
 genotype_richcompare(PyObject *self, PyObject *other, int op)
 {
-	int geno_self, geno_other;
+	PyObject *geno1=NULL, *geno2=NULL, *ret=NULL;
 
-	geno_self  = Genotype_CheckExact(self);
-	geno_other = Genotype_CheckExact(other);
+	geno1 = genotype_normalized_tuple(self);
+	if(!geno1) goto done;
+	geno2 = genotype_normalized_tuple(other);
+	if(!geno2) goto done;
 
-	/* Genotype to genotype equality/inequality comparisons
-	   are based on object identity */
-	if(geno_self && geno_other && (op==Py_EQ || op==Py_NE))
-	{
-		if(op==Py_EQ)
-			return PyBool_FromLong(self==other);
-		else
-			return PyBool_FromLong(self!=other);
-	}
+	ret=PyObject_RichCompare(geno1, geno2, op);
 
-	/* Otherwise compare based on the corresponding tuple ordering */
-	if(geno_self)
-	{
-		self=genotype_alleles( (GenotypeObject *)self );
-		if(!self) return NULL;
-		Py_DECREF(self);  /* SAFE: borrowed reference that belongs to self */
-	}
-
-	if(geno_other)
-	{
-		other=genotype_alleles( (GenotypeObject *)other );
-		if(!other) return NULL;
-		Py_DECREF(other); /* SAFE: borrowed reference that belongs to other*/
-	}
-
-	if(!PyTuple_Check(self)  || PyTuple_GET_SIZE(self)  != 2 ||
-	   !PyTuple_Check(other) || PyTuple_GET_SIZE(other) != 2)
-	{
-		Py_INCREF(Py_NotImplemented);
-		return Py_NotImplemented;
-	}
-	return PyObject_RichCompare(self, other, op);
+done:
+	Py_XDECREF(geno1);
+	Py_XDECREF(geno2);
+	return ret;
 }
 
 static PyMemberDef genotype_members[] = {
@@ -3406,13 +3413,13 @@ place_list(PyObject *self, PyObject *args)
 			}
 			Py_DECREF(items);
 		}
-		else if(PyList_CheckExact(destitem) && !PyList_CheckExact(srcitem))
+		else if(PyList_CheckExact(destitem))
 		{
 			int ret = PyList_Append(destitem, srcitem);
 			Py_DECREF(destitem);
 			if(ret < 0) goto error;
 		}
-		else if(!PyList_CheckExact(destitem) && PyList_CheckExact(srcitem))
+		else if(PyList_CheckExact(srcitem))
 		{
 			ret = PyList_Append(srcitem, destitem);
 			Py_DECREF(destitem);
