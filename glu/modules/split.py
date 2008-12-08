@@ -74,7 +74,6 @@ def genomatrix_multiplexer_packed(genos, samplegroups, locusgroups, defaultsampl
   # take care of this for me...
   if columngroups and rowgroups:
     for rowkey,row in genos:
-      models = row.descriptor.models
       row = row[:]
       for rowgroup in rowgroups.get(rowkey) or rdefault:
         if not rowgroup:
@@ -82,7 +81,7 @@ def genomatrix_multiplexer_packed(genos, samplegroups, locusgroups, defaultsampl
         for columngroup,indices,descr,header in groupcols:
           if not descr:
             n     = len(indices)
-            model = models[0]
+            model = row.descriptor[0]
             descr = descrcache.get( (model,n) )
           if not descr:
             descr = descrcache[model,n] = GenotypeArrayDescriptor([model]*n)
@@ -91,12 +90,11 @@ def genomatrix_multiplexer_packed(genos, samplegroups, locusgroups, defaultsampl
 
   elif columngroups:
     for rowkey,row in genos:
-      models = row.descriptor.models
       row = row[:]
       for columngroup,indices,descr,header in groupcols:
         if not descr:
           n     = len(indices)
-          model = models[0]
+          model = row.descriptor[0]
           descr = descrcache.get( (model,n) )
         if not descr:
           descr = descrcache[model,n] = GenotypeArrayDescriptor([model]*n)
