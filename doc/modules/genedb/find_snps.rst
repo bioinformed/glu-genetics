@@ -27,6 +27,3 @@ Options:
                         limit)
   -o FILE, --output=FILE
                         the name of the output file, '-' for standard out
-  -i FILE, --infile=FILE
-                        the name of the feature file containing list of
-                        features, '-' for standard in

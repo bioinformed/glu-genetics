@@ -41,8 +41,6 @@ def option_parser():
                     help='maximum number of downstream SNPs (default=0 for no limit)')
   parser.add_option('-o', '--output',  dest='output', default='-', metavar='FILE',
                     help="the name of the output file, '-' for standard out")
-  parser.add_option('-i', '--infile',   dest='infile',  default='-', metavar='FILE',
-                    help="the name of the feature file containing list of features, '-' for standard in")
   return parser
 
 

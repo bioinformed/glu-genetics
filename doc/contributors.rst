@@ -21,11 +21,10 @@ subsidiary of Science Applications International Corporation (SAIC_).
 GLU would not have been possible without the dedication and perseverance of
 the team at NCI and our CGEMS collaborators:
 
-* Laurie Burdette
+* Laurie Burdett
 * Stephen Chanock
 * Constance Chen
 * Xiang Deng
-* Thomas Giles
 * Jesus Gonzalez-Bosquet
 * Amy Hutchinson
 * Peter Kraft
@@ -34,6 +33,7 @@ the team at NCI and our CGEMS collaborators:
 * Dennis Maeder
 * Nick Orr
 * Bernice Packer
+* Gilles Thomas
 * Peggy Tucker
 * Zhaoming Wang
 * Robert Welch

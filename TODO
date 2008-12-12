@@ -15,9 +15,9 @@ documentation
 distribution
 ------------
 
-  * Prepare Linux binary distribution (AMD64 and Intel64)
-  * Prepare OSX binary distribution
-  * Prepare win32 binary distribution (AMD and Intel)
+  * ==DONE== Prepare Linux binary distribution (AMD64 and Intel64)
+  * ==DONE== Prepare OSX binary distribution
+  * ==DONE== Prepare win32 binary distribution (AMD and Intel)
 
 -------
 genolib
