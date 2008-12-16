@@ -34,7 +34,7 @@ class SampleConcordStat(object):
 
   def update(self, refgeno, refsample, compgeno, compsample):
     values = self.stats[refsample,compsample]
-    if refgeno.alleles()==compgeno.alleles():
+    if refgeno==compgeno:
       values[4]    += 1
     else:
       mode = geno_pair_mode(refgeno,compgeno)
@@ -108,7 +108,7 @@ def generate_locus_output(locusconcord,allelemaps):
     for (g1,g2),n in stats.iteritems():
       refgenos[g1]  = refgenos.get(g1,0)  + n
       compgenos[g2] = compgenos.get(g2,0) + n
-      if g1.alleles()==g2.alleles():
+      if g1==g2:
         concord       += n
       else:
         mode = geno_pair_mode(g1,g2)
@@ -127,7 +127,7 @@ def generate_locus_output(locusconcord,allelemaps):
     discordgenos = []
     for (g1,g2),n in stats.iteritems():
       cdat = (''.join(g1),''.join(g2),n)
-      if g1.alleles()==g2.alleles():
+      if g1==g2:
         concordgenos.append(cdat)
       else:
         discordgenos.append(cdat)
