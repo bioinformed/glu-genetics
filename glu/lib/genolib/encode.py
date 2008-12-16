@@ -11,14 +11,14 @@ __revision__  = '$Id$'
 import sys
 
 from   operator                  import getitem
-from   itertools                 import izip,imap,chain,repeat
+from   itertools                 import izip,imap,repeat,count
 
-from   glu.lib.utils             import izip_exact,is_str
+from   glu.lib.utils             import is_str
 
 from   glu.lib.genolib.locus     import Genome
-from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,Genotype,   \
+from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,            \
                                         GenotypeLookupError, GenotypeRepresentationError, \
-                                        model_from_alleles
+                                        build_model, build_descr
 
 
 def _sample_encoding_error(loci,models,genos,warn=False):
@@ -90,15 +90,11 @@ def pack_genomatrixstream(genos):
         yield label,GenotypeArray(descr,row)
     else:
       n = len(genos.columns)
-      descrcache = {}
 
-      for label,row in genos:
-        model = row[0].model
-        descr = descrcache.get(model)
-        if descr is None:
-          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
-
-        yield label,GenotypeArray(descr,row)
+      for lname,row in genos:
+        model = genos.genome.get_model(lname)
+        descr = build_descr(model,n)
+        yield lname,GenotypeArray(descr,row)
 
   if not genos.columns:
     return genos
@@ -106,7 +102,6 @@ def pack_genomatrixstream(genos):
   return genos.clone(_pack(genos),packed=True)
 
 
-# FIXME: Implement COW on genotype models
 def recode_genomatrixstream(genos, genome, warn=False):
   '''
   Returns a new genomatrix with the genotypes encoded with representations
@@ -123,13 +118,14 @@ def recode_genomatrixstream(genos, genome, warn=False):
                        supplied genome
   @rtype             : GenomatrixStream
 
-  >>> from glu.lib.genolib.streams import GenomatrixStream
-  >>> defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
+  >>> from glu.lib.genolib.streams   import GenomatrixStream
+  >>> from glu.lib.genolib.genoarray import Genotype
+  >>> defmodel = build_model(alleles='ACGT',allow_hemizygote=True)
   >>> genome = Genome()
-  >>> genome.set_locus('l1',model=defmodel)
-  >>> genome.set_locus('l2',model=defmodel)
-  >>> genome.set_locus('l3',model=defmodel)
-  >>> genome.set_locus('l4',model=defmodel)
+  >>> genome.set_locus('l1',defmodel)
+  >>> genome.set_locus('l2',defmodel)
+  >>> genome.set_locus('l3',defmodel)
+  >>> genome.set_locus('l4',defmodel)
 
   Test ldat "unknown" models remapped to a default model
 
@@ -146,7 +142,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
   ('s1', 's2', 's3')
   >>> all(model is defmodel for model in genos.models)
   True
-  >>> for (label,row),model in izip_exact(genos,genos.models):
+  >>> for (label,row),model in izip(genos,genos.models):
   ...   print label,row,model is defmodel,all(isinstance(g,Genotype) for g in row)
   l1 [('A', 'A'), (None, None), ('G', 'G')] True True
   l2 [(None, None), (None, None), (None, None)] True True
@@ -178,7 +174,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
   >>> len(genos.models)
   4
   >>> genos = recode_genomatrixstream(genos,Genome())
-  >>> for (label,row),model in izip_exact(genos,genos.models):
+  >>> for (label,row),model in izip(genos,genos.models):
   ...   print label,row,model is not defmodel,all(isinstance(g,Genotype) for g in row)
   l1 [('A', 'A'), (None, None), ('G', 'G')] True True
   l2 [(None, None), (None, None), (None, None)] True True
@@ -191,7 +187,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
   >>> len(genos.models)
   4
   >>> genos = recode_genomatrixstream(genos,genome)
-  >>> for (label,row),model in izip_exact(genos,genos.models):
+  >>> for (label,row),model in izip(genos,genos.models):
   ...   print label,row,model is defmodel,all(isinstance(g,Genotype) for g in row)
   l1 [('A', 'A'), (None, None), ('G', 'G')] True True
   l2 [(None, None), (None, None), (None, None)] True True
@@ -237,19 +233,59 @@ def recode_genomatrixstream(genos, genome, warn=False):
   # Data for slowpath
   models = []
 
-  # All loci and models are known
-  if genos.loci is not None and len(genos.models) == len(genos.loci):
+  if genos.format=='ldat':
+    def _recode_genomatrixstream():
+      n = len(genos.samples)
+
+      packed = genos.packed
+
+      for i,(lname,row),old_model in izip(count(),genos,genos.models):
+        old_locus = genos.genome.loci[lname]
+
+        if lname not in genome.loci:
+          loc = genome.loci[lname] = old_locus
+        else:
+          genome.merge_locus(lname, None, old_locus.chromosome, old_locus.location,
+                                          old_locus.strand, warn)
+          loc = genome.loci[lname]
+
+        if loc.model is None:
+          model = loc.model = old_model
+        else:
+          model = loc.model
+
+        # If recoding or packing is required
+        if old_model is not model or not packed:
+          descr = build_descr(model,n)
+
+          try:
+            row = GenotypeArray(descr,row)
+          except GenotypeLookupError:
+            try:
+              model = models[i] = loc.model = build_model(alleles=old_model.alleles[1:],base=loc.model)
+            except GenotypeRepresentationError:
+              _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),model,warn)
+
+            descr = build_descr(model,n)
+            row = GenotypeArray(descr,row)
+
+        models.append(model)
+        yield lname,row
+
+  # sdat format
+  elif genos.format=='sdat':
+    assert genos.loci is not None and len(genos.loci) == len(genos.models)
+
+    # All loci and models are known
     recode = False
     for lname,old_model in izip(genos.loci,genos.models):
-      # Get the new model or fix the old model
       old_locus = genos.genome.loci[lname]
-      #assert old_locus.model is old_model or None in (old_model,old_locus.model)
 
       if lname not in genome.loci:
         loc = genome.loci[lname] = old_locus
       else:
-        genome.merge_locus(lname, None, old_locus.fixed,    old_locus.chromosome,
-                                        old_locus.location, old_locus.strand, warn)
+        genome.merge_locus(lname, None, old_locus.chromosome, old_locus.location,
+                                        old_locus.strand, warn)
 
         loc = genome.get_locus(lname)
 
@@ -262,10 +298,9 @@ def recode_genomatrixstream(genos, genome, warn=False):
       if model is not old_model:
         recode = True
         try:
-          for g in old_model.genotypes[1:]:
-            model.add_genotype(g)
+          model = loc.model = build_model(alleles=old_model.alleles[1:],base=model)
         except GenotypeRepresentationError:
-          _encoding_error(lname,g,model,warn)
+          _encoding_error(lname,set(old_model.alleles)-set(model.alleles),model,warn)
 
       models.append(model)
 
@@ -274,158 +309,29 @@ def recode_genomatrixstream(genos, genome, warn=False):
       assert genos.models == models
       return genos.clone(genos.use_stream(), genome=genome, materialized=False)
 
-  # MEDIUM PATH: Ldat, recoding needed, known models
-  if models and genos.format=='ldat':
     def _recode_genomatrixstream():
-      n = len(genos.samples)
+      descr = GenotypeArrayDescriptor(models)
 
-      descrcache = {}
-      packed = genos.packed
-
-      for (lname,row),old_model,model in izip(genos,genos.models,models):
-        # Cache the descriptor for this model, since we're likely to see it again
-        if packed:
-          assert old_model is row.descriptor[0]
-          descr = descrcache[old_model] = row.descriptor
-
-        # Get or build the new descriptor
-        descr = descrcache.get(model)
-        if not descr:
-          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
-
-        # If the model changed, recode by adding all genotypes and packing
-        if old_model is not model:
-          loc = genome.get_locus(lname)
-          # FIXME: The semantics of the fixed flag are broken
-          if not loc.fixed:
-            # Unpack to speed updates and repacking
-            row = row[:]
-            try:
-              for g in set(row):
-                model.add_genotype(g)
-            except GenotypeRepresentationError:
-              _encoding_error(lname,g,model,warn)
-              row = None
-
+      for sample,row in genos:
+        # Try to yield updated genotype array, hoping that all alleles are represented
+        try:
           row = GenotypeArray(descr,row)
-
-        # Otherwise, only repack if necessary
-        elif not packed:
-          row = GenotypeArray(descr,row)
-
-        yield lname,row
-
-  # SLOWPATH: Ldat without model information
-  elif genos.format=='ldat':
-    def _recode_genomatrixstream():
-      n = len(genos.samples)
-
-      descrcache = {}
-      packed = genos.packed
-
-      for (lname,row),old_model in izip_exact(genos,genos.models):
-        # Get the new model or fix the old model
-        old_locus = genos.genome.loci[lname]
-        #assert old_locus.model is old_model or None in (old_model,old_locus.model)
-
-        if lname not in genome.loci:
-          loc = genome.loci[lname] = old_locus
-        else:
-          genome.merge_locus(lname, None, old_locus.fixed,    old_locus.chromosome,
-                                          old_locus.location, old_locus.strand, warn)
-
-          loc = genome.get_locus(lname)
-
-        if loc.model is None:
-          loc.model = old_model
-        else:
-          model = loc.model
-
-        # Cache the descriptor for this model, since we're likely to see it again
-        if packed:
-          assert old_model is row.descriptor[0]
-          descr = descrcache[old_model] = row.descriptor
-
-        # Get or build the new descriptor
-        descr = descrcache.get(model)
-        if not descr:
-          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
-
-        # If the model changed, recode by adding all genotypes and packing
-        if old_model is not model:
-          # FIXME: The semantics of the fixed flag are broken
-          if not loc.fixed:
-            # Unpack to speed updates and repacking
-            row = row[:]
-            try:
-              for g in set(row):
-                model.add_genotype(g)
-            except GenotypeRepresentationError:
-              _encoding_error(lname,g,model,warn)
-              row = None
-
-          row = GenotypeArray(descr,row)
-
-        # Otherwise, only repack if necessary
-        elif not packed:
-          row = GenotypeArray(descr,row)
-
-        models.append(model)
-        yield lname,row
-
-  # sdat format
-  elif genos.format=='sdat':
-    #assert genome is not genos.genome
-    assert genos.loci is not None and len(genos.loci) == len(genos.models) == len(models)
-
-    # Find all models that must be updated
-    updates = []
-    for i,(lname,old_model,model) in enumerate(izip(genos.loci,genos.models,models)):
-      if model is not old_model:
-        loc = genome.get_locus(lname)
-        # FIXME: The semantics of the fixed flag are broken
-        if not loc.fixed:
-          updates.append( (i,model.add_genotype) )
-
-    # FASTERPATH: If all models are fixed, recoding is straightforward
-    if not updates:
-      def _recode_genomatrixstream():
-        descr = GenotypeArrayDescriptor(models)
-        for sample,row in genos:
-          try:
-            # Recode and yield new row
-            row = GenotypeArray(descr,row)
-          except GenotypeLookupError:
-            _sample_encoding_error(genos.loci,models,row,warn)
-
-          yield sample,row
-
-    # SLOWPATH: Otherwise, recode by adding genotypes from all changed
-    # models and packing.
-    else:
-      def _recode_genomatrixstream():
-        descr = GenotypeArrayDescriptor(models)
-        for sample,row in genos:
-          # Unpack row to speed access -- both updates and GenotypeArray will
-          # need to unpack
-          if updates:
-            row = row[:]
-
-          # Try to yield updated genotype array, hoping that all alleles are represented
-          try:
-            yield sample,GenotypeArray(descr,row)
-
-          except GenotypeRepresentationError:
-            # Update all changed models to ensure they contain the needed alleles
-            for i,add in updates:
+        except GenotypeLookupError:
+          for i,lname,geno,model in izip(count(),genos.loci,row,models):
+            if geno not in model:
               try:
-                add(row[i])
+                new_model = build_model(alleles=geno,base=model)
               except GenotypeRepresentationError:
-                _encoding_error(genos.loci[i],row[i],models[i],warn)
-                row[i] = models[i][None,None]
+                _encoding_error(lname,set(geno)-set(model.alleles),model,warn)
 
-            # Recode and yield new row
-            yield sample,GenotypeArray(descr,row)
+              if new_model is not model:
+                descr[i]  = new_model
+                models[i] = new_model
+                genome.get_locus(lname).model = new_model
+
+          row = GenotypeArray(descr,row)
+
+        yield sample,row
 
   else:
     raise ValueError('Uknown format')
@@ -433,7 +339,6 @@ def recode_genomatrixstream(genos, genome, warn=False):
   return genos.clone(_recode_genomatrixstream(),models=models,genome=genome,packed=True,materialized=False)
 
 
-# FIXME: Implement COW on genotype models
 def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
                                                  unique=False, warn=False):
   '''
@@ -452,7 +357,8 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   @return            : tuple of columns and a genomatrix generator in packed format
   @rtype             : 2-tuple of list of str and genomatrix generator
 
-  >>> defmodel = model_from_alleles('ACGT',allow_hemizygote=True)
+  >>> from glu.lib.genolib.genoarray import Genotype
+  >>> defmodel = build_model(alleles='ACGT',allow_hemizygote=True)
   >>> genome  = Genome(default_model=defmodel, default_fixed=True)
 
   With genome:
@@ -548,93 +454,73 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
       n = len(columns)
       m = genome.max_alleles+1
 
-      # FIXME: add support for hemizygote models
-      modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
-                               if locus.model is not None and len(locus.model.alleles)==m )
-      descrcache = {}
-
-      def _genokey(genos):
-        gset = set(a for g in set(genos) for a in g)
-        gset.discard(None)
-        return tuple(sorted(gset))
+      def get_alleles(genos):
+        alleles = set(a for g in set(genos) for a in g)
+        alleles.discard(None)
+        return tuple(sorted(alleles))
 
       for lname,row in genos:
-        key = None
-
         loc = genome.get_locus(lname)
 
         if loc.model is None:
-          key = _genokey(row)
-          cachable = genome.default_model is None and len(key) == genome.max_alleles
-
-          if cachable:
-            # Aggressively reuse models with fully compatible alleles
-            loc.model = modelcache.get(key)
-
-          if loc.model is None:
-            genome.get_locus_model(lname)
-
-          if cachable:
-            modelcache[key] = loc.model
+          loc.model = build_model(alleles=get_alleles(row))
 
         model = loc.model
+        descr = build_descr(model,n)
 
-        assert model is not None
-
-        # FIXME: The semantics of the fixed flag are broken
-        if not loc.fixed:
-          key = key or _genokey(row)
+        try:
+          row = GenotypeArray(descr,row)
+        except GenotypeLookupError:
           try:
-            for a in key:
-              model.add_allele(a)
+            new_alleles = get_alleles(row)
+            new_model = build_model(alleles=new_alleles,base=model)
           except GenotypeRepresentationError:
-            _encoding_error(lname,a,model,warn)
-            row = None
+            _encoding_error(lname,set(new_alleles)-set(model.alleles),model,warn)
 
-        descr = descrcache.get(model)
-        if not descr:
-          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
+          loc.model = model = new_model
+          descr = build_descr(model,n)
+          row = GenotypeArray(descr,row)
 
-        assert descr[0] is model
         models.append(model)
-        yield lname,GenotypeArray(descr,row)
+        yield lname,row
 
   elif format=='sdat':
-
-    genos = sdat_model_lookahead_from_tuples(columns,genos,genome)
-
-    updates = []
-
+    loci = []
     for i,lname in enumerate(columns):
       loc = genome.get_locus_model(lname)
+      loci.append(loc)
       models.append(loc.model)
-      # FIXME: The semantics of the fixed flag are broken
-      if not loc.fixed:
-        updates.append( (i,loc.model.add_genotype) )
 
     def _encode():
       descr = GenotypeArrayDescriptor(models)
 
-      if not updates:
-        for sample,row in genos:
-          yield sample,GenotypeArray(descr,row)
-      else:
-        for sample,row in genos:
-          for i,add in updates:
-            try:
-              add(row[i])
-            except GenotypeRepresentationError:
-              _encoding_error(columns[i],row[i],models[i],warn)
-              row[i] = models[i][None,None]
+      for sample,row in genos:
+        try:
+          row = GenotypeArray(descr,row)
+        except GenotypeLookupError:
+          new_row = [None]*len(columns)
+          for i,geno,model in izip(count(),row,models):
+            if geno not in model:
+              try:
+                model = build_model(alleles=geno,base=model)
+              except GenotypeRepresentationError:
+                _encoding_error(columns[i],set(geno)-set(model.alleles),model,warn)
 
-          yield sample,GenotypeArray(descr,row)
+              descr[i]      = model
+              models[i]     = model
+              loci[i].model = model
+
+            new_row[i] = model[geno]
+
+          row = GenotypeArray(descr,new_row)
+
+        yield sample,row
   else:
     raise ValueError('Uknown format')
 
   return columns,models,genome,_encode()
 
 
-# FIXME: Implement COW on genotype models
 def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=None,
                                                  unique=False,warn=False):
   '''
@@ -655,8 +541,9 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   @return            : tuple of columns and a genomatrix generator in packed format
   @rtype             : 2-tuple of list of str and genomatrix generator
 
-  >>> from reprs import snp
-  >>> defmodel  = model_from_alleles('ACGT',allow_hemizygote=True)
+  >>> from glu.lib.genolib.reprs import snp
+  >>> from glu.lib.genolib.genoarray import Genotype
+  >>> defmodel  = build_model(alleles='ACGT',allow_hemizygote=True)
   >>> genome = Genome(default_model=defmodel, default_fixed=True)
 
   >>> samples = ('s1', 's2', 's3')
@@ -745,152 +632,127 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
       n = len(columns)
       m = genome.max_alleles+1
 
-      # FIXME: add support for hemizygote models
-      modelcache   = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
-                               if locus.model is not None and len(locus.model.alleles)==m )
-      descrcache   = {}
-      strcache     = {}
-      to_string    = genorepr.to_string
+      cachemap     = {}
       from_strings = genorepr.from_strings
 
-      def _genokey(genos):
-        gset = set(a for g in set(from_strings(genos)) for a in g)
-        gset.discard(None)
-        return tuple(sorted(gset))
-
       for lname,row in genos:
-        key = None
-        loc = genome.get_locus(lname)
+        loc   = genome.get_locus(lname)
+        cache = cachemap.get(loc.model)
 
-        if loc.model is None:
-          key = _genokey(row)
-          cachable = genome.default_model is None and len(key) == genome.max_alleles
-
-          if cachable:
-            # Aggressively reuse models with fully compatible alleles
-            loc.model = modelcache.get(key)
-
-          if loc.model is None:
-            genome.get_locus_model(lname)
-
-          if cachable:
-            modelcache[key] = loc.model
-
-        model = loc.model
-
-        # FIXME: The semantics of the fixed flag are broken
-        if not loc.fixed:
-          key = key or _genokey(row)
+        # FAST PATH: known model, existing string cache
+        if loc.model is not None and cache is not None:
           try:
-            for a in key:
-              model.add_allele(a)
-          except GenotypeRepresentationError:
-            _encoding_error(lname,a,model,warn)
-            row = ['']*len(row)
+            descr = build_descr(loc.model,n)
+            row   = GenotypeArray(descr,imap(getitem, repeat(cache), row))
 
-        descr = descrcache.get(model)
-        if not descr:
-          descr = descrcache[model] = GenotypeArrayDescriptor( [model]*n )
+            models.append(loc.model)
+            yield lname,row
+            continue
 
-        cache = strcache.get(model)
-        if cache is None:
-          cache = strcache[model] = dict( (to_string(g),g) for g in model.genotypes )
-          for g in genorepr.missing_geno_strs:
-            cache[g] = model[None,None]
+          except (GenotypeLookupError,KeyError):
+            pass
 
-        models.append(model)
+        # SLOW PATH: no model, new alleles, no string cache, or new representation
+        gstrs   = tuple(set(row))
+        gtups   = from_strings(gstrs)
+        alleles = set(a for g in gtups for a in g)
+        alleles.discard(None)
 
         try:
-          yield lname,GenotypeArray(descr,imap(getitem, repeat(cache), row))
-        except KeyError:
-          gset = set(row)
-          try:
-            cache.update( (g,model[r]) for g,r in izip(gset,from_strings(gset)) )
-            yield lname,GenotypeArray(descr,imap(getitem, repeat(cache), row))
-          except KeyError,g:
-            _encoding_error(lname,g,model,warn)
-            yield lname,GenotypeArray(descr)
+          loc.model = build_model(alleles,base=loc.model)
+        except GenotypeRepresentationError:
+          _encoding_error(lname,set(alleles)-set(loc.model.alleles),model,warn)
+
+        cache = cachemap.get(loc.model)
+        if cache is None:
+          cache = cachemap[loc.model] = {}
+        cache.update( (gs,loc.model[gt]) for gs,gt in izip(gstrs,gtups) )
+
+        descr = build_descr(loc.model,n)
+        row   = GenotypeArray(descr,imap(getitem, repeat(cache), row))
+
+        models.append(loc.model)
+        yield lname,row
 
   elif format=='sdat':
-
-    genos = sdat_model_lookahead_from_strings(columns,genos,genome,genorepr)
-
     n = len(columns)
-    updates   = []
+    loci      = []
     cachemap  = {}
     cachelist = []
 
     to_string    = genorepr.to_string
     from_strings = genorepr.from_strings
 
+    def mk_cache(model):
+      cache = dict( (to_string(g),g) for g in model.genotypes )
+      cache.update( (genorepr.to_string_from_alleles((g[1],g[0])),g) for g in model.genotypes )
+      for g in genorepr.missing_geno_strs:
+        cache[g] = model[None,None]
+      return cache
+
     for lname in columns:
-      loc = genome.get_locus_model(lname)
+      loc   = genome.get_locus_model(lname)
+      loci.append(loc)
+
       model = loc.model
       models.append(model)
-      # FIXME: The semantics of the fixed flag are broken
-      if loc.fixed:
-        update = model.get_genotype
-      else:
-        update = model.add_genotype
-
-      cache = cachemap.get(model)
-      if cache is None:
-        cache = cachemap[model] = dict( (to_string(g),g) for g in model.genotypes )
-        cache.update( (genorepr.to_string_from_alleles((g[1],g[0])),g) for g in model.genotypes )
-        for g in genorepr.missing_geno_strs:
-          cache[g] = model[None,None]
-
-      cachelist.append(cache)
-      updates.append( (lname,update,cache) )
 
     def _encode():
       repr   = genorepr.from_string
       descr  = GenotypeArrayDescriptor(models)
       errors = (KeyError,ValueError,GenotypeRepresentationError)
 
-      for sample,row in genos:
+      cachelist = [{}]*len(columns)
+
+      for j,(sample,row) in enumerate(genos):
         try:
           row = GenotypeArray(descr,imap(getitem, cachelist, row) )
         except errors:
-          geno_tuples = from_strings(row)
+          new_row = [None]*len(loci)
 
-          for (lname,update,cache),gstr,g in izip(updates,row,geno_tuples):
-            # Aggressively form homozygote genotypes and cache them.  Thus
-            # we only see cache misses when we encounter previously
-            # unobserved alleles or when genotype formatting is off.
-            g1,g2 = g
-            if g1!=g2:
-              gh = g1,g1
-              try:
-                cache[genorepr.to_string_from_alleles(gh)] = update(gh)
-              except errors:
-                pass
+          for i,gstr,cache in izip(count(),row,cachelist):
+            g = cache.get(gstr)
+            if g is None:
+              loc  = loci[i]
+              geno = repr(gstr)
 
-              gh = g2,g2
-              try:
-                cache[genorepr.to_string_from_alleles(gh)] = update(gh)
-              except errors:
-                pass
+              if geno not in loc.model:
+                try:
+                  model = build_model(alleles=geno,base=loc.model)
+                except GenotypeRepresentationError:
+                  _encoding_error(columns[i],set(geno)-set(model.alleles),model,warn)
 
-            try:
-              cache[gstr] = update(g)
-            except errors:
-              pass
+                # Update model in various locations
+                loc.model    = model
+                descr[i]     = model
+                models[i]    = model
 
-          try:
-            row = GenotypeArray(descr,imap(getitem, cachelist, row) )
-          except errors:
-            _sample_encoding_error(columns,models,geno_tuples,warn)
+                # Update string to genotype cache
+                cache = cachemap.get(model)
+                if cache is None:
+                  cache = cachemap[model] = mk_cache(model)
+                cachelist[i] = cache
+
+              # Update cache
+              g = loc.model[geno]
+              cache[gstr] = g
+
+              assert g is loc.model[geno] and cache[gstr] is g
+
+            # Set genotype
+            new_row[i] = g
+
+          row = GenotypeArray(descr,new_row)
 
         yield sample,row
+
   else:
     raise ValueError('Uknown format')
 
   return columns,models,genome,_encode()
 
 
-# FIXME: Implement COW on genotype models
-def recode_genotriples(triples,genome):
+def recode_genotriples(triples,genome,warn=False):
   '''
   Returns a new genotriples with the genotypes encoded to a new internal representation
 
@@ -920,43 +782,51 @@ def recode_genotriples(triples,genome):
   ['l1', 'l2', 'l3']
   '''
   def _recode():
-    updates = {}
-    try:
-      for sample,lname,geno in triples:
-        ud = updates.get(lname)
+    updated = {}
+    for sample,lname,geno in triples:
+      model = updated.get(lname)
 
-        if ud is None:
-          old_model = geno.model
-          old_locus = triples.genome.loci[lname]
-          assert old_model is triples.genome.loci[lname].model
-          assert old_locus.model is old_model
+      if model is None:
+        old_model = geno.model
+        old_locus = triples.genome.loci[lname]
+        #assert old_model is triples.genome.loci[lname].model
+        #assert old_locus.model is old_model
 
-          genome.merge_locus(lname, fixed=old_locus.fixed, chromosome=old_locus.chromosome,
-                                          location=old_locus.location)
+        genome.merge_locus(lname, chromosome=old_locus.chromosome, location=old_locus.location)
 
-          loc = genome.get_locus(lname)
-          if loc.model is None:
-            loc.model = old_model
+        loc = genome.get_locus(lname)
+        if loc.model is None:
+          loc.model = model = geno.model
+        elif geno.model is not loc.model:
+          try:
+            loc.model = model = build_model(alleles=old_model.alleles[1:],base=loc.model)
+          except GenotypeRepresentationError:
+            _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),loc.model,warn)
+        else:
+          model = loc.model
 
-          # FIXME: The semantics of the fixed flag are broken
-          if old_model is loc.model or loc.fixed:
-            ud = loc.model.get_genotype
-          else:
-            ud = loc.model.add_genotype
+        updated[lname] = model
 
-          updates[lname] = ud
+      assert model is not None
 
-        yield sample,lname,ud(geno)
+      try:
+        geno = model[geno]
+      except GenotypeLookupError:
+        loc = genome.get_locus(lname)
+        try:
+          loc.model = model = build_model(alleles=geno.model.alleles[1:],base=loc.model)
+        except GenotypeRepresentationError:
+          _encoding_error(lname,set(geno.model.alleles)-set(model.alleles),model,warn)
 
-    except GenotypeRepresentationError:
-      model = triples.genome.get_model(lname)
-      _encoding_error(lname,geno,model)
+        updated[lname] = model
+        geno = model[geno]
+
+      yield sample,lname,geno
 
   return triples.clone(_recode(),genome=genome,materialized=False)
 
 
-# FIXME: Implement COW on genotype models
-def encode_genotriples_from_tuples(triples,genome):
+def encode_genotriples_from_tuples(triples,genome,warn=False):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
@@ -979,23 +849,24 @@ def encode_genotriples_from_tuples(triples,genome):
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   '''
-  try:
-    for sample,lname,geno in triples:
-      loc = genome.get_locus_model(lname)
+  for sample,lname,geno in triples:
+    loc = genome.get_locus_model(lname)
 
-      # FIXME: The semantics of the fixed flag are broken
-      if loc.fixed:
-        geno = loc.model.get_genotype(geno)
-      else:
-        geno = loc.model.add_genotype(geno)
+    try:
+      geno = loc.model[geno]
+    except GenotypeLookupError:
+      try:
+        new_model = build_model(alleles=geno,base=loc.model)
+      except GenotypeRepresentationError:
+        _encoding_error(lname,geno,loc.model,warn)
 
-      yield sample,lname,geno
-  except GenotypeRepresentationError:
-    _encoding_error(lname,geno,loc.model)
+      loc.model = new_model
+      geno = new_model[geno]
+
+    yield sample,lname,geno
 
 
-# FIXME: Implement COW on genotype models
-def encode_genotriples_from_strings(triples,genorepr,genome):
+def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
   '''
   Returns a new genotriples with the genotypes encoded to the a new internal representation
 
@@ -1006,7 +877,7 @@ def encode_genotriples_from_strings(triples,genorepr,genome):
   @return            : genotriple in bitpacked format
   @rtype             : genotriple generator
 
-  >>> from reprs import snp
+  >>> from glu.lib.genolib.reprs import snp
   >>> triples = [('s3', 'l1', 'GG'),('s3', 'l2', 'AA'),
   ...            ('s2', 'l3', 'GT'),('s1', 'l1', 'TT'),
   ...            ('s1', 'l1', 'GG'),('s2', 'l2', 'AA')]
@@ -1019,178 +890,45 @@ def encode_genotriples_from_strings(triples,genorepr,genome):
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   '''
-  local_repr = genorepr.from_string
+  from_string = genorepr.from_string
+  to_string   = genorepr.to_string
+
   if genome is None:
     genome = Genome()
 
-  updates = {}
+  def mk_cache(model):
+    cache = dict( (to_string(g),g) for g in model.genotypes )
+    cache.update( (genorepr.to_string_from_alleles((g[1],g[0])),g) for g in model.genotypes )
+    for g in genorepr.missing_geno_strs:
+      cache[g] = model[None,None]
+    return cache
 
-  try:
-    for sample,lname,geno in triples:
-      ud = updates.get(lname)
+  cachemap = {}
+  for sample,lname,geno in triples:
+    loc = genome.get_locus_model(lname)
+    model = loc.model
 
-      if ud is None:
-        loc = genome.get_locus_model(lname)
-        # FIXME: The semantics of the fixed flag are broken
-        if loc.fixed:
-          ud = lambda g,get=loc.model.get_genotype: get(local_repr(g))
-        else:
-          ud = lambda g,add=loc.model.add_genotype: add(local_repr(g))
+    cache = cachemap.get(model)
+    if cache is None:
+      cache = cachemap[model] = mk_cache(model)
 
-        updates[lname] = ud
+    try:
+      geno = cache[geno]
+    except KeyError:
+      try:
+        new_model = build_model(alleles=geno,base=loc.model)
+      except GenotypeRepresentationError:
+        _encoding_error(lname,geno,model,warn)
 
-      yield sample,lname,ud(geno)
+      if new_model is not loc.model:
+        model = loc.model = new_model
+        cache = cachemap.get(model)
+        if cache is None:
+          cache = cachemap[model] = mk_cache(model)
 
-  except GenotypeRepresentationError:
-    _encoding_error(lname,geno,loc.model)
+      geno = cache[geno] = model[from_string(geno)]
 
-
-def sdat_model_lookahead_from_strings(loci,genos,genome,genorepr,min_unknown=10,max_lookahead=50,warn=False):
-  '''
-  Lookahead in an sdat genotype stream to determine alleles and fixed
-  models.  This is a major optimization that can usually avoid the majority
-  of the overhead associated with creating len(loci) default models
-  '''
-  # Do not attempt to lookahead if a fixed model is used for unknown loci
-  if genome.default_fixed:
-    return genos
-
-  # Do not attempt to lookahead if only a small number of loci are unknown
-  unknown = sum(1 for lname in loci if genome.get_locus(lname).model is None)
-  if unknown < min_unknown:
-    return genos
-
-  # Track the alleles seen
-  alleles_seen = [ [] for i in range(len(loci)) ]
-
-  # Start looking ahead up to max_lookahead rows
-  lookahead_rows = []
-  for sample,row in genos:
-    lookahead_rows.append( (sample,row) )
-
-    row = genorepr.from_strings(row)
-
-    for g,seen in izip(row,alleles_seen):
-      seen.append(g[0])
-      seen.append(g[1])
-
-    if len(lookahead_rows) == max_lookahead:
-      break
-
-  # If there are rows in the lookahead buffer
-  if not lookahead_rows:
-    return genos
-
-  max_alleles = genome.max_alleles
-  modelcache = {}
-
-  try:
-    # Review the alleles seen at each locus
-    for lname,seen in izip(loci,alleles_seen):
-      loc = genome.get_locus(lname)
-      model = loc.model
-
-      # If the model is unknown, then check the alleles
-      if model is None:
-        seen = set(seen)
-        seen.discard(None)
-
-        # Create or reuse a fixed model if all alleles have been seen
-        # FIXME: add support for hemizygote models
-        # FIXME: The semantics of the fixed flag are broken
-        if len(seen) == max_alleles:
-          seen  = tuple(sorted(seen))
-          model = modelcache.get(seen)
-          if model is None:
-            model = modelcache[seen] = model_from_alleles(seen, max_alleles=max_alleles)
-          loc.model = model
-          loc.fixed = True
-          continue
-
-        # Otherwise create an empty default model
-        model = genome.get_model(lname)
-
-      # Populate the observed alleles when a fixed model cannot be used
-      for allele in seen:
-        model.add_allele(allele)
-
-  except GenotypeRepresentationError:
-    _encoding_error(lname,allele,model,warn)
-
-  return chain(lookahead_rows,genos)
-
-
-def sdat_model_lookahead_from_tuples(loci,genos,genome,min_unknown=10,max_lookahead=25,warn=False):
-  '''
-  Lookahead in an sdat genotype stream to determine alleles and fixed
-  models.  This is a major optimization that can usually avoid the majority
-  of the overhead associated with creating len(loci) default models
-  '''
-  # Do not attempt to lookahead if a fixed model is used for unknown loci
-  if genome.default_fixed:
-    return genos
-
-  # Do not attempt to lookahead if only a small number of loci are unknown
-  unknown = sum(1 for lname in loci if genome.get_locus(lname).model is None)
-  if unknown < min_unknown:
-    return genos
-
-  # Track the alleles seen
-  alleles_seen = [ [] for i in range(len(loci)) ]
-
-  # Start looking ahead up to max_lookahead rows
-  lookahead_rows = []
-  for sample,row in genos:
-    lookahead_rows.append( (sample,row) )
-
-    for g,seen in izip(row,alleles_seen):
-      seen.append(g[0])
-      seen.append(g[1])
-
-    if len(lookahead_rows) == max_lookahead:
-      break
-
-  # If there are rows in the lookahead buffer
-  if not lookahead_rows:
-    return genos
-
-  max_alleles = genome.max_alleles
-  modelcache = {}
-
-  try:
-    # Review the alleles seen at each locus
-    for lname,seen in izip(loci,alleles_seen):
-      loc = genome.get_locus(lname)
-      model = loc.model
-
-      # If the model is unknown, then check the alleles
-      if model is None:
-        seen = set(seen)
-        seen.discard(None)
-
-        # Create or reuse a fixed model if all alleles have been seen
-        # FIXME: add support for hemizygote models
-        # FIXME: The semantics of the fixed flag are broken
-        if len(seen) == max_alleles:
-          seen  = tuple(sorted(seen))
-          model = modelcache.get(seen)
-          if model is None:
-            model = modelcache[seen] = model_from_alleles(seen, max_alleles=max_alleles)
-          loc.model = model
-          loc.fixed = True
-          continue
-
-        # Otherwise create an empty default model
-        model = genome.get_model(lname)
-
-      # Populate the observed alleles when a fixed model cannot be used
-      for allele in seen:
-        model.add_allele(allele)
-
-  except GenotypeRepresentationError:
-    _encoding_error(lname,allele,model,warn)
-
-  return chain(lookahead_rows,genos)
+    yield sample,lname,geno
 
 
 def test():

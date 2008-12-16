@@ -29,7 +29,7 @@ from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool
 from   glu.lib.genolib.locus     import Genome,Locus
 from   glu.lib.genolib.phenos    import Phenome,SEX_UNKNOWN,PHENO_UNKNOWN,merge_phenome_list
 from   glu.lib.genolib.streams   import GenomatrixStream,GenotripleStream
-from   glu.lib.genolib.genoarray import UnphasedMarkerModel,GenotypeArrayDescriptor,GenotypeArray
+from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model,build_descr
 
 
 GENOMATRIX_COMPAT_VERSION,GENOMATRIX_VERSION=1,3
@@ -56,20 +56,6 @@ def _get_v_attr(gfile,names,default=None):
 
 def _model_key(model):
   return (model.allow_hemizygote,model.max_alleles)+tuple(g.alleles() for g in model.genotypes[1:])
-
-def _make_modelcache(genome):
-  modelcache = {}
-
-  if not genome:
-    return modelcache
-
-  for locus in genome.loci.values():
-    model = locus.model
-    if model and model.max_alleles == len(model.alleles)-1:
-      key = _model_key(model)
-      modelcache[key] = model
-
-  return modelcache
 
 
 class BinaryGenomatrixWriter(object):
@@ -199,11 +185,6 @@ class BinaryGenomatrixWriter(object):
                                'Matrix of binary encoded genotypes values',
                                chunkshape=(crows,ccols), filters=self.filters, expectedrows=50000)
 
-    if format == 'sdat':
-      self.models = list(row1.descriptor)
-    elif format == 'ldat':
-      self.models = []
-
     self.chunkrows = crows
     self.rowkeys   = []
     self.chunk     = []
@@ -228,9 +209,6 @@ class BinaryGenomatrixWriter(object):
     assert self.state == OPEN
 
     # FIXME: Check schema constraints!!!
-    if self.format == 'lbat':
-      self.models.append(genos.descriptor[0])
-
     self.rowkeys.append(rowkey)
     chunk = self.chunk
     chunk.append(genos.data)
@@ -263,7 +241,6 @@ class BinaryGenomatrixWriter(object):
 
     assert self.state == OPEN
 
-    models  = self.models
     rowkeys = self.rowkeys
     chunk   = self.chunk
 
@@ -280,7 +257,6 @@ class BinaryGenomatrixWriter(object):
       for rowkey,genos in rows:
         rowkeys.append(rowkey)
         chunk.append(genos.data)
-        models.append(genos.descriptor[0])
         if len(chunk) >= self.chunkrows:
           self.genotypes.append(chunk)
           chunk[:] = []
@@ -323,10 +299,11 @@ class BinaryGenomatrixWriter(object):
       loci    = self.header
       samples = self.rowkeys
 
-    save_models(gfile, loci, self.genome, self.models, filters=self.filters)
+    models = [ self.genome.get_model(locus) for locus in loci ]
+    save_models(gfile, loci, self.genome, models, filters=self.filters)
     save_phenos(gfile, samples, self.phenome, filters=self.filters)
 
-    self.rowkeys = self.header = self.genome = self.models = self.phenome = None
+    self.rowkeys = self.header = self.genome = self.phenome = None
 
     gfile.close()
 
@@ -443,7 +420,6 @@ class BinaryGenotripleWriter(object):
 
     self.samplemap = {}
     self.locusmap  = {}
-    self.modelmap  = {}
 
   def writerow(self, sample, locus, geno):
     '''
@@ -463,13 +439,8 @@ class BinaryGenotripleWriter(object):
 
     samplemap = self.samplemap
     locusmap  = self.locusmap
-    modelmap  = self.modelmap
 
     locusnum =  locusmap.setdefault(locus, len(locusmap))
-    if locusnum not in modelmap:
-      modelmap[locusnum] = geno.model
-    else:
-      assert geno.model is modelmap[locusnum]
 
     row = self.genotypes.row
     row['sample'] = samplemap.setdefault(sample,len(samplemap))
@@ -488,7 +459,6 @@ class BinaryGenotripleWriter(object):
       raise IOError('Cannot write to closed writer object')
 
     locusmap  = self.locusmap
-    modelmap  = self.modelmap
     samplemap = self.samplemap
 
     sd = samplemap.setdefault
@@ -499,11 +469,6 @@ class BinaryGenotripleWriter(object):
     row = self.genotypes.row
     for sample,locus,geno in triples:
       locusnum      = ld(locus,ll())
-
-      if locusnum not in modelmap:
-        modelmap[locusnum] = geno.model
-      else:
-        assert geno.model is modelmap[locusnum]
 
       row['sample'] = sd(sample,sl())
       row['locus']  = locusnum
@@ -528,9 +493,10 @@ class BinaryGenotripleWriter(object):
 
     samples = map(itemgetter(0), sorted(self.samplemap.iteritems(), key=itemgetter(1)))
     loci    = map(itemgetter(0), sorted(self.locusmap.iteritems(),  key=itemgetter(1)))
-    models  = map(itemgetter(1), sorted(self.modelmap.iteritems(),  key=itemgetter(0)))
 
-    self.samplemap = self.locusmap = self.modelmap = None
+    models = [ self.genome.get_model(locus) for locus in loci ]
+
+    self.samplemap = self.locusmap = None
 
     save_strings(gfile,'samples',samples,filters=self.filters)
     save_strings(gfile,'loci',   loci,   filters=self.filters)
@@ -663,8 +629,7 @@ def load_genotriples_binary(filename,format,genome=None,phenome=None,extra_args=
   samples = gfile.root.samples[:].tolist()
   loci    = gfile.root.loci[:].tolist()
 
-  modelcache = _make_modelcache(genome)
-  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=modelcache)
+  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
   models = list(file_models)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
@@ -754,11 +719,9 @@ def save_models(gfile, loci, genome, models, filters=None):
   locus_models = gfile.createTable(gfile.root, 'locus_models', LocusModelDesc, 'locus models',
                                        filters=filters, expectedrows=len(models))
 
-
   locus_row = locus_models.row
   for locus,model in izip_exact(loci,models):
     loc = genome.get_locus(locus)
-    assert loc.model in (None,model)
 
     key = _model_key(model)
     index = modelmap.get(key)
@@ -837,7 +800,7 @@ def save_models(gfile, loci, genome, models, filters=None):
   save_strings(gfile,'model_alleles',alleles,filters=filters)
 
 
-def load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=None):
+def load_models(gfile,loci,version,compat_version,ignoreloci):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -850,18 +813,15 @@ def load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=None):
   @param compat_version: genotype file version backward compatibility number
   @type  compat_version: int
   '''
-  if modelcache is None:
-    modelcache = {}
-
   if version == 1 or ignoreloci:
-    return load_models_v1(gfile,loci,modelcache)
+    return load_models_v1(gfile,loci)
   elif version in (2,3) or compat_version in (2,3):
-    return load_models_v2(gfile,loci,modelcache)
+    return load_models_v2(gfile,loci)
   else:
     raise ValueError('Unknown genotype file version: %s' % version)
 
 
-def load_models_v1(gfile,loci,modelcache):
+def load_models_v1(gfile,loci):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -882,20 +842,16 @@ def load_models_v1(gfile,loci,modelcache):
   genome = Genome()
 
   def _models():
+    empty = ()
+    modelcache = {}
     for locus,lmod in izip_exact(loci,gfile.root.locus_models[:].tolist()):
       max_alleles,allow_hemizygote = mods[lmod[0]]
 
-      genotypes = model_genotypes.get(lmod[0],())
+      genotypes = model_genotypes.get(lmod[0],empty)
       key       = (allow_hemizygote,max_alleles)+genotypes
       model     = modelcache.get(key)
-
       if model is None:
-        model = UnphasedMarkerModel(allow_hemizygote,max_alleles)
-        for g in genotypes:
-          model.add_genotype(g)
-        if len(model.alleles)-1 == max_alleles:
-          modelcache[key] = model
-
+        model   = modelcache[key] = build_model(genotypes=genotypes,allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)
       genome.loci[locus] = Locus(locus, model)
 
       yield model
@@ -903,7 +859,7 @@ def load_models_v1(gfile,loci,modelcache):
   return genome,_models()
 
 
-def load_models_v2(gfile,loci,modelcache):
+def load_models_v2(gfile,loci):
   '''
   Load models from an HDF5 binary genotype file
 
@@ -926,6 +882,7 @@ def load_models_v2(gfile,loci,modelcache):
   genome = Genome()
 
   def _models():
+    modelcache = {}
     empty      = ()
     strands    = STRANDS
     lmodels    = gfile.root.locus_models[:].tolist()
@@ -936,19 +893,14 @@ def load_models_v2(gfile,loci,modelcache):
       genotypes = model_genotypes.get(lmod[0],empty)
       key       = (allow_hemizygote,max_alleles)+genotypes
       model     = modelcache.get(key)
-
       if model is None:
-        model = UnphasedMarkerModel(allow_hemizygote,max_alleles)
-        for g in genotypes:
-          model.add_genotype(g)
-        if len(model.alleles)-1 == max_alleles:
-          modelcache[key] = model
+        model   = modelcache[key] = build_model(genotypes=genotypes,allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)
 
       location = lmod[2]
       if location == -1:
         location = None
 
-      genome.loci[locus] = Locus(locus, model, None, chrs[lmod[1]], location, strands[lmod[3]])
+      genome.loci[locus] = Locus(locus, model, chrs[lmod[1]], location, strands[lmod[3]])
 
       yield model
 
@@ -1285,8 +1237,7 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
 
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
-  modelcache = _make_modelcache(genome)
-  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci,modelcache=modelcache)
+  file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   if format == format_found == 'sbat':
@@ -1318,8 +1269,6 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
     models  = []
 
     def _load():
-      descrcache = {}
-
       chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
       chunks    = int(len(rows)+chunksize-1)//chunksize
 
@@ -1330,12 +1279,10 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
         chunk  = gfile.root.genotypes[start:stop,:]
         for j,label in enumerate(labels):
           model = file_models.next()
-          models.append(model)
-          descr = descrcache.get(model)
-          if descr is None:
-            descr = descrcache[model] = GenotypeArrayDescriptor( [model]*len(samples) )
+          descr = build_descr(model,len(samples))
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
+          models.append(model)
           yield label,g
 
       gfile.close()

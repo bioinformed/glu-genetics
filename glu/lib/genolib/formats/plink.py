@@ -20,8 +20,10 @@ __genoformats__ = [
   ('load_plink_bed', 'save_plink_bed', 'PlinkBedWriter',  'sdat', ['plink_sbed','sbed'],      None ) ]
 
 
+import numpy  as np
 import string
 
+from   operator                  import getitem
 from   itertools                 import islice,izip
 
 from   glu.lib.utils             import gcdisabled
@@ -30,7 +32,7 @@ from   glu.lib.fileutils         import autofile,namefile,               \
                                         parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.genoarray import model_from_alleles
+from   glu.lib.genolib.genoarray import build_model, build_descr, GenotypeArray, GenotypeArrayDescriptor
 from   glu.lib.genolib.locus     import Genome,load_locus_records,populate_genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN, \
                                         PHENO_UNKNOWN,PHENO_UNAFFECTED,PHENO_AFFECTED
@@ -55,7 +57,6 @@ CHR_RMAP   = {None:'0','':'0','X':'23','Y':'24','XY':'25','M':'26','MT':26}
 _ident_ws_trans = string.maketrans('\t\n\x0b\x0c\r ','______')
 
 
-# FIXME: Merlin also needs similar escaping (gack, I hate whitespace delimited formats)
 def escape_ident_ws(ident):
   '''
   Strip leading and trailing whitespace and replace all remaining whitespace
@@ -798,11 +799,7 @@ def save_plink_tped(filename,genos,format,extra_args=None,**kwargs):
 
 def load_plink_bim(filename,genome):
   mfile = autofile(filename)
-
-  # FIXME: Add support for hemizygote models
-  m = genome.max_alleles+1
-  modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
-                           if locus.model is not None and len(locus.model.alleles)==m )
+  modelcache = {}
 
   for i,line in enumerate(mfile):
     line = line.rstrip()
@@ -828,47 +825,22 @@ def load_plink_bim(filename,genome):
     if chr == '0':
       chr = None
 
-    alleles = []
-
     if allele1 == '0':
       allele1 = None
-    else:
-      alleles.append(allele1)
 
     if allele2 == '0':
       allele2 = None
-    else:
-      alleles.append(allele2)
 
-    alleles = tuple(sorted(alleles))
+    key = allele1,allele2
 
-    model = genome.get_locus(locus).model
+    model = modelcache.get(key)
+    if model is None:
+      a,b = allele1,allele2
+      model = modelcache[key] = build_model(genotypes=[(a,a),(b,b),(a,b)],max_alleles=2)
 
-    if not model:
-      model = modelcache.get(alleles)
+    genome.merge_locus(locus, model, chr, pdist)
 
-    if not model:
-      model = model_from_alleles(alleles,max_alleles=2)
-
-      if genome.default_model is None and len(alleles) == genome.max_alleles:
-        modelcache[alleles] = model
-
-    genome.merge_locus(locus, model, True, chr, pdist)
-
-    yield locus,allele1,allele2
-
-
-def _plink_decode(model,allele1,allele2):
-  genos = [model.genotypes[0]]*4
-
-  if allele1:
-    genos[0] = model.add_genotype( (allele1,allele1) )
-  if allele2:
-    genos[3] = model.add_genotype( (allele2,allele2) )
-  if allele1 and allele2:
-    genos[2] = model.add_genotype( (allele1,allele2) )
-
-  return genos
+    yield locus,model
 
 
 def _plink_encode(model, shift=0):
@@ -889,11 +861,11 @@ def _plink_update_encoding(model, genos, shift):
   a2 = model.alleles[2] if n>2 else None
 
   if a1:
-    genos[ model.add_genotype( (a1,a1) ).index ] = 0
+    genos[ model[a1,a1].index ] = 0
   if a2:
-    genos[ model.add_genotype( (a2,a2) ).index ] = 3<<shift
+    genos[ model[a2,a2].index ] = 3<<shift
   if a1 and a2:
-    genos[ model.add_genotype( (a1,a2) ).index ] = 2<<shift
+    genos[ model[a1,a2].index ] = 2<<shift
 
 
 def load_plink_bed(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
@@ -914,6 +886,22 @@ def load_plink_bed(filename,format,genome=None,phenome=None,extra_args=None,**kw
                        raising an error.
   @type    extra_args: dict
   @rtype             : GenomatrixStream
+
+  PLINK defines its binary genotype encoding based on an in-memory bit
+  pattern, which is written in reverse to disk.  Due to GLU's requirement
+  that the missing genotype be encoded as 0, we simply need to xor the
+  on-disk representation by 0b01010101 (0x55) to obtain a valid encoding
+  with homozygote 1 encoded as 1, homozygote 2 encoded as 2, and
+  heterozygotes as 3.  The resulting homogeneous encoding can then be
+  remapped to the correct descriptor.
+
+                   geno-  in-    on-   01
+                   type  memory disk  xor'd
+  ---------------- ----  ------ ----  -----
+  Missing genotype  __    10     01     00
+  Homozygote 1      AA    00     00     01
+  Homozygote 2      BB    11     11     10
+  Heterozygote      AB    01     10     11
   '''
   if extra_args is None:
     args = kwargs
@@ -947,82 +935,65 @@ def load_plink_bed(filename,format,genome=None,phenome=None,extra_args=None,**kw
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  if genome is None:
-    genome = Genome()
-
   if phenome is None:
     phenome = Phenome()
 
-  bim_loci = list(load_plink_bim(bim,genome))
-  loci     = [ l[0] for l in bim_loci ]
-  samples  = list(load_plink_tfam(fam,phenome))
-  models   = [ genome.get_model(locus) for locus in loci ]
+  file_genome = Genome()
+
+  loci,models = zip(*load_plink_bim(bim,file_genome))
+  models      = list(models)
+  samples     = list(load_plink_tfam(fam,phenome))
 
   if loc and isinstance(loc,basestring):
     loc = list(load_locus_records(loc)[2])
     # Merge map data into genome
-    populate_genome(genome,loc)
+    populate_genome(file_genome,loc)
 
   unique = len(set(samples))==len(samples) and len(set(loci))==len(loci)
+
+  def _decode(a):
+    '''
+    Reverse pairs of bits and xor result by 0b0101010101
+    '''
+    return ((a&0x03)<<6 | (a&0x0C)<<2 | (a&0x30)>>2 | (a&0xC0)>>6)^0x55
+
+  decode = dict( (chr(i),_decode(i)) for i in range(256) )
 
   if mode == 0:
     format = 'sdat'
 
     def _load_plink():
-      valuecache = {}
-      genovalues = []
-
-      for i,(locus,allele1,allele2) in enumerate(bim_loci):
-        # Cache must key off model and allele order
-        model  = models[i]
-        key    = model,allele1,allele2
-
-        values = valuecache.get(key)
-
-        if values is None:
-          values = valuecache[key] = _plink_decode(*key)
-
-        byte  = i//4
-        shift = 2*(i%4)
-
-        genovalues.append( (byte,shift,values) )
-
+      descr = GenotypeArrayDescriptor(models)
       rowbytes = (len(loci)*2+7)//8
+      decoder = [decode]*rowbytes
 
       for sample in samples:
-        data  = map(ord,gfile.read(rowbytes))
-        genos = [ values[(data[byte]>>shift)&3] for byte,shift,values in genovalues ]
+        genos = GenotypeArray(descr)
+        genos.data = np.array(map(getitem, decoder, gfile.read(rowbytes)),dtype=np.uint8)
         yield sample,genos
 
   elif mode == 1:
     format = 'ldat'
 
     def _load_plink():
-      genovalues = []
+      n = len(samples)
+      rowbytes = (n*2+7)//8
+      decoder = [decode]*rowbytes
 
-      for i,sample in enumerate(samples):
-        byte  = i//4
-        shift = 2*(i%4)
-        genovalues.append( (byte,shift) )
+      for lname,model in izip(loci,models):
+        descr = build_descr(model,n)
+        genos = GenotypeArray(descr)
+        genos.data = np.array(map(getitem, decoder, gfile.read(rowbytes)),dtype=np.uint8)
+        yield lname,genos
 
-      valuecache = {}
-      rowbytes = (len(samples)*2+7)//8
+  genos = GenomatrixStream(_load_plink(),format,loci=loci,samples=samples,models=models,
+                                         genome=file_genome,phenome=phenome,unique=unique,
+                                         packed=True)
 
-      for (locus,allele1,allele2),model in izip(bim_loci,models):
-        # Cache must key off model and allele order
-        key    = model,allele1,allele2
-        values = valuecache.get(key)
+  if genome:
+    genos = genos.transformed(recode_models=genome)
 
-        if values is None:
-          values = valuecache[key] = _plink_decode(*key)
-
-        data = map(ord,gfile.read(rowbytes))
-        genos = [ values[(data[byte]>>shift)&3] for byte,shift in genovalues ]
-
-        yield locus,genos
-
-  return GenomatrixStream(_load_plink(),format,loci=loci,samples=samples,models=models,
-                                        genome=genome,phenome=phenome,unique=unique)
+  return genos
 
 
 class PlinkBedWriter(object):
@@ -1145,28 +1116,6 @@ class PlinkBedWriter(object):
     else:
       # Write BED transposed-mode (sdat)
       self.out.write( chr(0) )
-      models = [ self.genome.get_model(locus) for locus in self.columns ]
-
-      # Build encodings for each locus and store the set of cached encodings
-      # so they can be updated as new alleles are detected.
-      #
-      # FIXME: This approach is optimal if all alleles are known, but falls
-      #        apart otherwise.  A better approach would be to use an
-      #        optimistic dict based approach that resolves new genotypes
-      #        only when encoding results in a KeyError.
-      #
-      # FIXME: Even using this appoach, we should be able to remove fixed
-      #        models from the cache to avoid unnecessary updates.
-      self.valuecache = valuecache = {}
-      self.genovalues = genovalues = []
-
-      for i,model in enumerate(models):
-        shift  = 2*(i%4)
-        key    = model,shift
-        values = valuecache.get(key)
-        if values is None:
-          values = valuecache[key] = _plink_encode(model,shift)
-        genovalues.append(values)
 
   def writerow(self, rowkey, genos):
     '''
@@ -1186,25 +1135,36 @@ class PlinkBedWriter(object):
       raise ValueError('[ERROR] Internal error: Genotypes do not match columns')
 
     rowbytes = (n*2+7)//8
-    row      = [0]*rowbytes
 
     if self.format == 'lbed':
       # Build encodings for each of the 4 shift values for each model
       model  = self.genome.get_model(rowkey)
       values = [ _plink_encode(model,shift) for shift in [0,2,4,6] ]
 
+      row = [0]*rowbytes
       for i,g in enumerate(genos):
         row[i//4] |= values[i%4][g.index]
     else:
-      # FIXME: This update encodings once per model,shift value, but it is
-      #        still fairly blecherously slow.
-      for (model,shift),values in self.valuecache.iteritems():
-        _plink_update_encoding(model, values, shift)
+      # Build encodings for each locus and store the set of cached encodings
+      # so they can be updated as new alleles are detected.
+      #
+      # FIXME: This approach is awful and should be replaced by something
+      #        much more intelligent
+      valuecache = {}
+      genovalues = []
 
-      values = self.genovalues
+      for i,locus in enumerate(self.columns):
+        model  = self.genome.get_model(locus)
+        shift  = 2*(i%4)
+        key    = model,shift
+        values = valuecache.get(key)
+        if values is None:
+          values = valuecache[key] = _plink_encode(model,shift)
+        genovalues.append(values)
 
+      row = [0]*rowbytes
       for i,g in enumerate(genos):
-        row[i//4] |= values[i][g.index]
+        row[i//4] |= genovalues[i][g.index]
 
     # Write row
     out.write( ''.join(map(chr,row)) )
@@ -1225,36 +1185,52 @@ class PlinkBedWriter(object):
     n = len(self.columns)
     rowbytes = (n*2+7)//8
 
-    if self.format=='sbed':
-      values = self.genovalues
+    if self.format=='lbed':
+      for lname,genos in rows:
+        if len(genos) != n:
+          raise ValueError('[ERROR] Internal error: Genotypes do not match columns')
 
-    for rowkey,genos in rows:
-      if len(genos) != n:
-        raise ValueError('[ERROR] Internal error: Genotypes do not match columns')
-
-      row = [0]*rowbytes
-
-      if self.format=='lbed':
         # Build encodings for each of the 4 shift values for each model
-        model  = self.genome.get_model(rowkey)
+        model  = self.genome.get_model(lname)
         values = [ _plink_encode(model,shift) for shift in [0,2,4,6] ]
 
+        row = [0]*rowbytes
         for i,g in enumerate(genos):
           row[i//4] |= values[i%4][g.index]
-      else:
-        # FIXME: This updates once per model,shift value, but it is still
-        #        fairly blecherously slow.
-        for (model,shift),values in self.valuecache.iteritems():
-          _plink_update_encoding(model, values, shift)
 
-        values = self.genovalues
+        # Write row
+        out.write( ''.join(map(chr,row)) )
+        self.rowkeys.append(lname)
 
+    else:
+      valuecache = {}
+
+      for sample,genos in rows:
+        if len(genos) != n:
+          raise ValueError('[ERROR] Internal error: Genotypes do not match columns')
+
+        # Build encodings for each locus and store the set of cached encodings
+        # so they can be updated as new alleles are detected.
+        #
+        # FIXME: This approach is awful and should be replaced by something
+        #        much more intelligent
+        genovalues = []
+        for i,locus in enumerate(self.columns):
+          model  = self.genome.get_model(locus)
+          shift  = 2*(i%4)
+          key    = model,shift
+          values = valuecache.get(key)
+          if values is None:
+            values = valuecache[key] = _plink_encode(model,shift)
+          genovalues.append(values)
+
+        row = [0]*rowbytes
         for i,g in enumerate(genos):
-          row[i//4] |= values[i][g.index]
+          row[i//4] |= genovalues[i][g.index]
 
-      # Write row
-      out.write( ''.join(map(chr,row)) )
-      self.rowkeys.append(rowkey)
+        # Write row
+        out.write( ''.join(map(chr,row)) )
+        self.rowkeys.append(sample)
 
   def close(self):
     '''

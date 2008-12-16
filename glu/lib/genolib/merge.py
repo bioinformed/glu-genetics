@@ -7,13 +7,13 @@ __revision__  = '$Id$'
 
 
 from   operator                  import itemgetter
-from   itertools                 import izip,starmap,dropwhile,repeat,imap
+from   itertools                 import izip,dropwhile,repeat,imap
 from   collections               import defaultdict
 
 from   glu.lib.utils             import tally
 from   glu.lib.fileutils         import table_writer
 
-from   glu.lib.genolib.genoarray import Genotype,model_from_alleles,FORCE_PYTHON
+from   glu.lib.genolib.genoarray import Genotype,FORCE_PYTHON
 
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)
@@ -34,7 +34,8 @@ class Unique(object):
   whenever input data are required to be unique, as this will be enforced
   rigorously.
 
-  >>> model = model_from_alleles('AB')
+  >>> from glu.lib.genolib.genoarray import build_model
+  >>> model = build_model('AB')
   >>> missing = model[None,None]
   >>> A,B='A','B'
   >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -95,7 +96,8 @@ try:
 
   def test_unanimous():
     '''
-    >>> model = model_from_alleles('AB')
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model = build_model('AB')
     >>> missing = model[None,None]
     >>> A,B='A','B'
     >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -122,7 +124,8 @@ try:
 
   def test_genotype_merger():
     '''
-    >>> model = model_from_alleles('AB')
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model = build_model('AB')
     >>> missing = model[None,None]
     >>> A,B='A','B'
     >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -202,7 +205,8 @@ except ImportError:
     @return           : concordance class, the consensus genotype
     @rtype            : int,str
 
-    >>> model = model_from_alleles('AB')
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model = build_model('AB')
     >>> missing = model[None,None]
     >>> A,B='A','B'
     >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -262,7 +266,8 @@ class Vote(object):
    3) discordant:   two or more non-missing genotypes that do not meet voting threshold
    4) missing:      zero or more missing genotypes only
 
-  >>> model = model_from_alleles('AB')
+  >>> from glu.lib.genolib.genoarray import build_model
+  >>> model = build_model('AB')
   >>> missing = model[None,None]
   >>> A,B='A','B'
   >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -365,7 +370,8 @@ class Ordered(object):
   3) discordant:   two or more non-missing genotypes that do not meet voting threshold
   4) missing:      zero or more missing genotypes only
 
-  >>> model = model_from_alleles('AB')
+  >>> from glu.lib.genolib.genoarray import build_model
+  >>> model = build_model('AB')
   >>> missing = model[None,None]
   >>> A,B='A','B'
   >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -474,7 +480,9 @@ try:
 
   def test_merger():
     '''
-    >>> model = model_from_alleles('AB')
+    >>> from itertools import starmap
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model = build_model('AB')
     >>> missing = model[None,None]
     >>> A,B='A','B'
     >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -564,7 +572,9 @@ except ImportError:
       @return      : consensus genotype
       @rtype       : object
 
-      >>> model = model_from_alleles('AB')
+      >>> from itertools import starmap
+      >>> from glu.lib.genolib.genoarray import build_model
+      >>> model = build_model('AB')
       >>> missing = model[None,None]
       >>> A,B='A','B'
       >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -605,7 +615,8 @@ except ImportError:
       @return       : consensus genotypes
       @rtype        : list of genotypes
 
-      >>> model = model_from_alleles('AB')
+      >>> from glu.lib.genolib.genoarray import build_model
+      >>> model = build_model('AB')
       >>> missing = model[None,None]
       >>> A,B='A','B'
       >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -649,7 +660,8 @@ except ImportError:
       @return       : consensus genotypes
       @rtype        : list of genotypes
 
-      >>> model = model_from_alleles('AB')
+      >>> from glu.lib.genolib.genoarray import build_model
+      >>> model = build_model('AB')
       >>> missing = model[None,None]
       >>> A,B='A','B'
       >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
@@ -743,7 +755,9 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   @param  locusfile: output file name or file object for merge stats by locus
   @type   locusfile: str or file object
 
-  >>> model = model_from_alleles('AB')
+  >>> from itertools import starmap
+  >>> from glu.lib.genolib.genoarray import build_model
+  >>> model = build_model('AB')
   >>> missing = model[None,None]
   >>> A,B='A','B'
   >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]

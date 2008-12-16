@@ -30,8 +30,8 @@ def count_haplotypes_native(genos1, genos2):
      c22 - haplotype counts for allele 2 by allele 2
      dh  - double heterozygote haplotypes (uninformative)
 
-  >>> from glu.lib.genolib.genoarray import model_from_alleles,GenotypeArrayDescriptor,GenotypeArray
-  >>> model = model_from_alleles('AB')
+  >>> from glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*1400)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -57,7 +57,7 @@ def count_haplotypes_native(genos1, genos2):
 
   # X-linked test
 
-  >>> model = model_from_alleles('AB',allow_hemizygote=True)
+  >>> model = build_model('AB',allow_hemizygote=True)
   >>> genos1  = encode([(None,'A'),(None,'B'),(None,'A'),('A','A'),('A','B'),('B','B'),('A','A')])
   >>> genos2  = encode([(None,'A'),(None,'B'),(None,'A'),('A','A'),('A','B'),('B','B'),('B','B')])
   >>> count_haplotypes_native(genos1[:i],genos2[:i])
@@ -103,8 +103,8 @@ def count_diplotypes(genos1, genos2):
   '''
   Return a list of diplotype frequencies and a sets of alleles from each locus
 
-  >>> from glu.lib.genolib.genoarray import model_from_alleles,GenotypeArrayDescriptor,GenotypeArray
-  >>> model = model_from_alleles('AB')
+  >>> from glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*1400)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -318,8 +318,8 @@ try:
   def test_count_haplotypes():
     '''
     >>> import numpy
-    >>> from glu.lib.genolib.genoarray import model_from_alleles,GenotypeArrayDescriptor,GenotypeArray
-    >>> model = model_from_alleles('AB')
+    >>> from glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*1400)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -351,7 +351,7 @@ try:
 
     # X-linked test
 
-    >>> model = model_from_alleles('AB',allow_hemizygote=True)
+    >>> model = build_model('AB',allow_hemizygote=True)
     >>> genos1  = encode([(None,'A'),(None,'B'),(None,'A'),('A','A'),('A','B'),('B','B'),('A','A')])
     >>> genos2  = encode([(None,'A'),(None,'B'),(None,'A'),('A','A'),('A','B'),('B','B'),('B','B')])
     >>> count_haplotypes_fast(genos1[:i],genos2[:i])

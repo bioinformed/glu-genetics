@@ -19,8 +19,8 @@ from   glu.lib.genolib           import load_genostream,geno_options
 
 def parent_offspring_concordance(parent1, parent2, child, locusstats):
   '''
-  >>> from glu.lib.genolib.genoarray import model_from_alleles,GenotypeArrayDescriptor,GenotypeArray
-  >>> model = model_from_alleles('AB')
+  >>> from glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def lstats(n): return [ [0,0] for i in xrange(n) ]
 

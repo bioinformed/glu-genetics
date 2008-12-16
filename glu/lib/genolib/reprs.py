@@ -8,8 +8,6 @@ __revision__  = '$Id$'
 from   operator                   import getitem
 from   itertools                  import imap, repeat
 
-from   glu.lib.genolib.genoarray  import model_from_alleles
-
 
 class Nothing(object): pass
 
@@ -75,7 +73,8 @@ class UnphasedMarkerRepresentation(object):
     @return   : genotype in string format
     @rtype    : str
 
-    >>> model=model_from_alleles('AG',allow_hemizygote=True)
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model=build_model('AG',allow_hemizygote=True)
     >>> snp.to_string( model['A','A'] )
     'AA'
     >>> snp.to_string( model[None, 'A'] )
@@ -131,7 +130,8 @@ class UnphasedMarkerRepresentation(object):
     @return   : genotype in string format
     @rtype    : str
 
-    >>> model=model_from_alleles('AG',allow_hemizygote=True)
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model=build_model('AG',allow_hemizygote=True)
     >>> snp.to_string_from_alleles( ('A','A') )
     'AA'
     >>> snp.to_string_from_alleles( (None, 'A') )
@@ -184,7 +184,8 @@ class UnphasedMarkerRepresentation(object):
     @return    : genotypes in string format
     @rtype     : sequence
 
-    >>> model=model_from_alleles('AG',allow_hemizygote=True)
+    >>> from glu.lib.genolib.genoarray import build_model
+    >>> model=build_model('AG',allow_hemizygote=True)
     >>> genos = [ model[g] for g in [('A','A'),(None,'A'),(None,None)] ]
     >>> snp.to_strings(genos)
     ['AA', ' A', '  ']

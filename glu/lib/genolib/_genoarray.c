@@ -289,6 +289,23 @@ genotype_richcompare(PyObject *self, PyObject *other, int op)
 {
 	PyObject *geno1=NULL, *geno2=NULL, *ret=NULL;
 
+	/* Fast path: equality comparisons for genotypes from the same model may use pointer comparison */
+	if( Genotype_CheckExact(self) && Genotype_CheckExact(other) && (op==Py_EQ || op==Py_NE) &&
+	    ((GenotypeObject *)self)->model == ((GenotypeObject *)other)->model)
+	{
+		int cmp;
+		if(op==Py_EQ)
+			cmp = (self==other);
+		else
+			cmp = (self!=other);
+
+		if(cmp)
+			Py_RETURN_TRUE;
+		else
+			Py_RETURN_FALSE;
+	}
+
+	/* Slow path: compare normalized genotype tuples */
 	geno1 = genotype_normalized_tuple(self);
 	if(!geno1) goto done;
 	geno2 = genotype_normalized_tuple(other);
@@ -1034,6 +1051,65 @@ genomodel_get_genotype(UnphasedMarkerModelObject *self, PyObject *geno)
 }
 
 static int
+genomodel_contains(UnphasedMarkerModelObject *self, PyObject *item)
+{
+	PyObject *geno = genomodel_get_genotype(self, item);
+	if(geno == NULL && PyErr_ExceptionMatches(GenotypeLookupError))
+	{
+		PyErr_Clear();
+		return 0;
+	}
+	if(geno == NULL)
+		return -1;
+
+	Py_DECREF(geno);
+	return 1;
+}
+
+static PyObject *
+genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObject *other)
+{
+	Py_ssize_t len1, len2, i;
+
+	if(self==other)
+		Py_RETURN_TRUE;
+
+	if( !UnphasedMarkerModel_Check(other) )
+	{
+		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
+		return NULL;
+	}
+
+	if( self->bit_size         != other->bit_size
+	 || self->max_alleles      != other->max_alleles
+	 || self->allow_hemizygote != other->allow_hemizygote)
+		Py_RETURN_FALSE;
+
+	/* FIXME: Check alleles?  Or are genotypes good enough? */
+
+	len1 = PyList_Size(self->genotypes);
+	if(len1==-1) return NULL;
+	len2 = PyList_Size(other->genotypes);
+	if(len2==-1) return NULL;
+
+	if(len1>len2)
+		Py_RETURN_FALSE;
+
+	for(i=0; i<len1; ++i)
+	{
+		PyObject   *g1 = PyList_GET_ITEM(self->genotypes,  i);
+		PyObject   *g2 = PyList_GET_ITEM(other->genotypes, i);
+		PyObject *comp = genotype_richcompare(g1, g2, Py_EQ);
+
+		if(!comp)          return NULL;
+		if(comp==Py_False) return comp;
+		Py_DECREF(comp);
+	}
+
+	Py_RETURN_TRUE;
+}
+
+static int
 genomodel_init(UnphasedMarkerModelObject *self, PyObject *args, PyObject *kw)
 {
 	PyObject *missing, *geno;
@@ -1090,11 +1166,25 @@ static PyMappingMethods genomodel_as_mapping = {
 	(objobjargproc)0,
 };
 
+static PySequenceMethods genomodel_as_sequence = {
+	0,						/* sq_length */
+	0,						/* sq_concat */
+	0,						/* sq_repeat */
+	0,						/* sq_item */
+	0,						/* sq_slice */
+	0,						/* sq_ass_item */
+	0,						/* sq_ass_slice */
+	(objobjproc)genomodel_contains,			/* sq_contains */
+	0,						/* sq_inplace_concat */
+	0,						/* sq_inplace_repeat */
+};
+
 static PyMethodDef genomodel_methods[] = {
-	{"get_genotype", (PyCFunction)genomodel_get_genotype, METH_O, "get an existing genotype"},
-	{"add_genotype", (PyCFunction)genomodel_add_genotype, METH_O, "get or add a genotype"},
-	{"get_allele",   (PyCFunction)genomodel_get_allele,   METH_O, "get an allele"},
-	{"add_allele",   (PyCFunction)genomodel_add_allele,   METH_O, "get or add an allele"},
+	{"get_genotype",   (PyCFunction)genomodel_get_genotype,   METH_O, "get an existing genotype"},
+	{"add_genotype",   (PyCFunction)genomodel_add_genotype,   METH_O, "get or add a genotype"},
+	{"get_allele",     (PyCFunction)genomodel_get_allele,     METH_O, "get an allele"},
+	{"add_allele",     (PyCFunction)genomodel_add_allele,     METH_O, "get or add an allele"},
+	{"replaceable_by", (PyCFunction)genomodel_replaceable_by, METH_O, "Return model could replace the other without altering existing encodings"},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -1126,12 +1216,12 @@ PyTypeObject UnphasedMarkerModelType = {
 	0,					/* tp_compare        */
 	0,					/* tp_repr           */
 	0,					/* tp_as_number      */
-	0,					/* tp_as_sequence    */
+	&genomodel_as_sequence,			/* tp_as_sequence    */
 	&genomodel_as_mapping,			/* tp_as_mapping     */
 	0,					/* tp_hash           */
 	0,					/* tp_call           */
 	0,					/* tp_str            */
-	0,		/* tp_getattro       */
+	0,					/* tp_getattro       */
 	0,					/* tp_setattro       */
 	0,					/* tp_as_buffer      */
 	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,	/* tp_flags          */
@@ -3463,7 +3553,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 {
 	Py_ssize_t i, len, found=0;
 	PyObject *genoseq=NULL;
-	GenotypeObject *genofound=NULL, *missing=NULL;
+	GenotypeObject *genofound=NULL;
 	PyObject **items;
 
 	*status = MERGE_MISSING;
@@ -3483,16 +3573,13 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 
 	if(Genotype_CheckExact(genos))
 	{
-		GenotypeObject *genofound = (GenotypeObject *)genos;
-		if(genofound->model != model)
-		{
-			PyErr_Format(GenotypeRepresentationError,
-			    "invalid genotype model in genos at index %zd", 0L);
-			goto error;
-		}
-		if(genofound->index != 0)
+		genofound = (GenotypeObject *)genos;
+		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, genofound->index); /* borrowed ref */
+
+		if(genofound && genofound->index != 0)
 			*status = MERGE_UNAMBIGUOUS;
-		Py_INCREF(genofound);
+
+		Py_XINCREF(genofound);
 		return genofound;
 	}
 
@@ -3520,21 +3607,11 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 			goto error;
 		}
 
-		if(geno->model != model)
-		{
-			PyErr_Format(GenotypeRepresentationError,
-			    "invalid genotype model in genos at index %zd", i);
-			goto error;
-		}
-
 		if(geno->index == 0)
-		{
-			missing = geno;
 			continue;
-		}
 		else if(!genofound)
 			genofound = geno;
-		else if(genofound != geno)
+		else if(genofound->index != geno->index)
 		{
 			*status = MERGE_DISCORDANT;
 			found = 0;
@@ -3544,16 +3621,16 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 	}
 
 	if(!found)
+		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0); /* borrowed ref */
+	else
 	{
-		if(missing)
-			genofound = missing;
-		else
-			genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0); /* borrowed ref */
+		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, genofound->index); /* borrowed ref */
+
+		if(found == 1)
+			*status = MERGE_UNAMBIGUOUS;
+		else /* found > 1 */
+			*status = MERGE_CONCORDANT;
 	}
-	else if(found == 1)
-		*status = MERGE_UNAMBIGUOUS;
-	else /* found > 1 */
-		*status = MERGE_CONCORDANT;
 
 	Py_XDECREF(genoseq);
 	Py_XINCREF(genofound);

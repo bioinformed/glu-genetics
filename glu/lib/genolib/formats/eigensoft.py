@@ -24,7 +24,7 @@ from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filena
 from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream,NonUniqueError
 from   glu.lib.genolib.genoarray import count_genotypes, count_alleles_from_genocounts, \
                                         major_allele_from_allelecounts, \
-                                        GenotypeArrayDescriptor, GenotypeArray, UnphasedMarkerModel
+                                        GenotypeArrayDescriptor, GenotypeArray, build_model
 from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.phenos    import Phenome,SEX_MALE,SEX_FEMALE,SEX_UNKNOWN
 
@@ -42,10 +42,12 @@ DEFAULT_ALLELES = 'A','B'
 UNKNOWN = 'UNKNOWN'
 
 
+# Requires empty genome
 def load_eigensoft_snps(filename,genome):
   loci = []
   models = []
   modelcache = {}
+
   for i,line in enumerate(autofile(filename)):
     line = line.strip()
 
@@ -75,17 +77,12 @@ def load_eigensoft_snps(filename,genome):
 
     model = modelcache.get(alleles)
     if model is None:
-      model = modelcache[alleles] = UnphasedMarkerModel(max_alleles=2)
-
-      # Assign genotypes in the appropriate order
       a,b = alleles
-      model.add_genotype( (a,a) )
-      model.add_genotype( (a,b) )
-      model.add_genotype( (b,b) )
+      model = modelcache[alleles] = build_model(genotypes=[(a,a),(a,b),(b,b)],max_alleles=2)
 
     loci.append(lname)
     models.append(model)
-    genome.set_locus(lname,model=model,chromosome=chr,location=location)
+    genome.set_locus(lname,model,chr,location)
 
   return loci,models
 

@@ -19,7 +19,7 @@ from   itertools                 import islice,dropwhile
 from   glu.lib.fileutils         import autofile,namefile,tryint,parse_augmented_filename,get_arg
 
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.genoarray import model_from_alleles
+from   glu.lib.genolib.genoarray import build_model
 from   glu.lib.genolib.reprs     import hapmap
 from   glu.lib.genolib.locus     import Genome
 
@@ -72,12 +72,8 @@ def load_hapmap(filename,format,genome=None,phenome=None,extra_args=None,**kwarg
   if genome is None:
     genome = Genome()
 
-  # FIXME: Add support for hemizygote models
-  m = genome.max_alleles+1
-  modelcache = dict( (tuple(sorted(locus.model.alleles[1:])),locus.model) for locus in genome.loci.itervalues()
-                           if locus.model is not None and len(locus.model.alleles)==m )
-
   def _load_hapmap():
+    modelcache = {}
     n = len(columns)
     for i,line in enumerate(gfile):
       fields = [ f.strip() for f in line.split(' ') ]
@@ -111,18 +107,15 @@ def load_hapmap(filename,format,genome=None,phenome=None,extra_args=None,**kwarg
       # FIXME: Add error recovery and detection
       assert len(alleles)<=2
 
-      model = genome.get_locus(locus).model
+      model = genome.get_model(locus)
 
       if not model:
         model = modelcache.get(alleles)
 
       if not model:
-        model = model_from_alleles(alleles,max_alleles=genome.max_alleles)
+        model = modelcache[alleles] = build_model(alleles,max_alleles=genome.max_alleles)
 
-        if genome.default_model is None and len(alleles) == genome.max_alleles:
-          modelcache[alleles] = model
-
-      genome.merge_locus(locus, model, False, chromosome, position, strand)
+      genome.merge_locus(locus, model, chromosome, position, strand)
 
       yield locus,genos
 

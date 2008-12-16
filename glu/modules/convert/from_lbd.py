@@ -9,8 +9,8 @@ __revision__  = '$Id$'
 import sys
 import csv
 
-from   operator                  import itemgetter
-from   itertools                 import islice,chain,izip,groupby
+from   operator                  import itemgetter,getitem
+from   itertools                 import islice,chain,imap,izip,groupby,repeat
 
 from   numpy                     import array,zeros
 
@@ -23,7 +23,7 @@ from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
 from   glu.lib.genolib.phenos    import Phenome, load_phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.io        import save_genostream, geno_options, GenoTransform
-from   glu.lib.genolib.genoarray import model_from_alleles
+from   glu.lib.genolib.genoarray import build_model, build_descr, GenotypeArray, GenotypeArrayDescriptor
 
 
 def load_lbd_file(filename,options):
@@ -286,44 +286,67 @@ def filter_gc(samples, gcthreshold):
     yield sampleid,genos,gcscores
 
 
-def build_models(loci,abmap,genome):
+def encode_genotypes(loci, samples, genome, phenome):
   '''
-  Build genotype locus models given a mapping derived from either the
-  Illumina manifest or a user-specified A/B map file.
+  Encode Illumina's A/B/H/U genotype calls to a homogeneous A/B model
   '''
-  genomap={}
+  model = build_model(alleles='AB',genotypes=[('A','A'),('A','B'),('B','B')],max_alleles=2)
+
+  genomap = dict( [('A',model['A','A']),
+                   ('B',model['B','B']),
+                   ('H',model['A','B']),
+                   ('U',model[None,None]) ])
+
+  descr = build_descr(model,len(loci))
+
+  for lname in loci:
+    genome.merge_locus(lname, model)
+
+  def _encode(descr):
+    for sampleid,genos,gcscores in samples:
+      genos = GenotypeArray(descr, imap(getitem, repeat(genomap), genos))
+      yield sampleid,genos
+
+  return GenomatrixStream(_encode(descr), 'sdat', loci=loci, models=list(descr),
+                                          genome=genome, phenome=phenome, packed=True)
+
+
+def recode_genotypes(genos, abmap):
+  '''
+  Recode packed genotypes according to supplied ab-map by writing a new
+  descriptor and copying the encoded genotype bitstrings.
+  '''
+
+  assert genos.packed
+
   modelcache = {}
-  models = []
+  genome = Genome()
 
-  for locus in loci:
-    a,b = abmap.get(locus, ('A','B') )
+  models = list(genos.models)
 
-    key = tuple(sorted([a,b]))
-    model = modelcache.get(key)
+  for i,lname in enumerate(genos.loci):
+    model     = models[i]
+    old_locus = genos.genome.loci[lname]
 
-    if not model:
-      model = modelcache[key] = model_from_alleles(key,max_alleles=2)
+    if lname in abmap:
+      alleles = abmap[lname]
+      new_model = modelcache.get(alleles)
+      if new_model is None:
+        a,b = alleles
+        model = build_model(genotypes=[(a,a),(a,b),(b,b)],max_alleles=2)
 
-    # FIXME: The semantics of the fixed flag are broken
-    genome.merge_locus(locus, model, fixed=True)
-    models.append(model)
+      models[i] = model
 
-    genomap[locus,'A'] = model[a,a]
-    genomap[locus,'B'] = model[b,b]
-    genomap[locus,'H'] = model[a,b]
-    genomap[locus,'U'] = model[None,None]
+    genome.merge_locus(lname, model, old_locus.chromosome, old_locus.location, old_locus.strand)
 
-  return genomap,models
+  def _recode():
+    descr = GenotypeArrayDescriptor(models)
+    for sample,row in genos:
+      new_row = GenotypeArray(descr)
+      new_row.data = row.data
+      yield sample,new_row
 
-
-def encode_genotypes(loci, samples, genomap):
-  '''
-  Encode Illumina's A/B/H/U genotype calls into the appropriate genotype
-  objects
-  '''
-  for sampleid,genos,gcscores in samples:
-    genos = [genomap[locus,geno] for locus,geno in izip(loci,genos)]
-    yield sampleid,genos
+  return genos.clone(_recode(), models=models, genome=genome, materialized=False)
 
 
 class GCSummary(object):
@@ -377,7 +400,7 @@ def option_parser():
   parser.add_option('-M', '--manifest', dest='manifest', metavar='FILE',
                     help='Illumina manifest file')
   parser.add_option('-s', '--targetstrand', dest='targetstrand', metavar='T', default='customer',
-                    help='Target strand based on Illumina manifest file: top, bottom, forward, '
+                    help='Target strand based on Illumina manifest file: ab, top, bottom, forward, '
                          'reverse, customer (default), anticustomer, design, antidesign')
   parser.add_option('-t', '--gcthreshold', dest='gcthreshold', type='float', metavar='N', default=0,
                     help='Genotypes with GC score less than N set to missing')
@@ -447,9 +470,10 @@ def main():
     # Summary is both object and new stream
     summary = samples = GCSummary(loci,samples)
 
-  genomap,models = build_models(loci,abmap,genome)
-  samples = encode_genotypes(loci, samples, genomap)
-  genos = GenomatrixStream(samples, 'sdat', loci=loci, models=models, genome=genome, phenome=phenome)
+  genos = encode_genotypes(loci, samples, genome, phenome)
+
+  if options.targetstrand != 'ab' and abmap:
+    genos = recode_genotypes(genos, abmap)
 
   # Late removal of excluded loci and insurance on removal of samples.
   # renaming is supported, but not really a good idea in most cases

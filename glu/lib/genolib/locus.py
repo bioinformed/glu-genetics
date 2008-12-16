@@ -11,7 +11,8 @@ import sys
 from   collections               import defaultdict
 
 from   glu.lib.fileutils         import namefile,table_reader,get_arg,parse_augmented_filename
-from   glu.lib.genolib.genoarray import model_from_alleles
+
+from   glu.lib.genolib.genoarray import build_model
 
 
 class Nothing(object): pass
@@ -44,12 +45,11 @@ class Locus(object):
   '''
   Locus metadata
   '''
-  __slots__ = ('name','model','fixed','chromosome','location','strand')
+  __slots__ = ('name','model','chromosome','location','strand')
 
-  def __init__(self, name, model=None, fixed=None, chromosome=None, location=None, strand=STRAND_UNKNOWN):
+  def __init__(self, name, model=None, chromosome=None, location=None, strand=STRAND_UNKNOWN):
     self.name       = name
     self.model      = model
-    self.fixed      = fixed
     self.chromosome = chromosome
     self.location   = location
     self.strand     = strand
@@ -76,7 +76,7 @@ class Genome(object):
     self.default_model = default_model
     self.default_fixed = default_fixed
 
-  def set_locus(self, name, model=Nothing, fixed=Nothing, chromosome=Nothing,
+  def set_locus(self, name, model=Nothing, chromosome=Nothing,
                             location=Nothing, strand=Nothing):
     '''
     FIXME: docstring
@@ -87,8 +87,6 @@ class Genome(object):
 
     if model is not Nothing:
       locus.model = model
-    if fixed is not Nothing:
-      locus.fixed = fixed
     if chromosome is not Nothing:
       locus.chromosome = chromosome
     if location is not Nothing:
@@ -96,7 +94,7 @@ class Genome(object):
     if strand is not Nothing:
       locus.strand = strand
 
-  def merge_locus(self, name, model=None, fixed=None, chromosome=None,
+  def merge_locus(self, name, model=None, chromosome=None,
                               location=None, strand=STRAND_UNKNOWN,
                               warn=False):
     '''
@@ -106,7 +104,7 @@ class Genome(object):
 
     # Fastpath: No merge needed
     if locus is None:
-      self.loci[name] = Locus(name,model,fixed,chromosome,location,strand)
+      self.loci[name] = Locus(name,model,chromosome,location,strand)
       return
 
     # Slowpath: Must check for incompatibilities
@@ -119,12 +117,6 @@ class Genome(object):
           sys.stderr.write('[WARNING] %s\n' % msg)
         else:
           raise ValueError(msg)
-
-    if fixed is not None:
-      if locus.fixed is None:
-        locus.fixed = fixed
-      else:
-        locus.fixed |= fixed
 
     if chromosome is not None:
       if locus.chromosome is None:
@@ -174,11 +166,10 @@ class Genome(object):
     locus = self.get_locus(name)
 
     if locus.model is None:
-      locus.fixed = self.default_fixed
       if self.default_model is not None:
         locus.model = self.default_model
       else:
-        locus.model = model_from_alleles(self.alleles, max_alleles=self.max_alleles)
+        locus.model = build_model(self.alleles, max_alleles=self.max_alleles)
 
     return locus
 
@@ -189,7 +180,7 @@ class Genome(object):
     return self.get_locus_model(name).model
 
 
-def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
+def load_locus_records(filename,extra_args=None,**kwargs):
   '''
   Load a locus file
 
@@ -357,36 +348,24 @@ def load_locus_records(filename,extra_args=None,modelcache=None,**kwargs):
   return default_max_alleles,default_alleles,_loci()
 
 
-def populate_genome(genome,loci,modelcache=None):
+def populate_genome(genome,loci):
   '''
   Return the default model and a sequence of Locus objects from an augmented
   locus description file
 
   FIXME: Add docstring and doctests
   '''
-  if modelcache is None:
-    modelcache = {}
-
   # FIXME: Model merge must be more careful about stepping on existing
   #        models, when they are actually compatible.  The current interface
   #        is required identical model objects, so problems will result if
   #        populate genome is called on a non-empty instance.
 
   for lname,max_alleles,alleles,chromosome,location,strand in loci:
-    model = None
-
-    if alleles:
-      key   = (max_alleles,)+tuple(sorted(alleles))
-      model = modelcache.get(key)
-      if model is None:
-        model = modelcache[key] = model_from_alleles(alleles,max_alleles=max_alleles)
-    elif max_alleles!=genome.max_alleles:
-      model = model_from_alleles([],max_alleles=max_alleles)
-
-    genome.merge_locus(lname, model, len(alleles)==max_alleles, chromosome, location, strand)
+    model = build_model(alleles,max_alleles=max_alleles)
+    genome.merge_locus(lname, model, chromosome, location, strand)
 
 
-def load_genome(filename,modelcache=None,**kwargs):
+def load_genome(filename,**kwargs):
   '''
   Return the default model and a sequence of Locus objects from an augmented
   locus description file
@@ -396,14 +375,14 @@ def load_genome(filename,modelcache=None,**kwargs):
   default_max_alleles,default_alleles,loci = load_locus_records(filename,**kwargs)
 
   if default_alleles:
-    default_model = model_from_alleles(default_alleles,max_alleles=default_max_alleles)
+    default_model = build_model(default_alleles,max_alleles=default_max_alleles)
   else:
     default_model = None
 
   genome = Genome(default_model=default_model, default_fixed=bool(default_alleles),
                   max_alleles=default_max_alleles, alleles=default_alleles)
 
-  populate_genome(genome,loci,modelcache)
+  populate_genome(genome,loci)
 
   return genome
 

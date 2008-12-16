@@ -1970,13 +1970,12 @@ def merge_sorted_genotriples(triples,mergefunc):
   [('l1', 's1', ('A', 'A')), ('l1', 's2', ('A', 'B')), ('l2', 's1', ('A', 'A')), ('l3', 's1', (None, None))]
   '''
   def _merge():
-    get2 = itemgetter(2)
+    get2   = itemgetter(2)
     genome = triples.genome
-    merge = mergefunc.merge_geno
+    merge  = mergefunc.merge_geno
+
     for (sample,locus),trips in groupby(triples, itemgetter(0,1)):
-      genos = map(get2,trips)
-      assert len(genos) < 2 or all(genos[0].model is g.model for g in genos)
-      geno  = merge(sample,locus,genome.get_model(locus),genos)
+      geno = merge(sample,locus,genome.get_model(locus),map(get2,trips))
       yield sample,locus,geno
 
   return triples.clone(_merge(),unique=True,materialized=False)
@@ -2925,8 +2924,7 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
   old_locus = old_genome.loci[old_name]
   old_model = old_locus.model
 
-  new_genome.merge_locus(new_name, fixed=old_locus.fixed,
-                                   chromosome=old_locus.chromosome,
+  new_genome.merge_locus(new_name, chromosome=old_locus.chromosome,
                                    location=old_locus.location,
                                    strand=old_locus.strand, warn=warn)
 

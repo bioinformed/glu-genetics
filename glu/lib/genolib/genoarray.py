@@ -9,11 +9,11 @@ __revision__  = '$Id$'
 
 
 __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeArrayDescriptor',
-           'GenotypeLookupError','GenotypeRepresentationError', 'model_from_alleles']
+           'GenotypeLookupError','GenotypeRepresentationError']
 
 
 import numpy
-from   itertools     import izip
+from   itertools     import izip,chain
 
 from   glu.lib.utils import izip_exact
 
@@ -357,7 +357,7 @@ except ImportError:
 
       old_model = self._models[i]
 
-      if not old_model.bit_size != new_model.bit_size:
+      if old_model.bit_size != new_model.bit_size:
         raise GenotypeRepresentationError('Model may not be replaced due to incompatible size')
 
       if len(old_model.alleles) > len(new_model.alleles):
@@ -597,6 +597,21 @@ except ImportError:
 
     __getitem__ = get_genotype
 
+    def __contains__(self, geno):
+      '''
+      Return if a given genotype tuple or object is contained within this model.
+
+      @param geno: genotype tuple
+      @type  geno: 2-tuple of allele objects
+      @return    : True if geno is contained within this model, otherwise False
+      @rtype     : bool
+      '''
+      try:
+        self.get_genotype(geno)
+        return True
+      except GenotypeLookupError:
+        return False
+
     def add_genotype(self, geno):
       '''
       Return the representation for a given genotype tuple.  If the
@@ -637,6 +652,53 @@ except ImportError:
       self.genomap[allele2,allele1] = g
 
       return g
+
+    def replaceable_by(self, other):
+      '''
+      Return model could replace the other without altering existing
+      encodings.  To be compatible this model must:
+
+        1. Have identical bit width, maximum alleles, and hemizygosity
+        2. the other model must have a superset of the alleles
+        3. this model's genotypes must be a prefix of genotypes of other
+
+      >>> model1 = build_model('A')
+      >>> model2 = build_model('AB')
+      >>> model3 = build_model('AB',allow_hemizygote=True)
+      >>> model4 = build_model('AB',genotypes=[('B','B')])
+
+      >>> model1.replaceable_by(model1)
+      True
+      >>> model2.replaceable_by(model2)
+      True
+      >>> model1.replaceable_by(model2)
+      True
+      >>> model2.replaceable_by(model1)
+      False
+      >>> model2.replaceable_by(model3)
+      False
+      >>> model1.replaceable_by(model4)
+      False
+      >>> model2.replaceable_by(model4)
+      False
+      '''
+      if self is other:
+        return True
+
+      if (self.bit_size != other.bit_size or self.max_alleles      != other.max_alleles
+                                          or self.allow_hemizygote != other.allow_hemizygote):
+        return False
+
+      if not (set(other.alleles)>=set(self.alleles)):
+        return False
+
+      if len(self.genotypes) > len(other.genotypes):
+        return False
+
+      if any( g1!=g2 for g1,g2 in izip(self.genotypes,other.genotypes) ):
+        return False
+
+      return True
 
 
   def genoarray_concordance(genos1, genos2):
@@ -689,7 +751,7 @@ except ImportError:
     @rtype      : list of integers
 
     >>> import random
-    >>> model = model_from_alleles('AB')
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*1400)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -740,7 +802,7 @@ except ImportError:
     @rtype      : list of integers
 
     >>> import random
-    >>> model = model_from_alleles('AB')
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*1400)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -780,7 +842,7 @@ except ImportError:
     @return             : 2-tuple of locus_counts and sample_counts
     @rtype              : tuple of numpy.array
 
-    >>> model = model_from_alleles('AB')
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*4)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -850,7 +912,7 @@ except ImportError:
     @return             : 2-tuple of  sample_counts and locus_counts
     @rtype              : tuple of numpy.array
 
-    >>> model = model_from_alleles('AB')
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*4)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -911,7 +973,7 @@ except ImportError:
     @return        : sequence with elements from the specified indices
     @rtype         : sequence
 
-    >>> model = model_from_alleles('AB')
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*4)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -981,7 +1043,7 @@ except ImportError:
     @return        : dest updated with elements of src
     @rtype         : sequence
 
-    >>> model = model_from_alleles('AB')
+    >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*4)
     >>> model.genotypes
     [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1070,7 +1132,7 @@ def count_genotypes2(genos1,genos2):
   @return      : count of each genotype
   @rtype       : sequence of two-locus genotype and integer count
 
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*1400)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1178,7 +1240,7 @@ def count_alleles_from_genocounts(model,genocounts):
   @rtype      : list of integers
 
   >>> import random
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
   >>> genos = model.genotypes*200+model.genotypes[2:]*200
@@ -1209,7 +1271,7 @@ def count_alleles_from_genos(model,genos):
   @rtype      : list of integers
 
   >>> import random
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
   >>> genos = model.genotypes*200+model.genotypes[2:]*200
@@ -1223,7 +1285,7 @@ def count_alleles_from_genos(model,genos):
 
 def minor_allele_from_allelecounts(model,allelecounts):
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def alleles_from_genos(nn,aa,ab,bb):
   ...   return count_alleles_from_genocounts(model,count_genotypes([NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
@@ -1270,7 +1332,7 @@ def minor_allele_from_allelecounts(model,allelecounts):
 
 def minor_allele_from_genocounts(model,counts):
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   g =[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
@@ -1296,7 +1358,7 @@ def minor_allele_from_genocounts(model,counts):
 
 def minor_allele_from_genos(genos):
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
@@ -1326,7 +1388,7 @@ def minor_allele_from_genos(genos):
 
 def major_allele_from_allelecounts(model,allelecounts):
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def alleles_from_genos(nn,aa,ab,bb):
   ...   return count_alleles_from_genocounts(model,count_genotypes([NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb))
@@ -1363,7 +1425,7 @@ def major_allele_from_allelecounts(model,allelecounts):
 
 def major_allele_from_genocounts(model,counts):
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   g =[NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
@@ -1389,7 +1451,7 @@ def major_allele_from_genocounts(model,counts):
 
 def major_allele_from_genos(genos):
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> NN,AA,AB,BB = model.genotypes
   >>> def mkgenos(nn,aa,ab,bb):
   ...   return [NN]*nn+[AA]*aa+[AB]*ab+[BB]*bb
@@ -1418,149 +1480,172 @@ def major_allele_from_genos(genos):
 
 ##################################################################################
 
-def model_from_alleles(alleles, allow_hemizygote=False, max_alleles=None):
+class ModelBuilder(object):
   '''
-  Build an UnphasedMarkerModel from the supplied alleles
+  Build and cache genotype model objects that may be requested by any:
+    * allele list (unordered)
+    * genotype list (ordered)
+    * maximum number of alleles storable (determines bit width)
+    * flag to allow hemizygote genotypes (boolean)
 
-  @param           alleles: alleles
-  @type            alleles: sequence of objects
-  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
-  @type   allow_hemizygote: bool
-  @param       max_alleles: maximum number of alleles allowed. Default is 2
-  @type        max_alleles: int or None
-  @return                 : model supporting the supplied alleles
-  @rtype                  : UnphasedMarkerModel
+  Any combination of alleles, genotypes, and maximum number of alleles may
+  be specified, provided they are consistant and at least one is non-missing
+  or empty.  Alleles are treated as unordered sets, while genotypes are
+  assumed to be ordered based on the desired encoding.
+
+  Model objects are returned fully populated with all possible genotypes
+  assigned an encoding index (see Genotype class).  Caching is extremely
+  aggressive, since it is assumed that models are fixed upon creation and no
+  new alleles may be added.
+
+  >>> mcache = ModelBuilder()
+  >>> m1 = mcache.get(alleles='AB')
+  >>> m1.alleles
+  [None, 'A', 'B']
+  >>> int(m1.max_alleles)
+  2
+  >>> m2 = mcache.get(alleles='BA',max_alleles=2)
+  >>> m2.alleles
+  [None, 'A', 'B']
+  >>> int(m2.max_alleles)
+  2
+  >>> m1 is m2
+  True
+  >>> m3 = mcache.get(alleles='AB',max_alleles=3)
+  >>> m1 is not m3
+  True
+  >>> m4 = mcache.get(genotypes=map(tuple,['AA','AB','BB']))
+  >>> m1 is m4
+  True
+  >>> m5 = mcache.get(genotypes=map(tuple,['AA','BA','BB']))
+  >>> m1 is m5
+  True
+  >>> m6 = mcache.get(genotypes=map(tuple,['BB','BA','AA']))
+  >>> m1 is m6
+  False
   '''
+  def __init__(self):
+    self.cache = {}
 
-  alleles = sorted(set(a for a in alleles if a is not None))
-  n = len(alleles)
+  def get(self, alleles=None, genotypes=None, max_alleles=None, allow_hemizygote=None, base=None):
+    if alleles is None and genotypes is None and not max_alleles:
+      raise ValueError('Insufficient information to build genotype model')
 
-  if not max_alleles:
-    max_alleles = n
+    # FASTPATH: Determine the form of key based on mixture of genotype,
+    #           allele, and size information
 
-  if allow_hemizygote:
-    alleles = [None]+alleles
+    # Extend base model, if specified, with new alleles and genotypes
+    if base is not None:
+      if max_alleles is not None and base.max_alleles != max_alleles:
+        raise GenotypeRepresentationError('Incompatible model maximum number of alleles')
+      if allow_hemizygote is not None and base.allow_hemizygote != allow_hemizygote:
+        raise GenotypeRepresentationError('Incompatible model allow_hemizygote')
 
-  n = len(alleles)
-  genos = [ (alleles[i],alleles[j]) for i in range(n) for j in range(i,n) ]
+      if genotypes:
+        if not all(g1==g2 for g1,g2 in izip(base.genotypes[1:],genotypes)):
+          raise GenotypeRepresentationError('Incompatible model genotypes')
+        if len(genotypes) >= len(base.genotypes):
+          return base
 
-  model = UnphasedMarkerModel(allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)
-  for g in genos:
-    model.add_genotype(g)
+      alleles          = list(alleles or []) + base.alleles[1:]
+      genotypes        = [ g.alleles() for g in base.genotypes[1:] ] + list(genotypes or [])
+      max_alleles      = base.max_alleles
+      allow_hemizygote = base.allow_hemizygote
 
-  return model
+    if allow_hemizygote is None:
+      allow_hemizygote = False
 
+    if genotypes is not None:
+      genotypes = tuple(tuple(sorted(g)) for g in genotypes)
 
-def model_from_genotypes(genotypes, allow_hemizygote=None, max_alleles=None):
-  '''
-  Build an UnphasedMarkerModel from the supplied genotypes.  All possible
-  genotypes will be added to the model from the alleles found in the
-  supplied genotypes.
+      if alleles is None:
+        alleles = (a for g in genotypes for a in g if a is not None)
 
-  @param         genotypes: genotypes
-  @type          genotypes: sequence of genotype tuples
-  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
-  @type   allow_hemizygote: bool
-  @param       max_alleles: maximum number of alleles allowed. Default is 2
-  @type        max_alleles: int or None
-  @return                 : model supporting the supplied genotypes
-  @rtype                  : UnphasedMarkerModel
-  '''
-  alleles = sorted(set(a for g in genotypes for a in g if a is not None))
-  return model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote, max_alleles)
+      alleles = tuple(sorted(set(alleles)))
 
+      if max_alleles is None:
+        max_alleles = len(alleles)
 
-def model_from_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
-  '''
-  Build an UnphasedMarkerModel from the supplied alleles and genotypes. All
-  possible genotypes will be added to the model from the alleles found in
-  the supplied genotypes.
+      key = (max_alleles,allow_hemizygote)+alleles+genotypes
 
-  @param           alleles: alleles
-  @type            alleles: sequence of objects
-  @param         genotypes: genotypes
-  @type          genotypes: sequence of genotype tuples
-  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
-  @type   allow_hemizygote: bool
-  @param       max_alleles: maximum number of alleles allowed. Default is 2
-  @type        max_alleles: int or None
-  @return                 : model supporting the supplied alleles and genotypes
-  @rtype                  : UnphasedMarkerModel
-  '''
+    else:
+      alleles = tuple(sorted(set(alleles)))
+      if max_alleles is None:
+        max_alleles = len(alleles)
+      key = (max_alleles,allow_hemizygote)+alleles
 
-  genoset = set(genotypes)
+    # Query cache
+    model = self.cache.get(key)
 
-  if not allow_hemizygote:
-    def hemi(g):
-      return (g[0] is None) ^ (g[1] is None)
-
-    hemi = any(hemi(g) for g in genoset)
-
-    if allow_hemizygote is not None and hemi:
-      raise GenotypeRepresentationError('Genotype model does not allow hemizygous genotypes')
-
-    allow_hemizygote = hemi
-
-  n = len(set(alleles))
-
-  if not max_alleles:
-    max_alleles = n
-  elif n > max_alleles:
-    raise GenotypeRepresentationError('Genotype model supports at most %d alleles, %d specified' % (max_alleles,n))
-
-  model = UnphasedMarkerModel(allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)
-
-  for a in alleles:
-    model.add_allele(a)
-
-  for g in genotypes:
-    model.add_genotype(g)
-
-  if allow_hemizygote:
-    alleles = [None]+alleles
-
-  all_genos = ( (alleles[i],alleles[j]) for i in range(n) for j in range(i,n) )
-
-  for g in all_genos:
-    model.add_genotype(g)
-
-  return model
+    # Handle miss
+    if model is None:
+      if genotypes and not alleles:
+        alleles = tuple(sorted(set(a for g in genotypes for a in g if a is not None)))
 
 
-def model_from_complete_alleles_and_genotypes(alleles, genotypes, allow_hemizygote=False, max_alleles=None):
-  '''
-  Build an UnphasedMarkerModel from the supplied alleles and genotypes.
-  Only the supplied alleles and genotypes will be added to the model.
+      if alleles and not max_alleles:
+        max_alleles = len(alleles)
 
-  @param           alleles: alleles
-  @type            alleles: sequence of objects
-  @param         genotypes: genotypes
-  @type          genotypes: sequence of genotype tuples
-  @param  allow_hemizygote: flag indicating if hemizygote genotypes are supported. Default is False
-  @type   allow_hemizygote: bool
-  @param       max_alleles: maximum number of alleles allowed. Default is 2
-  @type        max_alleles: int or None
-  @return                 : model supporting the supplied alleles and genotypes
-  @rtype                  : UnphasedMarkerModel
-  '''
+      model = UnphasedMarkerModel(allow_hemizygote,max_alleles)
 
-  if not max_alleles:
-    max_alleles = len(set(alleles))
+      if allow_hemizygote:
+        alleles = (None,)+alleles
 
-  model = UnphasedMarkerModel(allow_hemizygote=allow_hemizygote,max_alleles=max_alleles)
+      n = len(alleles)
+      genos = ((alleles[i],alleles[j]) for i in range(n) for j in range(i,n))
 
-  for a in alleles:
-    model.add_allele(a)
+      if genotypes:
+        genos = chain(genotypes,genos)
 
-  for g in genotypes:
-    model.add_genotype(g)
+      for g in genos:
+        model.add_genotype(g)
 
-  return model
+      self.cache[key] = model
 
+      # Store model under alleles with unspecified genotype encoding if no such version exists
+      if genotypes:
+        key = (max_alleles,allow_hemizygote)+alleles
+        if key not in self.cache:
+          self.cache[key] = model
+      else:
+        key += tuple(g.alleles() for g in model.genotypes[1:])
+        if key not in self.cache:
+          self.cache[key] = model
+
+    return model
+
+
+class DescrBuilder(object):
+  def __init__(self):
+    self.cache = {}
+
+  def get_homogeneous(self, model, n):
+    key = model,n
+    descr = self.cache.get(key)
+    if descr is None:
+      descr = GenotypeArrayDescriptor( [model]*n )
+      self.cache[key] = descr
+    return descr
+
+  get_ldat = get_homogeneous
+
+  def get_heterogeneous(self, models):
+    return GenotypeArrayDescriptor(models)
+
+  get_sdat = get_heterogeneous
+
+
+model_builder = ModelBuilder()
+build_model = model_builder.get
+
+descr_builder = DescrBuilder()
+build_descr = descr_builder.get_homogeneous
+
+##################################################################################
 
 def test_genotypes():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> model.alleles
   [None, 'A', 'B']
   >>> model.genotypes
@@ -1570,7 +1655,7 @@ def test_genotypes():
   >>> [ g.category for g in model.genotypes ]
   [0, 2, 3, 2]
 
-  >>> model = model_from_alleles('AB',allow_hemizygote=True)
+  >>> model = build_model('AB',allow_hemizygote=True)
   >>> model.alleles
   [None, 'A', 'B']
   >>> model.genotypes
@@ -1582,7 +1667,7 @@ def test_genotypes():
 
   # Test EQ
 
-  >>> model2 = model_from_alleles('AB')
+  >>> model2 = build_model('AB')
   >>> all(model[geno]==geno for geno in model2.genotypes)
   True
   >>> model['A','B'] == ('B','A')
@@ -1625,6 +1710,37 @@ def test_genotypes():
   True
   >>> all( not ((g1==g2) ^ (hash(g1)==hash(g2))) for g1 in model.genotypes for g2 in model2.genotypes)
   True
+
+  # Test contains
+  >>> model['A','A'] in model
+  True
+  >>> ('A','A') in model
+  True
+  >>> ('A','G') in model
+  False
+  >>> model2['A','A'] in model
+  True
+
+  # Test model compatibility
+  >>> model1 = build_model('A')
+  >>> model2 = build_model('AB')
+  >>> model3 = build_model('AB',allow_hemizygote=True)
+  >>> model4 = build_model('AB',genotypes=[('B','B')])
+
+  >>> model1.replaceable_by(model1)
+  True
+  >>> model2.replaceable_by(model2)
+  True
+  >>> model1.replaceable_by(model2)
+  True
+  >>> model2.replaceable_by(model1)
+  False
+  >>> model2.replaceable_by(model3)
+  False
+  >>> model1.replaceable_by(model4)
+  False
+  >>> model2.replaceable_by(model4)
+  False
   '''
 
 
@@ -1636,7 +1752,7 @@ def test_tolist():
 
   Test 2 bit:
 
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> int(model.bit_size)
   2
   >>> NN,AA,AB,BB = model.genotypes
@@ -1646,7 +1762,7 @@ def test_tolist():
 
   Test 4 bit:
 
-  >>> model = model_from_alleles('AB',max_alleles=5)
+  >>> model = build_model('AB',max_alleles=5)
   >>> int(model.bit_size)
   4
   >>> NN,AA,AB,BB = model.genotypes
@@ -1654,7 +1770,7 @@ def test_tolist():
   >>> g(genos).tolist()
   [(None, None), ('A', 'A'), ('A', 'B'), ('A', 'B'), ('B', 'B'), (None, None)]
 
-  >>> model = model_from_alleles('AB',max_alleles=16)
+  >>> model = build_model('AB',max_alleles=16)
   >>> int(model.bit_size)
   8
   >>> NN,AA,AB,BB = model.genotypes
@@ -1666,7 +1782,7 @@ def test_tolist():
 
 def test_indices():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*6)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1695,7 +1811,7 @@ def test_indices():
 def test_count_genotypes():
   '''
   >>> import random
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*1400)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1733,7 +1849,7 @@ def test_count_genotypes():
 def test_categories():
   '''
   >>> import random
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*1400)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1751,7 +1867,7 @@ def test_categories():
 
 def test_locus_summary():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*4)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1778,7 +1894,7 @@ def test_locus_summary():
 
 def test_sample_summary():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*4)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1805,7 +1921,7 @@ def test_sample_summary():
 
 def test_count_genotypes_4bit():
   '''
-  >>> model = model_from_alleles('AB',max_alleles=5)
+  >>> model = build_model('AB',max_alleles=5)
   >>> int(model.bit_size)
   4
 
@@ -1842,7 +1958,7 @@ def test_count_genotypes_4bit():
 
 def test_concordance_generic():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*6)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -1864,7 +1980,7 @@ def test_concordance_generic():
 
 def test_concordance_4bit():
   '''
-  >>> model = model_from_alleles('AB',max_alleles=5)
+  >>> model = build_model('AB',max_alleles=5)
   >>> int(model.bit_size)
   4
 
@@ -1903,7 +2019,7 @@ def test_concordance_4bit():
 
 def test_concordance_2bit():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> int(model.bit_size)
   2
 
@@ -1960,7 +2076,7 @@ def test_concordance_2bit():
 
 def test_pick():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*4)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -2000,7 +2116,7 @@ def test_pick_columns():
 
 def test_place():
   '''
-  >>> model = model_from_alleles('AB')
+  >>> model = build_model('AB')
   >>> descr = GenotypeArrayDescriptor([model]*4)
   >>> model.genotypes
   [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
@@ -2054,12 +2170,12 @@ def bench_locus_summary():
     print
 
   genos = [('A','A'),('A','C'),('C','C'),('A','A'),(None,None),(None,'A'),('C',None)]*(m//7)
-  model = model_from_alleles('ACGT',allow_hemizygote=True)
+  model = build_model('ACGT',allow_hemizygote=True)
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
   bench(genos)
 
-  model = model_from_alleles('AB')
+  model = build_model('AB')
   genos = model.genotypes*(m//len(model.genotypes))
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
@@ -2099,12 +2215,12 @@ def bench_sample_summary():
     print
 
   genos = [('A','A'),('A','C'),('C','C'),('A','A'),(None,None),(None,'A'),('C',None)]*(m//7)
-  model = model_from_alleles('ACGT',allow_hemizygote=True)
+  model = build_model('ACGT',allow_hemizygote=True)
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
   bench(genos)
 
-  model = model_from_alleles('AB')
+  model = build_model('AB')
   genos = model.genotypes*(m//len(model.genotypes))
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
@@ -2156,133 +2272,16 @@ def bench_categories():
     print
 
   genos = [('A','A'),('A','C'),('C','C'),('A','A'),(None,None),(None,'A'),('C',None)]*m
-  model = model_from_alleles('ACGT',allow_hemizygote=True)
+  model = build_model('ACGT',allow_hemizygote=True)
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
   bench(genos)
 
-  model = model_from_alleles('AB')
+  model = build_model('AB')
   genos = model.genotypes*m*2
   descr = GenotypeArrayDescriptor( [model]*len(genos) )
   genos = GenotypeArray(descr, genos)
   bench(genos)
-
-
-def main():
-  import time
-  import genoarray
-
-  from   itertools import izip,repeat,imap
-  from   operator  import getitem
-
-  def parse_geno(g):
-    g = g.strip()
-    if not g:
-      return None,None
-    if len(g) == 1:
-      return None,g
-    else:
-      return tuple(g)
-
-  n = 500
-  m = 5000
-
-  genos = ['AA','AC','CC','AA','CA','',' A','C ']*m
-
-  t1 = time.clock()
-
-  if 1:
-    model   = model_from_alleles('ACGT',allow_hemizygote=True)
-    descr   = GenotypeArrayDescriptor( [model]*len(genos) )
-    genomap = dict( (g,m.get_genotype(parse_geno(g))) for m,g in izip(descr,genos) )
-    print descr.bit_size,descr.byte_size, float(descr.bit_size)/len(descr)
-
-  if 1:
-    for i in range(n):
-      e = GenotypeArray(descr, imap(getitem, repeat(genomap), genos))
-      f = GenotypeArray(e, e)
-      d = map(Genotype.alleles, e)
-
-  t2 = time.clock()
-
-  if 1:
-    for i in range(n):
-      e = genoarray.snp_acgt2.pack_strs(genos)
-      f = genoarray.snp_acgt2.pack_reps(e)
-      d = genoarray.snp_acgt2.genos_from_reps(e)
-
-  t3 = time.clock()
-
-  if 1:
-    for i in range(n):
-      e = genoarray.snp_acgt.pack_strs(genos)
-      f = genoarray.snp_acgt.pack_reps(e)
-      d = genoarray.snp_acgt.genos_from_reps(e)
-
-  t4 = time.clock()
-
-  if 1:
-    for i in range(m):
-      e = genoarray.snp_marker.pack_strs(genos)
-      f = genoarray.snp_marker.pack_reps(e)
-      d = genoarray.snp_marker.genos_from_reps(e)
-
-  t5 = time.clock()
-
-  if 1:
-    print '_genoarray:',t2-t1
-    print 'snp_acgt2 :',t3-t2
-    print 'snp_acgt  :',t4-t3
-    print 'snp_marker:',t5-t4
-    print
-    print '_genoarray/snp_acgt  :',(t2-t1)/(t4-t3),(t4-t3)/(t2-t1)
-    print 'snp_acgt2 /snp_acgt  :',(t3-t2)/(t4-t3),(t4-t3)/(t3-t2)
-    print
-    print 'snp_acgt2 /snp_marker:',(t3-t2)/(t5-t4),(t5-t4)/(t3-t2)
-    print '_genoarray/snp_marker:',(t2-t1)/(t5-t4),(t5-t4)/(t2-t1)
-
-  if 0:
-    snp_ab = model_from_alleles('AB',allow_hemizygote=True)
-    print snp_ab.bit_size
-    print snp_ab.alleles
-    print snp_ab.genotypes
-    print snp_ab.genomap
-
-  if 0:
-    print len(snp_ab.get_genotype( (None,None) ) )
-    print len(snp_ab.get_genotype( ('A',None)  ) )
-    print len(snp_ab.get_genotype( (None,'A')  ) )
-    print len(snp_ab.get_genotype( ('A', 'A')  ) )
-    print bool(snp_ab.get_genotype( (None,None) ) )
-    print bool(snp_ab.get_genotype( ('A',None)  ) )
-    print bool(snp_ab.get_genotype( (None,'A')  ) )
-    print bool(snp_ab.get_genotype( ('A', 'A')  ) )
-    print 'A'  in snp_ab.get_genotype( (None,None) )
-    print 'A'  in snp_ab.get_genotype( ('A',None)  )
-    print 'A'  in snp_ab.get_genotype( (None,'A')  )
-    print 'A'  in snp_ab.get_genotype( ('A', 'A')  )
-    print 'B'  in snp_ab.get_genotype( (None,None) )
-    print 'B'  in snp_ab.get_genotype( ('A',None)  )
-    print 'B'  in snp_ab.get_genotype( (None,'A')  )
-    print 'B'  in snp_ab.get_genotype( ('A', 'A')  )
-    print None in snp_ab.get_genotype( (None,None) )
-    print None in snp_ab.get_genotype( ('A',None)  )
-    print None in snp_ab.get_genotype( (None,'A')  )
-    print None in snp_ab.get_genotype( ('A', 'A')  )
-    print snp_ab.get_genotype( (None,None) )[0],snp_ab.get_genotype( (None,None) )[1]
-    print snp_ab.get_genotype( ('A',None)  )[0],snp_ab.get_genotype( ('A',None)  )[1]
-    print snp_ab.get_genotype( (None,'A')  )[0],snp_ab.get_genotype( (None,'A')  )[1]
-    print snp_ab.get_genotype( ('A', 'A')  )[0],snp_ab.get_genotype( ('A', 'A')  )[1]
-
-  if 0:
-    genos = ['AA','AA','','BB','BA','AA']
-    print snp_ab.genotypes
-    descr = GenotypeArrayDescriptor( [snp_ab]*len(genos) )
-    e = GenotypeArray(descr, (parse_geno(g) for g in genos))
-    print descr.byte_size
-    print e
-    print e.data
-    print buffer(e.data)
 
 
 def test():
@@ -2295,22 +2294,3 @@ if __name__ == '__main__':
   #bench_categories()
   #bench_locus_summary()
   #bench_sample_summary()
-
-  if 0:
-    if 0:
-      try:
-        import cProfile as profile
-      except ImportError:
-        import profile
-      import pstats
-
-      prof = profile.Profile()
-      try:
-        prof.runcall(main)
-      finally:
-        stats = pstats.Stats(prof)
-        stats.strip_dirs()
-        stats.sort_stats('time', 'calls')
-        stats.print_stats(25)
-    else:
-      main()
