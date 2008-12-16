@@ -27,7 +27,7 @@ def option_parser():
   usage = 'usage: %prog [options] genotypes'
   parser = optparse.OptionParser(usage=usage)
 
-  geno_options(parser,input=True)
+  geno_options(parser,input=True,filter=True)
 
   parser.add_option('-e', '--duplicates', dest='duplicates', metavar='FILE',
                     help='Mapping from sample identifier to subject identifier')
@@ -99,7 +99,8 @@ def main():
         expected_dupset.union(dupset[0],dup)
 
   genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                   genome=options.loci,phenome=options.pedigree)
+                                   genome=options.loci,phenome=options.pedigree,
+                                   transform=options)
 
   if options.checkexp:
     pairs = expected_pairs(genos, expected_dupset)
