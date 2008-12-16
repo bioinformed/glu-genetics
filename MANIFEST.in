@@ -1,4 +1,4 @@
 include MANIFEST.in README LICENSE ez_setup.py
 recursive-include glu      README VERSION *.py *.c *.h
-recursive-include docs     Makefile conf.py *.rst *.txt *.html *.css *.dat *.py *.json *.png *.js
+recursive-include doc      Makefile conf.py *.rst *.txt *.html *.css *.dat *.py *.json *.png *.js
 recursive-include glu/test *
