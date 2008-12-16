@@ -285,7 +285,7 @@ def extract_illumina_snps(manifest):
     strand     = strandmap[assay[assayid_idx].split('_')[-2]]
     alleles    = assay[snp_idx][1:-1]
 
-    if chromosome=='Mt':
+    if chromosome in ('Mt','MT'):
       chromosome='M'
 
     yield rs,chromosome,position,strand,alleles
@@ -293,6 +293,8 @@ def extract_illumina_snps(manifest):
 
 def get_goldenpath_dbsnp(snpfile):
   print 'LOADING DBSNP:',snpfile
+  known = set(['1','10','11','12','13','14','15','16','17','18','19','2','20','21','22','3','4','5','6','7','8','9','M','X','Y','MT','XY'])
+
   for row in table_reader(snpfile):
     rs         = row[4]
     chromosome = row[1]
@@ -306,6 +308,12 @@ def get_goldenpath_dbsnp(snpfile):
 
     if chromosome.startswith('chr'):
       chromosome = chromosome[3:]
+
+    if chromosome in ('Mt','MT'):
+      chromosome='M'
+
+    if chromosome not in known:
+      continue
 
     yield rs,chromosome,position,strand,alleles
 
@@ -417,7 +425,7 @@ def get_mirbase(mfile):
 
 
 def main():
-  con = sqlite3.connect('db/b2/genedb_ncbi36.3_huge.db')
+  con = sqlite3.connect('db/b3/genedb_ncbi36.3_dbsnp129.db')
 
   con.execute('PRAGMA synchronous=OFF;')
   con.execute('PRAGMA journal_mode=OFF;')
