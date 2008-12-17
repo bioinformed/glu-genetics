@@ -431,8 +431,7 @@ def load_genotriples_text(filename,format,genome=None,phenome=None,extra_args=No
   def _load():
     # Micro-optimization
     local_intern = intern
-    local_strip  = str.strip
-    repr         = genorepr.from_string
+    from_string  = genorepr.from_string
 
     for row in rows:
       if not row:
@@ -440,9 +439,9 @@ def load_genotriples_text(filename,format,genome=None,phenome=None,extra_args=No
       elif len(row) != 3:
         raise ValueError('Invalid genotriple on line %d of %s' % (rows.line_num+1,namefile(filename)))
 
-      sample = local_intern(local_strip(row[0]))
-      locus  = local_intern(local_strip(row[1]))
-      geno   = repr(row[2])
+      sample = local_intern(row[0])
+      locus  = local_intern(row[1])
+      geno   = from_string(row[2])
 
       yield sample,locus,geno
 
