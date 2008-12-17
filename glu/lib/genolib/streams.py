@@ -2574,18 +2574,21 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     columns,genos = rowsby(triples, columns, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
     rows = None
 
-    models = []
     if format=='sdat':
       models = [ genome.get_model(locus) for locus in columns ]
+      def _build(genos):
+        for sample,row in genos:
+          # FIXME: For lack of model change notification
+          models[:] = [ genome.get_model(locus) for locus in columns ]
+          yield sample,row
     else:
+      models = []
       def _build(genos):
         for locus,row in genos:
-          assert locus in genome.loci
-          assert isinstance(row[0],Genotype)
-          assert row[0].model is genome.loci[locus].model
           models.append( genome.get_model(locus) )
           yield locus,row
-      genos = _build(genos)
+
+    genos = _build(genos)
 
   columns = tuple(columns)
   if format=='ldat':
