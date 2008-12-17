@@ -331,12 +331,13 @@ def transform_files(infiles,informat,ingenorepr,
     raise ValueError("Output file format for '%s' must be specified" % namefile(outfile))
 
   pformat = genostream_preferred_format(outformat)
+
   if not pformat and n:
     pformat = genos[0].format
 
   if pformat in ('ldat','sdat'):
     genos = GenomatrixStream.from_streams(genos,pformat,mergefunc=mergefunc)
-  elif pformat=='trip':
+  elif pformat in ('genotriple','trip'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)
   else:
     raise NotImplementedError("Format '%s' is not supported" % outformat)
