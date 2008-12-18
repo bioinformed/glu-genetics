@@ -3576,7 +3576,9 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		genofound = (GenotypeObject *)genos;
 		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, genofound->index); /* borrowed ref */
 
-		if(genofound && genofound->index != 0)
+		if(!genofound && PyErr_ExceptionMatches(PyExc_IndexError))
+			PyErr_SetString(PyExc_IndexError,"invalid genotype model");
+		else if(genofound && genofound->index != 0)
 			*status = MERGE_UNAMBIGUOUS;
 
 		Py_XINCREF(genofound);
@@ -3626,7 +3628,9 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 	{
 		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, genofound->index); /* borrowed ref */
 
-		if(found == 1)
+		if(!genofound && PyErr_ExceptionMatches(PyExc_IndexError))
+			PyErr_SetString(PyExc_IndexError,"invalid genotype model");
+		else if(found == 1)
 			*status = MERGE_UNAMBIGUOUS;
 		else /* found > 1 */
 			*status = MERGE_CONCORDANT;
