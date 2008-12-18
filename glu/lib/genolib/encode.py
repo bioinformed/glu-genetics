@@ -332,7 +332,9 @@ def recode_genomatrixstream(genos, genome, warn=False):
                 descr[i]  = new_model
                 models[i] = new_model
                 updates.append( (i,model) )
-                genome.get_locus(lname).model = new_model
+                loc = genome.get_locus(lname)
+                assert loc.model is None or loc.model.replaceable_by(model)
+                loc.model = new_model
 
           row = GenotypeArray(descr,row)
 
@@ -885,6 +887,7 @@ def encode_genotriples_from_tuples(triples,genome,warn=False):
           _encoding_error(lname,geno,loc.model,warn)
 
         updates.append( (lname,new_model) )
+        assert loc.model is None or loc.model.replaceable_by(new_model)
         loc.model = new_model
         geno = new_model[geno]
 
@@ -948,6 +951,7 @@ def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
           _encoding_error(lname,geno,model,warn)
 
         if new_model is not loc.model:
+          assert loc.model is None or loc.model.replaceable_by(new_model)
           model = loc.model = new_model
           updates.append( (lname,model) )
 

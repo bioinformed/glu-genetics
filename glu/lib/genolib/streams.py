@@ -2956,6 +2956,8 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
 
   if new_model is None:
     new_locus.model = old_model
+
+  # FIXME: Recoding should be triggered only when models are not replaceable
   elif old_model is None or new_model is not old_model:
     new_locus.model = None
     return True
@@ -3234,7 +3236,20 @@ def rename_genomatrixstream_column(genos,colmap,warn=False):
       new_name = colmap.get(old_name,old_name)
       _genome_rename_loci(genos.genome, old_name, genome, new_name, warn)
 
-    genos = genos.clone(genos.use_stream(), loci=new_columns, genome=genome, unique=unique)
+    # Propogate model updates
+    # FIXME: Can possible do recoding in this step
+    def _rename(genos):
+      for sample,row in genos:
+        if genos.updates:
+          for i,model in genos.updates:
+            lname = genos.loci[i]
+            lname = colmap.get(lname,lname)
+            loc   = genome.loci[lname]
+            assert loc.model is None or loc.model.replaceable_by(model)
+            loc.model = model
+        yield sample,row
+
+    genos = genos.clone(_rename(genos), loci=new_columns, genome=genome, unique=unique, materialized=False)
     genos = genos.transformed(recode_models=genome)
 
   return genos
