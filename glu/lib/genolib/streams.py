@@ -2156,6 +2156,7 @@ def merge_genomatrixstream(genos, mergefunc):
     models = []
     samples,loci = new_columns,new_rows
   else:
+    # Models are final, so no updates are pending
     models = [ genos.genome.get_model(column) for column in new_columns ]
     samples,loci = new_rows,new_columns
 
@@ -2398,6 +2399,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
     models = []
     samples,loci = new_columns,new_rows
   else:
+    # Models are final, so no updates are pending
     models = [ genome.get_model(column) for column in new_columns ]
     samples,loci = new_rows,new_columns
 
@@ -2576,7 +2578,10 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     if format=='ldat':
       models = [ genome.get_model(row) for row in rows ]
     else:
+      # Models are final, so no updates are pending
       models = [ genome.get_model(column) for column in columns ]
+
+    updates = None
 
   # FASTPATH: rowsby using order and known columns
   else:
@@ -2584,20 +2589,29 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     rows = None
 
     if format=='sdat':
-      models = [ genome.get_model(locus) for locus in columns ]
+      # Models are not yet final, so updates may be pending
+      models  = [ genome.get_model(locus) for locus in columns ]
+      updates = []
+
       def _build(genos):
         locmap = dict( (locus,i) for i,locus in enumerate(columns) )
         for sample,row in genos:
-
           # Update models that have changes since last row
           if triples.updates:
             for lname,model in triples.updates:
-              models[ locmap[lname] ] = model
+              i = locmap[lname]
+              if models[i].replaceable_by(model):
+                models[i] = model
+                updates.append( (i,model) )
+              else:
+                assert model.replaceable_by(models[i])
+
             triples.updates[:] = []
 
           yield sample,row
     else:
-      models = []
+      models  = []
+      updates = None
       def _build(genos):
         for locus,row in genos:
           models.append( genome.get_model(locus) )
@@ -2616,7 +2630,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   else:
     samples,loci = rows,columns
 
-  return GenomatrixStream(genos,format,samples=samples,loci=loci,models=models,
+  return GenomatrixStream(genos,format,samples=samples,loci=loci,models=models,updates=updates,
                                 genome=genome,phenome=triples.phenome,unique=True)
 
 
@@ -3330,16 +3344,35 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   if columns == genos.columns:
     return genos
 
-  def _filter():
-    for label,row in genos:
-      yield label,pick(row,indices)
-
   if genos.format=='ldat':
+    def _filter():
+      for lname,row in genos:
+        yield lname,pick(row,indices)
     new_genos=genos.clone(_filter(),samples=columns,packed=False,materialized=False)
   else:
     assert len(genos.columns) == len(genos.models)
-    models = pick(genos.models,indices)
-    new_genos=genos.clone(_filter(),loci=columns,models=models,packed=False,materialized=False)
+    models  = pick(genos.models,indices)
+    updates = []
+
+    def _filter():
+      indexmap = dict( (i,j) for j,i in enumerate(indices) )
+      for sample,row in genos:
+        if updates:
+          updates[:] = []
+
+        # Process model updates
+        if genos.updates:
+          for i,model in genos.updates:
+            j = indexmap.get(i)
+            if j is not None:
+              assert models[j].replaceable_by(model)
+              models[j] = model
+              updates.append( (j,model) )
+
+        yield sample,pick(row,indices)
+
+    new_genos=genos.clone(_filter(),loci=columns,models=models,updates=updates,
+                                    packed=False,materialized=False)
 
   return new_genos
 
@@ -3395,22 +3428,37 @@ def reorder_genomatrixstream_columns(genos,labels):
     raise ValueError('Duplicated column label: %s' % l)
 
   new_columns = pick(genos.columns,indices)
-  rows = iter(genos)
-  def _reorder():
-    for label,row in rows:
-      yield label,pick(row, indices)
 
-  models = genos.models
-  if genos.format=='sdat' and models is not None:
-    models = pick(models,indices)
+  if new_columns == genos.columns:
+    return genos
 
   if genos.format=='ldat':
-    new_genos = genos.clone(_reorder(),samples=new_columns,materialized=False,packed=False)
-  else:
     models = genos.models
-    if models is not None:
-      models = pick(models,indices)
-    new_genos = genos.clone(_reorder(),loci=new_columns,models=models,materialized=False,packed=False)
+
+    def _reorder():
+      for label,row in genos:
+        yield label,pick(row, indices)
+
+    new_genos = genos.clone(_reorder(),samples=new_columns,materialized=False,packed=False)
+
+  else:
+    models  = pick(genos.models,indices)
+    updates = []
+
+    def _reorder():
+      neworder = map(itemgetter(0),sorted(enumerate(indices), key=itemgetter(1)))
+
+      for sample,row in genos:
+        if genos.updates:
+          for i,model in genos.updates:
+            j = neworder[i]
+            assert models[j].replaceable_by(model)
+            models[j] = model
+            updates.append( (j,model) )
+
+        yield sample,pick(row, indices)
+
+    new_genos = genos.clone(_reorder(),loci=new_columns,models=models,updates=updates,materialized=False,packed=False)
 
   return new_genos
 
