@@ -335,7 +335,11 @@ def transform_files(infiles,informat,ingenorepr,
   if not pformat and n:
     pformat = genos[0].format
 
-  if pformat in ('ldat','sdat'):
+  if n==1:
+    genos = genos[0]
+    if mergefunc:
+      genos = genos.merged(mergefunc)
+  elif pformat in ('ldat','sdat'):
     genos = GenomatrixStream.from_streams(genos,pformat,mergefunc=mergefunc)
   elif pformat in ('genotriple','trip'):
     genos = GenotripleStream.from_streams(genos,mergefunc=mergefunc)

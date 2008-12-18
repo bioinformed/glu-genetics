@@ -86,7 +86,7 @@ class GenotripleStream(GenotypeStream):
   format = 'genotriple'
 
   def __init__(self, triples, samples=None, loci=None, genome=None, phenome=None,
-                              order=None, unique=False, materialized=False):
+                              order=None, unique=False, materialized=False, updates=None):
     '''
     Create a new GenotripleStream object
 
@@ -146,6 +146,7 @@ class GenotripleStream(GenotypeStream):
     self.phenome      = phenome
     self.unique       = bool(unique)
     self.materialized = materialized or isinstance(triples, (list,tuple))
+    self.updates      = updates
 
   if DEBUG:
     def __iter__(self):
@@ -276,9 +277,9 @@ class GenotripleStream(GenotypeStream):
     if phenome is None:
       phenome = Phenome()
 
-    triples = encode_genotriples_from_tuples(triples, genome)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
-                                     unique=unique)
+    triples,updates = encode_genotriples_from_tuples(triples, genome)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, updates=updates,
+                                     genome=genome, phenome=phenome, unique=unique)
 
   @staticmethod
   def from_strings(triples, genorepr, samples=None, loci=None, order=None, unique=False,
@@ -324,9 +325,9 @@ class GenotripleStream(GenotypeStream):
     if phenome is None:
       phenome = Phenome()
 
-    triples = encode_genotriples_from_strings(triples, genorepr, genome)
-    return GenotripleStream(triples, samples=samples, loci=loci, order=order, genome=genome, phenome=phenome,
-                                     unique=unique)
+    triples,updates = encode_genotriples_from_strings(triples, genorepr, genome)
+    return GenotripleStream(triples, samples=samples, loci=loci, order=order, updates=updates,
+                                     genome=genome, phenome=phenome, unique=unique)
 
   def to_tuples(self):
     '''
@@ -414,6 +415,7 @@ class GenotripleStream(GenotypeStream):
     kwargs.setdefault('phenome',      self.phenome)
     kwargs.setdefault('unique',       self.unique)
     kwargs.setdefault('materialized', self.materialized)
+    kwargs.setdefault('updates',      self.updates)
 
     return GenotripleStream(triples, **kwargs)
 
@@ -728,7 +730,7 @@ class GenomatrixStream(GenotypeStream):
   '''
   def __init__(self, genos, format, samples=None, loci=None, models=None,
                      genome=None, phenome=None, unique=True, materialized=False,
-                     packed=False):
+                     packed=False,updates=None):
     '''
     Create a new GenomatrixStream object
 
@@ -828,6 +830,7 @@ class GenomatrixStream(GenotypeStream):
     self.unique       = unique
     self.materialized = materialized
     self.packed       = packed
+    self.updates      = updates
 
   if DEBUG:
     def __iter__(self):
@@ -995,9 +998,9 @@ class GenomatrixStream(GenotypeStream):
     if phenome is None:
       phenome = Phenome()
 
-    columns,models,genome,genos = encode_genomatrixstream_from_tuples(columns,genos,format,
+    columns,models,updates,genome,genos = encode_genomatrixstream_from_tuples(columns,genos,format,
                                    genome=genome,unique=unique)
-    return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
+    return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models, updates=updates,
                                    genome=genome, phenome=phenome, unique=unique,
                                    packed=True, materialized=False)
 
@@ -1038,9 +1041,9 @@ class GenomatrixStream(GenotypeStream):
     if phenome is None:
       phenome = Phenome()
 
-    columns,models,genome,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,
+    columns,models,updates,genome,genos = encode_genomatrixstream_from_strings(columns,genos,format,genorepr,
                                    genome=genome,unique=unique)
-    return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models,
+    return GenomatrixStream(genos, format, samples=samples, loci=loci, models=models, updates=updates,
                                    genome=genome, phenome=phenome, unique=unique,
                                    packed=True, materialized=False)
 
@@ -1128,6 +1131,7 @@ class GenomatrixStream(GenotypeStream):
     kwargs.setdefault('unique',       self.unique)
     kwargs.setdefault('materialized', self.materialized)
     kwargs.setdefault('packed',       self.packed)
+    kwargs.setdefault('updates',      self.updates)
 
     return GenomatrixStream(genos, **kwargs)
 
@@ -2564,6 +2568,11 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     columns,rows,data = xtab(triples, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
     genos  = tuple(izip(rows,data))
     rows   = tuple(rows)
+
+    # FIXME: May need to clear these more aggressively
+    if triples.updates:
+      triples.updates[:] = []
+
     if format=='ldat':
       models = [ genome.get_model(row) for row in rows ]
     else:
@@ -2577,15 +2586,26 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     if format=='sdat':
       models = [ genome.get_model(locus) for locus in columns ]
       def _build(genos):
+        locmap = dict( (locus,i) for i,locus in enumerate(columns) )
         for sample,row in genos:
-          # FIXME: For lack of model change notification
-          models[:] = [ genome.get_model(locus) for locus in columns ]
+
+          # Update models that have changes since last row
+          if triples.updates:
+            for lname,model in triples.updates:
+              models[ locmap[lname] ] = model
+            triples.updates[:] = []
+
           yield sample,row
     else:
       models = []
       def _build(genos):
         for locus,row in genos:
           models.append( genome.get_model(locus) )
+
+          # Clear updated models
+          if triples.updates:
+            triples.updates[:] = []
+
           yield locus,row
 
     genos = _build(genos)
@@ -3028,6 +3048,7 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
   old_genome  = triples.genome
   new_genome  = Genome()
   new_phenome = _phenome_rename(triples.phenome, samplemap, warn)
+  updates     = []
 
   def _rename(triples):
     recode = {}
@@ -3036,17 +3057,18 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
       new_sample = samplemap.get(sample,sample)
       new_locus  = locusmap.get(locus,locus)
 
-      recode_model = recode.get(locus)
-      if recode_model is None:
-        if _genome_rename_loci(old_genome, locus, new_genome, new_locus, warn):
-          recode_model = new_genome.loci[new_locus].model
-        else:
-          recode_model = False
+      if new_locus not in new_genome.loci:
+        _genome_rename_loci(old_genome, locus, new_genome, new_locus, warn)
 
-        recode[locus] = recode_model
+      if triples.updates:
+        for lname,model in triples.updates:
+          new_lname = locusmap.get(lname,lname)
+          new_loc   = new_genome.loci[new_lname]
+          assert new_loc.model.replaceable_by(model)
+          new_genome.loci[new_lname].model = model
+          updates.append( (new_lname,model) )
 
-      if recode_model:
-        geno = recode_model[geno]
+        triples.updates[:] = []
 
       yield new_sample,new_locus,geno
 
@@ -3060,7 +3082,7 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
 
   # FIXME: We can do more to prove uniqueness
   return triples.clone(_rename(triples),samples=samples,loci=loci,genome=new_genome,phenome=new_phenome,
-                                        order=None,materialized=False)
+                                        order=None,updates=updates,materialized=False)
 
 
 def filter_genotriples(triples,sampleset,locusset,exclude=False):

@@ -231,7 +231,8 @@ def recode_genomatrixstream(genos, genome, warn=False):
   #  return genos
 
   # Data for slowpath
-  models = []
+  models  = []
+  updates = []
 
   if genos.format=='ldat':
     def _recode_genomatrixstream():
@@ -313,6 +314,9 @@ def recode_genomatrixstream(genos, genome, warn=False):
       descr = GenotypeArrayDescriptor(models)
 
       for sample,row in genos:
+        if updates:
+          updates[:] = []
+
         # Try to yield updated genotype array, hoping that all alleles are represented
         try:
           row = GenotypeArray(descr,row)
@@ -327,6 +331,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
               if new_model is not model:
                 descr[i]  = new_model
                 models[i] = new_model
+                updates.append( (i,model) )
                 genome.get_locus(lname).model = new_model
 
           row = GenotypeArray(descr,row)
@@ -336,7 +341,8 @@ def recode_genomatrixstream(genos, genome, warn=False):
   else:
     raise ValueError('Uknown format')
 
-  return genos.clone(_recode_genomatrixstream(),models=models,genome=genome,packed=True,materialized=False)
+  return genos.clone(_recode_genomatrixstream(),models=models,updates=updates,
+                     genome=genome,packed=True,materialized=False)
 
 
 def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
@@ -368,7 +374,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   ...          ('l2', [(None, None), (None, None),  (None, None)]),
   ...          ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
   ...          ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
-  >>> samples,models,genome,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',genome)
+  >>> samples,models,updates,genome,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',genome)
   >>> samples
   ('s1', 's2', 's3')
   >>> for label,row in new_rows:
@@ -382,7 +388,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   >>> genos = [('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')]),
   ...          ('s2', [(None, None), (None, None), (None, None), (None, None)]),
   ...          ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])]
-  >>> loci,models,genome,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
+  >>> loci,models,updates,genome,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for label,row in new_rows:
@@ -398,7 +404,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   ...          ('l2', [(None, None), (None, None),  (None, None)]),
   ...          ('l3', [ ('A', 'A'),  (None, None),  (None, None)]),
   ...          ('l4', [ ('G', 'T'),  (None, None),   ('T', 'T')] )]
-  >>> samples,models,genome,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat')
+  >>> samples,models,updates,genome,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat')
   >>> samples
   ('s1', 's2', 's3')
   >>> for label,row in new_rows:
@@ -412,7 +418,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   >>> genos = [('s1', [('A', 'A'), (None, None), ('A', 'A'), ('G', 'T')]),
   ...          ('s2', [(None, None), (None, None), (None, None), (None, None)]),
   ...          ('s3', [('G', 'G'), (None, None), (None, None), ('T', 'T')])]
-  >>> loci,models,genome,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
+  >>> loci,models,updates,genome,new_rows = encode_genomatrixstream_from_tuples(loci,genos,'sdat')
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for label,row in new_rows:
@@ -430,7 +436,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   ...          ('l1', [ ('A','T') ]),
   ...          ('l2', [ ('A','G') ])]
   >>> genome = Genome()
-  >>> samples,models,genome,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',genome)
+  >>> samples,models,updates,genome,new_rows = encode_genomatrixstream_from_tuples(samples,genos,'ldat',genome)
   >>> new_rows = list(new_rows)
   >>> samples
   ('s1',)
@@ -447,7 +453,8 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   if not columns:
     return columns,[],genome,[]
 
-  models = []
+  models  = []
+  updates = []
 
   if format=='ldat':
     def _encode():
@@ -478,6 +485,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
             _encoding_error(lname,set(new_alleles)-set(model.alleles),model,warn)
 
           loc.model = model = new_model
+
           descr = build_descr(model,n)
           row = GenotypeArray(descr,row)
 
@@ -495,6 +503,9 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
       descr = GenotypeArrayDescriptor(models)
 
       for sample,row in genos:
+        if updates:
+          updates[:] = []
+
         try:
           row = GenotypeArray(descr,row)
         except GenotypeLookupError:
@@ -509,6 +520,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
               descr[i]      = model
               models[i]     = model
               loci[i].model = model
+              updates.append( (i,model) )
 
             new_row[i] = model[geno]
 
@@ -518,7 +530,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   else:
     raise ValueError('Uknown format')
 
-  return columns,models,genome,_encode()
+  return columns,models,updates,genome,_encode()
 
 
 def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=None,
@@ -551,7 +563,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   ...          ('l2', ['  ', '',   '  ']),
   ...          ('l3', ['AA', '  ', '  ']),
   ...          ('l4', ['GT', '  ', 'TT'] )]
-  >>> samples,models,genome,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,genome)
+  >>> samples,models,updates,genome,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,genome)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in new_rows:
@@ -565,7 +577,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   >>> genos = [('s1', ['AA', '  ', 'AA', 'GT']),
   ...          ('s2', ['  ', '',   '  ', '  ']),
   ...          ('s3', ['GG', '  ', '  ', 'TT'])]
-  >>> loci,models,genome,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp,genome)
+  >>> loci,models,updates,genome,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp,genome)
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for row in new_rows:
@@ -579,7 +591,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   ...          ('l2', ['  ', '',   '  ']),
   ...          ('l3', ['AA', '  ', '  ']),
   ...          ('l4', ['GT', '  ', 'TT'] )]
-  >>> samples,models,genome,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp)
+  >>> samples,models,updates,genome,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp)
   >>> samples
   ('s1', 's2', 's3')
   >>> for row in new_rows:
@@ -593,7 +605,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   >>> genos = [('s1', ['AA', '  ', 'AA', 'GT']),
   ...          ('s2', ['  ', '',   '  ', '  ']),
   ...          ('s3', ['GG', '  ', '  ', 'TT'])]
-  >>> loci,models,genome,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp)
+  >>> loci,models,updates,genome,new_rows = encode_genomatrixstream_from_strings(loci,genos,'sdat',snp)
   >>> loci
   ('l1', 'l2', 'l3', 'l4')
   >>> for row in new_rows:
@@ -611,7 +623,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   ...          ('l1', [ ('AT') ]),
   ...          ('l2', [ ('AG') ])]
   >>> genome = Genome()
-  >>> samples,models,genome,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,genome)
+  >>> samples,models,updates,genome,new_rows = encode_genomatrixstream_from_strings(samples,genos,'ldat',snp,genome)
   >>> new_rows = list(new_rows)
   >>> samples
   ('s1',)
@@ -625,7 +637,8 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   if genome is None:
     genome = Genome()
 
-  models = []
+  models  = []
+  updates = []
 
   if format=='ldat':
     def _encode():
@@ -704,7 +717,10 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
 
       cachelist = [{}]*len(columns)
 
-      for j,(sample,row) in enumerate(genos):
+      for sample,row in genos:
+        if updates:
+          updates[:] = []
+
         try:
           row = GenotypeArray(descr,imap(getitem, cachelist, row) )
         except errors:
@@ -726,6 +742,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
                 loc.model    = model
                 descr[i]     = model
                 models[i]    = model
+                updates.append( (i,model) )
 
                 # Update string to genotype cache
                 cache = cachemap.get(model)
@@ -749,7 +766,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   else:
     raise ValueError('Uknown format')
 
-  return columns,models,genome,_encode()
+  return columns,models,updates,genome,_encode()
 
 
 def recode_genotriples(triples,genome,warn=False):
@@ -781,6 +798,7 @@ def recode_genotriples(triples,genome,warn=False):
   >>> sorted(genome.loci)
   ['l1', 'l2', 'l3']
   '''
+  updates = []
   def _recode():
     updated = {}
     for sample,lname,geno in triples:
@@ -800,6 +818,7 @@ def recode_genotriples(triples,genome,warn=False):
         elif geno.model is not loc.model:
           try:
             loc.model = model = build_model(alleles=old_model.alleles[1:],base=loc.model)
+            updates.append( (lname,model) )
           except GenotypeRepresentationError:
             _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),loc.model,warn)
         else:
@@ -815,6 +834,7 @@ def recode_genotriples(triples,genome,warn=False):
         loc = genome.get_locus(lname)
         try:
           loc.model = model = build_model(alleles=geno.model.alleles[1:],base=loc.model)
+          updates.append( (lname,model) )
         except GenotypeRepresentationError:
           _encoding_error(lname,set(geno.model.alleles)-set(model.alleles),model,warn)
 
@@ -823,7 +843,7 @@ def recode_genotriples(triples,genome,warn=False):
 
       yield sample,lname,geno
 
-  return triples.clone(_recode(),genome=genome,materialized=False)
+  return triples.clone(_recode(),updates=updates,genome=genome,materialized=False)
 
 
 def encode_genotriples_from_tuples(triples,genome,warn=False):
@@ -840,7 +860,8 @@ def encode_genotriples_from_tuples(triples,genome,warn=False):
   >>> triples = [('s3', 'l1', ('G', 'G')),('s3', 'l2', ('A', 'A')),
   ...            ('s2', 'l3', ('G', 'T')),('s1', 'l1', ('T', 'T')),
   ...            ('s1', 'l1', ('G', 'G')),('s2', 'l2', ('A', 'A'))]
-  >>> for row in encode_genotriples_from_tuples(triples,Genome()):
+  >>> triples,updates = encode_genotriples_from_tuples(triples,Genome())
+  >>> for row in triples:
   ...   print row
   ('s3', 'l1', ('G', 'G'))
   ('s3', 'l2', ('A', 'A'))
@@ -849,21 +870,27 @@ def encode_genotriples_from_tuples(triples,genome,warn=False):
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   '''
-  for sample,lname,geno in triples:
-    loc = genome.get_locus_model(lname)
+  updates = []
 
-    try:
-      geno = loc.model[geno]
-    except GenotypeLookupError:
+  def _encode():
+    for sample,lname,geno in triples:
+      loc = genome.get_locus_model(lname)
+
       try:
-        new_model = build_model(alleles=geno,base=loc.model)
-      except GenotypeRepresentationError:
-        _encoding_error(lname,geno,loc.model,warn)
+        geno = loc.model[geno]
+      except GenotypeLookupError:
+        try:
+          new_model = build_model(alleles=geno,base=loc.model)
+        except GenotypeRepresentationError:
+          _encoding_error(lname,geno,loc.model,warn)
 
-      loc.model = new_model
-      geno = new_model[geno]
+        updates.append( (lname,new_model) )
+        loc.model = new_model
+        geno = new_model[geno]
 
-    yield sample,lname,geno
+      yield sample,lname,geno
+
+  return _encode(),updates
 
 
 def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
@@ -881,7 +908,8 @@ def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
   >>> triples = [('s3', 'l1', 'GG'),('s3', 'l2', 'AA'),
   ...            ('s2', 'l3', 'GT'),('s1', 'l1', 'TT'),
   ...            ('s1', 'l1', 'GG'),('s2', 'l2', 'AA')]
-  >>> for row in encode_genotriples_from_strings(triples,snp,Genome()):
+  >>> triples,updates = encode_genotriples_from_strings(triples,snp,Genome())
+  >>> for row in triples:
   ...   print row
   ('s3', 'l1', ('G', 'G'))
   ('s3', 'l2', ('A', 'A'))
@@ -890,45 +918,48 @@ def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
   ('s1', 'l1', ('G', 'G'))
   ('s2', 'l2', ('A', 'A'))
   '''
-  from_string = genorepr.from_string
-  to_string   = genorepr.to_string
+  updates = []
+  def _encode():
+    from_string = genorepr.from_string
+    to_string   = genorepr.to_string
 
-  if genome is None:
-    genome = Genome()
+    def mk_cache(model):
+      cache = dict( (to_string(g),g) for g in model.genotypes )
+      cache.update( (genorepr.to_string_from_alleles((g[1],g[0])),g) for g in model.genotypes )
+      for g in genorepr.missing_geno_strs:
+        cache[g] = model[None,None]
+      return cache
 
-  def mk_cache(model):
-    cache = dict( (to_string(g),g) for g in model.genotypes )
-    cache.update( (genorepr.to_string_from_alleles((g[1],g[0])),g) for g in model.genotypes )
-    for g in genorepr.missing_geno_strs:
-      cache[g] = model[None,None]
-    return cache
+    cachemap = {}
+    for sample,lname,geno in triples:
+      loc = genome.get_locus_model(lname)
+      model = loc.model
 
-  cachemap = {}
-  for sample,lname,geno in triples:
-    loc = genome.get_locus_model(lname)
-    model = loc.model
+      cache = cachemap.get(model)
+      if cache is None:
+        cache = cachemap[model] = mk_cache(model)
 
-    cache = cachemap.get(model)
-    if cache is None:
-      cache = cachemap[model] = mk_cache(model)
-
-    try:
-      geno = cache[geno]
-    except KeyError:
       try:
-        new_model = build_model(alleles=geno,base=loc.model)
-      except GenotypeRepresentationError:
-        _encoding_error(lname,geno,model,warn)
+        geno = cache[geno]
+      except KeyError:
+        try:
+          new_model = build_model(alleles=geno,base=loc.model)
+        except GenotypeRepresentationError:
+          _encoding_error(lname,geno,model,warn)
 
-      if new_model is not loc.model:
-        model = loc.model = new_model
-        cache = cachemap.get(model)
-        if cache is None:
-          cache = cachemap[model] = mk_cache(model)
+        if new_model is not loc.model:
+          model = loc.model = new_model
+          updates.append( (lname,model) )
 
-      geno = cache[geno] = model[from_string(geno)]
+          cache = cachemap.get(model)
+          if cache is None:
+            cache = cachemap[model] = mk_cache(model)
 
-    yield sample,lname,geno
+        geno = cache[geno] = model[from_string(geno)]
+
+      yield sample,lname,geno
+
+  return _encode(),updates
 
 
 def test():
