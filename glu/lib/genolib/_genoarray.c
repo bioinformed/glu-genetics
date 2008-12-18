@@ -1933,11 +1933,6 @@ typedef struct {
 
 static int indices_foreach(Py_ssize_t i, GenotypeObject *geno, genotype_indices_state *state)
 {
-	if(state->model && state->model != geno->model)
-	{
-		PyErr_SetString(PyExc_TypeError,"heterogeneous genotype model");
-		return -1;
-	}
 	state->indices[i] = geno->index;
 	return 0;
 }
@@ -2005,11 +2000,6 @@ typedef struct {
 
 static int counts_foreach(Py_ssize_t i, GenotypeObject *geno, genotype_counts_state *state)
 {
-	if(state->model && state->model != geno->model)
-	{
-		PyErr_SetString(PyExc_TypeError,"heterogeneous genotype model");
-		return -1;
-	}
 	state->counts[geno->index] += 1;
 	return 0;
 }
@@ -2499,11 +2489,6 @@ typedef struct {
 
 static int locus_summary_foreach(Py_ssize_t i, GenotypeObject *geno, locus_summary_state *state)
 {
-	if(state->model && state->model != geno->model)
-	{
-		PyErr_SetString(PyExc_TypeError,"heterogeneous genotype model");
-		return -1;
-	}
 	state->locus_counts[geno->index] += 1;
 	*(unsigned long *)PyArray_GETPTR2(state->sample_counts, i, genotype_category(geno)) += 1;
 	return 0;
@@ -3102,13 +3087,6 @@ genoarray_concordance(PyObject *self, PyObject *args)
 		{
 			PyErr_Format(GenotypeRepresentationError,
 			    "invalid genotype object in genos2 at index %zd", i);
-			goto error;
-		}
-
-		if(a->model != b->model)
-		{
-			PyErr_Format(GenotypeRepresentationError,
-			    "genotype models do not match at index %zd", i);
 			goto error;
 		}
 
