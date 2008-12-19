@@ -2344,6 +2344,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
     # Pass-through to merge_genomatrixsteam
     if format=='sdat':
+      # FIXME: Do I need to propogate updates? How do I propogate updates?
       genos = genos[0].clone(chain(*genos),genome=genome,samples=rowlist,unique=unique,
                              materialized=False)
     else:
@@ -2606,7 +2607,8 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
               else:
                 assert model.replaceable_by(models[i])
 
-            triples.updates[:] = []
+            if triples.updates:
+              triples.updates[:] = []
 
           yield sample,row
     else:
@@ -2830,12 +2832,18 @@ def filter_genomatrixstream_missing(genos):
 
     new_genos = genos.clone(_filter(),loci=None,models=models,materialized=False)
   else:
+    updates = []
     def _filter():
       for lname,row in genos:
+        if genos.updates:
+          updates.extend(genos.updates)
+
         if any(row):
           yield lname,row
+          if updates:
+            updates[:] = []
 
-    new_genos = genos.clone(_filter(),samples=None,materialized=False)
+    new_genos = genos.clone(_filter(),samples=None,updates=updates,materialized=False)
 
   rows = []
 
@@ -3688,18 +3696,27 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
       return genos
 
   if genos.format=='sdat':
+    updates = []
     if exclude:
       def _filter():
         for subject,row in genos:
+          if genos.updates:
+            updates.extend(genos.updates)
           if subject not in rowset:
             yield subject,row
+            if updates:
+              updates[:] = []
     else:
       def _filter():
         for subject,row in genos:
+          if genos.updates:
+            updates.extend(genos.updates)
           if subject in rowset:
             yield subject,row
+            if updates:
+              updates[:] = []
 
-    return genos.clone(_filter(),samples=rows,materialized=False)
+    return genos.clone(_filter(),samples=rows,updates=updates,materialized=False)
 
   else:
     models = []
