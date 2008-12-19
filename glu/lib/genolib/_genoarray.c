@@ -3093,7 +3093,7 @@ genoarray_concordance(PyObject *self, PyObject *args)
 		/* If both genotypes are not missing */
 		if(a->index && b->index)
 		{
-			if(a==b) concordant += 1;
+			if(a->index==b->index) concordant += 1;
 			comparisons += 1;
 		}
 	}
