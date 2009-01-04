@@ -3526,6 +3526,23 @@ error:
 
 /******************************************************************************************************/
 
+static inline GenotypeObject *
+get_canonical_genotype_nested(UnphasedMarkerModelObject *model, GenotypeObject *geno)
+{
+	if(geno->model != model)
+	{
+		geno = (GenotypeObject *)PyList_GetItem(model->genotypes, geno->index); /* borrowed ref */
+
+		if(!geno)
+		{
+			if(PyErr_ExceptionMatches(PyExc_IndexError))
+				PyErr_SetString(PyExc_IndexError,"invalid genotype model");
+			return NULL;
+		}
+	}
+	return geno;
+}
+
 static GenotypeObject *
 merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *status)
 {
@@ -3549,17 +3566,17 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		return genofound;
 	}
 
+	/* Fast path for naked genotypes */
 	if(Genotype_CheckExact(genos))
 	{
-		genofound = (GenotypeObject *)genos;
-		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, genofound->index); /* borrowed ref */
+		/* borrowed ref */
+		genofound = get_canonical_genotype_nested(model, (GenotypeObject *)genos);
+		if(!genofound) return NULL;
 
-		if(!genofound && PyErr_ExceptionMatches(PyExc_IndexError))
-			PyErr_SetString(PyExc_IndexError,"invalid genotype model");
-		else if(genofound && genofound->index != 0)
+		if(genofound->index != 0)
 			*status = MERGE_UNAMBIGUOUS;
 
-		Py_XINCREF(genofound);
+		Py_INCREF(genofound);
 		return genofound;
 	}
 
@@ -3597,6 +3614,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 			found = 0;
 			break;
 		}
+		/* Count concordant genotypes found */
 		found++;
 	}
 
@@ -3604,18 +3622,18 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, 0); /* borrowed ref */
 	else
 	{
-		genofound = (GenotypeObject *)PyList_GetItem(model->genotypes, genofound->index); /* borrowed ref */
+		/* Ensure that the consensus genotype belongs to the canonical model */
+		genofound = get_canonical_genotype_nested(model, genofound); /* borrowed ref */
+		if(!genofound) goto error;
 
-		if(!genofound && PyErr_ExceptionMatches(PyExc_IndexError))
-			PyErr_SetString(PyExc_IndexError,"invalid genotype model");
-		else if(found == 1)
+		if(found == 1)
 			*status = MERGE_UNAMBIGUOUS;
 		else /* found > 1 */
 			*status = MERGE_CONCORDANT;
 	}
 
-	Py_XDECREF(genoseq);
-	Py_XINCREF(genofound);
+	Py_INCREF(genofound);
+	Py_DECREF(genoseq);
 	return genofound;
 
 error:
