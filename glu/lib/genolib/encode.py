@@ -240,7 +240,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
 
       packed = genos.packed
 
-      for i,(lname,row),old_model in izip(count(),genos,genos.models):
+      for (lname,row),old_model in izip(genos,genos.models):
         old_locus = genos.genome.loci[lname]
 
         if lname not in genome.loci:
@@ -263,7 +263,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
             row = GenotypeArray(descr,row)
           except GenotypeLookupError:
             try:
-              model = models[i] = loc.model = build_model(alleles=old_model.alleles[1:],base=loc.model)
+              model = loc.model = build_model(alleles=old_model.alleles[1:],base=loc.model)
             except GenotypeRepresentationError:
               _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),model,warn)
 
