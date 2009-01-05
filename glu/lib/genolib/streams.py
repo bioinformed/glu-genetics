@@ -2286,6 +2286,26 @@ def merge_genomatrixstream_list(genos, mergefunc):
   ('s2', [(None, None), ('T', 'T'), (None, None)])
   ('s3', [(None, None), ('A', 'T'), ('A', 'T')])
 
+  Test path for completely heterogeneous columns:
+
+  >>> samples1 =         ('s1',         's2',        's3')
+  >>> rows1 = [('l1',[ ('G', 'G'),   ('G', 'T'),  ('T', 'T')]),
+  ...          ('l2',[ ('A', 'A'),   ('T', 'T'),  ('A', 'T')])]
+  >>> samples2 =         ('s4',         's5',        's6')
+  >>> rows2 = [('l1',[(None, None),  ('T', 'T'),  ('G', 'G')]),
+  ...          ('l3',[ ('A', 'A'),  (None, None), ('A', 'T')])]
+  >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples1)
+  >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples2)
+  >>> genos = [genos1,genos2]
+  >>> genos = merge_genomatrixstream_list(genos,VoteMerger())
+  >>> genos.samples
+  ('s1', 's2', 's3', 's4', 's5', 's6')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('G', 'G'), ('G', 'T'), ('T', 'T'), (None, None), ('T', 'T'), ('G', 'G')])
+  ('l2', [('A', 'A'), ('T', 'T'), ('A', 'T'), (None, None), (None, None), (None, None)])
+  ('l3', [(None, None), (None, None), (None, None), ('A', 'A'), (None, None), ('A', 'T')])
+
   Test really fast-path for homogeneous schema and disjoint rows:
 
   >>> samples =          ('s1',         's2',        's3')
@@ -2293,9 +2313,8 @@ def merge_genomatrixstream_list(genos, mergefunc):
   ...          ('l2',[ ('A', 'A'),   ('T', 'T'),  ('A', 'T')])]
   >>> rows2 = [('l3',[(None, None),  ('T', 'T'),  ('G', 'G')]),
   ...          ('l4',[ ('A', 'A'),  (None, None), ('A', 'T')])]
-  >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples).materialize()
-  >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples).materialize()
-
+  >>> genos1 = GenomatrixStream.from_tuples(rows1,'ldat',samples=samples)
+  >>> genos2 = GenomatrixStream.from_tuples(rows2,'ldat',samples=samples)
   >>> genos = [genos1,genos2]
   >>> genos = merge_genomatrixstream_list(genos,VoteMerger())
   >>> genos.samples
@@ -2325,7 +2344,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
   genome  = genos[0].genome
   genos   = [ g.transformed(recode_models=genome) for g in genos ]
-  phenome = merge_phenome_list([g.phenome for g in genos ])
+  phenome = merge_phenome_list([ g.phenome for g in genos ])
 
   columns = [ g.columns for g in genos ]
   if all(columns[0]==c for c in columns):
@@ -2363,7 +2382,82 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
     return genos
 
-  # Slow path to handle heterogeneous columns
+  # Fast path to handle disjoint columns
+  allcolumns = set(chain(*columns))
+  columnlens = [ len(c) for c in columns ]
+  clen       = sum(columnlens)
+
+  if len(allcolumns) == clen:
+    # Slow path to handle heterogeneous columns
+    new_rows      = {}
+    blanks        = [ [None]*n for n in columnlens ]
+    ranges        = [ slice(n) for n in columnlens ]
+    merge_rows    = defaultdict(lambda: defaultdict(list))
+
+    # We must materialize all streams, so ensure they are packed
+    genos = [ g.transformed(repack=True) for g in genos ]
+
+    for i,g in enumerate(genos):
+      # Collect row labels and materialize all rows for later merging
+      for row_label,row in g:
+        new_rows.setdefault(row_label,len(new_rows))
+        merge_rows[row_label][i].append(row)
+
+    # Invert row dictionary to recover insertion orderings
+    new_columns = tuple(chain(*columns))
+    new_rows    = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(), key=itemgetter(1))))
+    n           = len(genos)
+
+    if format=='ldat':
+      models = []
+      samples,loci = new_columns,new_rows
+    else:
+      # Models are final, so no updates are pending
+      models = [ genome.get_model(column) for column in new_columns ]
+      samples,loci = new_rows,new_columns
+
+    def _merger():
+      # Fully general merge over duplicate rows and columns
+      for label in new_rows:
+        with gcdisabled():
+          # Form null genotype lists at each new column
+          # (place_list understands None is a null list)
+          new_row = []
+
+          # Iterate over input rows and schema, find the cooresponding column
+          # mappings, and append the relevant genotypes
+          last = 0
+          for i,rows in merge_rows.pop(label).iteritems():
+            for j in xrange(last,i):
+              new_row += blanks[j]
+
+            last = i+1
+
+            if len(rows) == 1:
+              new_row += rows[0]
+            else:
+              new_row += pick_columns(rows,ranges[i])
+
+          for j in xrange(last,n):
+            new_row += blanks[j]
+
+          # Merge genotypes
+          if format=='ldat':
+            model = genome.get_model(label)
+            models.append(model)
+            new_row = mergefunc.merge_locus(samples, label, model, new_row)
+          else:
+            new_row = mergefunc.merge_sample(label, loci, models, new_row)
+
+        # Yield new row
+        yield label,new_row
+
+    return genos[0].clone(_merger(),samples=samples,loci=loci,models=models,genome=genome,
+                                    packed=False,materialized=False,unique=True)
+
+  #######
+
+  # Slow path to handle heterogeneous but not disjoint columns
   new_rows      = {}
   new_columns   = {}
   merge_columns = defaultdict(lambda: ([],[]))
@@ -2434,7 +2528,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
           model = genome.get_model(label)
           models.append(model)
           new_row = mergefunc.merge_locus(samples, label, model, new_row)
-
         else:
           new_row = mergefunc.merge_sample(label, loci, models, new_row)
 
