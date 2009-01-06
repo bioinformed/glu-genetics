@@ -2,6 +2,72 @@
 What's New in GLU 1.0
 *********************
 
+Version 1.0a6 (2009-01-06)
+==========================
+
+* Major re-write of genotype model encoding.  This corrects a major design
+  flaw which caused excessive amounts of memory to be used to process
+  monomorphic SNPs or other instances of incomplete genotype models.  The
+  details are fairly low-level and technical, but the net result is that GLU
+  is much smarter about allocating new model objects, performs faster for many
+  operations, and requires less memory.
+
+  Although known in principle, this issue was first reported in the wild
+  when Jun Lu was utilizing HapMap build 23, which includes 125k monomorphic
+  SNPs (incomplete models).  Over 4.7 GB of RAM and 2m22s were needed to
+  subset the data using GLU 1.0a5 with the old model management strategy,
+  but now only 315 MB of RAM and 5.7s are needed to perform the same
+  operations.  A pleasant side-effect is that runtime performance is greatly
+  improved for this and many other operations.  This 15x reduction in the
+  amount of memory and a 25x reduction in time required is a substantive
+  start on optimizing GLU for operation on more modest desktop hardware,
+  though clearly more work is needed.
+
+  Special thanks to Jun Lu for his help in testing this fairly significant
+  set of changes.
+
+* GLU's genotype file format support is now fully "pluggable", in that new
+  formats can be added by placing code in a plug-ins directory and will be
+  automatically made available to all programs.  The API is not yet
+  documented, but this feature removes a major barrier for adding custom and
+  user-defined file formats to GLU.  This feature also fixes a number of
+  internal limitations and bugs.
+
+  Some formats can no longer be specified by file extension.  e.g.,::
+
+    glu transform mydata.lbat -o mydata.structure
+
+  is now invalid.  Really, there are no files with the .structure extension in
+  the wild (nor should there be).  What any sensible user wants is::
+
+    glu transform mydata.lbat -o mydata.dat:format=structure
+
+  or::
+
+    glu transform mydata.lbat -F structure -o mydata.dat
+
+* :mod:`tagzilla`'s founder filter is now based on an exclude filter, since phenome
+  information may not include all individuals.  This ensures that those with
+  unknown descent are assumed to be founders, rather than non-founders.
+
+* Enhance association testing output to include standard errors
+  (logit1/linear1), genotype counts by category (logit1), maf by category
+  (logit1), and align degenerate categories (logit1).
+
+* Renaming alleles and recoding models is now done before applying sample
+  and locus renaming.  The original behavior had identifiability issues.
+
+* Added support for Illumina's genotype matrix format by adding a new
+  genotype representation (missing genotype='--').  To use, specify
+  representation "-g isnp".
+
+* Enabled genotype filter command line parameters in ginfo.
+
+* Standardize command-line help output to use the standard error output stream.
+
+* Documentation updates based on contributions from Dennis Maeder, Jun
+  Lu, Zhaoming Wang and Dan Eisenberg.
+
 Version 1.0a5 (2008-10-01)
 ==========================
 

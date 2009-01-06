@@ -36,7 +36,7 @@ master_doc = 'contents'
 
 # General substitutions.
 project = 'GLU'
-copyright = '2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400'
+copyright = '2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400'
 
 # The default replacements for |version| and |release|, also used in various
 # other places throughout the built documents.
@@ -44,7 +44,7 @@ copyright = '2008, BioInformed LLC and the U.S. Department of Health & Human Ser
 # The short X.Y version.
 version = '1.0'
 # The full version, including alpha/beta/rc tags.
-release = '1.0a6-dev'
+release = '1.0a6'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
