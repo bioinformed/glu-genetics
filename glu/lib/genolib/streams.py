@@ -506,6 +506,15 @@ class GenotripleStream(GenotypeStream):
     if transform.filter_missing_genotypes:
       triples = filter_genotriples_missing(triples)
 
+    # Optimize includes and excludes
+    if transform.samples.include is not None and transform.samples.exclude is not None:
+      transform.samples.include -= transform.samples.exclude
+      transform.samples.exclude  = None
+
+    if transform.loci.include is not None and transform.loci.exclude is not None:
+      transform.loci.include -= transform.loci.exclude
+      transform.loci.exclude  = None
+
     # Sample and locus includes
     if transform.samples.include is not None or transform.loci.include is not None:
       triples = filter_genotriples(triples,transform.samples.include,transform.loci.include)
@@ -1314,6 +1323,15 @@ class GenomatrixStream(GenotypeStream):
     # 6) Order and repack
 
     genos = self
+
+    # Optimize includes and excludes
+    if rowtransform.include is not None and rowtransform.exclude is not None:
+      rowtransform.include -= rowtransform.exclude
+      rowtransform.exclude  = None
+
+    if coltransform.include is not None and coltransform.exclude is not None:
+      coltransform.include -= coltransform.exclude
+      coltransform.exclude  = None
 
     # Apply row includes and excludes
     if rowtransform.exclude:
@@ -2390,8 +2408,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
   if len(allcolumns) == clen:
     # Slow path to handle heterogeneous columns
     new_rows      = {}
-    blanks        = [ [None]*n for n in columnlens ]
-    ranges        = [ slice(n) for n in columnlens ]
     merge_rows    = defaultdict(lambda: defaultdict(list))
 
     # We must materialize all streams, so ensure they are packed
@@ -2406,7 +2422,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
     # Invert row dictionary to recover insertion orderings
     new_columns = tuple(chain(*columns))
     new_rows    = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(), key=itemgetter(1))))
-    n           = len(genos)
 
     if format=='ldat':
       models = []
@@ -2417,29 +2432,24 @@ def merge_genomatrixstream_list(genos, mergefunc):
       samples,loci = new_rows,new_columns
 
     def _merger():
+      dranges = []
+      n = 0
+      for c in columnlens:
+        dranges.append( slice(n,n+c)  )
+        n += c
+
       # Fully general merge over duplicate rows and columns
       for label in new_rows:
         with gcdisabled():
           # Form null genotype lists at each new column
           # (place_list understands None is a null list)
-          new_row = []
+          new_row = [None]*clen
 
           # Iterate over input rows and schema, find the cooresponding column
           # mappings, and append the relevant genotypes
           last = 0
           for i,rows in merge_rows.pop(label).iteritems():
-            for j in xrange(last,i):
-              new_row += blanks[j]
-
-            last = i+1
-
-            if len(rows) == 1:
-              new_row += rows[0]
-            else:
-              new_row += pick_columns(rows,ranges[i])
-
-          for j in xrange(last,n):
-            new_row += blanks[j]
+            new_row[dranges[i]] = pick_columns(rows) if len(rows)>1 else rows[0]
 
           # Merge genotypes
           if format=='ldat':
@@ -2482,7 +2492,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
   # Invert row and column dictionaries to recover insertion orderings
   new_columns = tuple(imap(itemgetter(0),sorted(new_columns.iteritems(),key=itemgetter(1))))
   new_rows    = tuple(imap(itemgetter(0),sorted(new_rows.iteritems(),   key=itemgetter(1))))
-  n = len(new_columns)
+  n           = len(new_columns)
 
   # FIXME: Refactor to clarify the following cases
   #        1) Identical columns
