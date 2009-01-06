@@ -12,7 +12,7 @@ import bisect
 
 from   operator                        import itemgetter
 
-from   glu.lib.fileutils               import table_reader,table_writer
+from   glu.lib.fileutils               import list_reader,table_reader,table_writer
 
 from   glu.modules.genedb              import open_genedb
 from   glu.modules.genedb.find_regions import resolve_features
@@ -31,6 +31,10 @@ def option_parser():
 
   parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
                       help='Genedb genome annotation database name or file')
+  parser.add_option('--includeloci', dest='includeloci', metavar='FILE',
+                    help='List of loci to include')
+  parser.add_option('--excludeloci', dest='excludeloci', metavar='FILE',
+                    help='List of loci to exclude')
   parser.add_option('-u', '--upbases',   dest='upbases',   default=20000, type='int',  metavar='N',
                     help='upstream margin in bases (default=20000)')
   parser.add_option('-d', '--downbases', dest='downbases', default=10000, type='int',  metavar='N',
@@ -89,6 +93,62 @@ def process_results(results,start,end,strand,nup,ndown):
   return _calc_rank_dist()
 
 
+def as_set(f):
+  '''
+  Return f, based on the following rules.  If f is:
+    1. None,  return None
+    2. a set, return f
+    3. a dict, return set(f)
+    4. otherwise, pass f through a list_reader and
+       return the results as a set
+
+  >>> as_set(None) is None
+  True
+  >>> as_set(set('abc')) == set('abc')
+  True
+  >>> as_set([1, 2, 3]) == set([1,2,3])
+  True
+  >>> as_set(iter(['a\\t1','b\\t2','c\\t3'])) == set('abc')
+  True
+  '''
+  if f is None:
+    return None
+  elif isinstance(f, set):
+    return f
+  elif isinstance(f, (dict,list,tuple)):
+    return set(f)
+  else:
+    return set(list_reader(f))
+
+
+def filter_results(results,options):
+  '''
+  Filter SNPs based on an inclusion or exclusion list
+  '''
+  include = as_set(options.includeloci)
+  exclude = as_set(options.excludeloci)
+
+  if include is None and exclude is None:
+    return results
+
+  if include is not None and exclude is not None:
+    include = include - exclude
+    exclude = None
+
+  if include is not None:
+    def _filter():
+      for result in results:
+        if result[0] in include:
+          yield result
+  else:
+    def _filter():
+      for result in results:
+        if result[0] not in exclude:
+          yield result
+
+  return _filter()
+
+
 def main():
   parser = option_parser()
   options,args = parser.parse_args()
@@ -115,6 +175,7 @@ def main():
       chrStart,chrEnd = feature_margin(start,end,strand,int(mup or 0),int(mdown or 0))
 
       results = query_snps_by_location(con,chr,chrStart,chrEnd)
+      results = filter_results(results,options)
       results = process_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
 
       for result in results:
