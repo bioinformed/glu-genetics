@@ -97,7 +97,7 @@ def pack_genomatrixstream(genos):
         yield lname,GenotypeArray(descr,row)
 
   if not genos.columns:
-    return genos
+    return genos.clone([],packed=True,samples=(),loci=(),models=[])
 
   return genos.clone(_pack(genos),packed=True)
 
