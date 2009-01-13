@@ -49,6 +49,7 @@ def encode_loci(genos):
     other = other[0]
 
     # Form numeric encoding of informative data (0,.5,1)
+    # NB: dicts are faster than lists here-- sigh.
     gmap = { model[major,major]:0.0,
              model[other,major]:0.5,
              model[other,other]:1.0 }
@@ -61,6 +62,7 @@ def encode_loci(genos):
     norm = numpy.sqrt(p*(1-p))
 
     # Form genotype to score mapping
+    # NB: dicts are faster than lists here-- sigh.
     gmap = { model[None,None]  :  0.0,
              model[major,major]: (0.0-avg)/norm,
              model[other,major]: (0.5-avg)/norm,
