@@ -69,7 +69,7 @@ class GenotypeStream(object):
     @rtype :  sequence of sample, locus, and genotype
     '''
     if self.used_stream():
-      raise RuntimeError('Genotriple stream already used')
+      raise RuntimeError('Genotype stream already used')
 
     if not self.materialized:
       self.__private_stream_do_not_touch,genos = None,self.__private_stream_do_not_touch
@@ -2024,7 +2024,7 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s3',[ ('A', 'A'),  (None, None), (None, None)]),
   ...         ('s4',[ ('A', 'T'),  (None, None),  ('T', 'T')])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
-  >>> merger= VoteMerger()
+  >>> merger= VoteMerger(trackstats=True)
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
   ('l1', 'l2', 'l3')
@@ -2041,7 +2041,7 @@ def merge_genomatrixstream(genos, mergefunc):
 
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
   >>> genos.loci = None
-  >>> merger= VoteMerger()
+  >>> merger= VoteMerger(trackstats=True)
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.samples
   ('s1', 's2', 's3', 's4')
@@ -2066,7 +2066,7 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s1',[ ('A', 'A'),  ('A', 'A'),   (None, None)]),
   ...         ('s1',[ ('A', 'T'), (None, None),  ('G', 'T') ])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
-  >>> merger=VoteMerger()
+  >>> merger=VoteMerger(trackstats=True)
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
   ('l1', 'l2', 'l3')
@@ -2080,7 +2080,7 @@ def merge_genomatrixstream(genos, mergefunc):
   [('l1', [0, 0, 0, 1, 1]), ('l2', [2, 0, 0, 0, 0]), ('l3', [0, 1, 0, 0, 1])]
 
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
-  >>> merger= VoteMerger()
+  >>> merger= VoteMerger(trackstats=True)
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.samples
   ('s1', 's2')
@@ -2100,7 +2100,7 @@ def merge_genomatrixstream(genos, mergefunc):
   ...         ('s1',[ ('C', 'C'),   ('A', 'A'),  (None, None)]),
   ...         ('s1',[ ('C', 'T'),  (None, None),  ('C', 'T')])]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False)
-  >>> merger=VoteMerger()
+  >>> merger=VoteMerger(trackstats=True)
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.loci
   ('l1', 'l2')
@@ -2114,7 +2114,7 @@ def merge_genomatrixstream(genos, mergefunc):
   [('l1', [1, 0, 0, 1, 0]), ('l2', [2, 0, 0, 0, 0])]
 
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci,unique=False).as_ldat()
-  >>> merger=VoteMerger()
+  >>> merger=VoteMerger(trackstats=True)
   >>> genos = merge_genomatrixstream(genos,merger)
   >>> genos.samples
   ('s1', 's2')
@@ -2572,7 +2572,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
   ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
   >>> triples = GenotripleStream.from_tuples(triples).sorted('sample')
-  >>> merge = UniqueMerger()
+  >>> merge = UniqueMerger(trackstats=True)
   >>> genos = build_genomatrixstream_from_genotriples(triples,'sdat',merge)
   >>> genos.loci
   ('l1', 'l2')
@@ -2597,7 +2597,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   ...            ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
   ...            ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
   >>> triples = GenotripleStream.from_tuples(triples).sorted('sample').materialize()
-  >>> merger = VoteMerger()
+  >>> merger = VoteMerger(trackstats=True)
   >>> triples.samples = None
   >>> triples.loci=['l1','l2']
   >>> genos = build_genomatrixstream_from_genotriples(triples,'sdat',merger)
@@ -2613,7 +2613,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
   [('l1', [3, 0, 0, 0, 0]), ('l2', [3, 0, 0, 0, 0])]
 
-  >>> merger = VoteMerger()
+  >>> merger = VoteMerger(trackstats=True)
   >>> triples.loci=None
   >>> triples.samples=['s1','s2','s3']
   >>> genos = build_genomatrixstream_from_genotriples(triples,'sdat',merger)
@@ -2629,7 +2629,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   >>> sorted( (l,list(c)) for l,c in merger.locusstats.iteritems())
   [('l1', [3, 0, 0, 0, 0]), ('l2', [3, 0, 0, 0, 0])]
 
-  >>> merger = VoteMerger()
+  >>> merger = VoteMerger(trackstats=True)
   >>> genos = build_genomatrixstream_from_genotriples(triples,'ldat',merger)
   >>> genos.samples
   ('s1', 's2', 's3')

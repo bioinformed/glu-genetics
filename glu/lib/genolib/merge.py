@@ -130,7 +130,7 @@ try:
     >>> A,B='A','B'
     >>> AA,AB,BB = model[A,A],model[A,B],model[B,B]
 
-    >>> merger = GenotypeMerger(unanimous)
+    >>> merger = GenotypeMerger(unanimous,True)
     >>> merger.merge_geno('s1','l1',model,None)
     (None, None)
     >>> merger.merge_geno('s1','l1',model,[])
@@ -161,7 +161,7 @@ try:
     >>> locus   = 'l1'
     >>> row     = [[AA,AA,missing,AA,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-    >>> merger = GenotypeMerger(unanimous)
+    >>> merger = GenotypeMerger(unanimous,True)
     >>> merger.merge_locus(samples, locus, model, row)
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
 
@@ -174,7 +174,7 @@ try:
     >>> loci   = ['l1','l2','l3','l4','l5','l6']
     >>> row    = [[AA,AA,missing,AA,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-    >>> merger = GenotypeMerger(unanimous)
+    >>> merger = GenotypeMerger(unanimous,True)
     >>> merger.merge_sample(sample, loci, [model]*6, row)
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
 
@@ -491,7 +491,7 @@ try:
     >>> loci     = ['l1','l2','l3','l1','l2','l3']
     >>> genosets = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-    >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+    >>> merger = GenotypeMerger(Vote(threshold = 0.8),True)
     >>> list(starmap(merger.merge_geno,izip(samples,loci,repeat(model),genosets)))
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
     >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
@@ -503,7 +503,7 @@ try:
     >>> locus   = 'l1'
     >>> row     = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-    >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+    >>> merger = GenotypeMerger(Vote(threshold = 0.8),True)
     >>> merger.merge_locus(samples, locus, model, row)
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
     >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
@@ -515,7 +515,7 @@ try:
     >>> loci   = ['l1','l2','l3','l4','l5','l6']
     >>> row    = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-    >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+    >>> merger = GenotypeMerger(Vote(threshold = 0.8),True)
     >>> merger.merge_sample(sample, loci, [model]*6, row)
     [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
     >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
@@ -583,7 +583,7 @@ except ImportError:
       >>> loci     = ['l1','l2','l3','l1','l2','l3']
       >>> genosets = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-      >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+      >>> merger = GenotypeMerger(Vote(threshold = 0.8),True)
       >>> list(starmap(merger.merge_geno,izip(samples,loci,repeat(model),genosets)))
       [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
       >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
@@ -625,7 +625,7 @@ except ImportError:
       >>> locus   = 'l1'
       >>> row     = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-      >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+      >>> merger = GenotypeMerger(Vote(threshold = 0.8),True)
       >>> merger.merge_locus(samples, locus, model, row)
       [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
       >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
@@ -670,7 +670,7 @@ except ImportError:
       >>> loci   = ['l1','l2','l3','l4','l5','l6']
       >>> row    = [[AA,AA,missing,AA,AB,AA],missing,[AA,AB,AB],[missing,missing],[missing],[AA]]
 
-      >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+      >>> merger = GenotypeMerger(Vote(threshold = 0.8),True)
       >>> merger.merge_sample(sample, loci, [model]*6, row)
       [('A', 'A'), (None, None), (None, None), (None, None), (None, None), ('A', 'A')]
       >>> sorted( (l,list(c)) for l,c in merger.samplestats.iteritems())
@@ -690,25 +690,25 @@ except ImportError:
       return list(new_row)
 
 
-def UniqueMerger(threshold=None,trackstats=True):
+def UniqueMerger(threshold=None,trackstats=False):
   return GenotypeMerger(Unique(),trackstats=trackstats)
 
 
-def UnanimousMerger(threshold=None,trackstats=True):
+def UnanimousMerger(threshold=None,trackstats=False):
   return GenotypeMerger(unanimous,trackstats=trackstats)
 
 
-def VoteMerger(threshold=1.0,trackstats=True):
+def VoteMerger(threshold=1.0,trackstats=False):
   if threshold>=1.0:
     return UnanimousMerger(trackstats=trackstats)
   return GenotypeMerger(Vote(threshold=threshold),trackstats=trackstats)
 
 
-def OrderedMerger(threshold=0.4999999,trackstats=True):
+def OrderedMerger(threshold=0.4999999,trackstats=False):
   return GenotypeMerger(Ordered(threshold=threshold),trackstats=trackstats)
 
 
-def get_genomerger(mergername,trackstats=True):
+def get_genomerger(mergername,trackstats=False):
   '''
   Retrieve the supported genotype merge algorithm. Otherwise raises an ValueError exception.
 
@@ -770,7 +770,7 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   ...            [AB],[AA],[AA,AA,AA,AA,AB],[AB,AB],
   ...            [AA,AB,AB],[AA,AA],[AA,missing,missing,missing],[AA,AA,AA]]
 
-  >>> merger = GenotypeMerger(Vote(threshold = 0.8))
+  >>> merger = GenotypeMerger(Vote(threshold = 0.8), trackstats=True)
   >>> list(starmap(merger.merge_geno, izip(samples,loci,repeat(model),genosets))) # doctest: +NORMALIZE_WHITESPACE
   [('A', 'A'), (None, None), ('A', 'A'), (None, None), (None, None), ('A', 'A'),
    ('A', 'A'), (None, None), ('A', 'B'), ('A', 'A'), ('A', 'A'), ('A', 'B'),
