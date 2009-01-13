@@ -23,7 +23,9 @@ from   itertools import izip, count, chain
 
 def as_set(items):
   '''
-  Return items as a set if it not already a set or dict.
+  Return items as a set if it not already a set or dict.  An exception is
+  made if items is a bare string, where a set with a single item is returned
+  (rather than the set of characters in items).
 
   @param  items: sequence, set, or mapping
   @rtype       : set or dict
@@ -48,8 +50,13 @@ def as_set(items):
 
   >>> as_set(iter(t)) == set(t)
   True
+
+  >>> as_set('ab') == set(['ab'])
+  True
   '''
-  if isinstance(items, (dict,set)):
+  if is_str(items):
+    items = [items]
+  elif isinstance(items, (dict,set)):
     return items
   return set(items)
 
