@@ -30,12 +30,12 @@ All-in-one binary installer for Windows XP and Vista (32 bit)
 
    * `Intel CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-win32_Intel.zip
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a6-win32_Intel.zip
 
    * AMD CPU *(coming soon)*
 
 2. Double-clock on the ZIP archive and extract the contents an accessible location.
-   Here we use ``C:\glu-1.0a5-win32_Intel``.
+   Here we use ``C:\glu-1.0a6-win32_Intel``.
 
 3. Add GLU to your executable path (recommended)
 
@@ -47,7 +47,7 @@ All-in-one binary installer for Windows XP and Vista (32 bit)
 
    * **Append** the directory name where you installed GLU, prefixed by a semi-colon ';'::
 
-       ;C:\glu-1.0a5-win32_Intel
+       ;C:\glu-1.0a6-win32_Intel
 
      (remember, enter the directory where GLU was extracted)
 
@@ -111,15 +111,15 @@ All-in-one binary archive for Linux and OS X
 
    * `Linux 64 bit with an Intel CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_Intel_EM64T.tar.gz
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a6-Linux_Intel_EM64T.tar.gz
 
    * `Linux 64 bit with an AMD CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-Linux_AMD_EM64T.tar.gz
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a6-Linux_AMD_EM64T.tar.gz
 
    * `Apple OS X with an Intel CPU`__
 
-     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a5-OSX_Intel.tar.gz
+     __ http://code.google.com/p/glu-genetics/downloads/detail?name=glu-1.0a6-OSX_Intel.tar.gz
 
 
    Below we will assume the Linux 64 bit version for Intel CPUs.
@@ -128,19 +128,19 @@ All-in-one binary archive for Linux and OS X
 
      cd /opt
      mkdir glu
-     tar xzf /path/to/glu-1.0a5-Linux_Intel_EM64T.tar.gz
+     tar xzf /path/to/glu-1.0a6-Linux_Intel_EM64T.tar.gz
 
-   GLU will be extracted to a new directory named ``glu-1.0a5-Linux_Intel_EM64T``.
+   GLU will be extracted to a new directory named ``glu-1.0a6-Linux_Intel_EM64T``.
 
 3. Add GLU to your executable path (recommended)
 
    * In **bash** or similar shells::
 
-       export PATH=$PATH:/opt/glu/glu-1.0a5-Linux_Intel_EM64T
+       export PATH=$PATH:/opt/glu/glu-1.0a6-Linux_Intel_EM64T
 
    * In **tcsh** or similar shells::
 
-       setenv PATH $PATH:/opt/glu/glu-1.0a5-Linux_Intel_EM64T
+       setenv PATH $PATH:/opt/glu/glu-1.0a6-Linux_Intel_EM64T
 
    NOTE: The exact GLU directory name will depend on the version of GLU, so use
    the one appropriate for your installation.  Also, these settings are only
