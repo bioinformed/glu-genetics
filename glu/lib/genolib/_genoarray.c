@@ -62,7 +62,7 @@ genotype_init(GenotypeObject *self, PyObject *args, PyObject *kwds)
 		&model, &allele1_index, &allele2_index, &index))
 		return -1;
 
-	if(!model || !UnphasedMarkerModel_Check(model))
+	if(!model || !UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		return -1;
@@ -311,7 +311,7 @@ genotype_richcompare(PyObject *self, PyObject *other, int op)
 	geno2 = genotype_normalized_tuple(other);
 	if(!geno2) goto done;
 
-	ret=PyObject_RichCompare(geno1, geno2, op);
+	ret = PyObject_RichCompare(geno1, geno2, op);
 
 done:
 	Py_XDECREF(geno1);
@@ -453,7 +453,7 @@ descr_init(GenotypeArrayDescriptorObject *self, PyObject *args, PyObject *kwds)
 	{
 		model = (UnphasedMarkerModelObject *)PyList_GetItem(models, i); /* borrowed ref */
 		if(!model) goto error;
-		if(!UnphasedMarkerModel_Check(model) || model->bit_size > 32)
+		if(!UnphasedMarkerModel_CheckExact(model) || model->bit_size > 32)
 		{
 			PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 			goto error;
@@ -557,7 +557,7 @@ descr_ass_item(GenotypeArrayDescriptorObject *self, Py_ssize_t item, UnphasedMar
 	Py_ssize_t old_len, new_len;
 	int ret;
 
-	if(!new_model || !UnphasedMarkerModel_Check(new_model))
+	if(!new_model || !UnphasedMarkerModel_CheckExact(new_model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		return -1;
@@ -626,12 +626,13 @@ descr_ass_slice(GenotypeArrayDescriptorObject *self, PySliceObject *slice, PyObj
 		return -1;
 
 	seq = PyObject_GetIter(value);
-	if(seq == NULL) goto error;
+	if(!seq) goto error;
 
 	for (i=start, j=0; j<slicelength; i+=step, ++j)
 	{
-		new_model = (UnphasedMarkerModelObject *)PyIter_Next(seq);
+		new_model = (UnphasedMarkerModelObject *)PyIter_Next(seq); /* new ref */
 
+		/* break on error or end of sequence */
 		if(!new_model) break;
 
 		if( descr_ass_item(self, i, new_model) == -1 )
@@ -642,17 +643,22 @@ descr_ass_slice(GenotypeArrayDescriptorObject *self, PySliceObject *slice, PyObj
 		Py_DECREF(new_model);
 	}
 
-	if(PyErr_Occurred())
+	if(PyErr_Occurred()) goto error;
+
+	if(j<slicelength)
 	{
-		if(j<slicelength && PyErr_ExceptionMatches(PyExc_StopIteration))
-		{
-			PyErr_Clear();
-			PyErr_SetString(PyExc_ValueError,"attempt to assign too short sequence");
-		}
+		PyErr_SetString(PyExc_ValueError,"attempt to assign too short sequence");
 		goto error;
 	}
-	else if(j!=slicelength)
+
+	/* Check slice length by requesting beyond last element */
+	new_model = (UnphasedMarkerModelObject *)PyIter_Next(seq); /* new ref */
+	if(PyErr_Occurred()) goto error;
+
+	/* should be NULL if at end of sequence */
+	if(new_model)
 	{
+		Py_DECREF(new_model);
 		PyErr_SetString(PyExc_ValueError,"attempt to assign too long a sequence");
 		goto error;
 	}
@@ -749,7 +755,7 @@ PyTypeObject GenotypeArrayDescriptorType = {
 	(inquiry)descr_clear,			/* tp_clear          */
 	0,					/* tp_richcompare    */
 	0,					/* tp_weaklistoffset */
-	0,					/* tp_iter           */
+	(getiterfunc)descr_iter,		/* tp_iter           */
 	0,					/* tp_iternext       */
 	descr_methods,				/* tp_methods        */
 	descr_members,				/* tp_members        */
@@ -1054,13 +1060,12 @@ static int
 genomodel_contains(UnphasedMarkerModelObject *self, PyObject *item)
 {
 	PyObject *geno = genomodel_get_genotype(self, item);
-	if(geno == NULL && PyErr_ExceptionMatches(GenotypeLookupError))
+	if(!geno && PyErr_ExceptionMatches(GenotypeLookupError))
 	{
 		PyErr_Clear();
 		return 0;
 	}
-	if(geno == NULL)
-		return -1;
+	if(!geno) return -1;
 
 	Py_DECREF(geno);
 	return 1;
@@ -1071,10 +1076,9 @@ genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObj
 {
 	Py_ssize_t len1, len2, i;
 
-	if(self==other)
-		Py_RETURN_TRUE;
+	if(self == other) Py_RETURN_TRUE;
 
-	if( !UnphasedMarkerModel_Check(other) )
+	if( !UnphasedMarkerModel_CheckExact(other) )
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		return NULL;
@@ -1124,8 +1128,7 @@ genomodel_init(UnphasedMarkerModelObject *self, PyObject *args, PyObject *kw)
 		return -1;
 
 	/* Force models to have at least two alleles */
-	if(n < 2)
-		n = 2;
+	if(n < 2) n = 2;
 
 	self->allow_hemizygote = PyObject_IsTrue(allow_hemizygote);
 	if((short)self->allow_hemizygote == -1) return -1;
@@ -1267,7 +1270,6 @@ genoarray_dealloc(GenotypeArrayObject *self)
 static Py_ssize_t
 genoarray_length(GenotypeArrayObject *self)
 {
-	Py_ssize_t n;
 	PyObject *models;
 
 	if(!self->descriptor || !GenotypeArrayDescriptor_CheckExact(self->descriptor))
@@ -1279,11 +1281,7 @@ genoarray_length(GenotypeArrayObject *self)
 	models = self->descriptor->models;
 	if(!models) return -1;
 
-	n = PyList_Size(models);
-	if(n == -1 && PyErr_Occurred())
-		return -1;
-
-	return n;
+	return PyList_Size(models);
 }
 
 static PyObject *
@@ -1317,8 +1315,7 @@ genoarray_alloc(PyTypeObject *type, Py_ssize_t nitems)
 	else
 		obj = (PyObject *)PyObject_MALLOC(size);
 
-	if(obj == NULL)
-		return PyErr_NoMemory();
+	if(!obj) return PyErr_NoMemory();
 
 	memset(obj, '\0', size);
 
@@ -1389,12 +1386,11 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 	UnphasedMarkerModelObject *model;
 	char *status;
 
-	model = (UnphasedMarkerModelObject *)PyList_GetItem(models, i); /* borrowed ref */
+	model = (UnphasedMarkerModelObject *)PyList_GET_ITEM(models, i); /* borrowed ref */
 
-	if(!model)
-		return NULL;
+	if(!model) return NULL;
 
-	if(!UnphasedMarkerModel_Check(model) || !model->genotypes)
+	if(!UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 			return NULL;
@@ -1412,6 +1408,9 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 	}
 
 	geno = PyList_GetItem(model->genotypes, k); /* borrowed ref */
+
+	/* FIXME: Handle index error for better error message */
+
 	Py_XINCREF(geno);
 
 	return geno;
@@ -1439,8 +1438,8 @@ genoarray_item(GenotypeArrayObject *self, Py_ssize_t item)
 	if( genoarray_checkstate(self) == -1 )
 		return NULL;
 
-	offsets  = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
-	models   = self->descriptor->models;
+	offsets = (unsigned int *)PyArray_DATA(self->descriptor->offsets);
+	models  = self->descriptor->models;
 	/* FIXME: Set error state */
 
 	if(!PyList_Check(models))
@@ -1451,11 +1450,13 @@ genoarray_item(GenotypeArrayObject *self, Py_ssize_t item)
 
 	n = PyList_GET_SIZE(models);
 
+#if NOT_NECESSARY
 	if( n+1 != PyArray_SIZE(self->descriptor->offsets) )
 	{
 		PyErr_SetString(PyExc_ValueError,"offsets and models sizes must agree");
 		return NULL;
 	}
+#endif
 
 	if(item < 0 || item >= n)
 	{
@@ -1501,6 +1502,8 @@ genoarray_slice(GenotypeArrayObject *self, PySliceObject *slice)
 
 	if(PySlice_GetIndicesEx(slice, n, &start, &stop, &step, &slicelength) < 0)
 		goto done;
+
+	/* FIXME: Add slice range check */
 
 	result = PyList_New(slicelength);
 	if(!result) goto done;
@@ -1608,7 +1611,7 @@ genoarray_subscript(GenotypeArrayObject *self, PyObject *item)
 	}
 }
 
-static int
+static inline int
 genoarray_inner_set(PyObject *models, PyObject *geno, unsigned char *data, Py_ssize_t datasize, unsigned int *offsets, Py_ssize_t i)
 {
 	UnphasedMarkerModelObject *model;
@@ -1618,14 +1621,13 @@ genoarray_inner_set(PyObject *models, PyObject *geno, unsigned char *data, Py_ss
 
 	model = (UnphasedMarkerModelObject *)PyList_GET_ITEM(models, i); /* borrowed ref */
 
-	if(!model || !UnphasedMarkerModel_Check(model))
+	if(!model || !UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		return -1;
 	}
 
-	if(!Genotype_CheckExact(geno) ||
-	   (Genotype_CheckExact(geno) && ((GenotypeObject *)geno)->model != model))
+	if(!Genotype_CheckExact(geno) || ((GenotypeObject *)geno)->model != model)
 	{
 		/* Handle foreign genotypes by looking them up by their alleles */
 		geno = genomodel_get_genotype( (UnphasedMarkerModelObject *)model, geno);
@@ -1762,6 +1764,7 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 		}
 
 		if(!slicelength) goto done;
+
 		seqitems = PySequence_Fast_ITEMS(seq);
 
 		for (i=start, j=0; j<slicelength; i+=step, j++)
@@ -1772,25 +1775,17 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 	}
 	else
 	{
-		PyObject *(*iternext)(PyObject *);
-
+		PyObject *geno;
 		seq = PyObject_GetIter(value);
-		if(seq == NULL)
-			goto error;
-		iternext = *seq->ob_type->tp_iternext;
+		if(!seq) goto error;
 
 		for (i=start, j=0; j<slicelength; i+=step, j++)
 		{
-			PyObject *geno = iternext(seq);
-			if(!geno)
-			{
-				if(PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_StopIteration))
-				{
-					PyErr_Clear();
-					PyErr_SetString(PyExc_ValueError,"attempt to assign too short sequence");
-				}
-				goto error;
-			}
+			geno = PyIter_Next(seq);
+
+			/* break on error or end of sequence */
+			if(!geno) break;
+
 			if( genoarray_inner_set(models, geno, self->data, datasize, offsets, i) == -1 )
 			{
 				Py_DECREF(geno);
@@ -1798,12 +1793,28 @@ genoarray_ass_slice(GenotypeArrayObject *self, PySliceObject *slice, PyObject *v
 			}
 			Py_DECREF(geno);
 		}
-		if(j!=slicelength)
+
+		if(PyErr_Occurred()) goto error;
+
+		if(j<slicelength)
 		{
+			PyErr_SetString(PyExc_ValueError,"attempt to assign too short sequence");
+			goto error;
+		}
+
+		/* Check slice length by requesting beyond last element */
+		geno = PyIter_Next(seq); /* new ref */
+		if(PyErr_Occurred()) goto error;
+
+		/* should be NULL if at end of sequence */
+		if(geno)
+		{
+			Py_DECREF(geno);
 			PyErr_SetString(PyExc_ValueError,"attempt to assign too long a sequence");
 			goto error;
 		}
 	}
+
 done:	ret = 0;
 
 error:
@@ -1947,7 +1958,7 @@ genotype_indices(PyObject *genos, UnphasedMarkerModelObject *model)
 	len = PyObject_Size(genos);
 	if(len==-1) return NULL;
 
-	if(model && !UnphasedMarkerModel_Check(model))
+	if(model && !UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		return NULL;
@@ -1956,7 +1967,6 @@ genotype_indices(PyObject *genos, UnphasedMarkerModelObject *model)
 	index_array = PyArray_SimpleNew(1,&len,NPY_UINT);
 	if(!index_array) return NULL;
 
-	state.model = model;
 	state.indices = (unsigned int *)PyArray_DATA(index_array);
 
 	if(for_each_genotype(genos, (geno_foreach)indices_foreach, &state) < 0)
@@ -1995,7 +2005,6 @@ genotype_indices_func(PyObject *self, PyObject *args, PyObject *kw)
 
 typedef struct {
 	unsigned long *counts;
-	UnphasedMarkerModelObject *model;
 } genotype_counts_state;
 
 static int counts_foreach(Py_ssize_t i, GenotypeObject *geno, genotype_counts_state *state)
@@ -2044,7 +2053,7 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 		Py_DECREF(geno);
 	}
 
-	if(!model || !UnphasedMarkerModel_Check(model))
+	if(!model || !UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		return NULL;
@@ -2068,7 +2077,6 @@ count_genotypes(PyObject *genos, PyObject *count_array, PyObject *model)
 		PyArray_FILLWBYTE(count_array, 0);
 	}
 
-	state.model  = (UnphasedMarkerModelObject *)model; /* borrowed ref */
 	state.counts = (unsigned long *)PyArray_DATA(count_array); /* borrowed ref */
 
 	if(for_each_genotype(genos, (geno_foreach)counts_foreach, &state) < 0)
@@ -2484,7 +2492,6 @@ error:
 typedef struct {
 	PyObject *sample_counts;
 	unsigned long *locus_counts;
-	UnphasedMarkerModelObject *model;
 } locus_summary_state;
 
 static int locus_summary_foreach(Py_ssize_t i, GenotypeObject *geno, locus_summary_state *state)
@@ -2540,7 +2547,7 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 		Py_DECREF(geno);
 	}
 
-	if(!model || !UnphasedMarkerModel_Check(model))
+	if(!model || !UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		goto error;
@@ -2586,7 +2593,6 @@ locus_summary(PyObject *genos, PyObject *sample_counts, PyObject *locus_counts, 
 		PyArray_FILLWBYTE(sample_counts, 0);
 	}
 
-	state.model         = (UnphasedMarkerModelObject *)model;
 	state.locus_counts  = (unsigned long *)PyArray_DATA(locus_counts);
 	state.sample_counts = sample_counts;
 
@@ -3553,7 +3559,7 @@ merge_unanimous(UnphasedMarkerModelObject *model, PyObject *genos, Py_ssize_t *s
 
 	*status = MERGE_MISSING;
 
-	if(!UnphasedMarkerModel_Check(model))
+	if(!UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
 		goto error;
@@ -3669,7 +3675,7 @@ genomerger_init(GenotypeMergerObject *self, PyObject *args, PyObject *kwds)
 
 	self->cmergefunc  = NULL;
 	self->pymergefunc = self->samplestats = self->locusstats = NULL;
-	self->trackstats  = 1;
+	self->trackstats  = 0;
 
 	if(!PyArg_ParseTupleAndKeywords(args, kwds, "O|i", kwlist,
 		&self->pymergefunc, &self->trackstats))
@@ -3728,13 +3734,16 @@ genomerger_merge_genotype_py(GenotypeMergerObject *self, PyObject *model, PyObje
 		Py_DECREF(result);
 		return NULL;
 	}
+
 	*status = PyInt_AsSsize_t(PyTuple_GET_ITEM(result,0));
 	if(*status==-1 && PyErr_Occurred())
 	{
 		Py_DECREF(result);
 		return NULL;
 	}
+
 	geno = (GenotypeObject *)PyTuple_GET_ITEM(result,1); /* borrowed ref */
+
 	Py_INCREF(geno);
 	Py_DECREF(result);
 	return (PyObject *)geno;
@@ -4135,12 +4144,12 @@ init_genoarray(void)
 
 	GenotypeLookupError = PyErr_NewException("_genoarray.GenotypeLookupError",
 		PyExc_KeyError, NULL);
-	if(GenotypeLookupError == NULL)
+	if(!GenotypeLookupError)
 		return;
 
 	GenotypeRepresentationError = PyErr_NewException("_genoarray.GenotypeRepresentationError",
 		PyExc_ValueError, NULL);
-	if(GenotypeRepresentationError == NULL)
+	if(!GenotypeRepresentationError)
 		return;
 
 	/* Increment reference counts on all static types to ensure they are not freed */
