@@ -291,14 +291,70 @@ def guess_related_file(filename,extensions):
   return None
 
 
+def parse_augmented_name(name,args):
+  '''
+  Retrieve option-value pairs from the name delimited by colon.  Unlike
+  parse_augmented_filename, name need not be a file and no filesystem
+  checking is performed.
+
+  @param  name: potentially augmented name
+  @type   name: str
+  @param  args: option dictionary
+  @type   args: dict
+  @return     : name
+  @rtype      : str
+
+  >>> args = {}
+  >>> parse_augmented_name('foo',args)
+  'foo'
+  >>> sorted(args.iteritems())
+  []
+
+  >>> args = {}
+  >>> parse_augmented_name('foo:',args)
+  'foo'
+  >>> sorted(args.iteritems())
+  []
+
+  >>> args = {}
+  >>> parse_augmented_name('hello:foo=bar',args)
+  'hello'
+  >>> sorted(args.iteritems())
+  [('foo', 'bar')]
+
+  >>> args = {}
+  >>> parse_augmented_name('goodbye:foo=bar:baz:=spoo',args)
+  'goodbye'
+  >>> sorted(args.iteritems())
+  [('', 'spoo'), ('baz', ''), ('foo', 'bar')]
+  '''
+  name_save = name
+
+  while ':' in name:
+    name,arg = name.rsplit(':',1)
+    kv = arg.split('=')
+
+    if len(kv) > 2:
+      raise ValueError("Invalid augmented name argument in '%s'" % name_save)
+    elif len(kv) == 1:
+      kv.append('')
+
+    if kv != ['','']:
+      args[kv[0]] = kv[1]
+
+  return name
+
+
 def parse_augmented_filename(filename,args):
   '''
-  Retrieve option-value pairs from the filename delimited by colon
+  Retrieve option-value pairs from the filename delimited by colon.  Options and values are added to the args dictionary.
 
-  @param  filename: file name
+  @param  filename: potentially agumented file name string
   @type   filename: str
-  @return         : filename and tuples of appended additional option and its value
-  @rtype          : list
+  @param      args: option dictionary
+  @type       args: dict
+  @return         : file name
+  @rtype          : str
 
   >>> args = {}
   >>> parse_augmented_filename('file.gz',args)
@@ -333,7 +389,7 @@ def parse_augmented_filename(filename,args):
     kv = arg.split('=')
 
     if len(kv) > 2:
-      raise ValueError("Invalid extended filename argument in '%s'" % filename_save)
+      raise ValueError("Invalid augmented filename argument in '%s'" % filename_save)
     elif len(kv) == 1:
       kv.append('')
 
