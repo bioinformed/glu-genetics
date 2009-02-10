@@ -449,14 +449,14 @@ def main():
   if options.abmap:
     abmap.update(load_abmap(options.abmap))
 
-  filter = GenoTransform.from_options(options)
+  transform = GenoTransform.from_options(options)
 
   args = iter(args)
-  loci,gentrain,samples = load_lbd_file(args.next(),filter)
+  loci,gentrain,samples = load_lbd_file(args.next(),transform)
 
   loci = list(loci)
   for arg in args:
-    more_loci,more_gentrain,more_samples = load_lbd_file(arg,filter)
+    more_loci,more_gentrain,more_samples = load_lbd_file(arg,transform)
 
     if list(more_loci) != loci:
       raise RuntimeError('Genotype headers do not match')
@@ -477,7 +477,7 @@ def main():
 
   # Late removal of excluded loci and insurance on removal of samples.
   # renaming is supported, but not really a good idea in most cases
-  genos = genos.transformed(transform=filter)
+  genos = genos.transformed(transform)
 
   save_genostream(options.output,genos,format=options.outformat,genorepr=options.outgenorepr,hyphen=sys.stdout)
 
