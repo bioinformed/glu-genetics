@@ -39,6 +39,12 @@ def option_parser():
                     help='Minimum minor allele frequency filter')
   input.add_option('--mingenos', dest='mingenos', metavar='N', default=10, type='int',
                     help='Minimum number of observed genotype filter.  default=10')
+  input.add_option('-c', '--categorical', dest='categorical', metavar='VAR', action='append',
+                    help='Create indicator variables based on values of VAR')
+  input.add_option('--includevar', dest='includevar', metavar='VAR=VAL', action='append',
+                    help='Include only records with variable VAR equal to VAL')
+  input.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
+                    help='Exclude all records with variable VAR equal to VAL')
 
   analysis = optparse.OptionGroup(parser, 'Analysis options')
 

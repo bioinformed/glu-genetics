@@ -15,6 +15,9 @@ The :option:`--model`, :option:`--test`, and :option:`--display` options are
 specified by a formula notation.  See :ref:`user_manual-formulae` for more
 information.
 
+See the section on :ref:`user_manual-categorical` for usage of :option:`-c`,
+:option:`--categorical`, :option:`--includevar`, and :option:`--excludevar`.
+
 Usage::
 
   glu assoc.logit1 [options] phenotypes genotypes
@@ -45,6 +48,10 @@ Options:
     --minmaf=N          Minimum minor allele frequency filter
     --mingenos=N        Minimum number of observed genotype filter.
                         default=10
+    -c VAR, --categorical=VAR
+                          Create indicator variables based on values of VAR
+    --includevar=VARVAL   Include only records with variable VAR equal to VAL
+    --excludevar=VARVAL   Exclude all records with variable VAR equal to VAL
 
   Analysis options:
 

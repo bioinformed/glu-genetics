@@ -761,6 +761,13 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
             # Set genotype
             new_row[i] = g
 
+          if 0: # DEBUG
+            for i,g in enumerate(new_row):
+              assert models[i] is descr[i]
+              assert models[i] is loci[i].model
+              assert g == loci[i].model[g]
+              assert g in descr[i], 'Genotype %s not in model %s at locus %s' % (type(g),descr[i].genotypes[1:],columns[i])
+
           row = GenotypeArray(descr,new_row)
 
         yield sample,row

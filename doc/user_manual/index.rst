@@ -31,3 +31,4 @@ GLU is free and open-source, and is constantly being enhanced.
    formats
    preferred_formats
    formulae
+   categorical

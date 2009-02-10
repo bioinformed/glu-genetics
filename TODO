@@ -1,6 +1,6 @@
-=================
-GLU 1.0 TODO LIST
-=================
+==================
+GLU 1.0+ TODO LIST
+==================
 
 -------------
 documentation
@@ -27,6 +27,8 @@ genolib
     handled
 
   * File format auto-detection based on headers (HapMap, ldat, sdat, ?bat, primarily)
+
+  * Add support for yet another WTCCC format: https://www.wtccc.org.uk/info/data_formats.shtml
 
   * Improve file format support:
     * PLINK text (http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml)
