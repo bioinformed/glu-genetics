@@ -12,7 +12,7 @@ import csv
 from   operator                  import itemgetter,getitem
 from   itertools                 import islice,chain,imap,izip,groupby,repeat
 
-from   numpy                     import array,zeros
+from   numpy                     import array,zeros,isfinite
 
 from   glu.lib.utils             import izip_exact, is_str
 from   glu.lib.fileutils         import autofile,table_reader,table_writer
@@ -358,27 +358,35 @@ class GCSummary(object):
     self.samplestats = samplestats = []
     locusstats1 = zeros(len(self.loci))
     locusstats2 = zeros(len(self.loci))
+    locuscounts = zeros(len(self.loci),dtype=int)
 
     n = len(self.loci)
 
     for sampleid,genos,gcscores in self.samples:
       gc = array(gcscores,dtype=float)
-      samplestats.append( (sampleid, gc.mean(), gc.std()) )
+
+      mask = isfinite(gc)
+      gc[~mask] = 0
 
       # Track first two uncentered moments
       locusstats1 += gc
       locusstats2 += gc**2
 
+      # Track the number of finite values (in Python, False=0, True=1)
+      locuscounts += mask
+
+      gc = gc[mask]
+      samplestats.append( (sampleid, gc.mean(), gc.std()) )
+
       yield sampleid,genos,gcscores
 
     self.locusstats = []
     if samplestats:
-      m   = len(samplestats)
-      mu  = locusstats1/m
+      mu  = locusstats1/locuscounts
 
       # Compute std.dev from sqrt(E(X**2) - E(X)**2), with compensation for
       # the inherant numerical problems with the approach
-      var = locusstats2/m - mu**2
+      var = locusstats2/locuscounts - mu**2
       var[var < 0] = 0
       std = var**0.5
 
