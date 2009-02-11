@@ -12,7 +12,7 @@ from   types             import NoneType
 from   collections       import defaultdict
 from   itertools         import izip
 
-from   glu.lib.utils     import as_set
+from   glu.lib.utils     import as_set,is_str
 from   glu.lib.fileutils import namefile,get_arg,trybool,list_reader,map_reader,table_reader
 
 
@@ -70,6 +70,92 @@ def load_rename_alleles_file(filename):
     rename[lname] = locus_rename
 
   return rename
+
+
+def _union_options(opts):
+  '''
+  >>> _union_options(None)
+  >>> _union_options([])
+  >>> sorted(_union_options(':foo'))
+  ['foo']
+  >>> sorted(_union_options([[1]]))
+  [1]
+  >>> sorted(_union_options([[1,2,3]]))
+  [1, 2, 3]
+  >>> sorted(_union_options([[],[1,2,3]]))
+  [1, 2, 3]
+  >>> sorted(_union_options([[1,4],[1,2,3]]))
+  [1, 2, 3, 4]
+  >>> sorted(_union_options([[1,2,3],[1,2,3]]))
+  [1, 2, 3]
+  >>> sorted(_union_options([[1,2,3],[4,5,6]]))
+  [1, 2, 3, 4, 5, 6]
+  '''
+  if is_str(opts):
+    opts = [opts]
+
+  if not opts:
+    return None
+
+  results = set()
+  for item in opts:
+    if not isinstance(item, seq_type):
+      item = set(list_reader(item))
+    elif item is not None:
+      item = as_set(item)
+    results |= item
+
+  return results
+
+
+def _intersect_options(opts):
+  '''
+  >>> _intersect_options(None)
+  >>> _intersect_options([])
+  >>> sorted(_intersect_options(':foo'))
+  ['foo']
+  >>> sorted(_intersect_options([[1]]))
+  [1]
+  >>> sorted(_intersect_options([[1,2,3]]))
+  [1, 2, 3]
+  >>> sorted(_intersect_options([[],[1,2,3]]))
+  []
+  >>> sorted(_intersect_options([[1,4],[1,2,3]]))
+  [1]
+  >>> sorted(_intersect_options([[1,2,3],[1,2,3]]))
+  [1, 2, 3]
+  >>> sorted(_intersect_options([[1,2,3],[4,5,6]]))
+  []
+  '''
+  if is_str(opts):
+    opts = [opts]
+
+  if not opts:
+    return None
+
+  results = None
+  for item in opts:
+    if not isinstance(item, seq_type):
+      item = set(list_reader(item))
+    elif item is not None:
+      item = as_set(item)
+
+    if results is None:
+      results = item
+    else:
+      results &= item
+
+  return results
+
+
+def _get_opt(options,name):
+  return getattr(options,name,None)
+
+def _get_opt_union(options,name):
+  return _union_options(getattr(options,name,None))
+
+def _get_opt_intersect(options,name):
+  return _intersect_options(getattr(options,name,None))
 
 
 class GenoTransform(object):
@@ -135,16 +221,16 @@ class GenoTransform(object):
     @return: transformed genotriple stream
     @rtype : GenotripleStream
     '''
-    return GenoTransform(include_samples=getattr(options,'includesamples',None),
-                         exclude_samples=getattr(options,'excludesamples',None),
-                          rename_samples=getattr(options,'renamesamples', None),
-                           order_samples=getattr(options,'ordersamples',  None),
-                            include_loci=getattr(options,'includeloci',   None),
-                            exclude_loci=getattr(options,'excludeloci',   None),
-                             rename_loci=getattr(options,'renameloci',    None),
-                              order_loci=getattr(options,'orderloci',     None),
-                          rename_alleles=getattr(options,'renamealleles', None),
-                          filter_missing=getattr(options,'filtermissing', None))
+    return GenoTransform(include_samples=_get_opt_intersect(options,'includesamples'),
+                         exclude_samples=    _get_opt_union(options,'excludesamples'),
+                          rename_samples=          _get_opt(options,'renamesamples' ),
+                           order_samples=          _get_opt(options,'ordersamples'  ),
+                            include_loci=_get_opt_intersect(options,'includeloci'   ),
+                            exclude_loci=    _get_opt_union(options,'excludeloci'   ),
+                             rename_loci=          _get_opt(options,'renameloci'    ),
+                              order_loci=          _get_opt(options,'orderloci'     ),
+                          rename_alleles=          _get_opt(options,'renamealleles' ),
+                          filter_missing=          _get_opt(options,'filtermissing' ))
 
   @staticmethod
   def from_kwargs(extra_args=None,**kwargs):

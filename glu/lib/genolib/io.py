@@ -57,14 +57,14 @@ def geno_options(group,input=False,output=False,merge=False,filter=False,transfo
     group.add_option('--filtermissing', action='store_true', dest='filtermissing',
                       help='Filters out the samples or loci with missing genotypes')
 
-    group.add_option('--includesamples', dest='includesamples', metavar='FILE',
+    group.add_option('--includesamples', dest='includesamples', metavar='FILE', action='append',
                       help='List of samples to include')
-    group.add_option('--includeloci', dest='includeloci', metavar='FILE',
+    group.add_option('--includeloci', dest='includeloci', metavar='FILE', action='append',
                       help='List of loci to include')
 
-    group.add_option('--excludesamples', dest='excludesamples', metavar='FILE',
+    group.add_option('--excludesamples', dest='excludesamples', metavar='FILE', action='append',
                       help='List of samples to exclude')
-    group.add_option('--excludeloci', dest='excludeloci', metavar='FILE',
+    group.add_option('--excludeloci', dest='excludeloci', metavar='FILE', action='append',
                       help='List of loci to exclude')
 
   if transform:
