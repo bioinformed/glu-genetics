@@ -14,7 +14,7 @@ from   itertools           import izip
 
 import scipy.stats
 
-from   numpy               import zeros,isfinite
+from   numpy               import zeros,isfinite,hstack
 
 from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import GLogit,LinAlgError
@@ -156,6 +156,13 @@ def summary_header(options,null):
   return header
 
 
+def dump_model(filename,model):
+  f = table_writer(filename)
+  f.writerow(['pid','depvar']+model.vars)
+  for pid,x in zip(model.pids,hstack( [model.y,model.X] ).tolist()):
+    f.writerow( [pid]+x )
+
+
 def main():
   parser = option_parser()
   options,args = parser.parse_args()
@@ -186,6 +193,9 @@ def main():
   # Obtain estimates of covariate effects under the null
   null = GLogit(null_model.y,null_model.X,vars=null_model.vars)
   null.fit()
+
+  if 0:
+    dump_model('null.csv',null_model)
 
   if options.details:
     details.write('NULL MODEL:\n\n')
@@ -249,9 +259,7 @@ def main():
 
     # Design matrix debugging output
     if 0:
-      f = table_writer('%s.csv' % lname,dialect='csv')
-      f.writerow(model.vars)
-      f.writerows(model.X.tolist())
+      dump_model('%s.csv' % lname, model)
 
     # R model verfication debugging code
     if 0:

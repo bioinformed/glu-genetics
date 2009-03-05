@@ -677,6 +677,7 @@ def _load_loci(filename,options,keep):
     options.excludesamples = set(list_reader(options.excludesamples))
     keep -= options.excludesamples
 
+  loci = None
   if filename is not None:
     loci = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
                            genome=options.loci,phenome=options.pedigree,
@@ -692,8 +693,11 @@ def _load_loci(filename,options,keep):
     samples   = loci.samples if filename is not None else None
     fixedloci = fixedloci.transformed(include_samples=keep,order_samples=samples)
 
-  if filename is None:
-    return None,fixedloci,list(keep)
+  if fixedloci and loci:
+    assert fixedloci.samples == loci.samples
+
+  if loci is None:
+    return None,fixedloci,list(fixedloci.samples)
 
   loci        = loci.transformed(include_samples=keep)
   samples     = loci.samples
@@ -898,7 +902,7 @@ class BiallelicLocusModel(object):
 
 
 class LocusModel(object):
-  def __init__(self, formula, y, X, pheno, vars, loci, model_loci):
+  def __init__(self, formula, y, X, pheno, vars, loci, model_loci, pids):
     self.formula    = formula
     self.y          = y
     self.X          = X
@@ -906,6 +910,7 @@ class LocusModel(object):
     self.vars       = vars
     self.loci       = loci
     self.model_loci = model_loci
+    self.pids       = pids
 
 
 # FIXME: Needs docs+tests
@@ -998,6 +1003,7 @@ class LocusModelBuilder(object):
 
     X = []
     y = []
+    pids = []
     for row in self.phenos:
       pid  = row[0]
       stat = row[1]
@@ -1006,6 +1012,7 @@ class LocusModelBuilder(object):
       if None in effects:
         continue
 
+      pids.append(pid)
       y.append([stat])
       X.append(effects)
 
@@ -1027,7 +1034,7 @@ class LocusModelBuilder(object):
       if colcounts.min() < self.mingenos:
         return None
 
-    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci)
+    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci,pids)
 
 
 def variable_summary(out, x, categorical_limit=5, verbose=1):
