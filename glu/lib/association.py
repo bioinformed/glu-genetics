@@ -7,21 +7,22 @@ __revision__  = '$Id$'
 
 import sys
 
-from   math              import ceil,log
-from   itertools         import izip,chain
-from   collections       import defaultdict
-from   operator          import itemgetter
+from   math               import ceil,log
+from   itertools          import izip,chain
+from   collections        import defaultdict
+from   operator           import itemgetter
 
-from   numpy             import array,matrix,asarray,asanyarray,zeros, \
-                                exp,nan,abs,arange,median,inf,minimum
-from   scipy             import stats
+from   numpy              import array,matrix,asarray,asanyarray,zeros, \
+                                 exp,nan,abs,arange,median,inf,minimum
+from   scipy              import stats
 
-from   glu.lib.utils     import tally,as_set,is_str
-from   glu.lib.fileutils import namefile,list_reader,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
-                                parse_augmented_name,resolve_column_header_atom
-from   glu.lib.genolib   import load_genostream,pick
-from   glu.lib.formula   import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
-                                GENO,TREND,FormulaParser
+from   glu.lib.utils      import tally,as_set,is_str
+from   glu.lib.fileutils  import namefile,list_reader,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
+                                 parse_augmented_name,resolve_column_header_atom
+from   glu.lib.genolib    import load_genostream,pick
+from   glu.lib.genolib.transform import _union_options, _intersect_options
+from   glu.lib.formula    import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
+                                 GENO,TREND,FormulaParser
 
 
 LOGE_10 = log(10)
@@ -670,12 +671,10 @@ def create_all_categorical(header,phenos,categorical):
 
 def _load_loci(filename,options,keep):
   if options.includesamples:
-    options.includesamples = set(list_reader(options.includesamples))
-    keep &= options.includesamples
+    keep &= _union_options(options.includesamples)
 
   if options.excludesamples:
-    options.excludesamples = set(list_reader(options.excludesamples))
-    keep -= options.excludesamples
+    keep -= _intersect_options(options.excludesamples)
 
   loci = None
   if filename is not None:
@@ -690,7 +689,7 @@ def _load_loci(filename,options,keep):
                                 genome=options.loci,phenome=options.pedigree,
                                 transform=options).as_ldat()
     keep     &= set(fixedloci.samples)
-    samples   = loci.samples if filename is not None else None
+    samples   = loci.samples if loci is not None else None
     fixedloci = fixedloci.transformed(include_samples=keep,order_samples=samples)
 
   if fixedloci and loci:
@@ -1016,12 +1015,15 @@ class LocusModelBuilder(object):
       y.append([stat])
       X.append(effects)
 
-    y = matrix(y, dtype=float)
-    X = matrix(X, dtype=float)
+    if not y:
+      return None
 
     # Do not fit models with no contrast
-    if len(set(y.A.ravel())) < 2:
+    if len(set(i[0] for i in y)) < 2:
       return None
+
+    y = matrix(y, dtype=float)
+    X = matrix(X, dtype=float)
 
     if mingenos is None:
       mingenos = self.mingenos
