@@ -127,6 +127,7 @@ class GenotripleStream(GenotypeStream):
     assert isinstance(genome,Genome)
     assert phenome is not None
     assert isinstance(phenome,Phenome)
+    assert not materialized or isinstance(triples, (list,tuple))
 
     if order not in (None,'locus','sample'):
       raise ValueError('invalid GenotripleStream order specified')
@@ -655,7 +656,7 @@ class GenotripleStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
 
-    >>> ldat = triples.clone(triples,loci=['l1','l2'],samples=None).as_ldat(merge)
+    >>> ldat = triples.clone(list(triples),loci=['l1','l2'],samples=None).as_ldat(merge)
     >>> ldat.samples
     ('s1', 's2', 's3')
     >>> for row in ldat:
@@ -663,7 +664,7 @@ class GenotripleStream(GenotypeStream):
     ('l1', [('G', 'G'), ('G', 'T'), ('G', 'G')])
     ('l2', [('A', 'A'), ('T', 'T'), ('A', 'A')])
 
-    >>> ldat = triples.clone(triples,samples=['s1','s2','s3'],loci=None).as_ldat(merge)
+    >>> ldat = triples.clone(list(triples),samples=['s1','s2','s3'],loci=None).as_ldat(merge)
     >>> ldat.samples
     ('s1', 's2', 's3')
     >>> for row in ldat:
@@ -705,7 +706,7 @@ class GenotripleStream(GenotypeStream):
     ('s2', [('G', 'T'), ('T', 'T')])
     ('s3', [('G', 'G'), ('A', 'A')])
 
-    >>> sdat = triples.clone(triples,loci=['l1','l2'],samples=None).as_sdat(merge)
+    >>> sdat = triples.clone(list(triples),loci=['l1','l2'],samples=None).as_sdat(merge)
     >>> sdat.loci
     ('l1', 'l2')
     >>> sdat.samples
@@ -716,7 +717,7 @@ class GenotripleStream(GenotypeStream):
     ('s2', [('G', 'T'), ('T', 'T')])
     ('s3', [('G', 'G'), ('A', 'A')])
 
-    >>> sdat = triples.clone(triples,samples=['s1','s2','s3'],loci=None).as_sdat(merge)
+    >>> sdat = triples.clone(list(triples),samples=['s1','s2','s3'],loci=None).as_sdat(merge)
     >>> sdat.loci
     ('l1', 'l2')
     >>> sdat.samples
@@ -791,6 +792,7 @@ class GenomatrixStream(GenotypeStream):
     assert isinstance(genome,Genome)
     assert phenome is not None
     assert isinstance(phenome,Phenome)
+    assert not materialized or isinstance(genos, (list,tuple))
 
     if phenome is None:
       phenome = Phenome()
@@ -2986,7 +2988,7 @@ def filter_genotriples_missing(triples):
   >>> list(filter_genotriples_missing(triples))
   [('l2', 's2', ('A', 'T'))]
   '''
-  return triples.clone(ifilter(itemgetter(2), triples))
+  return triples.clone(ifilter(itemgetter(2), triples), materialized=False)
 
 
 def build_genotriples_from_genomatrix(genos):
@@ -3191,9 +3193,15 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
         for lname,model in triples.updates:
           new_lname = locusmap.get(lname,lname)
           new_loc   = new_genome.loci[new_lname]
-          assert new_loc.model.replaceable_by(model)
-          new_genome.loci[new_lname].model = model
-          updates.append( (new_lname,model) )
+          if not new_loc.model.replaceable_by(model):
+#            if not model.replaceable_by(new_loc.model):
+#              print '!!! Incompatible models for %s (%s) and %s (%s): %s >< %s' % (lname,model.alleles,
+#                                                                                   new_lname,new_loc.model.alleles,
+#                                                                                   model.genotypes,new_loc.model.genotypes)
+            assert model.replaceable_by(new_loc.model)
+          else:
+            new_genome.loci[new_lname].model = model
+            updates.append( (new_lname,model) )
 
         triples.updates[:] = []
 
@@ -3287,7 +3295,7 @@ def filter_genotriples(triples,sampleset,locusset,exclude=False):
   elif samples is None and sampleset is not None and not exclude:
     samples = sampleset
 
-  return triples.clone(_filter(),loci=loci,samples=samples,order=None)
+  return triples.clone(_filter(),loci=loci,samples=samples,order=None,materialized=False)
 
 
 def rename_genomatrixstream_column(genos,colmap,warn=False):

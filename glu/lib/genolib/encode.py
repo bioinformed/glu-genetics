@@ -99,7 +99,7 @@ def pack_genomatrixstream(genos):
   if not genos.columns:
     return genos.clone([],packed=True,samples=(),loci=(),models=[])
 
-  return genos.clone(_pack(genos),packed=True)
+  return genos.clone(_pack(genos),packed=True,materialized=False)
 
 
 def recode_genomatrixstream(genos, genome, warn=False):
