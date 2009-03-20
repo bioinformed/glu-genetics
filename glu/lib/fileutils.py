@@ -684,7 +684,7 @@ def list_reader(filename,extra_args=None,**kwargs):
   elif index is None:
     index = columns
 
-  items = table_reader(name, columns=[index], extra_args=args)
+  items = table_reader(name, columns=index, extra_args=args)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
