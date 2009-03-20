@@ -137,6 +137,9 @@ class BinaryGenomatrixWriter(object):
     compress = get_arg(args,['compress'],True)
     scratch  = int(get_arg(args,['scratch'],16*1024*1024))
 
+    self.ignoreloci   = trybool(get_arg(args,['ignoreloci']))
+    self.ignorephenos = trybool(get_arg(args,['ignorephenos']))
+
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
@@ -300,8 +303,8 @@ class BinaryGenomatrixWriter(object):
       samples = self.rowkeys
 
     models = [ self.genome.get_model(locus) for locus in loci ]
-    save_models(gfile, loci, self.genome, models, filters=self.filters)
-    save_phenos(gfile, samples, self.phenome, filters=self.filters)
+    save_models(gfile, loci, self.genome, models, filters=self.filters, ignoreloci=self.ignoreloci)
+    save_phenos(gfile, samples, self.phenome, filters=self.filters, ignorephenos=self.ignorephenos)
 
     self.rowkeys = self.header = self.genome = self.phenome = None
 
@@ -383,6 +386,9 @@ class BinaryGenotripleWriter(object):
 
     compress  = get_arg(args,['compress'],True)
     chunksize = int(get_arg(args,['chunksize'],232960))
+
+    self.ignoreloci   = trybool(get_arg(args,['ignoreloci']))
+    self.ignorephenos = trybool(get_arg(args,['ignorephenos']))
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -501,8 +507,8 @@ class BinaryGenotripleWriter(object):
     save_strings(gfile,'samples',samples,filters=self.filters)
     save_strings(gfile,'loci',   loci,   filters=self.filters)
 
-    save_models(gfile,loci,self.genome,models,filters=self.filters)
-    save_phenos(gfile,samples,self.phenome,filters=self.filters)
+    save_models(gfile,loci,self.genome,models,filters=self.filters, ignoreloci=self.ignoreloci)
+    save_phenos(gfile,samples,self.phenome,filters=self.filters, ignorephenos=self.ignorephenos)
 
     self.genome = self.phenome = None
 
@@ -675,7 +681,7 @@ def save_strings(gfile,name,data,filters=None,maxlen=None):
   a.flush()
 
 
-def save_models(gfile, loci, genome, models, filters=None):
+def save_models(gfile, loci, genome, models, filters=None, ignoreloci=False):
   '''
   Save the supplied list of models that correspond to specific genetic loci
   to an open HDF5 file instance
@@ -702,7 +708,7 @@ def save_models(gfile, loci, genome, models, filters=None):
   ad = allelemap.setdefault
   al = allelemap.__len__
 
-  chrmap   = {}
+  chrmap   = {None:0}
   modelmap = {}
 
   #####
@@ -730,14 +736,20 @@ def save_models(gfile, loci, genome, models, filters=None):
       for allele in model.alleles:
         ad(allele,al())
 
-    chr = chrmap.get(loc.chromosome)
-    if chr is None:
-      chr = chrmap[loc.chromosome] = len(chrmap)
-
     locus_row['model']      = index
-    locus_row['chromosome'] = chr
-    locus_row['location']   = loc.location if loc.location is not None else -1
-    locus_row['strand']     = STRANDMAP[loc.strand]
+
+    if not ignoreloci:
+      chr = chrmap.get(loc.chromosome)
+      if chr is None:
+        chr = chrmap[loc.chromosome] = len(chrmap)
+
+      locus_row['chromosome'] = chr
+      locus_row['location']   = loc.location if loc.location is not None else -1
+      locus_row['strand']     = STRANDMAP[loc.strand]
+    else:
+      locus_row['chromosome'] =  0
+      locus_row['location']   = -1
+      locus_row['strand']     =  0
 
     locus_row.append()
 
@@ -910,7 +922,7 @@ def load_models_v2(gfile,loci):
 #######################################################################################
 
 
-def save_phenos(gfile, samples, phenome, filters=None):
+def save_phenos(gfile, samples, phenome, filters=None, ignorephenos=False):
   '''
   Save the phenotypes associated with the specified list of samples to an
   open HDF5 file instance.  A series of table are created with the
@@ -956,7 +968,7 @@ def save_phenos(gfile, samples, phenome, filters=None):
                                              'basic phenotype data',
                                              filters=filters, expectedrows=len(samples))
 
-  if phenome:
+  if phenome and not ignorephenos:
     pheno_row = phenotypes.row
     for sampleid,sample in enumerate(samples):
       phenos = phenome.phenos.get(sample)
