@@ -12,7 +12,7 @@ Summary
 
 - Genotype data (ASCII text formats):
 
-  trip:
+  tdat:
     tab-delimited ASCII file containing a single sample, locus, and genotype per line
   ldat:
     tab-delimited ASCII file containing a matrix of genotypes with a locus per row and a sample per column
@@ -46,12 +46,12 @@ Summary
 Genotype data file format details
 =================================
 
-TRIP format
+tdat format
 -----------
 
-The GLU TRIP (genotriple) format is a tab-delimited ASCII format with
-exactly three columns of data and one row (line) of data per genotype to
-be stored.  Rows may appear in any order and no header line is allowed.
+The GLU genotype triple (tdat) format is a tab-delimited ASCII format with
+exactly three columns of data and one row (line) of data per genotype to be
+stored.  Rows may appear in any order and no header line is allowed.
 
 Columns:
 
@@ -73,7 +73,7 @@ Example::
   S3	rs12345	AT	
   S1	rs54321	AG
 
-*Note: TBAT format is the compressed binary version of TRIP format.*
+*Note: TBAT format is the compressed binary version of TDAT format.*
 
 
 LDAT format
