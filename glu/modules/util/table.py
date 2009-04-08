@@ -8,8 +8,6 @@ __revision__  = '$Id$'
 
 import sys
 
-from   itertools           import chain
-
 from   glu.lib.fileutils   import table_reader,table_writer
 from   glu.lib.association import create_all_categorical,subset_all_variables
 
@@ -45,6 +43,7 @@ def main():
   try:
     header = table.next()
   except StopIteration:
+    # Error?
     return
 
   if options.categorical:
@@ -53,7 +52,7 @@ def main():
   if options.includevar or options.excludevar:
     header,table = subset_all_variables(header,table,options.includevar,options.excludevar)
 
-  table = chain([header],table)
+  out.writerow(header)
   out.writerows(table)
 
 

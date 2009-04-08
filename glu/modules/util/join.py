@@ -9,10 +9,11 @@ __revision__  = '$Id$'
 
 import sys
 
-from   collections       import defaultdict
+from   collections         import defaultdict
 
-from   glu.lib.utils     import pick,unique
-from   glu.lib.fileutils import table_reader,tryint1,table_writer,resolve_column_headers
+from   glu.lib.utils       import pick,unique
+from   glu.lib.fileutils   import table_reader,tryint1,table_writer,resolve_column_headers
+from   glu.lib.association import create_all_categorical,subset_all_variables
 
 
 def option_parser():
@@ -37,6 +38,12 @@ def option_parser():
                     help='Require that rows with valid keys from table2 are unique')
   parser.add_option('-j', '--join', dest='join', default='left',
                     help="Join type: 'left' (default) or 'inner'")
+  parser.add_option('-c', '--categorical', dest='categorical', metavar='VAR', action='append',
+                    help='Create indicator variables based on values of VAR')
+  parser.add_option('--includevar', dest='includevar', metavar='VAR=VAL', action='append',
+                    help='Include only records with variable VAR equal to VAL')
+  parser.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
+                    help='Exclude all records with variable VAR equal to VAL')
 
   return parser
 
@@ -244,8 +251,22 @@ def main():
   table  = left_join(table1,table2,key1=options.key1,key2=options.key2,
                     unique=options.unique,inner=(join_type=='inner'),
                     prefix1=options.prefix1,prefix2=options.prefix2)
-  out    = table_writer(options.output,hyphen=sys.stdout)
 
+  try:
+    header = table.next()
+  except StopIteration:
+    # Error?
+    return
+
+  if options.categorical:
+    header,table = create_all_categorical(header,table,options.categorical)
+
+  if options.includevar or options.excludevar:
+    header,table = subset_all_variables(header,table,options.includevar,options.excludevar)
+
+  out = table_writer(options.output,hyphen=sys.stdout)
+
+  out.writerow(header)
   out.writerows(table)
 
 
