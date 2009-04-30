@@ -12,8 +12,7 @@ import sys
 from   collections         import defaultdict
 
 from   glu.lib.utils       import pick,unique
-from   glu.lib.fileutils   import table_reader,tryint1,table_writer,resolve_column_headers
-from   glu.lib.association import create_all_categorical,subset_all_variables
+from   glu.lib.fileutils   import table_reader,tryint1,table_writer,resolve_column_headers,cook_table
 
 
 def option_parser():
@@ -44,6 +43,8 @@ def option_parser():
                     help='Include only records with variable VAR equal to VAL')
   parser.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
                     help='Exclude all records with variable VAR equal to VAL')
+  parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
+                    help='Sort rows based on values in column VAR')
 
   return parser
 
@@ -252,21 +253,10 @@ def main():
                     unique=options.unique,inner=(join_type=='inner'),
                     prefix1=options.prefix1,prefix2=options.prefix2)
 
-  try:
-    header = table.next()
-  except StopIteration:
-    # Error?
-    return
+  out   = table_writer(options.output,hyphen=sys.stdout)
 
-  if options.categorical:
-    header,table = create_all_categorical(header,table,options.categorical)
+  table = cook_table(table,options)
 
-  if options.includevar or options.excludevar:
-    header,table = subset_all_variables(header,table,options.includevar,options.excludevar)
-
-  out = table_writer(options.output,hyphen=sys.stdout)
-
-  out.writerow(header)
   out.writerows(table)
 
 

@@ -8,8 +8,7 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils   import table_reader,table_writer
-from   glu.lib.association import create_all_categorical,subset_all_variables
+from   glu.lib.fileutils   import table_reader,table_writer,cook_table
 
 
 def option_parser():
@@ -24,6 +23,8 @@ def option_parser():
                     help='Include only records with variable VAR equal to VAL')
   parser.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
                     help='Exclude all records with variable VAR equal to VAL')
+  parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
+                    help='Sort rows based on values in column VAR')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
   return parser
@@ -40,19 +41,8 @@ def main():
   table = table_reader(args[0],hyphen=sys.stdin,want_header=True)
   out   = table_writer(options.output,hyphen=sys.stdout)
 
-  try:
-    header = table.next()
-  except StopIteration:
-    # Error?
-    return
+  table = cook_table(table,options)
 
-  if options.categorical:
-    header,table = create_all_categorical(header,table,options.categorical)
-
-  if options.includevar or options.excludevar:
-    header,table = subset_all_variables(header,table,options.includevar,options.excludevar)
-
-  out.writerow(header)
   out.writerows(table)
 
 

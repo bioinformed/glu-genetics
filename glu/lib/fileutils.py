@@ -8,14 +8,17 @@ __revision__  = '$Id$'
 import os
 import csv
 
-from   itertools     import islice,izip
+from   operator      import itemgetter
+from   itertools     import islice,izip,chain
 
-from   glu.lib.utils import is_str,peekfirst,deprecated_by
+from   glu.lib.utils import is_str,as_set,peekfirst,deprecated_by
 
 
 __all__ = ['autofile','namefile','hyphen',
            'guess_format','related_file','guess_related_file',
-           'list_reader', 'map_reader', 'table_reader', 'table_writer']
+           'list_reader', 'map_reader', 'table_reader', 'table_writer',
+           'cook_table', 'sort_table', 'subset_variables',
+           'create_categorical_variables']
 
 
 TABLE_FORMATS = set(['xls','csv'])
@@ -397,6 +400,42 @@ def parse_augmented_filename(filename,args):
       args[kv[0]] = kv[1]
 
   return filename
+
+
+def tryfloat(n):
+  '''
+  Try to coerce an arbitrary object to a float, otherwise return the
+  original value.  Existing integer objects are returned as-is without
+  converstion to a floating point value.
+
+  @param s: arbitrary item
+  @type  s: object
+  @return : integer coerced value or the orginal value
+  @rtype  : float or object
+
+  >>> tryfloat(1)
+  1
+  >>> tryfloat(1.65)==1.65
+  True
+  >>> tryfloat(1L)
+  1L
+  >>> tryfloat(None)
+  >>> tryfloat('1e-1')==1e-1
+  True
+  >>> tryfloat(' 1.2 ')
+  1.2
+  >>> tryfloat([1,2,3])
+  [1, 2, 3]
+  '''
+  if n is None:
+    return None
+  elif isinstance(n, (int,long,float)):
+    return n
+
+  try:
+    return float(n)
+  except (TypeError,ValueError):
+    return n
 
 
 def tryint(s):
@@ -1816,6 +1855,376 @@ try:
 except ImportError:
   def ExcelWriter(filename, sheet=None):
     raise ValueError('Missing xlwt module to write Microsoft Excel file')
+
+
+def cook_table(table, options):
+  '''
+  Create categorical variables, subset and sort table
+  '''
+  vars = ['categorical','includevar','excludevar','sort']
+
+  if not any(getattr(options,var) for var in vars):
+    return table
+
+  table = iter(table)
+
+  try:
+    header = table.next()
+  except StopIteration:
+    return []
+
+  if getattr(options,'categorical',None):
+    header,table = create_categorical_variables(header,table,options.categorical)
+
+  if getattr(options,'includevar',None) or getattr(options,'excludevar',None):
+    header,table = subset_variables(header,table,options.includevar,options.excludevar)
+
+  if getattr(options,'sort',None):
+    header,table = sort_table(header,table,options.sort)
+
+  return chain([header],table)
+
+
+def sort_table(header, table, keys):
+  '''
+  Sort a table based on one or more keys
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['3','M','-9' ],
+  ...           ['2','F','9e9' ],
+  ...           ['1','?','abc']]
+
+  >>> h,d = sort_table(header,data,'a')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', '?', 'abc']
+  ['2', 'F', '9e9']
+  ['3', 'M', '-9']
+
+  >>> h,d = sort_table(header,data,['b','a'])
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', '?', 'abc']
+  ['2', 'F', '9e9']
+  ['3', 'M', '-9']
+
+  >>> h,d = sort_table(header,data,'c,a')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['1', '?', 'abc']
+  '''
+  if is_str(keys):
+    keys = [keys]
+
+  indices  = []
+  for key in keys:
+    indices.extend(resolve_column_headers(header, key))
+
+  if not indices:
+    return header,table
+
+  get_inds = itemgetter(*indices)
+
+  def get_keys(item):
+    return map(tryfloat, get_inds(item))
+
+  return header,sorted(table,key=get_keys)
+
+
+def subset_variable(header,data,variable,include=None,exclude=None):
+  '''
+  Subset rows of a table based on inclusion and exclusion criteria for a single variable
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = subset_variable(header,data,'a',include='1')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+
+  >>> h,d = subset_variable(header,data,'b',exclude='?')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = subset_variable(header,data,'c',include='')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+  '''
+  index = resolve_column_header_atom(header,variable)
+
+  if include is not None and exclude is not None:
+    include = as_set(include)-as_set(exclude)
+    exclude = None
+
+  if include is not None:
+    def _subset():
+      for row in data:
+        if row[index] in include:
+          yield row
+
+  elif exclude is not None:
+    def _subset():
+      for row in data:
+        if row[index] not in exclude:
+          yield row
+  else:
+    return header,data
+
+  return header,_subset()
+
+
+def subset_variables(header,data,include=None,exclude=None):
+  '''
+  Subset rows of a table based on inclusion and exclusion criteria for one or more variables
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = subset_variables(header,data,include='a=1,2')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = subset_variables(header,data,exclude='b=?')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = subset_variables(header,data,include='c')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', '?', '1']
+
+  >>> h,d = subset_variables(header,data,include='c=')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = subset_variables(header,data,exclude='c')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = subset_variables(header,data,exclude='c=')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', '?', '1']
+  '''
+  if is_str(include):
+    include = [include]
+  else:
+    include = include or []
+
+  if is_str(exclude):
+    exclude = [exclude]
+  else:
+    exclude = exclude or []
+
+  for invar in include:
+    if '=' not in invar:
+      header,data = subset_variable(header,data,invar,exclude='')
+    else:
+      var,values = invar.split('=',1)
+      values = set(v.strip() for v in values.split(','))
+      header,data = subset_variable(header,data,var,include=values)
+
+  for exvar in exclude:
+    if '=' not in exvar:
+      header,data = subset_variable(header,data,exvar,include='')
+    else:
+      var,values = exvar.split('=',1)
+      values = set(v.strip() for v in values.split(','))
+      header,data = subset_variable(header,data,var,exclude=values)
+
+  return header,data
+
+
+def create_categorical_variable(header,data,variable,prefix=None,ref=None,include=None,exclude=None,
+                              yes='1',no='0',missing=''):
+  '''
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = create_categorical_variable(header,data,'a')
+  >>> h
+  ['a', 'b', 'c', 'a_1', 'a_2', 'a_3']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '1', '0', '0']
+  ['2', 'F', '', '0', '1', '0']
+  ['3', '?', '1', '0', '0', '1']
+
+  >>> h,d = create_categorical_variable(header,data,'a',ref=['1'])
+  >>> h
+  ['a', 'b', 'c', 'a_2', 'a_3']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '0', '0']
+  ['2', 'F', '', '1', '0']
+  ['3', '?', '1', '0', '1']
+
+  >>> h,d = create_categorical_variable(header,data,'b',prefix='',exclude=['?'],yes='Y',no='N')
+  >>> h
+  ['a', 'b', 'c', 'F', 'M']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', 'N', 'Y']
+  ['2', 'F', '', 'Y', 'N']
+  ['3', '?', '1', '', '']
+
+  >>> h,d = create_categorical_variable(header,data,'c',ref='1')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+  ['3', '?', '1']
+
+  >>> h,d = create_categorical_variable(header,data,'c',exclude='1')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+  ['3', '?', '1']
+  '''
+  index = resolve_column_header_atom(header,variable)
+  if include is not None and exclude is not None:
+    include = as_set(include)-as_set(exclude)
+    exclude = None
+
+  if not isinstance(data,(tuple,list)):
+    data = list(data)
+
+  values = set(row[index] for row in data if len(row)>=index)
+  values.discard('')
+
+  if include is not None:
+    values &= as_set(include)
+  if exclude is not None:
+    values -= as_set(exclude)
+
+  if prefix is None:
+    prefix = '%s_' % variable
+
+  if ref is None:
+    ref = set()
+  else:
+    ref = as_set(ref)
+
+  values = sorted(values-ref)
+
+  if not values:
+    return header,data
+
+  header = header + [ '%s%s' % (prefix,value) for value in sorted(values) ]
+  values = dict( (v,i) for i,v in enumerate(values) )
+
+  def _make_category():
+    n = len(values)
+    missingrow = [missing]*n
+    for row in data:
+      if index>=len(row):
+        yield row+missingrow
+        continue
+
+      val = row[index]
+      cats = [no]*n
+      if val in values:
+        cats[ values[val] ] = yes
+      elif val not in ref:
+        cats = missingrow
+
+      yield row+cats
+
+  return header,_make_category()
+
+
+def create_categorical_variables(header,phenos,categorical):
+  '''
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = create_categorical_variables(header,data,['a'])
+  >>> h
+  ['a', 'b', 'c', 'a_1', 'a_2', 'a_3']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '1', '0', '0']
+  ['2', 'F', '', '0', '1', '0']
+  ['3', '?', '1', '0', '0', '1']
+
+  >>> h,d = create_categorical_variables(header,data,['a','b:ref=M:prefix=:exclude=?','c:exclude=1:yes=Y:no=N'])
+  >>> h
+  ['a', 'b', 'c', 'a_1', 'a_2', 'a_3', 'F']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '1', '0', '0', '0']
+  ['2', 'F', '', '0', '1', '0', '1']
+  ['3', '?', '1', '0', '0', '1', '']
+  '''
+  allowed_args = set(['prefix','ref','include','exclude','missing','yes','no'])
+
+  for cat in categorical:
+    opts = {}
+    var  = parse_augmented_name(cat,opts)
+
+    illegal = set(opts) - allowed_args
+    if illegal:
+      raise ValueError('Illegal argument(s) to categorical: %s' % ','.join(sorted(illegal)))
+
+    for arg,val in opts.items():
+      if arg in ('ref','include','exclude'):
+        opts[arg] = set(v.strip() for v in val.split(','))
+
+    header,phenos = create_categorical_variable(header,phenos,var,**opts)
+
+  return header,phenos
 
 
 def _test():
