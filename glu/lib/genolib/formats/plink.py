@@ -836,7 +836,16 @@ def load_plink_bim(filename,genome):
     model = modelcache.get(key)
     if model is None:
       a,b = allele1,allele2
-      model = modelcache[key] = build_model(genotypes=[(a,a),(b,b),(a,b)],max_alleles=2)
+      if a and b:
+        genos = [(a,a),(b,b),(a,b)]
+      elif a:
+        genos = [(a,a)]
+      elif b:
+        raise RuntimeError('Invalid BIM locus model: (%s/%s)' % (a,b))
+      else:
+        genos = []
+
+      model = modelcache[key] = build_model(genotypes=genos,max_alleles=2)
 
     genome.merge_locus(locus, model, chr, pdist)
 
