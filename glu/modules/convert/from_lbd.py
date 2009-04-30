@@ -12,7 +12,7 @@ import csv
 from   operator                  import itemgetter,getitem
 from   itertools                 import islice,chain,imap,izip,groupby,repeat
 
-from   numpy                     import array,zeros,isfinite
+from   numpy                     import array,zeros,isfinite,nan
 
 from   glu.lib.utils             import izip_exact, is_str
 from   glu.lib.fileutils         import autofile,table_reader,table_writer
@@ -58,8 +58,11 @@ def load_lbd_file(filename,options):
       if sampleid == 'blank':
         continue
 
-      genos  = genos[8:]
-      scores = map(float,islice(scores,8,None))
+      genos = genos[8:]
+      try:
+        scores = map(float,islice(scores,8,None))
+      except ValueError:
+        scores = [ float(s) if s!='NaN' else nan for s in scores ]
 
       yield sampleid,genos,scores
 
@@ -113,13 +116,14 @@ def load_illumina_manifest(filename):
       break
 
   format = attrs['Assay Format']
-  # OPA manifest
+
+  # Old style OPA manifest
   if format == 'Golden Gate':
     pass
 
-  # Infinium
-  # Known formats: Infinium,Infinium II,Infinium 2,Infinium HD Super
-  elif format.startswith('Infinium'):
+  # Infinium or new Golden Gate
+  # Known formats: Infinium,Infinium II,Infinium 2,Infinium HD Super,GoldenGate
+  elif format.startswith('Infinium') or format == 'GoldenGate':
     heading,contents = sections.next()
     assert heading == 'Assay'
   else:
