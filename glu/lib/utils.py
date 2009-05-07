@@ -10,7 +10,7 @@ __revision__  = '$Id$'
 
 __all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumerate','pick',
            'peekfirst','groups','unique','izip_exact','deprecated','deprecated_by',
-           'gcdisabled']
+           'gcdisabled','chunk']
 
 import gc
 import array
@@ -18,7 +18,7 @@ import warnings
 import collections
 
 from   functools import update_wrapper
-from   itertools import izip, count, chain
+from   itertools import izip, count, chain, islice, repeat
 
 
 def as_set(items):
@@ -481,6 +481,29 @@ class gcdisabled(object):
   def __exit__(self, type, value, traceback):
     if self.isenabled:
       gc.enable()
+
+
+def chunk(iterable, size, **kwargs):
+  '''
+  Generator that breaks an iterable into tuples of chunks (tuples) of a
+  given size.  The optional keyword parameter 'pad' if the last block is
+  padded with a given value or returned as-is if smaller than a full
+  chunk.
+
+  >>> list(chunk(xrange(7), 3))
+  [(0, 1, 2), (3, 4, 5), (6,)]
+  >>> list(chunk(xrange(7), 3, pad=None))
+  [(0, 1, 2), (3, 4, 5), (6, None, None)]
+  '''
+  iterable = iter(iterable)
+  pad = kwargs.get('pad')
+  while True:
+    block = tuple(islice(iterable,size))
+    if not block:
+        break
+    if len(block) < size and 'pad' in kwargs:
+      block = tuple(chain(block, repeat(pad, size-len(block))))
+    yield block
 
 
 def _test():

@@ -10,11 +10,11 @@ import sys
 import csv
 
 from   operator                  import itemgetter,getitem
-from   itertools                 import islice,chain,imap,izip,groupby,repeat
+from   itertools                 import islice,chain,imap,izip,repeat
 
 from   numpy                     import array,zeros,isfinite,nan
 
-from   glu.lib.utils             import izip_exact, is_str
+from   glu.lib.utils             import izip_exact, is_str, chunk
 from   glu.lib.fileutils         import autofile,table_reader,table_writer
 from   glu.lib.sections          import read_sections
 from   glu.lib.sequence          import norm_snp_seq,complement_base
@@ -43,26 +43,25 @@ def load_lbd_file(filename,options):
     for i in xrange(n):
       data.next()
 
-  def sample_generator():
-    for key,rows in groupby(data,itemgetter(0,1,2,3,4)):
-      rows = list(rows)
-      assert len(rows) == 2
-      genos,scores = rows
+  def sample_generator(sopts):
+    for genos,scores in chunk(data,2):
+      assert genos[:6] == scores[:6]
       assert  genos[6] == 'calls'
       assert scores[6] == 'Score_Call'
 
       sampleid = genos[0]
 
-      # FIXME: Why do we have blanks?  Is this a local artifact or an
-      # Illumina one?
-      if sampleid == 'blank':
+      if sopts.include is not None and sampleid not in sopts.include:
+        continue
+
+      if sopts.exclude is not None and sampleid     in sopts.exclude:
         continue
 
       genos = genos[8:]
       try:
-        scores = map(float,islice(scores,8,None))
+        scores = array(scores[8:],dtype=float)
       except ValueError:
-        scores = [ float(s) if s!='NaN' else nan for s in scores ]
+        scores = array( [ float(s) if s!='NaN' else nan for s in scores[8:] ] )
 
       yield sampleid,genos,scores
 
@@ -73,13 +72,7 @@ def load_lbd_file(filename,options):
   skiprows(3)
   loci    = parse_loci()
   skiprows(5)
-  samples = sample_generator()
-
-  if options.samples.include is not None:
-    samples = (s for s in samples if s[0]     in options.samples.include)
-
-  if options.samples.exclude is not None:
-    samples = (s for s in samples if s[0] not in options.samples.exclude)
+  samples = sample_generator(options.samples)
 
   assert len(gentrain) == len(loci)
 
@@ -286,7 +279,9 @@ def filter_gc(samples, gcthreshold):
   that threshold are set to missing
   '''
   for sampleid,genos,gcscores in samples:
-    genos = [ (g if gc>gcthreshold else 'U') for g,gc in izip(genos,gcscores) ]
+    indices = gcscores<=gcthreshold
+    for i in indices:
+      genos[i] = 'U'
     yield sampleid,genos,gcscores
 
 
