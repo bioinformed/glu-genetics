@@ -189,7 +189,7 @@ def main():
 
   if len(args) != 1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   # Include lists are used to communicate the universe of attempted samples/loci
   # Any not observed in the genotype data are classified as "missing"

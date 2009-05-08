@@ -90,7 +90,7 @@ def main():
 
   if not args:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   subset  = set()
   exclude = set()

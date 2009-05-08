@@ -407,7 +407,7 @@ def main():
 
   if len(args) != 1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   regions = None
   if options.regions:

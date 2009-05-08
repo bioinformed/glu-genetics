@@ -324,7 +324,7 @@ def main():
 
   if len(args) < 2:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   # Load equivalence maps as many-to-many mappings between final reference
   # names and final comparison names.  Since we match comparison to reference,

@@ -92,7 +92,7 @@ def main():
 
   if len(args)!=1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   con  = open_genedb(options.genedb)
   rows = table_reader(args[0],want_header=True,hyphen=sys.stdin)

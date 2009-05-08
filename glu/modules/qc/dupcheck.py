@@ -87,7 +87,7 @@ def main():
 
   if len(args) != 1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   expected_dupset = union_find()
   observed_dupset = union_find()

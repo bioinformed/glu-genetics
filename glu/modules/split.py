@@ -450,7 +450,7 @@ def main():
 
   if len(args) != 1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   filename = options.template if options.template else args[0]
 

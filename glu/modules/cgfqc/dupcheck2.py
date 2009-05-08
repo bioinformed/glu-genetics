@@ -330,7 +330,7 @@ def main():
 
   if len(args) != 1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   print >> sys.stderr, 'Loading genotype data...'
   merger   = get_genomerger(options.merge)

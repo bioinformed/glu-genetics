@@ -148,7 +148,7 @@ def main():
 
   if len(args) not in (1,2):
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   phenos = args[0]
   genos  = args[1] if len(args)==2 else None

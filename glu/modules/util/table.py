@@ -36,7 +36,7 @@ def main():
 
   if len(args) != 1:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   table = table_reader(args[0],hyphen=sys.stdin,want_header=True)
   out   = table_writer(options.output,hyphen=sys.stdout)

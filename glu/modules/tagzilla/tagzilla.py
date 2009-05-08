@@ -2143,7 +2143,7 @@ def main():
 
   if not args:
     parser.print_help(sys.stdout)
-    return
+    sys.exit(2)
 
   pops = len(get_populations(options.multipopulation))
 

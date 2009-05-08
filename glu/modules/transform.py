@@ -50,12 +50,12 @@ def main():
 
   if not args:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   if not options.output:
     parser.print_help(sys.stderr)
     sys.stderr.write('Error: Must specify output file\n')
-    return
+    sys.exit(2)
 
   infiles = sorted(set(args))
   merger  = get_genomerger(options.merge, bool(options.samplemerge or options.locusmerge))

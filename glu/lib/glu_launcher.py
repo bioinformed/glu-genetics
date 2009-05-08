@@ -148,6 +148,10 @@ def option_parser():
   return parser
 
 
+def write_traceback():
+  sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
+
+
 def main():
   parser = option_parser()
   glu_options,args = parser.parse_args()
@@ -160,7 +164,7 @@ def main():
     sys.stderr.write('\nFor information on how to get started run the "intro" module,\n'
                      'usually as "glu intro".  For a list of available modules run\n'
                      '"glu list".\n\n')
-    return
+    return 2
 
   if glu_options.gcstats:
     gc.set_debug(gc.DEBUG_STATS)
@@ -175,6 +179,8 @@ def main():
   if glu_options.stats:
     cstart = time.clock()
     tstart = time.time()
+
+  ret = 0
 
   try:
     loader = pkgutil.get_loader(module_fullname)
@@ -204,45 +210,65 @@ def main():
 
   except ModuleMissingError:
     sys.stderr.write('Unable to find module %s.  Please verify the module name and try again.\n' % module_name)
-    return
+    return 1
 
   except KeyboardInterrupt:
     sys.stderr.write('\n[%s] Execution aborted by user\n' % time.asctime())
 
     if glu_options.verbose:
-      sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
+      write_traceback()
+
+    ret = 1
 
   except GLUError, e:
     sys.stderr.write('\n%s\n\n[%s] Execution aborted due to reported error\n' % (e,time.asctime()))
 
     if glu_options.verbose:
-      sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
+      write_traceback()
+
+    ret = 1
 
   except IOError, e:
     sys.stderr.write('\n%s\n\n[%s] Execution aborted due to input/output error\n' % (e,time.asctime()))
 
     if glu_options.verbose:
-      sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
+      write_traceback()
 
-  except SystemExit:
-    pass
+    ret = 1
 
-  except:
-    sys.stderr.write('''
+  except SystemExit, e:
+    ret = e.code
+
+  except BaseException, e:
+    ret = 1
+
+    if not glu_options.verbose:
+      sys.stderr.write('''
+Execution aborted due to a problem with the program input, parameters
+supplied, an error in the program.  Please examine the error message below.
+If the cause of the error is not clear, re-run your command with 'glu -v'
+for more information.
+
+Error: %s
+''' % e)
+
+    else:
+      sys.stderr.write('''
 Execution aborted due to a problem with the program input, parameters
 supplied, an error in the program.  Please examine the following failure
 trace for clues as to what may have gone wrong.  When in doubt, please send
 this message and a complete description of the analysis you are attempting
 to perform to the software developers.
 
+Error: %s
+
 Command line:
   %s
+''' % (e, ' '.join(sys.argv)))
 
-Traceback:
-  %s
+      write_traceback()
 
-[%s] Execution aborted due to unhandled error
-''' % (' '.join(sys.argv),traceback.format_exc().replace('\n','\n  '),time.asctime()))
+    sys.stderr.write('\n[%s] Execution aborted due to a fatal error\n' % time.asctime())
 
   else:
     if glu_options.stats:
@@ -253,6 +279,8 @@ Traceback:
                                                               format_elapsed_time(time.time()  - tstart),
                                                               format_elapsed_time(time.clock() - cstart)))
 
+  return ret
+
 
 if __name__ == '__main__':
-  main()
+  sys.exit(main())

@@ -240,7 +240,7 @@ def main():
 
   if len(args) != 2:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   join_type = options.join.lower()
   if join_type not in ('left','inner'):

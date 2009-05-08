@@ -366,13 +366,14 @@ def main():
 
   if len(args) != 2:
     parser.print_help(sys.stderr)
-    return
+    sys.exit(2)
 
   con    = open_genedb(options.genedb)
   outdir = args[0]
 
   if not os.path.isdir(outdir):
     sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % outdir)
+    sys.exit(1)
 
   taskfile   = table_reader(args[1])
   header     = taskfile.next()

@@ -8,6 +8,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
+import os
+
 from   glu.lib.utils             import is_str
 from   glu.lib.fileutils         import namefile, parse_augmented_filename, get_arg
 
@@ -144,6 +146,8 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
     if is_str(hyphen):
       raise ValueError('a file object must be supplied for hyphen redirection')
     filename = hyphen
+  elif is_str(filename) and not os.path.isfile(filename):
+    raise IOError('No such file: %s' % filename)
 
   if format is None:
     format = guess_informat(filename)
