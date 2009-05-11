@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __abstract__  = 'GLU genotype data management objects'
-__copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
@@ -2869,7 +2869,8 @@ def rename_genotriples_alleles(triples, rename_alleles):
     for sample,locus,geno in triples:
       if locus in rename_alleles:
         remap = rename_alleles[locus]
-        geno  = (remap[geno[0]],remap[geno[1]])
+        g1,g2 = geno
+        geno  = (remap.get(g1,g1),remap.get(g2,g2))
       else:
         geno  = geno.alleles()
       yield sample,locus,geno
