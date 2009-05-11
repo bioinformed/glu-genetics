@@ -11,7 +11,7 @@ Requires:      Python 2.5, glu
 
 Revision:      $Id$
 
-Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.
+Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.
 See GLU license for terms by running: glu license
 */
 
@@ -1393,7 +1393,7 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 	if(!UnphasedMarkerModel_CheckExact(model))
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
-			return NULL;
+		return NULL;
 	}
 
 	offset1 = offsets[i];
@@ -1409,10 +1409,13 @@ genoarray_inner_get(PyObject *models, const unsigned char *data, Py_ssize_t data
 
 	geno = PyList_GetItem(model->genotypes, k); /* borrowed ref */
 
-	/* FIXME: Handle index error for better error message */
+	if(!geno)
+	{
+		PyErr_SetString(GenotypeRepresentationError, "Invalid genotype encoding");
+		return NULL;
+	}
 
-	Py_XINCREF(geno);
-
+	Py_INCREF(geno);
 	return geno;
 }
 
@@ -1609,6 +1612,41 @@ genoarray_subscript(GenotypeArrayObject *self, PyObject *item)
 		PyErr_SetString(PyExc_TypeError, "indices must be integers, slices, or lists of integers");
 		return NULL;
 	}
+}
+
+static int
+genoarray_check_encoding(GenotypeArrayObject *self)
+{
+	Py_ssize_t n, i;
+
+	n = genoarray_length(self);
+
+	if(n<0)
+	{
+		PyErr_Clear();
+		return -1;
+	}
+
+	for(i=0; i<n; ++i)
+	{
+		PyObject *geno = genoarray_item(self, i);
+		if(!geno)
+		{
+			PyErr_Clear();
+			return -1;
+		}
+		Py_DECREF(geno);
+	}
+	return 0;
+}
+
+static PyObject *
+genoarray_check_encoding_py(GenotypeArrayObject *self)
+{
+	if(genoarray_check_encoding(self) < 0)
+		Py_RETURN_FALSE;
+	else
+		Py_RETURN_TRUE;
 }
 
 static inline int
@@ -1882,18 +1920,25 @@ genoarray_data_set(GenotypeArrayObject *self, PyObject *new_data, void *closure)
 
 	if(!PyArray_CheckExact(new_data))
 	{
-		PyErr_SetString(PyExc_TypeError,"new data must be ndarray type");
+		PyErr_SetString(PyExc_TypeError,"binary data must be ndarray type");
 		return -1;
 	}
 
 	if(PyArray_NBYTES(new_data) != self->descriptor->byte_size)
 	{
-		PyErr_Format(PyExc_ValueError,"new data must be same size as current (%zd != %d)",
+		PyErr_Format(PyExc_ValueError,"binary data must be same size as current (%zd != %d)",
 		                               PyArray_NBYTES(new_data), self->descriptor->byte_size);
 		return -1;
 	}
 
 	memcpy(self->data, PyArray_DATA(new_data), self->descriptor->byte_size);
+
+	if(genoarray_check_encoding(self) < 0)
+	{
+		PyErr_SetString(GenotypeRepresentationError, "binary data contains invalid genotypes");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -2267,6 +2312,8 @@ static PyMethodDef genoarray_methods[] = {
 		"Return an array of counts by genotype category"},
 	{"tolist", (PyCFunction)genoarray_tolist, METH_NOARGS,
 		"Return a list of genotypes"},
+	{"check_encoding", (PyCFunction)genoarray_check_encoding_py, METH_NOARGS,
+		"Check genotype encoding to verify it matches the supplied descriptor"},
 	{"__getitem__", (PyCFunction)genoarray_subscript, METH_O|METH_COEXIST, getitem_doc},
 	{NULL,		NULL}		/* sentinel */
 };

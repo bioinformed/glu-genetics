@@ -3,7 +3,7 @@
 from __future__ import with_statement
 
 __abstract__  = 'Genotype storage formats based on a Bit-packed binary representation'
-__copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
@@ -211,7 +211,10 @@ class BinaryGenomatrixWriter(object):
 
     assert self.state == OPEN
 
-    # FIXME: Check schema constraints!!!
+    # Verify encoding invariants (for safety: this should not be necessary)
+    if not genos.check_encoding():
+      raise ValueError('Invalid genotype encoding for %s' % rowkey)
+
     self.rowkeys.append(rowkey)
     chunk = self.chunk
     chunk.append(genos.data)
@@ -247,9 +250,12 @@ class BinaryGenomatrixWriter(object):
     rowkeys = self.rowkeys
     chunk   = self.chunk
 
-    # FIXME: Check schema constraints!!!
     if self.format == 'sbat':
       for rowkey,genos in rows:
+        # Verify encoding invariants (for safety: this should not be necessary)
+        if not genos.check_encoding():
+          raise ValueError('Invalid genotype encoding for sample %s' % rowkey)
+
         rowkeys.append(rowkey)
         chunk.append(genos.data)
         if len(chunk) >= self.chunkrows:
@@ -258,6 +264,10 @@ class BinaryGenomatrixWriter(object):
 
     elif self.format == 'lbat':
       for rowkey,genos in rows:
+        # Verify encoding invariants (for safety: this should not be necessary)
+        if not genos.check_encoding():
+          raise ValueError('Invalid genotype encoding for locus %s' % rowkey)
+
         rowkeys.append(rowkey)
         chunk.append(genos.data)
         if len(chunk) >= self.chunkrows:
@@ -1272,6 +1282,11 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
         for j,label in enumerate(labels):
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
+
+          # Verify encoding invariants (for safety: this should not be necessary)
+          if not g.check_encoding():
+            raise ValueError('Invalid genotype encoding for sample %s' % label)
+
           yield label,g
 
       gfile.close()
@@ -1294,6 +1309,12 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
           descr = build_descr(model,len(samples))
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
+
+          # Verify encoding invariants (for safety: this should not be necessary)
+          if not g.check_encoding():
+            raise ValueError('Invalid genotype encoding for locus %s' % label)
+
+
           models.append(model)
           yield label,g
 
