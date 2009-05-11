@@ -4,7 +4,7 @@ from __future__ import with_statement
 
 __gluindex__  = True
 __abstract__  = 'Split a genotype file into multiple pieces based on sample and locus groups'
-__copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
@@ -74,7 +74,6 @@ def genomatrix_multiplexer_packed(genos, samplegroups, locusgroups, defaultsampl
   # take care of this for me...
   if columngroups and rowgroups:
     for rowkey,row in genos:
-      row = row[:]
       for rowgroup in rowgroups.get(rowkey) or rdefault:
         if not rowgroup:
           continue
@@ -90,7 +89,6 @@ def genomatrix_multiplexer_packed(genos, samplegroups, locusgroups, defaultsampl
 
   elif columngroups:
     for rowkey,row in genos:
-      row = row[:]
       for columngroup,indices,descr,header in groupcols:
         if not descr:
           n     = len(indices)
