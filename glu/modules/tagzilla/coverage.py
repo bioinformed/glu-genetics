@@ -4,7 +4,7 @@ __gluindex__  = True
 __program__   = 'TagZilla coverage'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
 __abstract__  = 'Evaluate maximum coverage of a set of tags'
-__copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
@@ -15,7 +15,7 @@ import optparse
 from   glu.lib.fileutils             import list_reader, table_writer
 from   glu.lib.genolib               import geno_options
 
-from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, epsilon, sfloat, \
+from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, check_option01, epsilon, sfloat, \
                                             build_design_score, generate_ldpairs
 
 
@@ -56,24 +56,30 @@ def option_parser():
   genoldgroup = optparse.OptionGroup(parser, 'Genotype and LD estimation options')
 
   genoldgroup.add_option('-a', '--minmaf', dest='maf', metavar='FREQ', type='float', default=0.05,
+                          action='callback', callback=check_option01,
                           help='Minimum minor allele frequency (MAF) (default=0.05)')
   genoldgroup.add_option('-A', '--minobmaf', dest='obmaf', metavar='FREQ', type='float', default=None,
+                          action='callback', callback=check_option01,
                           help='Minimum minor allele frequency (MAF) for obligate tags (defaults to -a/--minmaf)')
   genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
                           help='Drop loci with less than N valid genotypes. Default=0')
   genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
+                          action='callback', callback=check_option01,
                           help='Drop loci with completion rate less than N (0-1). Default=0')
   genoldgroup.add_option('-m', '--maxdist', dest='maxdist', metavar='D', type='int', default=200,
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
+                          action='callback', callback=check_option01,
                           help='Filter out loci that fail to meet a minimum signficance level (pvalue) for a '
                                'test Hardy-Weignberg proportion (no default)')
 
   bingroup = optparse.OptionGroup(parser, 'Binning options')
 
   bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
+                          action='callback', callback=check_option01,
                           help='Minimum d-prime threshold to output (default=0)')
   bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0,
+                          action='callback', callback=check_option01,
                           help='Minimum r-squared threshold to output (default=0)')
 
   parser.add_option_group(inputgroup)

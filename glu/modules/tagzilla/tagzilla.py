@@ -17,7 +17,7 @@ efficient multi-population tagging, incorporation of design scores and bin
 informativity measures, and calculation of detailed bin and locus coverage
 statistics by type of bin.  Please consult the accompanying manual for more
 information.'''
-__copyright__ = 'Copyright (c) 2008, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
@@ -1777,6 +1777,12 @@ class TagZillaOptionParser(optparse.OptionParser):
     del self.rargs[0]
 
 
+def check_option01(option, opt_str, value, parser):
+  if not (0 <= value <= 1):
+    raise optparse.OptionValueError('option %s: value must be between 0 and 1.  Got %s' % (opt_str,value))
+  setattr(parser.values, option.dest, value)
+
+
 def option_parser():
   usage = 'usage: %prog [options] genotypes [options] genotypes'
   parser = TagZillaOptionParser(usage=usage)
@@ -1829,27 +1835,33 @@ def option_parser():
   genoldgroup = optparse.OptionGroup(parser, 'Genotype and LD estimation options')
 
   genoldgroup.add_option('-a', '--minmaf', dest='maf', metavar='FREQ', type='float', default=0.05,
+                          action='callback', callback=check_option01,
                           help='Minimum minor allele frequency (MAF) (default=0.05)')
   genoldgroup.add_option('-A', '--minobmaf', dest='obmaf', metavar='FREQ', type='float', default=None,
+                          action='callback', callback=check_option01,
                           help='Minimum minor allele frequency (MAF) for obligate tags (defaults to -a/--minmaf)')
   genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
                           help='Drop loci with less than N valid genotypes (default=0)')
   genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
+                          action='callback', callback=check_option01,
                           help='Drop loci with completion rate less than N (0-1) (default=0)')
   genoldgroup.add_option('-m', '--maxdist', dest='maxdist', metavar='D', type='int', default=200,
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
+                          action='callback', callback=check_option01,
                           help='Filter out loci that fail to meet a minimum signficance level (pvalue) for a '
                                'test Hardy-Weignberg proportion (no default)')
 
   bingroup = optparse.OptionGroup(parser, 'Binning options')
 
-  bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
-                          help='Minimum d-prime threshold to output (default=0)')
   bingroup.add_option('-M', '--multipopulation', dest='multipopulation', metavar='N or P1,P2,...',
                           help='Multipopulation tagging where every N input files represent a group of populations. '
                                'May be specified as an integer N or a comma separated list of population labels.')
+  bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
+                          action='callback', callback=check_option01,
+                          help='Minimum d-prime threshold to output (default=0)')
   bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.8,
+                          action='callback', callback=check_option01,
                           help='Minimum r-squared threshold to output (default=0.8)')
   bingroup.add_option('-t', '--targetbins', dest='targetbins', metavar='N', type='int', default=0,
                           help='Stop when N bins have been selected (default=0 for unlimited)')
