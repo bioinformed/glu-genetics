@@ -402,7 +402,7 @@ def _load_loci(filename,options,keep):
     keep &= set(loci.samples)
 
   fixedloci = None
-  if options.fixedloci:
+  if options.fixedloci is not None:
     fixedloci = load_genostream(options.fixedloci,format=options.informat,genorepr=options.ingenorepr,
                                 genome=options.loci,phenome=options.pedigree,
                                 transform=options).as_ldat()
@@ -410,8 +410,7 @@ def _load_loci(filename,options,keep):
     samples   = loci.samples if loci is not None else None
     fixedloci = fixedloci.transformed(include_samples=keep,order_samples=samples)
 
-  if fixedloci and loci:
-    assert fixedloci.samples == loci.samples
+  assert fixedloci is None or loci is None or fixedloci.samples == loci.samples
 
   if loci is None:
     return None,fixedloci,list(fixedloci.samples)
