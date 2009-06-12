@@ -1078,32 +1078,46 @@ def resolve_column_header(header,column):
   raise
 
 
-def resolve_column_headers(header,columns):
+def resolve_column_headers(header,include,exclude=None):
   '''
   @param       header: header line of the input file
   @type        header: sequence of strs
-  @param      columns: indices, names, or ranges of columns to select, comma
+  @param      include: indices, names, or ranges of columns to select, comma
                        delimited
-  @type       columns: list of strings, integers, or 2-tuples for ranges
+  @type       include: list of strings, integers, or 2-tuples for ranges
+  @param      exclude: indices, names, or ranges of columns to exclude, comma
+                       delimited
+  @type       exclude: list of strings, integers, or 2-tuples for ranges
   @return            : resolved header line
   @rtype             : sequence of strs
   '''
-  if isinstance(columns,int):
-    columns = [columns]
-  elif isinstance(columns,str):
-    columns = columns.split(',')
+  if isinstance(include,int):
+    include = [include]
+  elif isinstance(include,str):
+    include = include.split(',')
 
-  indices = []
-  for column in columns:
-    col = resolve_column_header(header,column)
-    if isinstance(col,tuple):
-      indices.extend( xrange(col[0],col[1]+1) )
+  if include is None:
+    if header:
+      indices = range(len(header))
     else:
-      indices.append(col)
+      raise ValueError('Cannot resolve indices for unknown header')
+  else:
+    indices = []
+    for column in include:
+      col = resolve_column_header(header,column)
+      if isinstance(col,tuple):
+        indices.extend( xrange(col[0],col[1]+1) )
+      else:
+        indices.append(col)
+
+  if exclude:
+    exclude_indices = set(resolve_column_headers(header,exclude))
+    indices = [ i for i in indices if i not in exclude_indices ]
+
   return indices
 
 
-def table_columns(rows, columns, header=None, want_header=False):
+def table_columns(rows, columns, drop=None, header=None, want_header=False):
   '''
   Return a rows from a sequence for columns specified by name or number. A
   single row of column headers may be embedded within the row sequence or
@@ -1145,6 +1159,10 @@ def table_columns(rows, columns, header=None, want_header=False):
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
   >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c1','c2']))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],None,drop='c2'))
+  [['loc1'], ['loc2'], ['loc1'], ['loc2']]
+  >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],None,drop=[1]))
+  [['loc1'], ['loc2'], ['loc1'], ['loc2']]
   >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[('c1','c2')]))
   [['loc1', ''], ['loc2', ''], ['loc1', 'loc1'], ['loc2', '']]
   >>> list(table_columns([['c1','c2'],['loc1'],['loc2'],['loc1','loc1'],['loc2']],[(0,'c2')]))
@@ -1167,7 +1185,7 @@ def table_columns(rows, columns, header=None, want_header=False):
   rows = iter(rows)
 
   # All columns are to be returned
-  if not columns:
+  if not columns and not drop:
     def _table_reader_all(header):
       if header is None:
         try:
@@ -1194,17 +1212,18 @@ def table_columns(rows, columns, header=None, want_header=False):
     return _table_reader_all(header)
 
   # Otherwise, resolve column heading names into indices
-  if header is None:
-    try:
-      indices = resolve_column_headers(None,columns)
-    except ValueError:
-      # Need headers
-      try:
-        header = map(str.strip,rows.next())
-      except StopIteration:
-        return
+  try:
+    indices = resolve_column_headers(header,columns,drop)
+  except ValueError:
+    if header is not None:
+      raise
 
-  indices = resolve_column_headers(header,columns)
+    try:
+      header = map(str.strip,rows.next())
+    except StopIteration:
+      return
+
+    indices = resolve_column_headers(header,columns,drop)
 
   if not want_header:
     header = None
@@ -1364,6 +1383,7 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   skip    = int(get_arg(args, ['skip','s'], 0))
   format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
+  drop    = get_arg(args, ['d','drop'])
   header  = get_arg(args, ['h','header'])
 
   if header is not None and isinstance(header,str):
@@ -1383,20 +1403,21 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   if skip:
     rows = islice(rows,skip,None)
 
-  return table_columns(rows,columns,header=header,want_header=want_header)
+  return table_columns(rows,columns,drop,header=header,want_header=want_header)
 
 
 class TableWriter(object):
   '''
   Write selected columns to a lower-level tabular data writer object
   '''
-  def __init__(self, writer, columns):
+  def __init__(self, writer, columns, drop):
     self.writer  = writer
     self.columns = columns
+    self.drop    = drop
 
     # Try to resolve column headings without a header row
     try:
-      self.indices = resolve_column_headers(None,columns)
+      self.indices = indices = resolve_column_headers(None,columns,drop)
     except ValueError:
       self.indices = None
 
@@ -1410,7 +1431,7 @@ class TableWriter(object):
       except IndexError:
         return
 
-      self.indices = indices = resolve_column_headers(row,self.columns)
+      self.indices = indices = resolve_column_headers(row,self.columns,self.drop)
 
     for row in rows:
       m = len(row)
@@ -1422,7 +1443,7 @@ class TableWriter(object):
 
     # First row and indices require header information
     if indices is None:
-      self.indices = indices = resolve_column_headers(row,self.columns)
+      self.indices = indices = resolve_column_headers(row,self.columns,self.drop)
 
     m = len(row)
     row = [ (row[j] if j<m else '') for j in indices ]
@@ -1545,6 +1566,26 @@ def table_writer(filename,extra_args=None,**kwargs):
   H2  H3
   2   3
   b   c
+
+  >>> o=StringIO()
+  >>> w=table_writer(o,drop='H2')
+  >>> w.writerows([['H1','H2','H3'],
+  ...              ['1','2','3'],
+  ...              ['a','b','c']])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  H1  H3
+  1   3
+  a   c
+
+  >>> o=StringIO()
+  >>> w=table_writer(o,columns='1-3',drop='H2-H3')
+  >>> w.writerows([['H1','H2','H3'],
+  ...              ['1','2','3'],
+  ...              ['a','b','c']])
+  >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
+  H1
+  1
+  a
   '''
   if extra_args is None:
     args = kwargs
@@ -1555,6 +1596,7 @@ def table_writer(filename,extra_args=None,**kwargs):
   name    = parse_augmented_filename(filename,args)
   format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
+  drop    = get_arg(args, ['d','drop'])
 
   format  = format.lower()
   if format in ('xls','excel'):
@@ -1567,8 +1609,9 @@ def table_writer(filename,extra_args=None,**kwargs):
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  if columns is not None:
-    writer = TableWriter(writer, columns)
+  # Use a wrapper writer object to handle column selectors
+  if columns is not None or drop:
+    writer = TableWriter(writer, columns, drop)
 
   return writer
 
@@ -1931,10 +1974,17 @@ def sort_table(header, table, keys):
   if not indices:
     return header,table
 
-  get_inds = itemgetter(*indices)
+  # Itemgetter returns a single element for one key
+  if len(indices) == 1:
+    index = indices[0]
+    def get_keys(item):
+      return tryfloat(item[index])
 
-  def get_keys(item):
-    return map(tryfloat, get_inds(item))
+  # Itemgetter returns a tuple for a compound key
+  else:
+    get_inds = itemgetter(*indices)
+    def get_keys(item):
+      return map(tryfloat, get_inds(item))
 
   return header,sorted(table,key=get_keys)
 
