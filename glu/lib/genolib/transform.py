@@ -165,7 +165,8 @@ class GenoTransform(object):
   '''
   def __init__(self, include_samples, exclude_samples, rename_samples, order_samples,
                      include_loci,    exclude_loci,    rename_loci,    order_loci,
-                     recode_models=None, rename_alleles=None, repack=False, filter_missing=False):
+                     recode_models=None, rename_alleles=None, repack=False,
+                     filter_founders=False, filter_nonfounders=False, filter_missing=False):
     '''
     Create a new GenoTransform object with supplied metadata,
     which are used to specify all the operations of transforming the genostream
@@ -194,6 +195,10 @@ class GenoTransform(object):
     @type    recode_models: Genome instance or None
     @param  rename_alleles: rename alleles for any loci in the supplied dictionary from old allele name to new allele name
     @type   rename_alleles: dict from old_allele str -> new_allele str
+    @param  filter_founders: filter (exclude) founders from stream
+    @type   filter_founders: bool
+    @param  filter_nonfounders: filter (exclude) non-founders from stream
+    @type   filter_nonfounders: bool
     @param  filter_missing: filter missing genotypes from the stream
     @type   filter_missing: bool
     @param          repack: trigger repacking of genotypes to ensure that the most compact storage
@@ -211,6 +216,8 @@ class GenoTransform(object):
     self.recode_models            = recode_models
     self.rename_alleles           = rename_alleles
     self.repack                   = repack
+    self.filter_founders          = filter_founders
+    self.filter_nonfounders       = filter_nonfounders
     self.filter_missing_genotypes = filter_missing
 
   @staticmethod
@@ -221,16 +228,18 @@ class GenoTransform(object):
     @return: transformed genotriple stream
     @rtype : GenotripleStream
     '''
-    return GenoTransform(include_samples=_get_opt_intersect(options,'includesamples'),
-                         exclude_samples=    _get_opt_union(options,'excludesamples'),
-                          rename_samples=          _get_opt(options,'renamesamples' ),
-                           order_samples=          _get_opt(options,'ordersamples'  ),
-                            include_loci=_get_opt_intersect(options,'includeloci'   ),
-                            exclude_loci=    _get_opt_union(options,'excludeloci'   ),
-                             rename_loci=          _get_opt(options,'renameloci'    ),
-                              order_loci=          _get_opt(options,'orderloci'     ),
-                          rename_alleles=          _get_opt(options,'renamealleles' ),
-                          filter_missing=          _get_opt(options,'filtermissing' ))
+    return GenoTransform(include_samples=_get_opt_intersect(options,'includesamples'   ),
+                         exclude_samples=    _get_opt_union(options,'excludesamples'   ),
+                          rename_samples=          _get_opt(options,'renamesamples'    ),
+                           order_samples=          _get_opt(options,'ordersamples'     ),
+                            include_loci=_get_opt_intersect(options,'includeloci'      ),
+                            exclude_loci=    _get_opt_union(options,'excludeloci'      ),
+                             rename_loci=          _get_opt(options,'renameloci'       ),
+                              order_loci=          _get_opt(options,'orderloci'        ),
+                          rename_alleles=          _get_opt(options,'renamealleles'    ),
+                         filter_founders=          _get_opt(options,'filterfounders'   ),
+                      filter_nonfounders=          _get_opt(options,'filternonfounders'),
+                          filter_missing=          _get_opt(options,'filtermissing'    ))
 
   @staticmethod
   def from_kwargs(extra_args=None,**kwargs):
@@ -257,6 +266,8 @@ class GenoTransform(object):
                                 recode_models=get_arg(args,['recode_models',  'recodemodels'  ]),
                                rename_alleles=get_arg(args,['rename_alleles', 'renamealleles' ]),
                                        repack=trybool(get_arg(args,['repack'])),
+                              filter_founders=trybool(get_arg(args,['filter_founders','filterfounders'])),
+                           filter_nonfounders=trybool(get_arg(args,['filter_nonfounders','filternonfounders'])),
                                filter_missing=trybool(get_arg(args,['filter_missing','filtermissing'])))
 
     if extra_args is None and args:
@@ -285,6 +296,8 @@ class GenoTransform(object):
     recode_models            = _merge_genome(self.recode_models, other.recode_models)
     rename_alleles           = _merge_map(self.rename_alleles, other.rename_alleles)
     repack                   = self.repack or other.repack
+    filter_founders          = self.filter_founders or other.filter_founders
+    filter_nonfounders       = self.filter_nonfounders or other.filter_nonfounders
     filter_missing_genotypes = self.filter_missing_genotypes or other.filter_missing_genotypes
 
     return GenoTransform(include_samples=samples.include,
@@ -298,6 +311,8 @@ class GenoTransform(object):
                            recode_models=recode_models,
                           rename_alleles=rename_alleles,
                                   repack=repack,
+                         filter_founcers=filter_founders,
+                      filter_nonfouncers=filter_nonfounders,
                           filter_missing=filter_missing_genotypes)
 
 
@@ -328,13 +343,21 @@ def _merge_map(map1, map2):
   raise NotImplementedError
 
 
-def _merge_set(set1,set2):
+def _merge_set_union(set1,set2):
   if set1 is None:
     return set2
   if set2 is None:
     return set1
 
-  raise as_set(set1)|as_set(set2)
+  return as_set(set1)|as_set(set2)
+
+def _merge_set_intersect(set1,set2):
+  if set1 is None:
+    return set2
+  if set2 is None:
+    return set1
+
+  return as_set(set1)&as_set(set2)
 
 
 class GenoSubTransform(object):
@@ -377,8 +400,8 @@ class GenoSubTransform(object):
     self.order   = order
 
   def merge(self, other):
-    include = _merge_set(self.include, other.include)
-    exclude = _merge_set(self.exclude, other.exclude)
+    include = _merge_set_intersect(self.include, other.include)
+    exclude = _merge_set_union(self.exclude, other.exclude)
     rename  = _merge_map(self.rename,  other.rename)
     order   = self.order or other.order
 
