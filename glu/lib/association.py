@@ -412,6 +412,9 @@ def _load_loci(filename,options,keep):
 
   assert fixedloci is None or loci is None or fixedloci.samples == loci.samples
 
+  if loci is None and fixedloci is None:
+    return None,None,[]
+
   if loci is None:
     return None,fixedloci,list(fixedloci.samples)
 
@@ -868,7 +871,7 @@ def print_results_linear(out,locus_model,linear_model,verbose=1):
   out.write('Observations = %d\n' % n)
   out.write('Phenotype distribution:\n')
   out.write('  min=%g, mean=%g, median=%g, max=%g, sd=%g\n' % \
-                     (y.min(),y.mean(),median(y),y.max(),y.std()))
+                     (y.min(),y.mean(),median(y.tolist()),y.max(),y.std()))
   out.write('Covariate summary:\n')
   for name,x in izip(vars,linear_model.X.T):
     out.write('  %-12s: ' % name)
