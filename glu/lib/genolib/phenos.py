@@ -235,8 +235,8 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
 
       n = len(row)
 
-      name = intern(row[name_index].strip()) if name_index < n else ''
-      ind  = intern(row[ind_index].strip())  if ind_index  < n else name
+      name = row[name_index].strip() if name_index is not None and name_index < n else ''
+      ind  = row[ind_index].strip()  if ind_index  is not None and ind_index  < n else name
 
       if not name and not ind:
         raise ValueError('Invalid phenotype record %d in %s (blank individual name)' % (i+1,namefile(filename)))
@@ -246,13 +246,13 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
       pheno  = PHENO_UNKNOWN
 
       if family_index is not None and family_index<n:
-        family = intern(row[family_index].strip()) or None
+        family = row[family_index].strip() or None
 
       if parent1_index is not None and parent1_index<n:
-        parent1 = intern(row[parent1_index].strip()) or None
+        parent1 = row[parent1_index].strip() or None
 
       if parent2_index is not None and parent2_index<n:
-        parent2 = intern(row[parent2_index].strip()) or None
+        parent2 = row[parent2_index].strip() or None
 
       if sex_index is not None and sex_index<n:
         sex = SEX_MAP[row[sex_index].strip().upper()]
@@ -260,13 +260,12 @@ def load_phenome_records(filename,extra_args=None,**kwargs):
       if pheno_index is not None and pheno_index<n:
         pheno = PHENO_MAP.get(row[pheno_index].upper(),PHENO_UNKNOWN)
 
-      if family is not None:
-        ind     = '%s:%s' % (family,ind)
-        parent1 = '%s:%s' % (family,parent1) if parent1 else None
-        parent2 = '%s:%s' % (family,parent2) if parent2 else None
-
+      # Create sample name from family:ind if not specified.  This is a bad
+      # idea when a family name is given, since it requires that users also
+      # follow the same munging pattern.  I'd rather we just tossed our
+      # cookies here, but we have to assume our users aren't stupid.
       if not name:
-        name = ind
+        name = '%s:%s' % (family,ind) if family else ind
 
       yield name,family,ind,parent1,parent2,sex,pheno
 
@@ -285,10 +284,12 @@ def load_phenome(filename,phenome=None,**kwargs):
   phenome = phenome or Phenome()
 
   for name,family,individual,parent1,parent2,sex,phenoclass in phenos:
-    if parent1:
-      phenome.merge_phenos(parent1)
-    if parent2:
-      phenome.merge_phenos(parent2)
+    # Do not assume that parent names are valid sample identifiers, since
+    # they're often not or are munged in ways we cannot predict here.
+    #if parent1:
+    #  phenome.merge_phenos(parent1,family=family)
+    #if parent2:
+    #  phenome.merge_phenos(parent2,family=family)
     phenome.merge_phenos(name,family,individual,parent1,parent2,sex,phenoclass)
 
   return phenome
