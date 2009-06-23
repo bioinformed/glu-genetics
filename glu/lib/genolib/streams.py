@@ -507,6 +507,13 @@ class GenotripleStream(GenotypeStream):
     if transform.filter_missing_genotypes:
       triples = filter_genotriples_missing(triples)
 
+    # Apply founder filters
+    # NB: When flattening sdat formats to triples, phenome may still be read alongside genotypes
+    if transform.filter_founders:
+      triples = filter_genotriples_founders(triples,'founder')
+    if transform.filter_nonfounders:
+      triples = filter_genotriples_founders(triples,'nonfounder')
+
     # Optimize includes and excludes
     if transform.samples.include is not None and transform.samples.exclude is not None:
       transform.samples.include -= transform.samples.exclude
@@ -1325,6 +1332,12 @@ class GenomatrixStream(GenotypeStream):
     # 6) Order and repack
 
     genos = self
+
+    # Apply founder filters
+    if transform.filter_founders:
+      genos = filter_genomatrixstream_founders(genos, 'founders')
+    if transform.filter_nonfounders:
+      genos = filter_genomatrixstream_founders(genos, 'nonfounders')
 
     # Optimize includes and excludes
     if rowtransform.include is not None and rowtransform.exclude is not None:
@@ -3299,6 +3312,76 @@ def filter_genotriples(triples,sampleset,locusset,exclude=False):
   return triples.clone(_filter(),loci=loci,samples=samples,order=None,materialized=False)
 
 
+def filter_genotriples_founders(triples,filter):
+  '''
+  Filter founders or non-founders from genotriples.
+
+  @param   triples: sequence of genotriples(str,str,genotype representation)
+  @type    triples: sequence
+  @param    filter: 'founders' to remove founders, 'nonfounders' to remove non-founders
+  @type     filter: str
+  @return         : filtered genotriples
+  @rtype          : generator
+
+  >>> samples =     ('s1','s2','s3')
+  >>> rows = [('l1',['AA','AG','GG']),
+  ...         ('l2',['AA','AT','TT'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'ldat',snp,samples=samples).materialize()
+  >>> genos.phenome.merge_phenos('s2',parent1='s1',parent2='s3')
+  >>> genos.phenome.merge_phenos('s3')
+  >>> genos.samples
+  ('s1', 's2', 's3')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
+  ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
+
+  >>> for s,l,g in filter_genotriples_founders(genos.as_genotriples(),'founders'):
+  ...   print s,l,g
+  s2 l1 ('A', 'G')
+  s2 l2 ('A', 'T')
+
+  >>> for s,l,g in filter_genotriples_founders(genos.as_genotriples(),'nonfounders'):
+  ...   print s,l,g
+  s1 l1 ('A', 'A')
+  s3 l1 ('G', 'G')
+  s1 l2 ('A', 'A')
+  s3 l2 ('T', 'T')
+  '''
+  if filter=='founders':
+    def _filter():
+      phenos   = triples.phenome.phenos
+      founders = {}
+      for sample,locus,geno in triples:
+        if sample not in founders:
+          founder = founders[sample] = sample not in phenos or phenos[sample].founder()
+          if founder:
+            continue
+        elif founders[sample]:
+          continue
+
+        yield sample,locus,geno
+
+  elif filter=='nonfounders':
+    def _filter():
+      phenos      = triples.phenome.phenos
+      nonfounders = {}
+      for sample,locus,geno in triples:
+        if sample not in nonfounders:
+          nonfounder = nonfounders[sample] = sample in phenos and phenos[sample].nonfounder()
+          if nonfounder:
+            continue
+        elif nonfounders[sample]:
+          continue
+
+        yield sample,locus,geno
+
+  else:
+    raise ValueError('Unknown founder filter value: %s' % filter)
+
+  return triples.clone(_filter(),samples=None,materialized=False)
+
+
 def rename_genomatrixstream_column(genos,colmap,warn=False):
   '''
   Rename the columns for the genotype matrix data
@@ -3808,27 +3891,18 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
       return genos
 
   if genos.format=='sdat':
-    updates = []
     if exclude:
       def _filter():
         for subject,row in genos:
-          if genos.updates:
-            updates.extend(genos.updates)
           if subject not in rowset:
             yield subject,row
-            if updates:
-              updates[:] = []
     else:
       def _filter():
         for subject,row in genos:
-          if genos.updates:
-            updates.extend(genos.updates)
           if subject in rowset:
             yield subject,row
-            if updates:
-              updates[:] = []
 
-    return genos.clone(_filter(),samples=rows,updates=updates,materialized=False)
+    return genos.clone(_filter(),samples=rows,materialized=False)
 
   else:
     models = []
@@ -3846,6 +3920,93 @@ def filter_genomatrixstream_by_row(genos,rowset,exclude=False):
             yield locus,row
 
     return genos.clone(_filter(),loci=rows,models=models,materialized=False)
+
+
+def filter_genomatrixstream_founders(genos,filter):
+  '''
+  Filter founders or non-founders from a genotype stream
+
+  @param   genos: genomatrix stream
+  @type    genos: sequence
+  @param  filter: 'founders' to remove founders, 'nonfounders' to remove non-founders
+  @type   filter: str
+  @return       : filtered genotype matrix
+  @rtype        : sequence
+
+  >>> samples =     ('s1','s2','s3')
+  >>> rows = [('l1',['AA','AG','GG']),
+  ...         ('l2',['AA','AT','TT'])]
+  >>> genos = GenomatrixStream.from_strings(rows,'ldat',snp,samples=samples).materialize()
+  >>> genos.phenome.merge_phenos('s2',parent1='s1',parent2='s3')
+  >>> genos.phenome.merge_phenos('s3')
+  >>> genos.samples
+  ('s1', 's2', 's3')
+  >>> for row in genos:
+  ...   print row
+  ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
+  ('l2', [('A', 'A'), ('A', 'T'), ('T', 'T')])
+
+  >>> new_genos = filter_genomatrixstream_founders(genos,'founders')
+  >>> new_genos.samples
+  ('s2',)
+  >>> for row in new_genos:
+  ...   print row
+  ('l1', [('A', 'G')])
+  ('l2', [('A', 'T')])
+
+  >>> new_genos = filter_genomatrixstream_founders(genos,'nonfounders')
+  >>> new_genos.samples
+  ('s1', 's3')
+  >>> for row in new_genos:
+  ...   print row
+  ('l1', [('A', 'A'), ('G', 'G')])
+  ('l2', [('A', 'A'), ('T', 'T')])
+
+  >>> new_genos = filter_genomatrixstream_founders(genos.transposed(),'founders')
+  >>> for row in new_genos:
+  ...   print row
+  ('s2', [('A', 'G'), ('A', 'T')])
+
+  >>> new_genos = filter_genomatrixstream_founders(genos.transposed(),'nonfounders')
+  >>> for row in new_genos:
+  ...   print row
+  ('s1', [('A', 'A'), ('A', 'A')])
+  ('s3', [('G', 'G'), ('T', 'T')])
+  '''
+  phenos = genos.phenome.phenos
+
+  # Filtering ldat streams require that pedigrees are known ahead of time
+  # and can use a simple pre-computed column exclusion filter
+  if genos.format == 'ldat':
+    if filter == 'founders':
+      exclude = set(sample for sample in genos.samples if sample not in phenos or phenos[sample].founder())
+    elif filter == 'nonfounders':
+      exclude = set(f.name for f in phenos.itervalues() if not f.founder())
+    else:
+      raise ValueError('Unknown founder filter value: %s' % filter)
+
+    return genos.transformed(excludesamples=exclude)
+
+  # For sdat formats, filters must be checked row by row, since some file
+  # formats may only discovery pedigree structure when rows are sequentially
+  # materialized
+  if filter == 'founders':
+    def _filter():
+      for sample,row in genos:
+        founder = sample not in phenos or phenos[sample].founder()
+        if not founder:
+          yield sample,row
+
+  elif filter == 'nonfounders':
+    def _filter():
+      for sample,row in genos:
+        founder = sample not in phenos or phenos[sample].founder()
+        if founder:
+          yield sample,row
+  else:
+    raise ValueError('Unknown founder filter value: %s' % filter)
+
+  return genos.clone(_filter(),samples=None,materialized=False)
 
 
 def transpose_generator(columns, rows, m=32):

@@ -69,6 +69,11 @@ def geno_options(group,input=False,output=False,merge=False,filter=False,transfo
     group.add_option('--excludeloci', dest='excludeloci', metavar='FILE', action='append',
                       help='List of loci to exclude')
 
+    group.add_option('--filterfounders', action='store_true', dest='filterfounders',
+                      help='Excludes founders')
+    group.add_option('--filternonfounders', action='store_true', dest='filternonfounders',
+                      help='Excludes non-founders')
+
   if transform:
     group.add_option('--renamesamples', dest='renamesamples', metavar='FILE',
                       help='Rename samples from a file containing rows of original name, tab, new name')
