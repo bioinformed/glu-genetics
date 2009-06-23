@@ -366,6 +366,10 @@ except ImportError:
       if len(old_model.genotypes) > len(new_model.genotypes):
         raise GenotypeRepresentationError('Model may not be replaced since new model defines too few genotypes')
 
+      n = len(old_model.genotypes)
+      if old_model.genotypes != new_model.genotypes[:n]:
+        raise GenotypeRepresentationError('Model may not be replaced since new model defines incompatible genotypes')
+
       self._models[i] = new_model
 
 

@@ -45,6 +45,10 @@ See GLU license for terms by running: glu license
 PyObject *GenotypeLookupError;
 PyObject *GenotypeRepresentationError;
 
+/* Forward decl */
+static int
+genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObject *other);
+
 /******************************************************************************************************/
 
 static int
@@ -596,9 +600,16 @@ descr_ass_item(GenotypeArrayDescriptorObject *self, Py_ssize_t item, UnphasedMar
 		return -1;
 	}
 
-	ret = PyList_SetItem(self->models, item, (PyObject *)new_model);
+	ret = genomodel_replaceable_by(old_model, new_model);
+	if(ret==-1) return -1;
+	if(ret==0)
+	{
+		PyErr_SetString(GenotypeRepresentationError,"Model may not be replaced since new model defines incompatible genotypes");
+		return -1;
+	}
 
-	if(ret==0) Py_INCREF(new_model);
+	ret = PyList_SetItem(self->models, item, (PyObject *)new_model); /* Steals reference to new_model */
+	if(ret==0) Py_INCREF(new_model); /* Account for stolen reference */
 
 	return ret;
 }
@@ -1071,33 +1082,30 @@ genomodel_contains(UnphasedMarkerModelObject *self, PyObject *item)
 	return 1;
 }
 
-static PyObject *
+static int
 genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObject *other)
 {
 	Py_ssize_t len1, len2, i;
 
-	if(self == other) Py_RETURN_TRUE;
+	if(self == other) return 1;
 
 	if( !UnphasedMarkerModel_CheckExact(other) )
 	{
 		PyErr_SetString(PyExc_TypeError,"invalid genotype model");
-		return NULL;
+		return -1;
 	}
 
 	if( self->bit_size         != other->bit_size
 	 || self->max_alleles      != other->max_alleles
 	 || self->allow_hemizygote != other->allow_hemizygote)
-		Py_RETURN_FALSE;
-
-	/* FIXME: Check alleles?  Or are genotypes good enough? */
+		return 0;
 
 	len1 = PyList_Size(self->genotypes);
-	if(len1==-1) return NULL;
+	if(len1==-1) return -1;
 	len2 = PyList_Size(other->genotypes);
-	if(len2==-1) return NULL;
+	if(len2==-1) return -1;
 
-	if(len1>len2)
-		Py_RETURN_FALSE;
+	if(len1>len2) return 0;
 
 	for(i=0; i<len1; ++i)
 	{
@@ -1105,12 +1113,28 @@ genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObj
 		PyObject   *g2 = PyList_GET_ITEM(other->genotypes, i);
 		PyObject *comp = genotype_richcompare(g1, g2, Py_EQ);
 
-		if(!comp)          return NULL;
-		if(comp==Py_False) return comp;
-		Py_DECREF(comp);
+		if(!comp)          return -1;
+		if(comp==Py_False)
+		{
+        		Py_DECREF(comp);
+		        return 0;
+                }
+        	Py_DECREF(comp);
 	}
+	return 1;
+}
 
-	Py_RETURN_TRUE;
+static PyObject *
+genomodel_replaceable_by_py(UnphasedMarkerModelObject *self, UnphasedMarkerModelObject *other)
+{
+        int ret = genomodel_replaceable_by(self, other);
+        if(ret == 0)
+                Py_RETURN_FALSE;
+        else if(ret == 1)
+                Py_RETURN_TRUE;
+        else
+                /* error must be set */
+                return NULL;
 }
 
 static int
@@ -1183,11 +1207,11 @@ static PySequenceMethods genomodel_as_sequence = {
 };
 
 static PyMethodDef genomodel_methods[] = {
-	{"get_genotype",   (PyCFunction)genomodel_get_genotype,   METH_O, "get an existing genotype"},
-	{"add_genotype",   (PyCFunction)genomodel_add_genotype,   METH_O, "get or add a genotype"},
-	{"get_allele",     (PyCFunction)genomodel_get_allele,     METH_O, "get an allele"},
-	{"add_allele",     (PyCFunction)genomodel_add_allele,     METH_O, "get or add an allele"},
-	{"replaceable_by", (PyCFunction)genomodel_replaceable_by, METH_O, "Return model could replace the other without altering existing encodings"},
+	{"get_genotype",   (PyCFunction)genomodel_get_genotype,      METH_O, "get an existing genotype"},
+	{"add_genotype",   (PyCFunction)genomodel_add_genotype,      METH_O, "get or add a genotype"},
+	{"get_allele",     (PyCFunction)genomodel_get_allele,        METH_O, "get an allele"},
+	{"add_allele",     (PyCFunction)genomodel_add_allele,        METH_O, "get or add an allele"},
+	{"replaceable_by", (PyCFunction)genomodel_replaceable_by_py, METH_O, "Return model could replace the other without altering existing encodings"},
 	{NULL,		NULL}		/* sentinel */
 };
 
