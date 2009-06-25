@@ -311,8 +311,8 @@ class GenoTransform(object):
                            recode_models=recode_models,
                           rename_alleles=rename_alleles,
                                   repack=repack,
-                         filter_founcers=filter_founders,
-                      filter_nonfouncers=filter_nonfounders,
+                         filter_founders=filter_founders,
+                      filter_nonfounders=filter_nonfounders,
                           filter_missing=filter_missing_genotypes)
 
 
