@@ -410,16 +410,15 @@ def _load_loci(filename,options,keep):
     samples   = loci.samples if loci is not None else None
     fixedloci = fixedloci.transformed(include_samples=keep,order_samples=samples)
 
-  assert fixedloci is None or loci is None or fixedloci.samples == loci.samples
-
   if loci is None and fixedloci is None:
     return None,None,[]
 
   if loci is None:
-    return None,fixedloci,list(fixedloci.samples)
+    return None,fixedloci,fixedloci.samples
 
-  loci        = loci.transformed(include_samples=keep)
-  samples     = loci.samples
+  loci = loci.transformed(include_samples=keep)
+
+  assert fixedloci is None or loci is None or fixedloci.samples == loci.samples
 
   return loci,fixedloci,loci.samples
 
