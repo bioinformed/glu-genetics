@@ -38,5 +38,5 @@ and analysis.
   qc/index
   assoc/index
   struct/index
-  tagzilla/index
+  ld/index
   util/index

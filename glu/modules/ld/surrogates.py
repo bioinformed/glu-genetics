@@ -73,12 +73,12 @@ def option_parser():
                           help='Filter out loci that fail to meet a minimum signficance level (pvalue) for a '
                                'test Hardy-Weignberg proportion (no default)')
 
-  bingroup = optparse.OptionGroup(parser, 'Binning options')
+  bingroup = optparse.OptionGroup(parser, 'LD threshold options')
 
   bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
                           action='callback', callback=check_option01,
                           help='Minimum d-prime threshold to output (default=0)')
-  bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0,
+  bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.95,
                           action='callback', callback=check_option01,
                           help='Minimum r-squared threshold to output (default=0)')
 
@@ -114,34 +114,53 @@ def main():
   if options.subset is not None:
     subset.update(exclude)
 
+  direct   = subset - exclude
+  subex    = subset | exclude
+  indirect = subset & exclude
+
   locusmap = {}
+  seen = set()
   options.multipopulation = None
-  # exclude is the ldsubset
-  ldpairs = generate_ldpairs(args, locusmap, set(), subset, exclude, options)
+  # ldsubset=indirect
+  ldpairs = generate_ldpairs(args, locusmap, set(), None, indirect, options)
 
   missing = '',0
   best_surrogate = {}
   for pairs in ldpairs:
+    seen.update(locusmap)
     for lname1,lname2,r2,dprime in pairs:
       if lname1==lname2:
         continue
-
-      d1=lname1 not in exclude
-      d2=lname2 not in exclude
-
-      if d1 and not d2:
-        best_locus,best_r2 = best_surrogate.get(lname2,missing)
-        if r2 > best_r2:
-          best_surrogate[lname2] = lname1,r2
-      elif not d1 and d2:
+      elif lname1 in indirect and lname2 not in subex:
         best_locus,best_r2 = best_surrogate.get(lname1,missing)
         if r2 > best_r2:
           best_surrogate[lname1] = lname2,r2
+      elif lname2 in indirect and lname1 not in subex:
+        best_locus,best_r2 = best_surrogate.get(lname2,missing)
+        if r2 > best_r2:
+          best_surrogate[lname2] = lname1,r2
 
   outfile = table_writer(options.output, hyphen=sys.stdout)
-  outfile.writerow(['LNAME','SURROGATE','RSQUARED'])
+  outfile.writerow(['LNAME','SURROGATE','RSQUARED','REASON'])
+
+  one    = sfloat(1)
+  reason = 'DIRECT'
+  for lname in direct:
+    outfile.writerow([lname,lname,one,reason])
+
+  reason = 'INDIRECT'
   for lname,(surrogate,r2) in best_surrogate.iteritems():
-    outfile.writerow([lname,surrogate,sfloat(r2)])
+    outfile.writerow([lname,surrogate,sfloat(r2),reason])
+
+  reason_nos = 'NO SURROGATE'
+  reason_nod = 'NO DATA'
+
+  for lname in subset:
+    if lname not in best_surrogate:
+      if lname in seen:
+        outfile.writerow([lname,'','',reason_nos])
+      else:
+        outfile.writerow([lname,'','',reason_nod])
 
 
 if __name__ == '__main__':

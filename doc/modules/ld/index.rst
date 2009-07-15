@@ -1,4 +1,4 @@
-.. _tagzillapackage:
+.. _ldpackage:
 
 *************************
 LD estimation and tagging

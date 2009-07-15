@@ -1,6 +1,9 @@
 ==========================================================
-:mod:`tagzilla` --- Robust and fast SNP tagging
+:mod:`ld.tagzilla` --- Robust and fast SNP tagging
 ==========================================================
+
+.. module:: ld.tagzilla
+   :synopsis: Robust and fast SNP tagging program
 
 .. module:: tagzilla
    :synopsis: Robust and fast SNP tagging program
@@ -8,7 +11,7 @@
 Introduction
 ============
 
-This user's guide explains the use of the :mod:`tagzilla`. TagZilla chooses
+This user's guide explains the use of the :mod:`ld.tagzilla`. TagZilla chooses
 tag SNPs for any given set of SNPs with genotypes. The TagZilla SNP
 selection algorithm estimates pair-wise r\ :sup:`2` and d' (d-prime) linkage
 disequilibrium (LD) statistics on genotype data from unrelated
@@ -35,12 +38,12 @@ r\ :sup:`2`, completion rate and other parameters.
 
 Usage::
 
-  glu tagzilla [options] genotypes [options] genotypes
+  glu ld.tagzilla [options] genotypes [options] genotypes
 
 
 Example::
 
-  glu tagzilla -p pedinfo2sample_CEU.txt -b summary -o pairs.out -O loci.out -D designscore.txt:0.6 \
+  glu ld.tagzilla -p pedinfo2sample_CEU.txt -b summary -o pairs.out -O loci.out -D designscore.txt:0.6 \
                -f hapmap genotypes_chr21_CEU.txt.gz
 
 

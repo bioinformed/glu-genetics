@@ -436,7 +436,7 @@ class BinInfo(NullBinInfo):
     locs    = sorted([ loci[lname].location for lname in bin ])
     spacing = sorted([ locs[i+1]-locs[i] for i in xrange(len(locs)-1) ])
     width   = locs[-1]-locs[0]
-    excls = exclude.intersection(bin)
+    excls   = exclude.intersection(bin) if exclude is not None else set()
 
     aspacing = 0
     if len(spacing) > 1:
@@ -1101,7 +1101,7 @@ def tag_disposition(lname, bin):
 def locus_disposition(lname, bin, exclude, qualifier=None):
   if lname in bin.tags:
     disposition = tag_disposition(lname, bin)
-  elif lname in exclude and bin.disposition != 'obligate-exclude':
+  elif exclude is not None and lname in exclude and bin.disposition != 'obligate-exclude':
     disposition = 'exclude'
   else:
     disposition = 'other'
@@ -1153,8 +1153,8 @@ def build_result(lname, largest, bins, lddata, includes, get_tags_required):
 
   result.recommended_tags = []
   result.include_typed    = includes.typed & largest
-  result.average_maf = largest.average_maf()
-  result.maxcovered  = largest.maxcovered
+  result.average_maf      = largest.average_maf()
+  result.maxcovered       = largest.maxcovered
 
   if largest.disposition in (Bin.INCLUDE_TYPED,Bin.INCLUDE_UNTYPED):
     result.include = lname
@@ -1397,7 +1397,7 @@ def load_festa_file(filename, locusmap, subset, rthreshold):
     lname1,lname2,ldvalue = re_spaces.split(line.strip())
     ldvalue = float(ldvalue)
 
-    if subset and (lname1 not in subset or lname2 not in subset):
+    if subset is not None and (lname1 not in subset or lname2 not in subset):
       continue
 
     if lname1 not in locusmap:
@@ -1420,7 +1420,7 @@ def load_hapmapld_file(filename, locusmap, subset, maxd, rthreshold, dthreshold)
   for line in ldfile:
     loc1,loc2,pop,lname1,lname2,dprime,r2,lod = line.strip().split(' ')
 
-    if subset and (lname1 not in subset or lname2 not in subset):
+    if subset is not None and (lname1 not in subset or lname2 not in subset):
       continue
 
     loc1 = int(loc1)
@@ -1615,7 +1615,7 @@ def filter_loci(loci, include, subset, options):
   if options.maf or options.obmaf:
     loci = filter_loci_by_maf(loci, options.maf, options.obmaf, include)
 
-  if options.subset:
+  if subset is not None:
     loci = filter_loci_by_inclusion(loci, subset)
 
   if options.range:
@@ -1646,7 +1646,7 @@ def filter_loci_ldsubset(loci, ldsubset, maxd):
   forward and one in reverse.  As such, a locus may be yielded twice if it
   is within maxd if a monitored location on both the left and the right.
   '''
-  if not ldsubset:
+  if ldsubset is None:
     return loci
 
   monitor = [ (l.chromosome,l.location) for l in loci if l.name in ldsubset ]
@@ -1936,6 +1936,11 @@ def build_output(options, exclude):
 
 class Includes(object):
   def __init__(self, typed, untyped):
+    if typed is None:
+      typed = set()
+    if untyped is None:
+      untyped = set()
+
     self.typed   = typed - untyped
     self.untyped = untyped
 
@@ -1950,11 +1955,11 @@ class Includes(object):
 
 
 def tagzilla_single(options,args):
-  subset          = set()
-  include_untyped = set()
-  include_typed   = set()
-  exclude         = set()
-  ldsubset        = set()
+  subset          = None
+  include_untyped = None
+  include_typed   = None
+  exclude         = None
+  ldsubset        = None
 
   if options.subset:
     subset = set(list_reader(options.subset))
@@ -2049,11 +2054,11 @@ def subset_tags(result, tags, recommended=None):
 
 
 def tagzilla_multi(options,args):
-  subset          = set()
-  ldsubset        = set()
-  include_untyped = set()
-  include_typed   = set()
-  exclude         = set()
+  subset          = None
+  ldsubset        = None
+  include_untyped = None
+  include_typed   = None
+  exclude         = None
 
   if options.subset:
     subset = set(list_reader(options.subset))
