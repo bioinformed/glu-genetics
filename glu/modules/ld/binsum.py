@@ -12,10 +12,10 @@ __revision__  = '$Id$'
 import sys
 import optparse
 
-from   glu.lib.imerge                import imerge
-from   glu.lib.fileutils             import autofile, hyphen, list_reader
+from   glu.lib.imerge          import imerge
+from   glu.lib.fileutils       import autofile, hyphen, list_reader
 
-from   glu.modules.tagzilla.tagzilla import BinInfo, NullBinInfo, locus_result_sequence, bin_qualifier
+from   glu.modules.ld.tagzilla import BinInfo, NullBinInfo, locus_result_sequence, bin_qualifier
 
 
 def option_parser():

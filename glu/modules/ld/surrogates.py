@@ -12,11 +12,11 @@ __revision__  = '$Id$'
 import sys
 import optparse
 
-from   glu.lib.fileutils             import list_reader, table_writer
-from   glu.lib.genolib               import geno_options
+from   glu.lib.fileutils       import list_reader, table_writer
+from   glu.lib.genolib         import geno_options
 
-from   glu.modules.tagzilla.tagzilla import TagZillaOptionParser, check_option01, epsilon, sfloat, \
-                                            build_design_score, generate_ldpairs
+from   glu.modules.ld.tagzilla import TagZillaOptionParser, check_option01, epsilon, sfloat, \
+                                      build_design_score, generate_ldpairs
 
 
 def option_parser():

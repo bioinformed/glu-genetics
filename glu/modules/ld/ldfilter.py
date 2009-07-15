@@ -3,7 +3,7 @@
 __gluindex__  = True
 __program__   = 'TagZilla LD filter'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
-__abstract__  = 'Sequentially silter a list of SNPs using an LD threshold'
+__abstract__  = 'Sequentially filter a list of SNPs based on an LD threshold'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -11,13 +11,13 @@ __revision__  = '$Id$'
 
 import sys
 
-from   itertools                     import islice
+from   itertools               import islice
 
-from   glu.lib.fileutils             import table_reader, table_writer, resolve_column_header
-from   glu.lib.genolib               import load_genostream, geno_options
-from   glu.lib.genolib.ld            import count_haplotypes, estimate_ld
+from   glu.lib.fileutils       import table_reader, table_writer, resolve_column_header
+from   glu.lib.genolib         import load_genostream, geno_options
+from   glu.lib.genolib.ld      import count_haplotypes, estimate_ld
 
-from   glu.modules.tagzilla.tagzilla import check_option01
+from   glu.modules.ld.tagzilla import check_option01
 
 
 def option_parser():

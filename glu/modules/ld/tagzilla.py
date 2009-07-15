@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __program__   = 'TagZilla'
+__gluindex__  = True
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)',
                  'Zhaoming Wang (wangzha@mail.nih.gov)']
 __abstract__  = 'Robust and fast SNP tagging program'
