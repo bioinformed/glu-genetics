@@ -19,7 +19,7 @@ from   glu.modules.genedb.find_regions import resolve_features
 from   glu.modules.genedb.queries      import query_snps_by_location
 
 
-HEADER = ['SNP_NAME','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
+HEADER = ['LOCUS','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
           'REGION_START','REGION_END','FEATURE_NAME','FEATURE_STRAND','FEATURE_START','FEATURE_END','FEATURE_TYPE']
 
 
@@ -121,32 +121,39 @@ def as_set(f):
     return set(list_reader(f))
 
 
-def filter_results(results,options):
+class ResultFilter(object):
   '''
   Filter SNPs based on an inclusion or exclusion list
   '''
-  include = as_set(options.includeloci)
-  exclude = as_set(options.excludeloci)
+  def __init__(self,options):
+    include = as_set(options.includeloci)
+    exclude = as_set(options.excludeloci)
 
-  if include is None and exclude is None:
-    return results
+    if include is not None and exclude is not None:
+      include = include - exclude
+      exclude = None
 
-  if include is not None and exclude is not None:
-    include = include - exclude
-    exclude = None
+    self.include = include
+    self.exclude = exclude
 
-  if include is not None:
-    def _filter():
-      for result in results:
-        if result[0] in include:
-          yield result
-  else:
-    def _filter():
-      for result in results:
-        if result[0] not in exclude:
-          yield result
+  def filter(self,results):
+    if self.include is None and self.exclude is None:
+      return results
 
-  return _filter()
+    if self.include is not None:
+      def _filter():
+        include = self.include
+        for result in results:
+          if result[0] in include:
+            yield result
+    else:
+      def _filter():
+        exclude = self.exclude
+        for result in results:
+          if result[0] not in exclude:
+            yield result
+
+    return _filter()
 
 
 def main():
@@ -160,6 +167,8 @@ def main():
   con = open_genedb(options.genedb)
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(HEADER)
+
+  filter_results = ResultFilter(options).filter
 
   for infile in args:
     features = table_reader(infile,want_header=True,hyphen=sys.stdin)
@@ -175,7 +184,7 @@ def main():
       chrStart,chrEnd = feature_margin(start,end,strand,int(mup or 0),int(mdown or 0))
 
       results = query_snps_by_location(con,chr,chrStart,chrEnd)
-      results = filter_results(results,options)
+      results = filter_results(results)
       results = process_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
 
       for result in results:
