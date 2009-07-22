@@ -1021,7 +1021,7 @@ def build_binsets(loci, ldpairs, includes, exclude, designscores):
         binsets[lname2].add(lname1, loci[lname1].maf)
 
   # Update the bin disposition if the lname is one of the excludes
-  for lname in exclude:
+  for lname in exclude or []:
     if lname in binsets:
       binsets[lname].disposition = Bin.EXCLUDE
 
