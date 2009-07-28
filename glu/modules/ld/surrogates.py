@@ -21,13 +21,7 @@ from   glu.modules.ld.tagzilla import TagZillaOptionParser, check_option01, epsi
 
 def option_parser():
   usage = 'usage: %prog [options] genotypes...'
-  parser = TagZillaOptionParser(usage=usage, add_help_option=False)
-
-  parser.add_option('-h', '--help', dest='help', action='store_true',
-                        help='show this help message and exit')
-  parser.add_option('--license', dest='license', action='store_true',
-                          help="show program's copyright and license terms and exit")
-  parser.add_option('--profile', dest='profile', metavar='P', help=optparse.SUPPRESS_HELP)
+  parser = TagZillaOptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
@@ -58,9 +52,6 @@ def option_parser():
   genoldgroup.add_option('-a', '--minmaf', dest='maf', metavar='FREQ', type='float', default=0.05,
                           action='callback', callback=check_option01,
                           help='Minimum minor allele frequency (MAF) (default=0.05)')
-  genoldgroup.add_option('-A', '--minobmaf', dest='obmaf', metavar='FREQ', type='float', default=None,
-                          action='callback', callback=check_option01,
-                          help='Minimum minor allele frequency (MAF) for obligate tags (defaults to -a/--minmaf)')
   genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
                           help='Drop loci with less than N valid genotypes. Default=0')
   genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
@@ -80,7 +71,7 @@ def option_parser():
                           help='Minimum d-prime threshold to output (default=0)')
   bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.95,
                           action='callback', callback=check_option01,
-                          help='Minimum r-squared threshold to output (default=0)')
+                          help='Minimum r-squared threshold to output (default=0.95)')
 
   parser.add_option_group(inputgroup)
   parser.add_option_group(outputgroup)
@@ -117,9 +108,9 @@ def main():
   direct   = subset - exclude
   subex    = subset | exclude
   indirect = subset & exclude
-
   locusmap = {}
-  seen = set()
+  seen     = set()
+
   options.multipopulation = None
   # ldsubset=indirect
   ldpairs = generate_ldpairs(args, locusmap, set(), None, indirect, options)

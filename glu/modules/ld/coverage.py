@@ -21,22 +21,14 @@ from   glu.modules.ld.tagzilla import TagZillaOptionParser, check_option01, epsi
 
 def option_parser():
   usage = 'usage: %prog [options] tagfile genotypes...'
-  parser = TagZillaOptionParser(usage=usage, add_help_option=False)
-
-  parser.add_option('-h', '--help', dest='help', action='store_true',
-                        help='show this help message and exit')
-  parser.add_option('--license', dest='license', action='store_true',
-                          help="show program's copyright and license terms and exit")
-  parser.add_option('--profile', dest='profile', metavar='P', help=optparse.SUPPRESS_HELP)
+  parser = TagZillaOptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
   geno_options(inputgroup,input=True,filter=True)
 
   inputgroup.add_option('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
-                          help='File containing loci that are excluded from being a tag')
-  inputgroup.add_option('-s', '--subset', dest='subset', metavar='FILE', default='',
-                          help='File containing loci that define the subset to be analyzed of the loci that are read')
+                          help='File containing loci that are excluded from covering another locus')
   inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
                           help='Ranges of genomic locations to analyze, specified as a comma seperated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
@@ -98,15 +90,11 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
-  subset  = set()
   exclude = set()
 
   tags = set(list_reader(args[0][1]))
 
   args = args[1:]
-
-  if options.subset:
-    subset = set(list_reader(options.subset))
 
   if options.exclude:
     exclude = set(list_reader(options.exclude))
@@ -121,7 +109,7 @@ def main():
 
   locusmap = {}
   options.multipopulation = None
-  ldpairs = generate_ldpairs(args, locusmap, set(), subset, tags, options)
+  ldpairs = generate_ldpairs(args, locusmap, set(), None, tags, options)
 
   loci    = set()
   besttag = dict( (tag,(tag,1)) for tag in tags )

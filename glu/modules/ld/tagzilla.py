@@ -1610,7 +1610,7 @@ def load_genotypes(filename, options):
 
 
 def filter_loci(loci, include, subset, options):
-  if options.obmaf is None:
+  if getattr(options,'obmaf',None) is None:
     options.obmaf = options.maf
 
   if options.maf or options.obmaf:
