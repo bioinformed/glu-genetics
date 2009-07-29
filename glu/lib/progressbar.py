@@ -441,21 +441,78 @@ def progress_bar(output=None, widgets=None, length=None, label='Progress: ', bar
   return ProgressBar(widgets=widgets, maxval=length)
 
 
-def progress_loop(items, update_interval=None, **kwargs):
-  bar = progress_bar(**kwargs)
+try:
+  import posix
 
-  if bar is None:
-    return items
+  # NB: The tty is kept open and never closed for performance reasons.
+  #     Hopefully this won't cause assplosions.
+  posix_tty    = open("/dev/tty")
+  posix_tty_fd = posix_tty.fileno()
 
-  def _progress(items,bar):
-    bar.start()
+  def is_foreground():
+    tpgrp = posix.tcgetpgrp(posix_tty_fd)
+    pgrp  = posix.getpgrp()
+    return tpgrp == pgrp
 
-    for i,item in enumerate(items):
-      if i%update_interval == 0:
-        bar.update(i, force=True)
+except ImportError:
+  def is_foreground():
+    return True
 
-      yield item
 
-    bar.finish()
+try:
+  from signal import alarm
 
-  return _progress(items,bar)
+  def progress_loop(items, update_interval=1, **kwargs):
+    bar = progress_bar(**kwargs)
+
+    if bar is None:
+      return items
+
+    def _progress():
+      bar.start()
+
+      def progress_handler(signum, frame):
+        # Do not print status if we're in the background
+        # Uses the current value of the loop counter
+        if is_foreground():
+          bar.update(i, force=True)
+
+        signal.alarm(1)
+
+      old = signal.signal(signal.SIGALRM, progress_handler)
+
+      try:
+        signal.alarm(1)
+
+        for i,item in enumerate(items):
+          yield item
+
+      finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old)
+
+      bar.finish()
+
+    return _progress()
+
+except ImportError:
+
+  def progress_loop(items, update_interval=None, **kwargs):
+    bar = progress_bar(**kwargs)
+
+    if bar is None:
+      return items
+
+    def _progress():
+      bar.start()
+
+      for i,item in enumerate(items):
+        # Do not print status if we're in the background
+        if i%update_interval == 0 and is_foreground():
+          bar.update(i, force=True)
+
+        yield item
+
+      bar.finish()
+
+    return _progress()
