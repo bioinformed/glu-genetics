@@ -31,14 +31,19 @@ def option_parser():
 
   parser.add_option('-e', '--duplicates', dest='duplicates', metavar='FILE',
                     help='Mapping from sample identifier to subject identifier')
-  parser.add_option('--checkexp', dest='checkexp', action='store_true',
+  parser.add_option('--testpairs', dest='testpairs', metavar='FILE',
+                    help='File containing a list of pairs to test')
+  parser.add_option('--testexp', dest='testexp', action='store_true',
                     help='Check only expected duplicate pairs')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output of duplicate check report')
   parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.80,
                     help='Minimum proportion genotype concordance threshold for duplicates (default=0.8)')
   parser.add_option('-m', '--mingenos', dest='mingenos', metavar='N', type='int', default=20,
                     help='Minimum number of concordant genotypes to be considered informative (default=20)')
+
+  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+                    help='Output duplicate report')
+  parser.add_option('-P', '--progress', dest='progress', action='store_true',
+                    help='Show analysis progress bar, if possible')
 
   return parser
 
@@ -61,19 +66,59 @@ def expected_pairs(genos, dupset):
   dupsets of size>1 and generating pairs from within members of each of the
   resulting sets.
   '''
-  sets = squeeze_pairs(dupset.sets(),genos.samples)
-
   samples = set()
-  for s in sets:
+  for s in squeeze_pairs(dupset.sets(),genos.samples):
     samples.update(s)
 
   genos = genos.transformed(includesamples=samples).as_sdat().materialize()
 
-  sets = squeeze_pairs(sets,genos.samples)
+  sets  = squeeze_pairs(sets,genos.samples)
   genos = dict(genos)
+  n     = sum( len(dset)*(len(dset)-1)//2 for dset in sets )
   pairs = [ pair_generator([ (s,genos[s]) for s in dset ]) for dset in sets ]
 
-  return chain(*pairs)
+  return chain(*pairs),n
+
+
+def file_pairs(genos, pairfile):
+  '''
+  Form pairs by generating only pairs of samples that appear in a file
+  '''
+  data = load_table(pairfile)
+  genos = dict(genos)
+
+  # Materialize pairs, since the length is needed for the progress bar
+  pairs   = []
+
+  # Create a local intern dictionary for sample names, since the list of
+  # pairs can be very long
+  samples = dict( (sample,sample) for sample in genos )
+
+  for row in data:
+    if len(row) < 2:
+      continue
+
+    # Intern sample names
+    sample1 = samples.get(row[0])
+    sample2 = samples.get(row[1])
+
+    if sample1 and sample2:
+      pairs.append( (sample1,genos[sample1]),(sample2,genos[sample2]) )
+
+  # FIXME: We may want to implement a progress bar with a spinner for
+  # unknown length, since materializing here may be fatal to performance
+  return pairs,len(pairs)
+
+
+def progress_bar(pairs, pair_count):
+  try:
+    from glu.lib.progressbar import progress_loop
+  except ImportError:
+    return pairs
+
+  update_interval = max(1,min(pair_count//100,250))
+
+  return progress_loop(pairs, length=pair_count, units='pairs', update_interval=update_interval)
 
 
 def main():
@@ -102,10 +147,18 @@ def main():
                                    genome=options.loci,phenome=options.pedigree,
                                    transform=options)
 
-  if options.checkexp:
-    pairs = expected_pairs(genos, expected_dupset)
+  if options.testexp and options.testpairs:
+    raise ValueErrir('Only one of --testexp and --testpairs may be specified')
+
+  if options.testpairs:
+    pairs,pair_count = file_pairs(genos, options.testpairs)
+
+  elif options.testexp:
+    pairs,pair_count = expected_pairs(genos, expected_dupset)
   else:
-    pairs = pair_generator(genos.as_sdat().materialize())
+    genos = genos.as_sdat().materialize()
+    pairs = pair_generator(genos)
+    pair_count = len(genos)*(len(genos)-1)//2
 
   status = { (True, True ): ['EXPECTED',  'CONCORDANT'],
              (True, False): ['EXPECTED',  'DISCORDANT'],
@@ -114,6 +167,9 @@ def main():
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(['SAMPLE1','SAMPLE2','CONCORDANT_GENOTYPES','COMPARISONS','CONCORDANCE_RATE',
                 'EXPECTED_DUPLICATE','OBSERVED_DUPLICATE'])
+
+  if options.progress:
+    pairs = progress_bar(pairs, pair_count)
 
   # N.B. It is not possible to output duplicates incrementally and enumerate
   # duplicate sets.  This is because sets can merge transitively as
