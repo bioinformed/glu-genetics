@@ -32,6 +32,7 @@ try:
                                             UnphasedMarkerModel, genotype_indices,
                                             count_genotypes, genotype_categories,
                                             locus_summary, sample_summary, genoarray_concordance,
+                                            genoarray_ibs,
                                             GenotypeLookupError, GenotypeRepresentationError,
                                             pick, pick_columns, place, place_list)
 
@@ -714,21 +715,47 @@ except ImportError:
     @param genos2: second input
     @type  genos2: sequence of genotypes
     @return      : number of concordant genotypes and number of non-missing comparisons made
-    @rtype       : tuple of (int,int)
+    @rtype       : (int,int)
     '''
     if len(genos1) != len(genos2):
       raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
 
     concordant = comparisons = 0
     for a,b in izip(genos1,genos2):
-      if a.model is not b.model:
-        raise GenotypeRepresentationError('genotype models do not match')
       if a and b:
-        if a is b:
+        if a==b:
           concordant += 1
         comparisons += 1
 
     return concordant,comparisons
+
+
+  def genoarray_ibs(genos1, genos2):
+    '''
+    Generate counts of alleles shared IBS between two genotype arrays
+
+    @param genos1: first input
+    @type  genos1: sequence of genotypes
+    @param genos2: second input
+    @type  genos2: sequence of genotypes
+    @return      : Tuple (IBS0, IBS1, IBS2) where IBSn is the count of genotypes that share n alleles IBS
+    @rtype       : (int,int,int)
+    '''
+    if len(genos1) != len(genos2):
+      raise ValueError("genotype vector sizes do not match: %zd != %zd" % (len(genos1),len(genos2)))
+
+    ibs0,ibs1,ibs2 = 0,0,0
+    for a,b in izip(genos1,genos2):
+      if a and b:
+        if a==b:
+          ibs2 += 1
+        elif (a[0]==b[0] or a[0]==b[1] or
+              a[1]==b[0] or a[1]==b[1]):
+          ibs1 += 1
+        else:
+          ibs0 += 1
+
+    return ibs0,ibs1,ibs2
 
 
   def genotype_indices(genos):
@@ -2076,6 +2103,130 @@ def test_concordance_2bit():
   >>> descr = GenotypeArrayDescriptor([model]*5)
   >>> genoarray_concordance(g([AA,AB,BB,AA,AA]),g([AA,BB,AA,BB,AA]))
   (2, 5)
+  '''
+
+def test_ibs_generic():
+  '''
+  >>> model = build_model('AB')
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)[:]
+
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0, 4)
+  >>> genoarray_ibs(g([NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN]),g([NN,NN,NN,NN,NN,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 2, 1)
+  >>> genoarray_ibs(g([AB,BB,BB,BB,AB,AA]),g([AB,AA,AB,AB,BB,BB]))
+  (2, 3, 1)
+  '''
+
+
+def test_ibs_4bit():
+  '''
+  >>> model = build_model('AB',max_alleles=5)
+  >>> int(model.bit_size)
+  4
+
+  Test even number of genotypes
+
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)
+
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0, 4)
+  >>> genoarray_ibs(g([NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN]),g([NN,NN,NN,NN,NN,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 2, 1)
+  >>> genoarray_ibs(g([AB,BB,BB,BB,AB,AA]),g([AB,AA,AB,AB,BB,BB]))
+  (2, 3, 1)
+
+  Test odd number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*7)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN,AB]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (0, 0, 5)
+  >>> genoarray_ibs(g([NN,NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN,AA]),g([NN,NN,NN,NN,NN,NN,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([AA,AB,AB,BB,NN,BB,AA]),g([NN,AA,AB,AB,BB,NN,BB]))
+  (1, 2, 1)
+  '''
+
+
+def test_ibs_2bit():
+  '''
+  >>> model = build_model('AB')
+  >>> int(model.bit_size)
+  2
+
+  Test even number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*6)
+  >>> model.genotypes
+  [(None, None), ('A', 'A'), ('A', 'B'), ('B', 'B')]
+  >>> NN,AA,AB,BB = model.genotypes
+
+  >>> def g(genos):
+  ...   return GenotypeArray(descr,genos)
+
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0, 4)
+  >>> genoarray_ibs(g([NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN]),g([NN,NN,NN,NN,NN,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([AA,AB,AB,BB,NN,BB]),g([NN,AA,AB,AB,BB,NN]))
+  (0, 2, 1)
+  >>> genoarray_ibs(g([AB,BB,BB,BB,AB,AA]),g([AB,AA,AB,AB,BB,BB]))
+  (2, 3, 1)
+
+  Test odd number of genotypes
+
+  >>> descr = GenotypeArrayDescriptor([model]*7)
+
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN,AB]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (0, 0, 5)
+  >>> genoarray_ibs(g([NN,NN,NN,NN,NN,NN,NN]),g([NN,AA,AB,AB,BB,NN,AB]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([NN,AA,AB,AB,BB,NN,AA]),g([NN,NN,NN,NN,NN,NN,NN]))
+  (0, 0, 0)
+  >>> genoarray_ibs(g([AA,AB,AB,BB,NN,BB,AA]),g([NN,AA,AB,AB,BB,NN,BB]))
+  (1, 2, 1)
+
+  Test fractions of a byte
+
+  >>> descr = GenotypeArrayDescriptor([model]*1)
+  >>> genoarray_ibs(g([AA]),g([AA]))
+  (0, 0, 1)
+  >>> descr = GenotypeArrayDescriptor([model]*2)
+  >>> genoarray_ibs(g([AA,AB]),g([AA,BB]))
+  (0, 1, 1)
+  >>> descr = GenotypeArrayDescriptor([model]*3)
+  >>> genoarray_ibs(g([AA,AB,BB]),g([AA,BB,AA]))
+  (1, 1, 1)
+  >>> descr = GenotypeArrayDescriptor([model]*4)
+  >>> genoarray_ibs(g([AA,AB,BB,AA]),g([AA,BB,AA,BB]))
+  (2, 1, 1)
+  >>> descr = GenotypeArrayDescriptor([model]*5)
+  >>> genoarray_ibs(g([AA,AB,BB,AA,AA]),g([AA,BB,AA,BB,AA]))
+  (2, 1, 2)
   '''
 
 def test_pick():

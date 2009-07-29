@@ -501,7 +501,7 @@ descr_traverse(GenotypeArrayDescriptorObject *self, visitproc visit, void *arg)
 	return 0;
 }
 
-static Py_ssize_t
+Py_ssize_t
 descr_length(GenotypeArrayDescriptorObject *self)
 {
 	Py_ssize_t n;
@@ -1116,10 +1116,10 @@ genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObj
 		if(!comp)          return -1;
 		if(comp==Py_False)
 		{
-        		Py_DECREF(comp);
+			Py_DECREF(comp);
 		        return 0;
-                }
-        	Py_DECREF(comp);
+		}
+		Py_DECREF(comp);
 	}
 	return 1;
 }
@@ -1127,14 +1127,14 @@ genomodel_replaceable_by(UnphasedMarkerModelObject *self, UnphasedMarkerModelObj
 static PyObject *
 genomodel_replaceable_by_py(UnphasedMarkerModelObject *self, UnphasedMarkerModelObject *other)
 {
-        int ret = genomodel_replaceable_by(self, other);
-        if(ret == 0)
-                Py_RETURN_FALSE;
-        else if(ret == 1)
-                Py_RETURN_TRUE;
-        else
-                /* error must be set */
-                return NULL;
+	int ret = genomodel_replaceable_by(self, other);
+	if(ret == 0)
+		Py_RETURN_FALSE;
+	else if(ret == 1)
+		Py_RETURN_TRUE;
+	else
+		/* error must be set */
+		return NULL;
 }
 
 static int
@@ -1957,12 +1957,13 @@ genoarray_data_set(GenotypeArrayObject *self, PyObject *new_data, void *closure)
 
 	memcpy(self->data, PyArray_DATA(new_data), self->descriptor->byte_size);
 
+/*
 	if(genoarray_check_encoding(self) < 0)
 	{
 		PyErr_SetString(GenotypeRepresentationError, "binary data contains invalid genotypes");
 		return -1;
 	}
-
+*/
 	return 0;
 }
 
@@ -2822,369 +2823,6 @@ sample_summary_func(PyObject *self, PyObject *args, PyObject *kw)
 
 /******************************************************************************************************/
 
-static PyObject *
-genoarray_concordance_8bit(PyObject *self, PyObject *args)
-{
-	GenotypeArrayObject *genos1, *genos2;
-	const unsigned char *g1, *g2;
-	const unsigned int *offsets;
-	Py_ssize_t len, concordant, comparisons, i;
-
-	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
-		return NULL;
-
-	if(!GenotypeArray_CheckExact(genos1))
-	{
-		PyErr_SetString(PyExc_TypeError,"genos1 must be a GenotypeArray instance");
-		return NULL;
-	}
-
-	if(!GenotypeArray_CheckExact(genos2))
-	{
-		PyErr_SetString(PyExc_TypeError,"genos2 must be a GenotypeArray instance");
-		return NULL;
-	}
-
-	if(genos1->descriptor != genos2->descriptor)
-	{
-		PyErr_SetString(GenotypeRepresentationError,"genos1 and genos2 must share the same descriptor");
-		return NULL;
-	}
-
-	if(genos1->descriptor->homogeneous != 8)
-	{
-		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 8 bit width");
-		return NULL;
-	}
-
-	len = descr_length(genos1->descriptor);
-	if(len < 0) return NULL;
-
-	offsets = (const unsigned int *)PyArray_DATA(genos1->descriptor->offsets);
-
-	if(offsets[0] != 0)
-	{
-		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
-		return NULL;
-	}
-
-	g1 = genos1->data;
-	g2 = genos2->data;
-
-	concordant = comparisons = 0;
-	for(i = 0; i < len; ++i)
-	{
-		const unsigned char a = g1[i];
-		const unsigned char b = g2[i];
-
-		/* If both genotypes are not missing */
-		if(a && b)
-		{
-			if(a==b) concordant += 1;
-			comparisons += 1;
-		}
-	}
-	return Py_BuildValue("(ii)", concordant, comparisons);
-}
-
-static PyObject *
-genoarray_concordance_4bit(PyObject *self, PyObject *args)
-{
-	GenotypeArrayObject *genos1, *genos2;
-	const unsigned char *g1, *g2;
-	const unsigned int *offsets;
-	Py_ssize_t len, concordant, comparisons, i;
-
-	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
-		return NULL;
-
-	if(!GenotypeArray_CheckExact(genos1))
-	{
-		PyErr_SetString(PyExc_TypeError,"genos1 must be a GenotypeArray instance");
-		return NULL;
-	}
-
-	if(!GenotypeArray_CheckExact(genos2))
-	{
-		PyErr_SetString(PyExc_TypeError,"genos2 must be a GenotypeArray instance");
-		return NULL;
-	}
-
-	if(genos1->descriptor != genos2->descriptor)
-	{
-		PyErr_SetString(GenotypeRepresentationError,"genos1 and genos2 must share the same descriptor");
-		return NULL;
-	}
-
-	if(genos1->descriptor->homogeneous != 4)
-	{
-		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 4 bit width");
-		return NULL;
-	}
-
-	len = descr_length(genos1->descriptor);
-	if(len < 0) return NULL;
-
-	offsets = (const unsigned int *)PyArray_DATA(genos1->descriptor->offsets);
-
-	if(offsets[0] != 0)
-	{
-		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
-		return NULL;
-	}
-
-	g1 = genos1->data;
-	g2 = genos2->data;
-
-	concordant = comparisons = 0;
-	for(i = 0; i < len/2; ++i)
-	{
-		const unsigned char a  = g1[i];
-		const unsigned char b  = g2[i];
-		const unsigned char a1 = a&0xF0;
-		const unsigned char b1 = b&0xF0;
-		const unsigned char a2 = a&0x0F;
-		const unsigned char b2 = b&0x0F;
-
-		/* If both genotypes are not missing */
-		if( a1 && b1 )
-		{
-			if(a1==b1) concordant += 1;
-			comparisons += 1;
-		}
-
-		if( a2 && b2 )
-		{
-			if(a2==b2) concordant += 1;
-			comparisons += 1;
-		}
-	}
-
-	if(len&1)
-	{
-		const unsigned char a  = g1[i];
-		const unsigned char b  = g2[i];
-		const unsigned char a1 = a&0xF0;
-		const unsigned char b1 = b&0xF0;
-
-		/* If both genotypes are not missing */
-		if( a1 && b1 )
-		{
-			if(a1==b1) concordant += 1;
-			comparisons += 1;
-		}
-
-	}
-	return Py_BuildValue("(ii)", concordant, comparisons);
-}
-
-static PyObject *
-genoarray_concordance_2bit(PyObject *self, PyObject *args)
-{
-	GenotypeArrayObject *genos1, *genos2;
-	const unsigned char *g1, *g2;
-	const unsigned int *offsets;
-	Py_ssize_t len, concordant, comparisons, i;
-
-	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
-		return NULL;
-
-	if(!GenotypeArray_CheckExact(genos1))
-	{
-		PyErr_SetString(PyExc_TypeError,"genos1 must be a GenotypeArray instance");
-		return NULL;
-	}
-
-	if(!GenotypeArray_CheckExact(genos2))
-	{
-		PyErr_SetString(PyExc_TypeError,"genos2 must be a GenotypeArray instance");
-		return NULL;
-	}
-
-	if(genos1->descriptor != genos2->descriptor)
-	{
-		PyErr_SetString(GenotypeRepresentationError,"genos1 and genos2 must share the same descriptor");
-		return NULL;
-	}
-
-	if(genos1->descriptor->homogeneous != 2)
-	{
-		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 2 bit width");
-		return NULL;
-	}
-
-	len = descr_length(genos1->descriptor);
-	if(len < 0) return NULL;
-
-	offsets = (const unsigned int *)PyArray_DATA(genos1->descriptor->offsets);
-
-	if(offsets[0] != 0)
-	{
-		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
-		return NULL;
-	}
-
-	g1 = genos1->data;
-	g2 = genos2->data;
-
-	concordant = comparisons = 0;
-	for(i = 0; i < len/4; ++i)
-	{
-		const unsigned char a  = g1[i];
-		const unsigned char b  = g2[i];
-		const unsigned char a1 = a&0xC0;
-		const unsigned char a2 = a&0x30;
-		const unsigned char a3 = a&0x0C;
-		const unsigned char a4 = a&0x03;
-		const unsigned char b1 = b&0xC0;
-		const unsigned char b2 = b&0x30;
-		const unsigned char b3 = b&0x0C;
-		const unsigned char b4 = b&0x03;
-
-		/* If both genotypes are not missing */
-		if( a1 && b1 )
-		{
-			if(a1==b1) concordant += 1;
-			comparisons += 1;
-		}
-
-		if( a2 && b2 )
-		{
-			if(a2==b2) concordant += 1;
-			comparisons += 1;
-		}
-		if( a3 && b3 )
-		{
-			if(a3==b3) concordant += 1;
-			comparisons += 1;
-		}
-
-		if( a4 && b4 )
-		{
-			if(a4==b4) concordant += 1;
-			comparisons += 1;
-		}
-	}
-
-	len = len&3;
-
-	/* Handle len%4 remaining genotypes */
-	if(len)
-	{
-		const unsigned char a  = g1[i];
-		const unsigned char b  = g2[i];
-		const unsigned char a1 = a&0xC0;
-		const unsigned char a2 = a&0x30;
-		const unsigned char a3 = a&0x0C;
-		const unsigned char b1 = b&0xC0;
-		const unsigned char b2 = b&0x30;
-		const unsigned char b3 = b&0x0C;
-
-		if( a1 && b1 )
-		{
-			if(a1==b1) concordant += 1;
-			comparisons += 1;
-		}
-
-		if( len>1 && a2 && b2 )
-		{
-			if(a2==b2) concordant += 1;
-			comparisons += 1;
-		}
-		if( len>2 && a3 && b3 )
-		{
-			if(a3==b3) concordant += 1;
-			comparisons += 1;
-		}
-	}
-
-	return Py_BuildValue("(ii)", concordant, comparisons);
-}
-
-static PyObject *
-genoarray_concordance(PyObject *self, PyObject *args)
-{
-	PyObject *genos1, *genos2;
-	PyObject **items1, **items2;
-	Py_ssize_t len1, len2, concordant, comparisons, i;
-
-	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
-		return NULL;
-
-	if(GenotypeArray_CheckExact(genos1) && GenotypeArray_CheckExact(genos2))
-	{
-		GenotypeArrayObject *g1 = (GenotypeArrayObject *)genos1;
-		GenotypeArrayObject *g2 = (GenotypeArrayObject *)genos2;
-		unsigned int   *offsets = (unsigned int *)PyArray_DATA(g1->descriptor->offsets);
-		if(g1->descriptor == g2->descriptor &&
-		   descr_length(g1->descriptor) > 0 && offsets[0] == 0)
-		{
-			if(g1->descriptor->homogeneous == 8)
-				return genoarray_concordance_8bit(self, args);
-			if(g1->descriptor->homogeneous == 4)
-				return genoarray_concordance_4bit(self, args);
-			if(g1->descriptor->homogeneous == 2)
-				return genoarray_concordance_2bit(self, args);
-		}
-	}
-
-	genos1 = PySequence_Fast(genos1,"cannot convert genos1 into a sequence");
-	if(!genos1) return NULL;
-
-	genos2 = PySequence_Fast(genos2,"cannot convert genos2 into a sequence");
-	if(!genos2) goto error;
-
-	len1 = PySequence_Fast_GET_SIZE(genos1);
-	len2 = PySequence_Fast_GET_SIZE(genos2);
-
-	if(len1 != len2)
-	{
-		PyErr_Format(GenotypeRepresentationError,"genotype array sizes do not match: %zd != %zd",
-		             len1, len2);
-		goto error;
-	}
-
-	items1 = PySequence_Fast_ITEMS(genos1);
-	items2 = PySequence_Fast_ITEMS(genos2);
-
-	concordant = comparisons = 0;
-	for(i = 0; i < len1; ++i)
-	{
-		GenotypeObject *a = (GenotypeObject *)items1[i];
-		GenotypeObject *b = (GenotypeObject *)items2[i];
-
-		if(!a || !Genotype_CheckExact(a))
-		{
-			PyErr_Format(GenotypeRepresentationError,
-			    "invalid genotype object in genos1 at index %zd", i);
-			goto error;
-		}
-
-		if(!b || !Genotype_CheckExact(b))
-		{
-			PyErr_Format(GenotypeRepresentationError,
-			    "invalid genotype object in genos2 at index %zd", i);
-			goto error;
-		}
-
-		/* If both genotypes are not missing */
-		if(a->index && b->index)
-		{
-			if(a->index==b->index) concordant += 1;
-			comparisons += 1;
-		}
-	}
-
-	Py_DECREF(genos1);
-	Py_DECREF(genos2);
-
-	return Py_BuildValue("(ii)", concordant, comparisons);
-
-error:
-	Py_XDECREF(genos1);
-	Py_XDECREF(genos2);
-	return NULL;
-}
 
 /******************************************************************************************************/
 
@@ -4181,6 +3819,14 @@ init_genoarray(void)
 		 "Generate simple concordance statistics from two genotype arrays stored in 4-bit format"},
 		{"genoarray_concordance_2bit",	genoarray_concordance_2bit,	METH_VARARGS,
 		 "Generate simple concordance statistics from two genotype arrays stored in 2-bit format"},
+		{"genoarray_ibs",	genoarray_ibs,	METH_VARARGS,
+		 "Generate counts of alleles shared IBS between two genotype arrays"},
+		{"genoarray_ibs_8bit",	genoarray_ibs_8bit,	METH_VARARGS,
+		 "Generate counts of alleles shared IBS between two genotype arrays stored in 8-bit format"},
+		{"genoarray_ibs_4bit",genoarray_ibs_4bit,	METH_VARARGS,
+		 "Generate counts of alleles shared IBS between two genotype arrays stored in 4-bit format"},
+		{"genoarray_ibs_2bit",	genoarray_ibs_2bit,	METH_VARARGS,
+		 "Generate counts of alleles shared IBS between two genotype arrays stored in 2-bit format"},
 		{"pick",	pick,	METH_VARARGS,
 		 "Pick items from a sequence given indices"},
 		{"pick_columns",	pick_columns,	METH_VARARGS,

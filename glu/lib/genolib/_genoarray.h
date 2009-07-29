@@ -84,11 +84,25 @@ PyTypeObject GenotypeMergerType;
 #define GenotypeArrayDescriptor_CheckExact(op) ((op)->ob_type == &GenotypeArrayDescriptorType)
 #define GenotypeMerger_CheckExact(op)          ((op)->ob_type == &GenotypeMergerType)
 
+Py_ssize_t descr_length(GenotypeArrayDescriptorObject *self);
+
 typedef int (*geno_foreach)(Py_ssize_t i, GenotypeObject *geno, void *state);
 
 int for_each_genotype_genoarray(GenotypeArrayObject *genos, geno_foreach func, void *state);
 int for_each_genotype(PyObject *genos, geno_foreach func, void *state);
 
+/* IBS */
+PyObject *genoarray_concordance_8bit(PyObject *self, PyObject *args);
+PyObject *genoarray_concordance_4bit(PyObject *self, PyObject *args);
+PyObject *genoarray_concordance_2bit(PyObject *self, PyObject *args);
+PyObject *genoarray_concordance(PyObject *self, PyObject *args);
+
+PyObject *genoarray_ibs_8bit(PyObject *self, PyObject *args);
+PyObject *genoarray_ibs_4bit(PyObject *self, PyObject *args);
+PyObject *genoarray_ibs_2bit(PyObject *self, PyObject *args);
+PyObject *genoarray_ibs(PyObject *self, PyObject *args);
+
+/* LD */
 PyObject *count_haplotypes(PyObject *self, PyObject *args);
 PyObject *estimate_ld(PyObject *self, PyObject *args);
 
