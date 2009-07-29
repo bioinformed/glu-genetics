@@ -211,10 +211,6 @@ class BinaryGenomatrixWriter(object):
 
     assert self.state == OPEN
 
-    # Verify encoding invariants (for safety: this should not be necessary)
-    if not genos.check_encoding():
-      raise ValueError('Invalid genotype encoding for %s' % rowkey)
-
     self.rowkeys.append(rowkey)
     chunk = self.chunk
     chunk.append(genos.data)
@@ -252,10 +248,6 @@ class BinaryGenomatrixWriter(object):
 
     if self.format == 'sbat':
       for rowkey,genos in rows:
-        # Verify encoding invariants (for safety: this should not be necessary)
-        if not genos.check_encoding():
-          raise ValueError('Invalid genotype encoding for sample %s' % rowkey)
-
         rowkeys.append(rowkey)
         chunk.append(genos.data)
         if len(chunk) >= self.chunkrows:
@@ -264,10 +256,6 @@ class BinaryGenomatrixWriter(object):
 
     elif self.format == 'lbat':
       for rowkey,genos in rows:
-        # Verify encoding invariants (for safety: this should not be necessary)
-        if not genos.check_encoding():
-          raise ValueError('Invalid genotype encoding for locus %s' % rowkey)
-
         rowkeys.append(rowkey)
         chunk.append(genos.data)
         if len(chunk) >= self.chunkrows:
@@ -1283,10 +1271,6 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
 
-          # Verify encoding invariants (for safety: this should not be necessary)
-          if not g.check_encoding():
-            raise ValueError('Invalid genotype encoding for sample %s' % label)
-
           yield label,g
 
       gfile.close()
@@ -1309,11 +1293,6 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
           descr = build_descr(model,len(samples))
           g = GenotypeArray(descr)
           g.data = chunk[j,:]
-
-          # Verify encoding invariants (for safety: this should not be necessary)
-          if not g.check_encoding():
-            raise ValueError('Invalid genotype encoding for locus %s' % label)
-
 
           models.append(model)
           yield label,g
