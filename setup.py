@@ -85,7 +85,8 @@ if __name__ == '__main__':
         ext_modules = [ Extension('glu.lib.genolib.bitarrayc',      sources = ['glu/lib/genolib/bitarrayc.c']),
                         Extension('glu.lib.genolib._genoarray',     sources = ['glu/lib/genolib/_genoarray.c',
                                                                                'glu/lib/genolib/bitarrayc.c',
+                                                                               'glu/lib/genolib/_ibs.c',
                                                                                'glu/lib/genolib/_ld.c'],
                                                                     include_dirs = [numpy.get_include()]),
-                        Extension('glu.modules.tagzilla.pqueue',    sources = ['glu/modules/tagzilla/pqueue.c']),
+                        Extension('glu.modules.ld.pqueue',    sources = ['glu/modules/ld/pqueue.c']),
                       ])
