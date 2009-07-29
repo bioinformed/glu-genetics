@@ -232,14 +232,11 @@ def main():
 
     ibs1  = ibs1/n
     ibs2  = ibs2/n
-
     ibd1  = max(0, min((ibs1 - ibd0*e01)/e11, 1))
     ibd2  = max(0,1-ibd0-ibd1)
+    pihat = ibd1/2 + ibd2
 
-    ibd   = np.array([ibd0,ibd1,ibd2],dtype=float)
-    pihat = ibd[1]/2 + ibd[2]
-
-    estimates = [ibs0,ibs1,ibs2,ibd0,ibd1,ibd2]
+    estimates = [ibs0,ibs1,ibs2,ibd0,ibd1,ibd2,pihat]
     out.writerow([sample1,sample2]+[ '%0.4f' % e for e in estimates ])
 
 
