@@ -24,46 +24,29 @@ from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_snps_by_location, query_gene_by_name
 
 
-POPS = {'CEU'    : 'hapmap',
-        'YRI'    : 'hapmap',
-        'JPT'    : 'hapmap',
-        'CHB'    : 'hapmap',
-        'JPT+CHB': 'hapmap',
-        'NHS'    : 'NHS',
-        'PLCO'   : 'PLCO'
-       }
+#FIXME: Make even moe configurable
+HAPPATH='/usr/local/share/hapmap/'
 
-#FIXME: Make configurable
-if 1:
-  GENOMEDB      = '/usr/local/share/genedb/genome36.3.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
-  HAP_GENOTYPES = '/usr/local/share/hapmap/build23/rs_strand/non-redundant/genotypes_chr%s_%s_r23a_nr.b36.txt.gz'
-  HAP_FORMAT    = 'hapmap'
-elif 1:
-  GENOMEDB      = '/usr/local/share/genedb/genome36.3.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
-  HAP_GENOTYPES = '/usr/local/share/hapmap/build22/rs_strand/non-redundant/genotypes_chr%s_%s_r22_nr.b36.txt.gz'
-  HAP_FORMAT    = 'hapmap'
-elif 0:
-  GENOMEDB      = '/usr/local/share/genedb/genome35-1.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
-  HAP_GENOTYPES = '/usr/local/share/hapmap/build21a/rs_strand/non-redundant/genotypes_chr%s_%s_r21a_nr.txt.gz'
-  HAP_FORMAT    = 'hapmap'
-else:
-  GENOMEDB      = '/usr/local/share/genedb/genome35-1.db'
-  HAP_PEDIGREES = '/usr/local/share/hapmap/hapmap_pedigree.tsv'
-  HAP_GENOTYPES = '/usr/local/share/hapmap/build19/non-redundant/genotypes_chr%s_%s.txt.gz'
-  HAP_FORMAT    = 'hapmap'
-
-NHS_PEDIGREES = None
-NHS_GENOTYPES = '/u3/projects/CGEMS/Scans/Breast/1/current/genotypes/STUDY/subjects_STUDY_%s.ldat.gz'
-NHS_MAP       = '/u3/projects/CGEMS/Scans/Breast/1/raw/snp.map'
-NHS_FORMAT    = 'ldat'
-
-PLCO_PEDIGREES = None
-PLCO_GENOTYPES = '/u3/projects/CGEMS/Scans/Prostate/1/build2/genotypes/STUDY/subjects_STUDY_%s.ldat.gz'
-PLCO_MAP       = '/u3/projects/CGEMS/Scans/Prostate/1/raw/snp.map'
-PLCO_FORMAT    = 'ldat'
+DATA = { 'hapmap27' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+                           genotypes=HAPPATH+'build27/glu/hapmap_%(POP)s_%(CHR)s_r27_fwd_nr_b36.lbat'),
+         'hapmap26' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+                           genotypes=HAPPATH+'build26/forward/non-redundant/hapmap_%(POP)s_%(CHR)s_r26_fwd_nr_b36.lbat'),
+         'hapmap23' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+                            pedigree=HAPPATH+'hapmap_pedigree.tsv',
+                           genotypes=HAPPATH+'build23/rs_strand/non-redundant/genotypes_chr%(CHR)s_%(POP)s_r23a_nr.b36.txt.gz',
+                              format='hapmap'),
+         'hapmap22' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+                            pedigree=HAPPATH+'hapmap_pedigree.tsv',
+                           genotypes=HAPPATH+'build22/rs_strand/non-redundant/genotypes_chr%(CHR)s_%(POP)s_r22_nr.b36.txt.gz',
+                              format='hapmap'),
+         'hapmap21' : dict(   genome='genome35-1.db',
+                            pedigree=HAPPATH+'hapmap_pedigree.tsv',
+                           genotypes=HAPPATH+'build21a/rs_strand/non-redundant/genotypes_chr%(CHR)s_%(POP)s_r21a_nr.txt.gz',
+                              format='hapmap'),
+         'hapmap19' : dict(   genome='genome35-1.db',
+                            pedigree=HAPPATH+'hapmap_pedigree.tsv',
+                           genotypes=HAPPATH+'build19/non-redundant/genotypes_chr%(CHR)s_%(POP)s.txt.gz',
+                              format='hapmap') }
 
 
 def project_chdir(*dirs):
@@ -95,29 +78,19 @@ def project_file(*dirs_and_file):
   return os.path.join(project_path(*dirs),pfile)
 
 
-def get_genotypes(populations,chromosome):
+def get_genotypes(config,populations,chromosome):
   command = []
 
   populations = populations.split(',')
   command.append(' -M %s' % escape_spaces(','.join(populations)))
 
   for population in populations:
-    data = POPS[population]
-
-    if data == 'hapmap':
-      command.append('-f hapmap')
-      command.append('-p %s' % escape_spaces(HAP_PEDIGREES))
-      command.append(escape_spaces(HAP_GENOTYPES % (chromosome,population)))
-    elif data == 'NHS':
-      command.append('-f ldat')
-      command.append('-l %s' % escape_spaces(NHS_MAP))
-      command.append(NHS_GENOTYPES % chromosome)
-    elif data == 'PLCO':
-      command.append('-f ldat')
-      command.append('-l %s' % escape_spaces(PLCO_MAP))
-      command.append(PLCO_GENOTYPES % chromosome)
-    else:
-      raise ValueError('Unknown population')
+    if 'format' in config:
+      command.append('-f %s' % escape_spaces(config['format']))
+    if 'pedigree' in config:
+      command.append('-p %s' % escape_spaces(config['pedigree']))
+    if 'genotypes' in config:
+      command.append( escape_spaces(config['genotypes'] % dict(POP=population,CHR=chromosome)) )
 
   return ' '.join(command)
 
@@ -126,7 +99,7 @@ def escape_spaces(s):
   return s.replace(' ','\\ ')
 
 
-def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,include,exclude,
+def run_tagzilla(config,outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,include,exclude,
                          designfiles,designdefault,includefile,cmdprefix):
 
   prefix = '%s_%s_%s' % (project,gene,populations)
@@ -147,7 +120,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
     if cmdprefix:
       command.append(cmdprefix)
 
-    command.append('python /usr/local/bin/glu tagzilla')
+    command.append('glu ld.tagzilla')
 
     command.append('-s subset')
     file('subset','w').write('\n'.join(snps))
@@ -180,7 +153,7 @@ def run_tagzilla(outdir,project,gene,dprime,r2,populations,chromosome,snps,maf,i
 
     command.append('--designdefault=%f' % designdefault)
 
-    command.append(get_genotypes(populations,chromosome))
+    command.append(get_genotypes(config,populations,chromosome))
 
     command += ['-C maxsnp','-O loci.out','-b sum.txt','-B bins.txt','2>&1']
     command  = ' '.join(command)
@@ -335,15 +308,13 @@ class SubprocessManager(object):
 def option_parser():
   import optparse
 
-  usage = 'usage: %prog [options] outdir jobfile'
+  usage = 'usage: %prog [options] dataset outdir jobfile'
   parser = optparse.OptionParser(usage=usage)
 
   parser.add_option('-D', '--designscores', dest='designscores', metavar='FILE', action='append',
                     help='Design scores (optional)')
   parser.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
                     help='Default design score for any locus not found in a design file')
-  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
-                      help='Genedb genome annotation database name or file')
   parser.add_option('-i', '--include',   dest='include', metavar='FILE',
                       help='Obligate tags (optional)')
   parser.add_option('--upstream',   dest='upstream',   default=20000, type='int',  metavar='N',
@@ -364,18 +335,26 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if len(args) != 2:
+  if len(args) != 3:
     parser.print_help(sys.stderr)
     sys.exit(2)
 
-  con    = open_genedb(options.genedb)
-  outdir = args[0]
+  if args[0] not in DATA:
+    sys.stderr.write('[ERROR] Invalid dataset specified: %s\n' % args[0])
+    sys.stderr.write('[ERROR] Choices are: %s\n' % ', '.join(sorted(DATA)))
+    sys.exit(2)
+
+  config = DATA[args[0]]
+
+  con = open_genedb(config.get('genome'))
+
+  outdir = args[1]
 
   if not os.path.isdir(outdir):
     sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % outdir)
     sys.exit(1)
 
-  taskfile   = table_reader(args[1])
+  taskfile   = table_reader(args[2])
   header     = taskfile.next()
   tasks      = sorted( extend(strip(t),12) for t in taskfile )
   tasks      = sorted(clean_tasks(con,tasks,options))
@@ -404,7 +383,7 @@ def main():
     if manager:
       time.sleep(startdelay)
 
-    proc=run_tagzilla(outdir,project,gene,dprime,r2,population,chromosome,snps,
+    proc=run_tagzilla(config,outdir,project,gene,dprime,r2,population,chromosome,snps,
                       maf,include,exclude,options.designscores,options.designdefault,
                       options.include,options.cmdprefix)
     manager.add(proc)
@@ -445,7 +424,7 @@ def main():
       designfile.write('%s\n' % rs)
 
     pdir = project_path(outdir,project)
-    command = 'glu tagzilla.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
+    command = 'glu ld.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
     binsum = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, bufsize=1)
     sys.stderr.write(binsum.stdout.read())
 
