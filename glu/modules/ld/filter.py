@@ -10,6 +10,7 @@ __revision__  = '$Id$'
 
 
 import sys
+import optparse
 
 from   itertools               import islice
 
@@ -21,8 +22,6 @@ from   glu.modules.ld.tagzilla import check_option01
 
 
 def option_parser():
-  import optparse
-
   usage = 'usage: %prog [options] snplist genotypes'
   parser = optparse.OptionParser(usage=usage)
 

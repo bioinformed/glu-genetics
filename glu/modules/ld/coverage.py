@@ -15,13 +15,13 @@ import optparse
 from   glu.lib.fileutils       import list_reader, table_writer
 from   glu.lib.genolib         import geno_options
 
-from   glu.modules.ld.tagzilla import TagZillaOptionParser, check_option01, epsilon, sfloat, \
+from   glu.modules.ld.tagzilla import check_option01, epsilon, sfloat, \
                                       build_design_score, generate_ldpairs
 
 
 def option_parser():
   usage = 'usage: %prog [options] tagfile genotypes...'
-  parser = TagZillaOptionParser(usage=usage)
+  parser = optparse.OptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
@@ -108,7 +108,7 @@ def main():
     tags -= set(t for t in tags if t not in designscores)
 
   locusmap = {}
-  options.multipopulation = None
+  args = [(options,arg) for arg in args]
   ldpairs = generate_ldpairs(args, locusmap, set(), None, tags, options)
 
   loci    = set()
