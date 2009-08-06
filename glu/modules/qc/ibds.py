@@ -198,7 +198,7 @@ def main():
     return
 
   out = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(['SAMPLE1','SAMPLE2','IBS0','IBS1','IBS2','IBD0','IBD1','IBD2','PIHAT'])
+  out.writerow(['SAMPLE1','SAMPLE2','COMPARISONS','IBS0','IBS1','IBS2','IBD0','IBD1','IBD2','PIHAT'])
 
   sys.stderr.write('Estimating pairwise IBS and IBD...\n')
 
@@ -236,8 +236,11 @@ def main():
     ibd2  = max(0,1-ibd0-ibd1)
     pihat = ibd1/2 + ibd2
 
+    if sample1>sample2:
+      sample1,sample2=sample2,sample1
+
     estimates = [ibs0,ibs1,ibs2,ibd0,ibd1,ibd2,pihat]
-    out.writerow([sample1,sample2]+[ '%0.4f' % e for e in estimates ])
+    out.writerow([sample1,sample2,n]+[ '%0.4f' % e for e in estimates ])
 
 
 if __name__=='__main__':
