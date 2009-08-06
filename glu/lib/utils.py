@@ -235,26 +235,26 @@ def peekfirst(sequence):
   return first,sequence
 
 
-def groups(sequence, keyfunc=None):
+def groups(sequence, key=None):
   '''
   Returns an iterator to the first element of each group of equal valued
-  items (or keyfunc(item) if keyfunc is specified).
+  items (or key(item) if key is specified).
 
   This generator is merely a simplified version of itertools.groupby, such that:
 
-  list(groups(seq,keyfunc)) == [ key for key,subiter in groupby(sequence,keyfunc) ]
+  list(groups(seq,key)) == [ key for key,subiter in groupby(sequence,key) ]
 
-  @param  sequence: input sequence
-  @type   sequence: sequence
-  @param   keyfunc: converting function for grouping
-  @type    keyfunc: function
-  @return         : new sequence
-  @rtype          : sequence
+  @param sequence: input sequence
+  @type  sequence: sequence
+  @param      key: converting function for grouping
+  @type       key: function
+  @return        : new sequence
+  @rtype         : sequence
 
   >>> list(groups( [1,1,2,2,3,3,1] ))
   [1, 2, 3, 1]
   '''
-  if keyfunc is None:
+  if key is None:
     last = object()
     for item in sequence:
       if item != last:
@@ -263,24 +263,24 @@ def groups(sequence, keyfunc=None):
   else:
     last = object()
     for item in sequence:
-      key = keyfunc(item)
-      if key != last:
-        last = key
+      k = key(item)
+      if k != last:
+        last = k
         yield item
 
 
-def unique(sequence, keyfunc=None):
+def unique(sequence, key=None):
   '''
   Generator to produce the unique first occurance of each item in a
-  sequence.  If keyfunc is specified, then the first occurance of each
-  keyfunc(item) is returned, otherwise the entire item is taken as a key.
+  sequence.  If key is specified, then the first occurance of each
+  key(item) is returned, otherwise the entire item is taken as a key.
   Ordering is stable, since result elements will always appear in the order
   they first first appear in the input sequence.  Keys must be hashable.
 
   @param  sequence: input sequence
   @type   sequence: sequence
-  @param   keyfunc: key function function
-  @type    keyfunc: callable
+  @param       key: key function function
+  @type        key: callable
   @return         : new sequence
   @rtype          : generator
 
@@ -288,16 +288,16 @@ def unique(sequence, keyfunc=None):
   [1, 2, 3]
   '''
   seen = set()
-  if keyfunc is None:
+  if key is None:
     for item in sequence:
       if item not in seen:
         seen.add(item)
         yield item
   else:
     for item in sequence:
-      key = keyfunc(item)
-      if key not in seen:
-        seen.add(key)
+      k = key(item)
+      if k not in seen:
+        seen.add(k)
         yield item
 
 
