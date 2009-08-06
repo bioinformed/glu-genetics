@@ -12,4 +12,5 @@ summaries and to verify data quality.
   summary
   concordance
   dupcheck
+  ibds
   mendel_check

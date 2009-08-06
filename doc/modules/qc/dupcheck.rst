@@ -43,9 +43,9 @@ Usage::
 Options:
 
   -h, --help            show this help message and exit
-  -f NAME, --format=NAME
+  -f NAME, --informat=NAME
                         Input genotype format
-  -g REP, --genorepr=REP
+  -g REP, --ingenorepr=REP
                         Input genotype representation
   -l FILE, --loci=FILE  Locus description file and options
   -p FILE, --pedigree=FILE
@@ -57,15 +57,19 @@ Options:
   --excludesamples=FILE
                         List of samples to exclude
   --excludeloci=FILE    List of loci to exclude
+  --filterfounders      Excludes founders
+  --filternonfounders   Excludes non-founders
   -e FILE, --duplicates=FILE
                         Mapping from sample identifier to subject identifier
-  --checkexp            Check only expected duplicate pairs
-  -o FILE, --output=FILE
-                        Output of duplicate check report
+  --testpairs=FILE      File containing a list of pairs to test
+  --testexp             Check only expected duplicate pairs
   -t N, --threshold=N   Minimum proportion genotype concordance threshold for
                         duplicates (default=0.8)
   -m N, --mingenos=N    Minimum number of concordant genotypes to be
                         considered informative (default=20)
+  -o FILE, --output=FILE
+                        Output duplicate report
+  -P, --progress        Show analysis progress bar, if possible
 
 Methods
 =======
@@ -118,3 +122,6 @@ Run::
 
   :mod:`qc.concordance`
     Compute concordance between two sets of genotypes
+
+  :mod:`qc.ibds`
+    Compute IBS and IBD sharing for pairs of samples
