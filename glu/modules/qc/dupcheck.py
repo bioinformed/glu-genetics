@@ -60,22 +60,29 @@ def squeeze_pairs(sets,universe=None):
   return [ s for s in sets if len(s)>1 ]
 
 
+def flatten_dupsets(sets):
+  '''
+  Flatten dupsets into a single flat set
+  '''
+  flat = set()
+  for s in sets:
+    flat.update(s)
+  return flat
+
+
 def expected_pairs(genos, dupset):
   '''
   Form pairs by materializing only samples that participate in expected
   dupsets of size>1 and generating pairs from within members of each of the
   resulting sets.
   '''
-  samples = set()
-  for s in squeeze_pairs(dupset.sets(),genos.samples):
-    samples.update(s)
-
-  genos = genos.transformed(includesamples=samples).as_sdat().materialize()
-
-  sets  = squeeze_pairs(sets,genos.samples)
-  genos = dict(genos)
-  n     = sum( len(dset)*(len(dset)-1)//2 for dset in sets )
-  pairs = [ pair_generator([ (s,genos[s]) for s in dset ]) for dset in sets ]
+  sets    = squeeze_pairs(dupset.sets(),genos.samples)
+  samples = flatten_dupsets(sets)
+  genos   = genos.transformed(includesamples=samples).as_sdat().materialize()
+  sets    = squeeze_pairs(sets,genos.samples)
+  genos   = dict(genos)
+  n       = sum( len(dset)*(len(dset)-1)//2 for dset in sets )
+  pairs   = [ pair_generator([ (s,genos[s]) for s in dset ]) for dset in sets ]
 
   return chain(*pairs),n
 
@@ -84,11 +91,11 @@ def file_pairs(genos, pairfile):
   '''
   Form pairs by generating only pairs of samples that appear in a file
   '''
-  data = load_table(pairfile)
+  data = table_reader(pairfile)
   genos = dict(genos)
 
   # Materialize pairs, since the length is needed for the progress bar
-  pairs   = []
+  pairs = []
 
   # Create a local intern dictionary for sample names, since the list of
   # pairs can be very long
@@ -148,7 +155,7 @@ def main():
                                    transform=options)
 
   if options.testexp and options.testpairs:
-    raise ValueErrir('Only one of --testexp and --testpairs may be specified')
+    raise ValueError('Only one of --testexp and --testpairs may be specified')
 
   if options.testpairs:
     pairs,pair_count = file_pairs(genos, options.testpairs)
