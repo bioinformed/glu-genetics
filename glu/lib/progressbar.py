@@ -163,17 +163,19 @@ class Bar(ProgressBarWidgetHFill):
         self.marker = marker
         self.left = left
         self.right = right
-    def _format_marker(self, pbar):
+    def _format_marker(self, pbar, width):
         if isinstance(self.marker, (str, unicode)):
-            return self.marker
+            m = self.marker
         else:
-            return self.marker.update(pbar)
+            m = self.marker.update(pbar)
+        return (m*(width//len(m)+1))[:width]
+
     def update(self, pbar, width):
         percent = pbar.percentage()
         cwidth = width - len(self.left) - len(self.right)
         marked_width = percent * cwidth // 100
-        m = self._format_marker(pbar)
-        bar = (self.left + (m*marked_width).ljust(cwidth) + self.right)
+        m = self._format_marker(pbar,marked_width)
+        bar = (self.left + m.ljust(cwidth) + self.right)
         return bar
 
 
@@ -196,12 +198,12 @@ class ProgressBar(object):
     it will try to guess it, if it fails it will default to 80 columns.
 
     The simple use is like this:
-    >>> pbar = ProgressBar().start()
-    >>> for i in xrange(100):
-    ...    # do something
-    ...    pbar.update(i+1)
-    ...
-    >>> pbar.finish()
+    >> pbar = ProgressBar().start()
+    >> for i in xrange(100):
+    ..    # do something
+    ..    pbar.update(i+1)
+    ..
+    >> pbar.finish()
 
     But anything you want to do is possible (well, almost anything).
     You can supply different widgets of any type in any order. And you
@@ -331,12 +333,12 @@ class ProgressBar(object):
         '''Start measuring time, and prints the bar at 0%.
 
         It returns self so you can use it like this:
-        >>> pbar = ProgressBar().start()
-        >>> for i in xrange(100):
-        ...    # do something
-        ...    pbar.update(i+1)
-        ...
-        >>> pbar.finish()
+        >> pbar = ProgressBar().start()
+        >> for i in xrange(100):
+        ..    # do something
+        ..    pbar.update(i+1)
+        ..
+        >> pbar.finish()
         '''
         self.start_time = self.last_update_time = time.time()
         self.update(0)
@@ -358,12 +360,12 @@ class DummyProgressBar(object):
     it will try to guess it, if it fails it will default to 80 columns.
 
     The simple use is like this:
-    >>> pbar = ProgressBar().start()
-    >>> for i in xrange(100):
-    ...    # do something
-    ...    pbar.update(i+1)
-    ...
-    >>> pbar.finish()
+    >> pbar = ProgressBar().start()
+    >> for i in xrange(100):
+    ..    # do something
+    ..    pbar.update(i+1)
+    ..
+    >> pbar.finish()
 
     But anything you want to do is possible (well, almost anything).
     You can supply different widgets of any type in any order. And you
@@ -399,12 +401,12 @@ class DummyProgressBar(object):
         '''Start measuring time, and prints the bar at 0%.
 
         It returns self so you can use it like this:
-        >>> pbar = ProgressBar().start()
-        >>> for i in xrange(100):
-        ...    # do something
-        ...    pbar.update(i+1)
-        ...
-        >>> pbar.finish()
+        >> pbar = ProgressBar().start()
+        >> for i in xrange(100):
+        ..    # do something
+        ..    pbar.update(i+1)
+        .
+        >> pbar.finish()
         '''
         return self
 
@@ -412,19 +414,19 @@ class DummyProgressBar(object):
         '''Used to tell the progress is finished.'''
 
 
+def _isatty(f):
+  if hasattr(f,'isatty'):
+    return f.isatty()
+  elif hasattr(f,'fileno'):
+    return os.isatty(f.fileno())
+  return False
+
+
 def progress_bar(output=None, widgets=None, length=None, label='Progress: ', bar_marker='#', units=None):
   if output is None:
     output = sys.stderr
 
-  try:
-    if not os.isatty(output.fileno()):
-      raise ValueError('Not a TTY')
-  except (AttributeError,ValueError,TypeError):
-    return None
-
-  try:
-    from progressbar import Percentage, Bar, ETA, ProgressRate, ProgressBar
-  except ImportError:
+  if not _isatty(output):
     return None
 
   if widgets is None:
@@ -444,9 +446,15 @@ def progress_bar(output=None, widgets=None, length=None, label='Progress: ', bar
 try:
   import posix
 
+  def _find_tty():
+    for f in (sys.stdin,sys.stderr,sys.stdout):
+      if _isatty(f):
+        return f
+    return open('/dev/tty')
+
   # NB: The tty is kept open and never closed for performance reasons.
   #     Hopefully this won't cause assplosions.
-  posix_tty    = open("/dev/tty")
+  posix_tty    = _find_tty()
   posix_tty_fd = posix_tty.fileno()
 
   def is_foreground():
@@ -454,7 +462,7 @@ try:
     pgrp  = posix.getpgrp()
     return tpgrp == pgrp
 
-except ImportError:
+except (ImportError,IOError):
   def is_foreground():
     return True
 
@@ -462,13 +470,57 @@ except ImportError:
 try:
   from signal import alarm
 
-  def progress_loop(items, update_interval=1, **kwargs):
+  class IntervalTimer(object):
+    def __init__(self, interval=1):
+      self.interval = interval
+      self.jobs = {}
+      self.seq = 0
+      self.old_handler = signal.signal(signal.SIGALRM, self._handler)
+      self.old_alarm = 0
+
+    def add(self, handler):
+      jobid = self.seq
+      self.seq += 1
+      hasjobs = bool(self.jobs)
+
+      self.jobs[jobid] = handler
+
+      if not hasjobs:
+        self.old_alarm = signal.alarm(self.interval)
+
+      return jobid
+
+    def remove(self, jobid):
+      del self.jobs[jobid]
+      if not self.jobs:
+        signal.alarm(self.old_alarm)
+
+    def _handler(self, signum, frame):
+      for job in self.jobs.itervalues():
+        job(signum, frame)
+
+      if self.old_handler and self.old_alarm>0:
+        self.old_alarm -= self.interval
+        if self.old_alarm<=0:
+          self.old_handler(signum, frame)
+          self.old_alarm = 0
+
+      if self.jobs:
+        signal.alarm(self.interval)
+
+
+  interval_timer = IntervalTimer(1)
+
+
+  def progress_loop(items, update_interval=None, **kwargs):
     bar = progress_bar(**kwargs)
 
     if bar is None:
       return items
 
     def _progress():
+      i=0
+
       bar.start()
 
       def progress_handler(signum, frame):
@@ -477,19 +529,14 @@ try:
         if is_foreground():
           bar.update(i, force=True)
 
-        signal.alarm(1)
-
-      old = signal.signal(signal.SIGALRM, progress_handler)
+      jobid = interval_timer.add(progress_handler)
 
       try:
-        signal.alarm(1)
-
         for i,item in enumerate(items):
           yield item
 
       finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old)
+        interval_timer.remove(jobid)
 
       bar.finish()
 
@@ -497,6 +544,7 @@ try:
 
 except ImportError:
 
+  # Fall back to a more portable dumb implementation
   def progress_loop(items, update_interval=None, **kwargs):
     bar = progress_bar(**kwargs)
 
