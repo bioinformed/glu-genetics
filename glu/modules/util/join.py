@@ -33,7 +33,7 @@ def option_parser():
                     help='prefix to prepend to each non-key header name in table1')
   parser.add_option('--prefix2', dest='prefix2',  metavar='P2',
                     help='prefix to prepend to each non-key header name in table2')
-  parser.add_option('-u', '--unique', dest='unique', action='store_true',
+  parser.add_option('-U', '--uniquejoin', dest='uniquejoin', action='store_true',
                     help='Require that rows with valid keys from table2 are unique')
   parser.add_option('-j', '--join', dest='join', default='left',
                     help="Join type: 'left' (default) or 'inner'")
@@ -45,6 +45,8 @@ def option_parser():
                     help='Exclude all records with variable VAR equal to VAL')
   parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
                     help='Sort rows based on values in column VAR')
+  parser.add_option('-u', '--uniq', dest='uniq', action='store_true',
+                    help='Produce only unique rows by collapsing consecutive duplicate rows')
 
   return parser
 
@@ -250,7 +252,7 @@ def main():
   table2 = table_reader(args[1],hyphen=sys.stdin,want_header=True)
 
   table  = left_join(table1,table2,key1=options.key1,key2=options.key2,
-                    unique=options.unique,inner=(join_type=='inner'),
+                    unique=options.uniquejoin,inner=(join_type=='inner'),
                     prefix1=options.prefix1,prefix2=options.prefix2)
 
   out   = table_writer(options.output,hyphen=sys.stdout)

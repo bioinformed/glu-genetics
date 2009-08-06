@@ -11,13 +11,13 @@ import csv
 from   operator      import itemgetter
 from   itertools     import islice,izip,chain
 
-from   glu.lib.utils import is_str,as_set,peekfirst,deprecated_by
+from   glu.lib.utils import is_str,as_set,peekfirst,deprecated_by,unique
 
 
 __all__ = ['autofile','namefile','hyphen',
            'guess_format','related_file','guess_related_file',
            'list_reader', 'map_reader', 'table_reader', 'table_writer',
-           'cook_table', 'sort_table', 'subset_variables',
+           'cook_table', 'sort_table', 'uniq_table', 'subset_variables',
            'create_categorical_variables']
 
 
@@ -1904,7 +1904,7 @@ def cook_table(table, options):
   '''
   Create categorical variables, subset and sort table
   '''
-  vars = ['categorical','includevar','excludevar','sort']
+  vars = ['categorical','includevar','excludevar','sort','uniq']
 
   if not any(getattr(options,var) for var in vars):
     return table
@@ -1925,7 +1925,26 @@ def cook_table(table, options):
   if getattr(options,'sort',None):
     header,table = sort_table(header,table,options.sort)
 
+  if getattr(options,'uniq',None):
+    header,table = uniq_table(header,table)
+
   return chain([header],table)
+
+
+def _key_func(indices):
+  # Itemgetter returns a single element for one key
+  if len(indices) == 1:
+    index = indices[0]
+    def get_keys(item):
+      return tryfloat(item[index])
+
+  # Itemgetter returns a tuple for a compound key
+  else:
+    get_inds = itemgetter(*indices)
+    def get_keys(item):
+      return tuple(map(tryfloat, get_inds(item)))
+
+  return get_keys
 
 
 def sort_table(header, table, keys):
@@ -1974,19 +1993,82 @@ def sort_table(header, table, keys):
   if not indices:
     return header,table
 
-  # Itemgetter returns a single element for one key
-  if len(indices) == 1:
-    index = indices[0]
-    def get_keys(item):
-      return tryfloat(item[index])
+  return header,sorted(table,key=_key_func(indices))
 
-  # Itemgetter returns a tuple for a compound key
-  else:
-    get_inds = itemgetter(*indices)
-    def get_keys(item):
-      return map(tryfloat, get_inds(item))
 
-  return header,sorted(table,key=get_keys)
+def uniq_table(header, table, keys=None):
+  '''
+  Generator to produce the unique first occurance of each item in a table.
+  Ordering is stable, since result elements will always appear in the order
+  they first first appear in the input sequence.
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['3','M','-9' ],
+  ...           ['2','F','9e9' ],
+  ...           ['3.0','M','-9' ],
+  ...           ['3.0','F','-9' ],
+  ...           ['2','F','9.0e9' ],
+  ...           ['1','?','abc']]
+
+  >>> h,d = uniq_table(header,data)
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['3.0', 'F', '-9']
+  ['1', '?', 'abc']
+
+  >>> h,d = uniq_table(header,data,'a')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['1', '?', 'abc']
+
+  >>> h,d = uniq_table(header,data,'a')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['1', '?', 'abc']
+
+  >>> h,d = uniq_table(header,data,['b','a'])
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['3.0', 'F', '-9']
+  ['1', '?', 'abc']
+
+  >>> h,d = uniq_table(header,data,'c,a')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['1', '?', 'abc']
+  '''
+  if not keys:
+    keys = range(len(header))
+  elif is_str(keys):
+    keys = [keys]
+
+  indices  = []
+  for key in keys:
+    indices.extend(resolve_column_headers(header, key))
+
+  assert indices
+
+  return header,unique(table,key=_key_func(indices))
 
 
 def subset_variable(header,data,variable,include=None,exclude=None):

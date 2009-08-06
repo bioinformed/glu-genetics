@@ -25,6 +25,8 @@ def option_parser():
                     help='Exclude all records with variable VAR equal to VAL')
   parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
                     help='Sort rows based on values in column VAR')
+  parser.add_option('-u', '--uniq', dest='uniq', action='store_true',
+                    help='Produce only unique rows by collapsing consecutive duplicate rows')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
   return parser
