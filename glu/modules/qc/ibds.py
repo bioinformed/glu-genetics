@@ -17,47 +17,9 @@ from   glu.lib.utils             import pair_generator
 from   glu.lib.fileutils         import table_writer
 from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.transform import _intersect_options, _union_options
-from   glu.lib.genolib.genoarray import locus_summary, sample_summary, \
-                                        genotype_indices, count_genotypes, \
-                                        genoarray_ibs
+from   glu.lib.genolib.genoarray import genoarray_ibs, genotype_count_matrix
 
 from   glu.modules.qc.dupcheck   import file_pairs, progress_bar
-
-
-def genotype_counts(genos):
-  if genos.format not in ('sdat','ldat'):
-    genos = genos.as_sdat()
-
-  if genos.format == 'ldat':
-    locus_counts = []
-    loci = []
-    for (lname,geno) in genos:
-      loci.append(lname)
-
-      count    = count_genotypes(geno)
-      # Set missing counts to zero
-      count[0] = 0
-
-      if len(count) < 4:
-        count = count.tolist()+[0]*(4-len(count))
-
-      locus_counts.append(count)
-
-    samples = set(genos.samples)
-    locus_counts = np.asarray(locus_counts,dtype=int)
-
-  else:
-    samples = set()
-    loci = genos.loci
-    locus_counts = None
-    for sample,geno in genos:
-      sample_count,locus_counts = sample_summary(geno,locus_counts)
-      samples.add(sample)
-
-    # Set missing counts to zero
-    locus_counts[:,0] = 0
-
-  return loci,samples,locus_counts
 
 
 def allele_counts(models,geno_counts):
@@ -173,7 +135,7 @@ def main():
     genos = genos.as_sdat().materialize()
 
   sys.stderr.write('Computing genotype frequencies...\n')
-  loci,samples,geno_counts = genotype_counts(genos)
+  loci,samples,geno_counts = genotype_count_matrix(genos)
 
   x,n = allele_counts(genos.models,geno_counts)
   ibs_given_ibd = estimate_ibs_given_ibd(x,n)

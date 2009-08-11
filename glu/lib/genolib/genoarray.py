@@ -12,7 +12,7 @@ __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeArrayDescri
            'GenotypeLookupError','GenotypeRepresentationError']
 
 
-import numpy
+import numpy as np
 from   itertools     import izip,chain
 
 from   glu.lib.utils import izip_exact
@@ -392,7 +392,7 @@ except ImportError:
       elif isinstance(descriptor, GenotypeArray):
         self.descriptor = descriptor.descriptor
 
-      self.data = numpy.zeros(self.descriptor.byte_size, dtype=numpy.ubyte)
+      self.data = np.zeros(self.descriptor.byte_size, dtype=np.ubyte)
 
       if genos is not None:
         self[:] = genos
@@ -486,7 +486,7 @@ except ImportError:
       data    = self.data
       offsets = self.descriptor.offsets
       inds    = [ getbits(data, offsets[i], offsets[i+1]-offsets[i]) for i in xrange(len(self)) ]
-      return numpy.asarray(inds,dtype=int)
+      return np.asarray(inds,dtype=int)
 
     def counts(self,counts=None,model=None):
       '''
@@ -817,7 +817,7 @@ except ImportError:
         raise GenotypeRepresentationError('genotype models do not match')
       counts[geno.index] += 1
 
-    return numpy.asarray(counts,dtype=int)
+    return np.asarray(counts,dtype=int)
 
 
   def genotype_categories(genos,counts=None):
@@ -852,7 +852,7 @@ except ImportError:
 
     for geno in genos:
       counts[geno.category] += 1
-    return numpy.array(counts,dtype=int)
+    return np.array(counts,dtype=int)
 
 
   def locus_summary(genos,sample_counts=None,locus_counts=None,model=None):
@@ -867,11 +867,11 @@ except ImportError:
     @param         genos: genotypes belonging to a single model
     @type          genos: sequence
     @param sample_counts: optional array of category counts to accumulate
-    @type  sample_counts: same type as numpy.zeros( (len(genos),4), dtype=int)
+    @type  sample_counts: same type as np.zeros( (len(genos),4), dtype=int)
     @param  locus_counts: optional array of genotype counts to accumulate
-    @type   locus_counts: same type as numpy.zeros(len(genos), dtype=int)
+    @type   locus_counts: same type as np.zeros(len(genos), dtype=int)
     @return             : 2-tuple of locus_counts and sample_counts
-    @rtype              : tuple of numpy.array
+    @rtype              : tuple of np.array
 
     >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*4)
@@ -910,7 +910,7 @@ except ImportError:
       raise ValueError('invalid locus count array')
 
     if sample_counts is None:
-      sample_counts = numpy.zeros((n,4), dtype=int)
+      sample_counts = np.zeros((n,4), dtype=int)
     elif sample_counts.shape != (n,4):
       raise ValueError('invalid sample count array')
 
@@ -920,7 +920,7 @@ except ImportError:
       locus_counts[geno.index]       += 1
       sample_counts[i,geno.category] += 1
 
-    locus_counts = numpy.asarray(locus_counts,dtype=int)
+    locus_counts = np.asarray(locus_counts,dtype=int)
 
     return locus_counts,sample_counts
 
@@ -937,11 +937,11 @@ except ImportError:
     @param         genos: genotypes belonging to a single model
     @type          genos: sequence
     @param  locus_counts: optional array of genotype counts to accumulate
-    @type   locus_counts: same type as numpy.zeros(len(genos), dtype=int)
+    @type   locus_counts: same type as np.zeros((len(genos),len(maxgenos)), dtype=int)
     @param sample_counts: optional array of category counts to accumulate
-    @type  sample_counts: same type as numpy.zeros( (len(genos),max(genosize), dtype=int)
+    @type  sample_counts: same type as np.zeros(4, dtype=int)
     @return             : 2-tuple of  sample_counts and locus_counts
-    @rtype              : tuple of numpy.array
+    @rtype              : tuple of np.array
 
     >>> model = build_model('AB')
     >>> descr = GenotypeArrayDescriptor([model]*4)
@@ -979,7 +979,7 @@ except ImportError:
       else:
         max_bits = max(g.model.bit_size for g in genos) if n else 0
 
-      locus_counts = numpy.zeros((n,1<<max_bits), dtype=int)
+      locus_counts = np.zeros((n,1<<max_bits), dtype=int)
 
     elif locus_counts.shape[0] != n:
       raise ValueError('invalid locus count array')
@@ -988,7 +988,7 @@ except ImportError:
       sample_counts[geno.category] += 1
       locus_counts[i,geno.index]   += 1
 
-    sample_counts = numpy.asarray(sample_counts,dtype=int)
+    sample_counts = np.asarray(sample_counts,dtype=int)
 
     return sample_counts,locus_counts
 
@@ -1508,6 +1508,53 @@ def major_allele_from_genos(genos):
 
   counts = count_alleles_from_genocounts(model,count_genotypes(genos))
   return major_allele_from_allelecounts(model, counts)
+
+##################################################################################
+
+
+def genotype_count_matrix(genos):
+  '''
+  Count the number of occurances of each n genotypes for a series of loci.
+  Genotype counts are returned as an m x n matrix of genotype counts where m
+  is the number of loci and n-1 is the maximum number of genotypes at any
+  locus, and each row contains integers counts corresponding to genotype
+  index.  The first column corresponds to the count of missing genotypes.
+
+  @param         genos: genotype stream
+  @type          genos: GenotypeStream instance
+  @return             : tuple of loci, samples, and m x n matrix of genotype counts
+  @rtype              : list of str, set of str, same type as np.zeros( (len(genos.loci),max(genosize)), dtype=int)
+  '''
+  if genos.format not in ('sdat','ldat'):
+    genos = genos.as_sdat()
+
+  if genos.format == 'ldat':
+    locus_counts = []
+    loci = []
+    for lname,geno in genos:
+      loci.append(lname)
+
+      count = count_genotypes(geno)
+
+      # FIXME: Keep a running maxgeno instead of assuming bialleleic SNPs
+      if len(count) < 4:
+        count = count.tolist()+[0]*(4-len(count))
+
+      locus_counts.append(count)
+
+    samples = set(genos.samples)
+    locus_counts = np.asarray(locus_counts,dtype=int)
+
+  else:
+    samples = set()
+    loci = genos.loci
+    locus_counts = None
+    for sample,geno in genos:
+      sample_count,locus_counts = sample_summary(geno,locus_counts)
+      samples.add(sample)
+
+  return loci,samples,locus_counts
+
 
 ##################################################################################
 
@@ -2302,9 +2349,9 @@ def bench_locus_summary():
 
     genoslist = genos.tolist()
 
-    sample_counts1 = numpy.zeros((len(genos),4), dtype=int)
+    sample_counts1 = np.zeros((len(genos),4), dtype=int)
     print sample_counts1.shape
-    sample_counts2 = numpy.zeros((len(genos),4), dtype=int)
+    sample_counts2 = np.zeros((len(genos),4), dtype=int)
 
     t1 = time.clock()
 
@@ -2347,9 +2394,9 @@ def bench_sample_summary():
 
     genoslist = genos.tolist()
 
-    locus_counts1 = numpy.zeros((len(genos),1<<genos.descriptor.max_bit_size), dtype=int)
+    locus_counts1 = np.zeros((len(genos),1<<genos.descriptor.max_bit_size), dtype=int)
     print locus_counts1.shape
-    locus_counts2 = numpy.zeros((len(genos),1<<genos.descriptor.max_bit_size), dtype=int)
+    locus_counts2 = np.zeros((len(genos),1<<genos.descriptor.max_bit_size), dtype=int)
 
     t1 = time.clock()
 
