@@ -38,3 +38,9 @@ Options:
   -O FILE, --vecout=FILE
                         Output eigenvalues and statistics to FILE
   --vectors=N           Output the top N eigenvectors.  Default=10
+
+
+.. seealso::
+
+  :mod:`struct.admix`
+    Estimate genetic admixture proportions

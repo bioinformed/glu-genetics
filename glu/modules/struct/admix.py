@@ -3,7 +3,7 @@
 from __future__ import division
 
 __gluindex__  = True
-__abstract__  = 'Estimate admixture proportions of a series of samples with a series of assumed ancestral populations'
+__abstract__  = 'Estimate genetic admixture proportions from series of assumed ancestral populations'
 __copyright__ = 'Copyright (c) 2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -56,11 +56,39 @@ def log_like(genos,pops):
     # Mask missing genotypes, take the natural log, and sum over loci
     l = -np.log(l).sum()
 
-    # Return log-likelihood
+    # Return -log-likelihood
     return l
 
   # Return likelihood function now that precomputations are done
   return log_like_fn
+
+
+def classify_ancestry(labels,mix,threshold):
+  '''
+  An individual is considered of a given ancestry based on the supplied
+  labels and estimated admixture coefficients if their coefficient is
+  greater than a given threshold.
+
+  Otherwise, an individual who has no single estimated admixture coefficient
+  that meets the specified threshold then one of two behaviors result.  If
+  only one population group exceeds 1-threshold then the ancestry is deemed
+  'ADMIXED' for that population.  Otherwise, a list of populations with
+  estimated admixture above 1-threshold is returned.
+  '''
+  popset = set()
+
+  cmax = -1
+  for pop,coeff in izip(labels,mix):
+    if coeff >= 1-threshold:
+      popset.add(pop)
+      cmax = max(cmax,coeff)
+
+  if len(popset)==1 and cmax < threshold:
+    ipop = 'ADMIXED %s' % popset.pop()
+  else:
+    ipop = ','.join(sorted(popset))
+
+  return ipop
 
 
 def progress_bar(samples, sample_count):
@@ -84,6 +112,8 @@ def option_parser():
 
   parser.add_option('--label', dest='labels', metavar='LABEL', action='append', default=[],
                     help='Population label (specify one per population)')
+  parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.80,
+                    help='Imputed ancestry threshold (default=0.80)')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='output table file name')
   parser.add_option('-P', '--progress', dest='progress', action='store_true',
@@ -103,7 +133,9 @@ def main():
   k = len(args)-1
 
   # Build population labels
-  labels = [ label.strip() for label in options.labels ]
+  labels = []
+  for label in options.labels:
+    labels.extend( l.strip() for l in label.split(',') )
 
   if '' in labels:
     raise ValueError('Blank population label specified')
@@ -174,23 +206,26 @@ def main():
     test = progress_bar(test, len(test.samples))
 
   out = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(['SAMPLE']+labels)
+  out.writerow(['SAMPLE']+labels+['IMPUTED_ANCESTRY'])
+
   for sample,genos in test:
     # Build likelihood function
     f = log_like(genos,pops)
 
-    # Perform a grid search
+    # Perform a grid search for initial estimates
     mix = scipy.optimize.brute(f, grid, finish=None)
 
-    # Refine by some rounds of the Nelder-Mead downhill simplex algorithm
-    mix = scipy.optimize.fmin(f, mix, disp=0)
+    # Refine using Powell's conjugate-gradient descent, hopefully away from
+    # a bound
+    mix = scipy.optimize.fmin_powell(f, mix, disp=0)
 
     # Augment admixture estimates and ensure they conform to bounds
     mix = np.asarray(mix.tolist()+[1-mix.sum()],dtype=float)
     np.clip(mix,0,1,out=mix)
 
     # Write output
-    out.writerow( [sample] + ['%.4f' % abs(a) for a in mix] )
+    ipop = classify_ancestry(labels, mix, options.threshold)
+    out.writerow([sample] + ['%.4f' % abs(a) for a in mix] + [ipop])
 
 
 if __name__=='__main__':

@@ -6,4 +6,5 @@ Population structure
 
 .. toctree::
 
-  pca.rst
+  admix
+  pca
