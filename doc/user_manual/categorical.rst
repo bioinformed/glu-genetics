@@ -21,7 +21,7 @@ association models (as in :mod:`assoc.logit1` or :mod:`assoc.linear1`).  It
 should be noted that genotype effects, although categorical, are encoded via
 a different mechanism :ref:`user_manual-formulae`.
 
-The following options are available in :mod:`util.table`,
+The following options are available in :mod:`util.table`, :mod:`util.join`,
 :mod:`assoc.logit1`, and :mod:`assoc.linear1`:
 
   -c VAR, --categorical=VAR  Create indicator variables based on values of VAR

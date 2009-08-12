@@ -6,6 +6,6 @@ Utility modules
 
 .. toctree::
 
-  join
   table
+  join
 
