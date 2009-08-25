@@ -22,7 +22,7 @@ def emit(filename,rows):
 
 def option_parser():
   import optparse
-  usage = 'Usage: %prog [options] genofile'
+  usage = 'Usage: %prog [options] genofile...'
 
   parser = optparse.OptionParser(usage=usage)
 
@@ -39,25 +39,17 @@ def option_parser():
   return parser
 
 
-def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
+def ginfo(filename,options,out):
+  genos = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
                                   genome=options.loci,phenome=options.pedigree,
                                   transform=options,hyphen=sys.stdin)
 
-  out = autofile(hyphen(options.output,sys.stdout),'w')
 
   if None in (genos.samples,genos.loci) and not options.lazy:
     out.write('Materializing genotypes.\n')
     genos = genos.materialize()
 
-  out.write('Filename    : %s\n' % namefile(args[0]))
+  out.write('Filename    : %s\n' % namefile(filename))
   out.write('Format      : %s\n' % genos.format)
 
   if genos.samples is not None:
@@ -65,6 +57,8 @@ def main():
 
   if genos.loci is not None:
     out.write('locus  count: %d\n' % len(genos.loci))
+
+  out.write('\n')
 
   if options.outputsamples:
     def _samples():
@@ -101,6 +95,23 @@ def main():
                       loc.chromosome or '', loc.location or '', loc.strand or '']
 
     emit(options.outputloci,_loci())
+
+
+def main():
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if len(args) < 1:
+    parser.print_help(sys.stderr)
+    sys.exit(2)
+
+  out = autofile(hyphen(options.output,sys.stdout),'w')
+
+  if len(args) > 1 and (options.outputsamples or options.outputloci):
+    raise ValueError('Cannot output samples or loci when multiple input files are specified')
+
+  for arg in args:
+    ginfo(arg,options,out)
 
 
 if __name__=='__main__':
