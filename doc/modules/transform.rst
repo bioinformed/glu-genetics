@@ -30,7 +30,7 @@ Options:
   Input/Output Options:
 
     -o FILE, --output=FILE
-                        Output transformed data to FILE(default is "-" for
+                        Output transformed data to FILE (default is "-" for
                         standard out)
     -f NAME, --informat=NAME
                         Input genotype format

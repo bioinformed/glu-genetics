@@ -23,7 +23,7 @@ def option_parser():
   ioopts = optparse.OptionGroup(parser, 'Input/Output Options')
 
   ioopts.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output transformed data to FILE(default is "-" for standard out)')
+                    help='Output transformed data to FILE (default is "-" for standard out)')
 
   geno_options(ioopts,input=True,output=True)
 
