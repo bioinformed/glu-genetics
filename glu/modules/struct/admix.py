@@ -110,8 +110,11 @@ def option_parser():
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('--label', dest='labels', metavar='LABEL', action='append', default=[],
-                    help='Population label (specify one per population)')
+  parser.add_option('--labels', dest='labels', metavar='LABELS', action='append', default=[],
+                    help='Population labels (specify one per population separated with commas)')
+  parser.add_option('--model', dest='model', metavar='MODEL', default='HWP',
+                    help='Model for genotype frequencies.  HWP to assume Hardy-Weinberg proportions, '
+                         'otherwise GENO to fit genotypes based on frequency.  (Default=HWP)')
   parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.80,
                     help='Imputed ancestry threshold (default=0.80)')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -176,15 +179,45 @@ def main():
     mask = np.array([ l in locusset for l in pop_loci ],dtype=bool)
     geno_counts = geno_counts[mask]
 
-    # Set each genotype to be observed at least once
-    np.clip(geno_counts,1,1e300,out=geno_counts)
-
     # Set missing genotypes to zero
     geno_counts[:,0] = 0
 
-    # Compute frequencies
-    n = geno_counts.sum(axis=1)[:,np.newaxis]
-    geno_freqs = geno_counts/n
+    if options.model.upper() == 'GENO':
+      # Set each genotype to be observed at least once
+      np.clip(geno_counts,1,1e300,out=geno_counts)
+      geno_counts[:,0] = 0
+
+      # Compute frequencies
+      n = geno_counts.sum(axis=1)[:,np.newaxis]
+      geno_freqs = geno_counts/n
+
+    elif options.model.upper() == 'HWP':
+      geno_freqs = np.zeros(geno_counts.shape, dtype=float)
+
+      for i,model in enumerate(genos.models):
+        n = 2*geno_counts[i].sum()
+
+        if not n or len(model.alleles)!=3:
+          geno_freqs[i] = 1
+          continue
+
+        a,b  =  model.alleles[1:3]
+        inds = (model[a,a].index,
+                model[a,b].index,
+                model[b,b].index)
+
+        hom1 = geno_counts[i,inds[0]]
+        hets = geno_counts[i,inds[1]]
+        hom2 = geno_counts[i,inds[2]]
+
+        p    = (2*hom1+hets)/n
+        q    = 1-p
+
+        geno_freqs[i,inds[0]] =   p*p
+        geno_freqs[i,inds[1]] = 2*p*q
+        geno_freqs[i,inds[2]] =   q*q
+    else:
+      raise ValueError('Invalid genotype likelihood model specified: %s' % options.model)
 
     # Append to list of source populations
     pops.append( (pop_loci,geno_freqs) )

@@ -40,7 +40,11 @@ Options:
   --excludeloci=FILE    List of loci to exclude
   --filterfounders      Excludes founders
   --filternonfounders   Excludes non-founders
-  --label=LABEL         Population label (specify one per population)
+  --labels=LABELS       Population labels (specify one per population
+                        separated with commas)
+  --model=MODEL         Model for genotype frequencies.  HWP to assume Hardy-
+                        Weinberg proportions, otherwise GENO to fit genotypes
+                        based on frequency.  (Default=HWP)
   -t N, --threshold=N   Imputed ancestry threshold (default=0.80)
   -o FILE, --output=FILE
                         output table file name
@@ -93,7 +97,7 @@ Example
 
 Run::
 
-    glu qc.admix mysamples.sbat CEU.lbat YRI.lbat ASA.lbat --label=CEU,YRI,ASA -o admix.out
+    glu qc.admix -P mysamples.sbat CEU.lbat YRI.lbat ASA.lbat --labels=CEU,YRI,ASA -o admix.out
 
 .. seealso::
 
