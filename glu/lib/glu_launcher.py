@@ -149,6 +149,7 @@ def option_parser():
 
 
 def write_traceback():
+  sys.stderr.write('\nWell, this is embarrassing.\n')
   sys.stderr.write('\nTraceback:  %s\n' % (traceback.format_exc().replace('\n','\n  ')))
 
 
@@ -241,6 +242,8 @@ def main():
 
   except BaseException, e:
     ret = 1
+
+    sys.stderr.write('''\nWell, that could have gone better.\n''')
 
     if not glu_options.verbose:
       sys.stderr.write('''
