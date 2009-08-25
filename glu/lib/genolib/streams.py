@@ -2210,7 +2210,12 @@ def merge_genomatrixstream(genos, mergefunc):
 
         # Merge genotypes
         if genos.format=='ldat':
-          model   = genos.genome.get_model(label)
+          model = genos.genome.get_model(label)
+
+          # Sanity Check: verify all models are conformable
+          # FIXME: If not, we must need to recode
+          assert all(row[0].model.replaceable_by(model) for row in rows)
+
           new_row = mergefunc.merge_locus(samples, label, model, new_row)
           models.append(model)
         else:
@@ -3097,9 +3102,14 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
 
   if new_model is None:
     new_locus.model = old_model
-
-  # FIXME: Recoding should be triggered only when models are not replaceable
-  elif old_model is None or new_model is not old_model:
+  elif old_model is None:
+    new_locus.model = new_model
+  elif new_model is old_model or old_model.replaceable_by(new_model):
+    new_locus.model = new_model
+  elif new_model.replaceable_by(old_model):
+    new_locus.model = old_model
+  else:
+    # Recoding needed
     new_locus.model = None
     return True
 
