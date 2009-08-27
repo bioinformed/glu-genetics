@@ -84,14 +84,18 @@ def remap_category(allelemap):
 
 
 def eval_remap(gmap, genocounts):
+  # Break ties by counting number of identity mappings
   concord = 0
+  ident   = sum(1 for a1,a2 in gmap.iteritems() if a1==a2)
+
   for (g1,g2),n in genocounts.iteritems():
     a     = g1
     b1,b2 = g2
     b1,b2 = gmap.get(b1),gmap.get(b2)
     if a == (b1,b2) or a == (b2,b1):
       concord += n
-  return concord
+
+  return concord,ident
 
 
 def remap_alleles(genocounts):
@@ -108,20 +112,11 @@ def remap_alleles(genocounts):
   (60, {'C': 'G', 'T': 'A'})
   '''
   genos = izip(*genocounts)
-  left  = set(a for g in genos.next() for a in g)
-  right = set(a for g in genos.next() for a in g)
-
-  if len(left) > len(right):
-    right.update( left - right )
-  elif len(left) < len(right):
-    left.update( right - left )
-
-  left  = list(left)
-  #print left
-  right = list(right)
+  left  = list(set(a for g in genos.next() for a in g))
+  right = list(set(a for g in genos.next() for a in g))
 
   maps = (dict(izip(right,lperm)) for lperm in permutations(left))
-  concord,bestmap = max( (eval_remap(map,genocounts),map) for map in maps )
+  (concord,ident),bestmap = max( (eval_remap(map,genocounts),map) for map in maps )
 
   return concord,bestmap
 
