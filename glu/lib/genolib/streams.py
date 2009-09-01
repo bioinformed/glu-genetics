@@ -159,13 +159,13 @@ class GenotripleStream(GenotypeStream):
       @return: genotriple stream
       @rtype :  sequence of sample, locus, and genotype
       '''
-      def _check(rows):
+      def _check_debug(rows):
         for sample,locus,geno in rows:
           assert isinstance(geno,Genotype)
           assert locus in self.genome.loci
           assert geno.model is self.genome.loci[locus].model
           yield sample,locus,geno
-      return _check(self.use_stream())
+      return _check_debug(self.use_stream())
 
   def _model_pairs(self):
     get_model = self.genome.get_model
@@ -861,7 +861,7 @@ class GenomatrixStream(GenotypeStream):
       @rtype :  sequence of sample, locus, and genotype
       '''
       if self.format=='ldat':
-        def _check(rows):
+        def _check_debug(rows):
           for (locus,row),model in izip_exact(rows,self.models):
             assert not self.packed or isinstance(row,GenotypeArray)
             assert not self.packed or model is row.descriptor[0]
@@ -869,16 +869,16 @@ class GenomatrixStream(GenotypeStream):
             assert model is self.genome.loci[locus].model
             assert all(isinstance(g,Genotype) for g in row)
             yield locus,row
-        return _check(self.use_stream())
+        return _check_debug(self.use_stream())
       else:
         assert all(self.genome.loci[locus].model in (model,None) for locus,model in izip_exact(self.loci,self.models))
-        def _check(rows):
+        def _check_debug(rows):
           for sample,row in rows:
             assert all(isinstance(g,Genotype) for g in row)
             assert len(self.models) == len(row)
             assert all(g.model is model for model,g in izip_exact(self.models,row))
             yield sample,row
-        return _check(self.use_stream())
+        return _check_debug(self.use_stream())
 
       return iter(self.use_stream())
 
@@ -1716,7 +1716,7 @@ def unique_check_genomatrixstream(genos):
     return genos
 
   # SLOWPATH: Check rows as they stream past
-  def _check():
+  def _check_unique():
     drows = set()
     for label,row in genos:
       if label in drows:
@@ -1726,7 +1726,7 @@ def unique_check_genomatrixstream(genos):
 
       yield label,row
 
-  return genos.clone(_check(),materialized=False,unique=True)
+  return genos.clone(_check_unique(),materialized=False,unique=True)
 
 
 #######################################################################################
