@@ -2401,8 +2401,15 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
     # Pass-through to merge_genomatrixsteam
     if format=='sdat':
-      # FIXME: Do I need to propogate updates? How do I propogate updates?
-      genos = genos[0].clone(chain(*genos),genome=genome,samples=rowlist,unique=unique,
+      updates = []
+      def _combine(genos):
+        for g in genos:
+          for row,genos in g:
+            updates[:] = g.updates
+            yield row,genos
+          updates[:] = []
+
+      genos = genos[0].clone(_combine(genos),genome=genome,samples=rowlist,unique=unique,updates=updates,
                              materialized=False)
     else:
       models = []
