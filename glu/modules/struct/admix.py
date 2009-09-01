@@ -10,18 +10,13 @@ __revision__  = '$Id$'
 
 
 import sys
-import time
 
 import numpy as np
 import scipy.optimize
 
 from   itertools                 import izip
-from   functools                 import partial
-from   operator                  import itemgetter
-from   collections               import defaultdict
 
-from   glu.lib.fileutils         import table_reader, table_writer, \
-                                        parse_augmented_filename
+from   glu.lib.fileutils         import table_writer
 from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.genoarray import genotype_count_matrix, genotype_indices
 
@@ -30,65 +25,6 @@ from   glu.lib.genolib.genoarray import genotype_count_matrix, genotype_indices
 EPSILON=np.finfo(float).eps
 ABSTOL=1e-6
 RELTOL=1e-9
-
-
-def normalize(x):
-  '''
-  Normalize an admixture vector x that may have been perturbed by roundoff
-  error, truncation, or other bad things that may result in boundary
-  violations.
-
-  Steps:
-    1. Clip all values to between [0..1] (inclusive)
-    2. Normalize values to sum to 1 by division by x.sum()
-    3. Check for round-off error and adjust 1-ULP<= x.sum() <= 1.
-
-  N.B. x cannot have large deviations from the expected bounds or else the
-       results will be rather arbitrary.
-  '''
-  x = np.clip(x,0,1)
-  x = x/x.sum()
-  while x.sum()>1:
-    x /= 1+EPSILON
-  return x
-
-
-def admixture_lnL(f,x):
-  '''
-  Let F be a (n x k) matrix of known frequencies of n events from k
-  distributions.  We wish to compute the negative log-likelihood function
-  over a (k x 1) vector x of proportions:
-
-    -lnL(x) = -sum(ln(F*x))
-
-    subject to sum(x) <= 1
-               min(x) >= 0
-
-  This routine is not for use as an objective function for optimization
-  algorithms.  During optimization, it is occasionally necessary to traverse
-  the likelihood surface in ways that (temporarily) violate model
-  constraints.
-  '''
-  k = f.shape[1]
-  x = np.asarray(x)
-
-  # Check bounds
-  if x.min() < 0.0 or x.max() > 1.0:
-    return np.inf
-
-  s = x.sum()
-  if s-1>EPSILON or s<0:
-    return np.inf
-
-  if (~np.isfinite(x)).any():
-    return np.inf
-
-  # Augment parameters
-  if len(x)+1==k:
-    x = np.append(x, [1-s])
-
-  # Compute weighted mixture of likelihoods per locus
-  return -np.log(np.dot(f,x)).sum()
 
 
 def estimate_admixture_em(f,x0=None,iters=100):
@@ -131,73 +67,6 @@ def estimate_admixture_em(f,x0=None,iters=100):
   return x
 
 
-def estimate_admixture_powell(f, x0, em_factor=20):
-  '''
-  Problem: Maximize a likelihood to determine mixing proportions a series of
-  events from a series of k Bernoulli distributions (a simplification of a
-  binomial mixture problem)
-
-  Let F be a (n x k) matrix of known frequencies of n events from k
-  distributions.  We wish to maximize the following log-likelihood function
-  over a (k x 1) vector x of proportions:
-
-    lnL(x) = sum(ln(F*x))
-
-    subject to sum(x) <= 1
-               min(x) >= 0
-
-  Note: n is typically 10,000-20,000
-        k is typically 2..5
-
-  Powell's conjugate-gradient descent method is used to estimate admixture,
-  though it is an unconstrained method.  A reduced parameter space x[:-1] is
-  used to partially avoid constraint violations, though good initial
-  parameter estimates are required for convergence.
-
-  This algorithm is extremely naive and is included only as a reference
-  point for more sophisticated methods.
-  '''
-  n,k = f.shape
-
-  iters = [0]
-
-  # Since Powell's method is operating without knowledge of constraints,
-  # begin with em_factor*k EM steps to ensure the Powell steps begin close
-  # to the likelihood's maximum.
-  x1 = normalize(estimate_admixture_em(f,x0=x0,iters=em_factor*k))
-
-  # likelihood function removing the dependent parameter and optimizing on
-  # the reduced parameter space of x[:-1]
-  def lnL(x):
-    iters[0] += 1
-    x = np.asarray(x)
-
-    # Check bounds, since Powell's method doesn't know about them
-    if x.min() < 0.0 or x.max() > 1:
-      return np.inf
-
-    s = x.sum()
-    if s-1>ABSTOL or s<0:
-      return np.inf
-
-    if (~np.isfinite(x)).any():
-      return np.inf
-
-    # Augment parameters
-    if len(x)+1==k:
-      x = np.append(x, [1-s])
-
-    # Compute weighted mixture of likelihoods per locus
-    return -np.log(np.dot(f,x)).sum()
-
-  # Refine using Powell's conjugate-gradient descent using a reduced
-  # paramter space, hopefully away from a bound.
-  x = scipy.optimize.fmin_powell(lnL, x1[:-1], disp=0, ftol=RELTOL)
-  x = np.append(x, [1-x.sum()])
-
-  return x,lnL(x),iters[0]
-
-
 def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
   '''
   Problem: Maximize a likelihood to determine mixing proportions a series of
@@ -228,7 +97,7 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
   NumPy versions.
   '''
   # WARNING: This code mixes NumPy and CVXOPT data types.  Proceed with caution.
-  from cvxopt import solvers, matrix, spdiag, mul, div, log
+  from cvxopt import solvers, matrix
 
   n,k = f.shape
   x0  = matrix(x0)
@@ -319,80 +188,6 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
   return x,l,iters[0]
 
 
-def estimate_admixture_openopt(f, x0, method='ralg'):
-  '''
-  Problem: Maximize a likelihood to determine mixing proportions a series of
-  events from a series of k Bernoulli distributions (a simplification of a
-  binomial mixture problem)
-
-  Let F be a (n x k) matrix of known frequencies of n events from k
-  distributions.  We wish to maximize the following log-likelihood function
-  over a (k x 1) vector x of proportions:
-
-    lnL(x) = sum(ln(F*x))
-
-    subject to sum(x) <= 1
-               min(x) >= 0
-
-  Note: n is typically 10,000-20,000
-        k is typically 2..5
-
-  OPENOPT's ralg algorithm is used, which is a constrained NLP/NSP solver
-  written by Dmitrey Kroshko.
-  '''
-  from openopt import NLP
-
-  n,k = f.shape
-
-  # Precompute cross-products of population frequencies (columns of f) for the Hessian
-  ff = [ [ f[:,i][:,np.newaxis]*f[:,j][:,np.newaxis] for j in range(k) ]
-                                                     for i in range(k) ]
-
-  # Store last function values, since the solver seems to want to
-  # re-evaluate them several times
-  last   = []
-  iters  = [0]
-
-  sqp = method=='scipy_slsqp'
-
-  # Build likelihood function
-  def lnL(x):
-    # Do not check constraints or else optimization will often get "stuck"
-    iters[0] += 1
-
-    # Compute mixture probabilities and log-likelihood
-    u =  np.dot(f,x)
-    l = -np.log(u).sum()
-
-    if sqp and not np.isfinite(l):
-      return np.inf
-
-    return l
-
-  def dlnL(x):
-    # Compute derivatives
-    u  =  np.dot(f,x)[:,np.newaxis]
-    df = -(f/u).sum(axis=0)
-    return df
-
-  def d2lnL(x):
-    u2 =  np.dot(f,x)**2
-    h  = np.array([ [ (ff[i][j]/u2).sum() for i in range(k) ]
-                                          for j in range(k) ], dtype=float)
-    return h
-
-  #   1 equality constraint for sum(x)==1
-  A = np.ones(k)
-  b = np.ones(1)
-
-  p = NLP(f=lnL, df=dlnL, x0=x0, lb=np.zeros(k), ub=np.ones(k), Aeq=A, beq=b, d2f=d2lnL,
-          maxIter=10000, iprint=-1, ftol=ABSTOL, xtol=ABSTOL)
-
-  r = p.solve(method)
-
-  return r.xf,r.ff,iters[0]
-
-
 def estimate_admixture_sqp(f, x0, failover=True):
   '''
   Problem: Maximize a likelihood to determine mixing proportions a series of events from a
@@ -419,10 +214,6 @@ def estimate_admixture_sqp(f, x0, failover=True):
 
   n,k = f.shape
   x0 = np.array(x0)
-
-  # Precompute cross-products of population frequencies (columns of f) for the Hessian
-  ff = [ [ f[:,i][:,np.newaxis]*f[:,j][:,np.newaxis] if i>=j else 0 for j in range(k) ]
-                                                                    for i in range(k) ]
 
   # Store last function values, since the solver seems to want to
   # re-evaluate them several times
@@ -469,6 +260,7 @@ def estimate_admixture_sqp(f, x0, failover=True):
                                     f_eqcons=eqcons, fprime_eqcons=fprime_eqcons,
                                     iter=25, full_output=True, iprint=-1, acc=ABSTOL/10)
 
+  # Sometimes x is returned as a list...
   x = np.asarray(x)
 
   # Allow algorithm to fail and re-try problem with CVXOPT (without
@@ -538,7 +330,6 @@ def load(options,args):
   locusset = set(test.loci)
 
   # Load source populations, align loci, and compute frequencies
-
   pops = []
   for arg in args[1:]:
     sys.stderr.write('Loading %s...\n' % arg)
@@ -631,29 +422,6 @@ def build_labels(options,args):
   return labels
 
 
-def load_references(filenames,k):
-  refs = []
-
-  expected_len = k+1
-
-  for filename in filenames:
-    args = {}
-    filename = parse_augmented_filename(filename,args)
-    name = args.pop('name',filename)
-    data = table_reader(filename, want_header=True, **args)
-    header = data.next()
-
-    if len(header) < expected_len:
-      raise ValueError('Too few columns in reference file %s (saw %d, expected at least %d'
-                        % (filename,len(header),expected_len))
-
-    data = dict( (row[0],map(float,row[1:expected_len])) for row in data )
-
-    refs.append( (name,data) )
-
-  return refs
-
-
 def option_parser():
   import optparse
 
@@ -667,8 +435,6 @@ def option_parser():
   parser.add_option('--model', dest='model', metavar='MODEL', default='HWP',
                     help='Model for genotype frequencies.  HWP to assume Hardy-Weinberg proportions, '
                          'otherwise GENO to fit genotypes based on frequency.  (Default=HWP)')
-  parser.add_option('--reference', dest='reference', metavar='FILE', action='append', default=[],
-                    help='Compare results to another struct.admix output file')
   parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.80,
                     help='Imputed ancestry threshold (default=0.80)')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -691,111 +457,27 @@ def main():
   labels    = build_labels(options,args)
   test,pops = load(options,args)
 
-  k = len(pops)
-  n = len(test.samples)
-
-  refs = load_references(options.reference,k)
-
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(['SAMPLE']+labels+['IMPUTED_ANCESTRY'])
-
-  methods = [ ('SQP',      estimate_admixture_sqp),
-#             ('POWELL10', partial(estimate_admixture_powell,  em_factor=10)),
-#             ('POWELL25', partial(estimate_admixture_powell,  em_factor=25)),
-#             ('POWELL50', partial(estimate_admixture_powell,  em_factor=50)),
-#             ('RALG',     partial(estimate_admixture_openopt, method='ralg')),
-#             ('OOSQP',    partial(estimate_admixture_openopt, method='scipy_slsqp')),
-#             ('CVXOPT',   estimate_admixture_cvxopt),
-            ]
-
-  times  = defaultdict(int)
-  iters  = defaultdict(int)
-  scores = defaultdict(float)
-
-  # Internal option for testing
-  outputsummary = False
-
-  def summary(i):
-    if not outputsummary:
-      return
-
-    # Produce summary performance table
-    total = sum(times.itervalues())
-
-    results = [ (method,scores[method],t,iters[method]) for method,t in times.iteritems() ]
-    results.sort(key=itemgetter(1,2,0))
-
-    out.writerow(['SUMMARY','SAMPLE=%d' % i])
-    out.writerow(['METHOD','SCORE','ITERS','TIME','%TIME','ITER/SEC','SAMPLE/SEC'])
-    for method,score,t,it in results:
-      ti = (it/t) if t else 0
-      ts = (i/t)  if t else 0
-      out.writerow([method, '%0.2f' % score, it, '%.2f' % t,'%.2f' % (t/total*100),
-                            '%.3f' % ti,'%.3f' % ts])
-
-    out.writerow([])
 
   if options.progress and test.samples:
     test = progress_bar(test, len(test.samples))
 
-  for i,(sample,genos) in enumerate(test):
-    if i%250==0 and i:
-      summary(i)
-
-    t0 = time.clock()
-    # Compute genotype frequencies, f
+  for sample,genos in test:
+    # Compute genotype frequencies
     ind     = np.asarray(genotype_indices(genos), dtype=int)
     mask    = ind>0
     indices = np.arange(len(ind))
     f       = np.array([ pop[indices,ind][mask] for pop in pops ], dtype=float).T
 
     # Find feasible starting values
-    x0      = normalize(estimate_admixture_em(f,iters=0*k))
-    times['PREP'] += time.clock()-t0
+    x0      = estimate_admixture_em(f,iters=0)
 
-    # Optimize using each method selected
-    results = []
-    for method,optfunc in methods:
-      t0 = time.clock()
-      x,fx,it = optfunc(f, x0)
-      times[method] += time.clock()-t0
-      iters[method] += it
-      x = normalize(x)
-      ipop = classify_ancestry(labels, x, options.threshold)
-      results.append([method] + ['%.4f' % a for a in x] + [ipop, it, fx])
+    # Estimate admixture
+    x,l,it  = estimate_admixture_sqp(f, x0)
 
-    # Provide reference results, if available
-    for name,data in refs:
-      if sample in data:
-        times[name] = 0
-        x = normalize(data[sample])
-        ipop = classify_ancestry(labels, x, options.threshold)
-        results.append([name] + ['%.4f' % a for a in x] + [ipop, '', admixture_lnL(f,x), ])
-
-
-    if len(results) == 1:
-      results[0][0] = sample
-      out.writerow(results[0][:-1])
-    else:
-      # Show results sorted by -log-likelihood (descending)
-      results.sort(key=itemgetter(k+3,k+2,0))
-
-      for r in results:
-        # Bake-off code
-        if 0:
-          s = r[k+3] - results[0][k+3]
-          scores[r[0]] += s if np.isfinite(s) else 10
-          r.append('%.2f' % s)
-        else:
-          r = r[:-1]
-
-        r[0] = '   %s   ' % r[0]
-
-      out.writerow([sample])
-      out.writerows(results)
-      out.writerow([])
-
-  summary(n)
+    ipop = classify_ancestry(labels, x, options.threshold)
+    out.writerow([sample]+['%.4f' % a for a in x] + [ipop])
 
 
 if __name__=='__main__':
