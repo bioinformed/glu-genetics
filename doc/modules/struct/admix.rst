@@ -97,7 +97,7 @@ Example
 
 Run::
 
-    glu qc.admix -P mysamples.sbat CEU.lbat YRI.lbat ASA.lbat --labels=CEU,YRI,ASA -o admix.out
+    glu struct.admix -P mysamples.sbat CEU.lbat YRI.lbat ASA.lbat --labels=CEU,YRI,ASA -o admix.out
 
 .. seealso::
 
