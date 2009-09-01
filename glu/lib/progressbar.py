@@ -317,7 +317,7 @@ class ProgressBar(object):
         '''
         return self.currval >= self.next_update
 
-    def update(self, value, force=False):
+    def update(self, value, force=False, show=True):
         'Updates the progress bar to a new value.'
         assert 0 <= value <= self.maxval
         self.currval = value
@@ -326,10 +326,11 @@ class ProgressBar(object):
         now = time.time()
         self.seconds_elapsed = now - self.start_time
         self.next_update = self._next_update()
-        self.fd.write(self._format_line() + '\r')
+        if show:
+          self.fd.write(self._format_line() + '\r')
         self.last_update_time = now
 
-    def start(self):
+    def start(self,show=True):
         '''Start measuring time, and prints the bar at 0%.
 
         It returns self so you can use it like this:
@@ -341,16 +342,17 @@ class ProgressBar(object):
         >> pbar.finish()
         '''
         self.start_time = self.last_update_time = time.time()
-        self.update(0)
+        self.update(0,show=show)
         return self
 
-    def finish(self):
+    def finish(self, show=True):
         '''Used to tell the progress is finished.'''
         self.finished = True
-        self.update(self.maxval)
-        self.fd.write('\n')
+        self.update(self.maxval,show=show)
+        if show:
+          self.fd.write('\n')
         if self.signal_set:
-            signal.signal(signal.SIGWINCH, signal.SIG_DFL)
+          signal.signal(signal.SIGWINCH, signal.SIG_DFL)
 
 
 class DummyProgressBar(object):
@@ -521,7 +523,7 @@ try:
     def _progress():
       i=0
 
-      bar.start()
+      bar.start(show=is_foreground())
 
       def progress_handler(signum, frame):
         # Do not print status if we're in the background
@@ -538,7 +540,7 @@ try:
       finally:
         interval_timer.remove(jobid)
 
-      bar.finish()
+      bar.finish(show=is_foreground())
 
     return _progress()
 
