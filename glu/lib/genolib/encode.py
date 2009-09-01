@@ -706,7 +706,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
       return cache
 
     for lname in columns:
-      loc   = genome.get_locus_model(lname)
+      loc = genome.get_locus_model(lname)
       loci.append(loc)
 
       model = loc.model
@@ -736,21 +736,22 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
 
               if geno not in loc.model:
                 try:
-                  model = build_model(alleles=geno,base=loc.model)
+                  loc.model = build_model(alleles=geno,base=loc.model)
                 except GenotypeRepresentationError:
                   _encoding_error(columns[i],set(geno)-set(model.alleles),model,warn)
 
+              model = loc.model
+              if models[i] is not model:
                 # Update model in various locations
-                loc.model    = model
-                descr[i]     = model
-                models[i]    = model
+                descr[i]  = model
+                models[i] = model
                 updates.append( (i,model) )
 
-                # Update string to genotype cache
-                cache = cachemap.get(model)
-                if cache is None:
-                  cache = cachemap[model] = mk_cache(model)
-                cachelist[i] = cache
+              # Update string to genotype cache
+              cache = cachemap.get(model)
+              if cache is None:
+                cache = cachemap[model] = mk_cache(model)
+              cachelist[i] = cache
 
               # Update cache
               g = loc.model[geno]
@@ -763,10 +764,8 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
 
           if 0: # DEBUG
             for i,g in enumerate(new_row):
-              assert models[i] is descr[i]
-              assert models[i] is loci[i].model
-              assert g == loci[i].model[g]
               assert g in descr[i], 'Genotype %s not in model %s at locus %s' % (type(g),descr[i].genotypes[1:],columns[i])
+              assert g.model.replaceable_by(models[i]),'model with alleles "%s" is not replaceable by model with alleles "%s"' % (''.join(g.model.alleles[1:]),''.join(models[i].alleles[1:]))
 
           row = GenotypeArray(descr,new_row)
 
