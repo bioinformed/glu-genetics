@@ -42,6 +42,8 @@ def option_parser():
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output duplicate report')
+  parser.add_option('--dupout', dest='dupout', metavar='FILE',
+                    help='Output sets of observed duplicate samples')
   parser.add_option('-P', '--progress', dest='progress', action='store_true',
                     help='Show analysis progress bar, if possible')
 
@@ -68,6 +70,17 @@ def flatten_dupsets(sets):
   for s in sets:
     flat.update(s)
   return flat
+
+
+def write_dupsets(filename, dupsets):
+  '''
+  Output a table of duplicates where each row contains all samples that met
+  the concordance threshold
+  '''
+  out = table_writer(filename)
+  for dset in dupsets.sets():
+    if len(dset) > 1:
+      out.writerow(sorted(dset))
 
 
 def expected_pairs(genos, dupset):
@@ -201,6 +214,9 @@ def main():
     rate = matches/comparisons if comparisons else ''
 
     out.writerow([sample1,sample2,matches,comparisons,rate]+status[exp_dup,obs_dup])
+
+  if options.dupout:
+    write_dupsets(options.dupout, observed_dupset)
 
 
 if __name__ == '__main__':
