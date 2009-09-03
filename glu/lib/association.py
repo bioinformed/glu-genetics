@@ -454,12 +454,12 @@ def parse_formulae(options,models):
   try:
     options.test = options.model.find(options.test)
   except KeyError:
-    raise ValueError('Formula does not contain all terms to be tested')
+    raise ValueError('Model does not contain all terms to be tested')
 
   try:
     options.display = options.model.find(options.display)
   except KeyError:
-    raise ValueError('Formula does not contain all terms to display')
+    raise ValueError('Model does not contain all terms to display')
 
   options.null = COMBINATION(t for t in options.model.terms()
                                 if t not in options.test and scan not in t.loci())
