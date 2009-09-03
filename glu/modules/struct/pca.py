@@ -10,7 +10,8 @@ import sys
 
 from   itertools                 import izip,islice
 
-import numpy
+import numpy as np
+import scipy.linalg
 
 try:
   import cvxopt, cvxopt.blas, cvxopt.lapack
@@ -59,7 +60,7 @@ def encode_loci(genos):
     s,n  = sum(inf),len(inf)
     avg  = s/n
     p    = (s+0.5)/(n+1)
-    norm = numpy.sqrt(p*(1-p))
+    norm = np.sqrt(p*(1-p))
 
     # Form genotype to score mapping
     # NB: dicts are faster than lists here-- sigh.
@@ -69,29 +70,6 @@ def encode_loci(genos):
              model[other,other]: (1.0-avg)/norm }
 
     yield [ gmap[g] for g in geno ]
-
-
-def tracy_widom(evals):
-  evals = numpy.asarray(evals).reshape(-1)
-  l1 = evals[::-1].cumsum()[::-1]
-  l2 = (evals[::-1]**2).cumsum()[::-1]
-  n  = numpy.arange(len(evals),0,-1,dtype=float)
-
-  oldf = numpy.seterr(all='ignore')
-
-  try:
-    s2 = n**2*l2/(l1**2)
-    v  = n*(n+2)/(s2-n)
-    l  = n*evals/l1
-    vs = numpy.sqrt(v-1)
-    ns = numpy.sqrt(n)
-    mu = (vs+ns)**2/v
-    ss = (vs+ns)/v*(1/vs+1/ns)**(1./3.)
-    tw = (l-mu)/ss
-  finally:
-    numpy.seterr(**oldf)
-
-  return tw,v
 
 
 def pca_cov_numpy(cov,n=None):
@@ -104,19 +82,24 @@ def pca_cov_numpy(cov,n=None):
      eval is a nxm matrix of eigenvectors
 
   The time complexity of PCA using SVD is O(n*m**2)
-  EIG:
   '''
-  cov = numpy.asarray(cov)
+  cov = np.asarray(cov)
 
   shape = cov.shape
+  m = shape[0]
   if len(shape) != 2 or shape[0] != shape[1]:
     raise ValueError('Invalid covariance matrix for PCA')
 
-  values,vectors = numpy.linalg.eigh(cov)
-  order = numpy.flipud(values.argsort())
-  values = numpy.where(values < 0, 0, values)
+  eigvals = (m-n,m-1) if n and m>n else None
 
-  return values[order],vectors[:,order].T
+  values,vectors = scipy.linalg.eigh(cov,eigvals=eigvals)
+
+  # eigh returns eigenvalues and vectors in ascending order,
+  # so reverse them
+  values  = values[::-1]
+  vectors = vectors[:,::-1].T
+
+  return values,vectors
 
 
 def pca_sequence_numpy(genos,n=None,chunksize=500):
@@ -131,7 +114,7 @@ def pca_sequence_numpy(genos,n=None,chunksize=500):
   The time complexity of PCA using symmetric eigenvalue decomposition is O(m*n**2)
   '''
   s,m = len(genos.samples),0
-  cov = numpy.zeros( (s,s), dtype=float )
+  cov = np.zeros( (s,s), dtype=float )
 
   data = encode_loci(genos)
 
@@ -142,8 +125,8 @@ def pca_sequence_numpy(genos,n=None,chunksize=500):
       break
 
     m    += len(chunk)
-    chunk = numpy.array(chunk, dtype=float)
-    cov  += numpy.dot(chunk.T, chunk)
+    chunk = np.array(chunk, dtype=float)
+    cov  += np.dot(chunk.T, chunk)
 
   return pca_cov_numpy(cov/m,n)
 
@@ -158,7 +141,6 @@ def pca_cov_cvxopt(cov,n=None):
      eval is a nxm matrix of eigenvectors
 
   The time complexity of PCA using SVD is O(n*m**2)
-  EIG:
   '''
   m = cov.size[0]
   n = n or m
@@ -234,7 +216,7 @@ def option_parser():
                     help='Output eigenvalues and statistics to FILE')
 
   parser.add_option('--vectors', dest='vectors', metavar='N', type='int', default=10,
-                    help='Output the top N eigenvectors.  Default=10')
+                    help='Output the top N eigenvectors.  Set to 0 for all.  Default=10')
   return parser
 
 
@@ -250,22 +232,7 @@ def main():
                                   genome=options.loci,phenome=options.pedigree,
                                   transform=options).as_ldat()
 
-  n = options.vectors or None
-
-  # Compute on all N or else we can't get TW_STATS if options.vecout
-  m = n if not options.vecout else None
-  values,vectors = do_pca(genos,n=m)
-
-  if options.vecout:
-    # Compute TW Stats before truncating data
-    twstats,n_eff=tracy_widom(values)
-
-  if n:
-    values  = values[:n]
-    vectors = vectors[:n,:]
-    if options.vecout:
-      twstats = twstats[:n]
-      n_eff   = n_eff[:n]
+  values,vectors = do_pca(genos,n=options.vectors or None)
 
   if options.output:
     out = table_writer(options.output,hyphen=sys.stdout)
@@ -275,11 +242,9 @@ def main():
 
   if options.vecout:
     out = table_writer(options.vecout)
-    out.writerow(['N', 'EV','TW_STAT','N_EFF'])
+    out.writerow(['N', 'EV'])
     for i in xrange(len(values)):
-      out.writerow(['%d' % (i+1), '%.4f' % values[i],
-                                  '%.4f' % twstats[i],
-                                  '%.2f' % n_eff[i]])
+      out.writerow(['%d' % (i+1), '%.4f' % values[i]])
 
 
 if __name__ == '__main__':
