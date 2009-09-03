@@ -7,9 +7,10 @@ __revision__  = '$Id$'
 
 import re
 
+import numpy as np
+
 from   ply    import lex,yacc
 
-from   numpy  import exp,sqrt
 from   scipy  import stats
 
 
@@ -77,19 +78,31 @@ class TERM(object):
     #else:
     return COMBINATION(results)
 
+  def estimates(self,p):
+    inds = np.array(self.indices())
+    return p.A[inds,0]
+
   def odds_ratios(self,p):
-    return exp(self.estimates(p))
+    return np.exp(self.estimates(p))
+
+  def variance(self,c):
+    inds = np.array(self.indices())
+    return c.A[inds,inds]
+
+  def covariance(self,c):
+    inds = np.array(self.indices())
+    return c.A[inds,:][:,inds]
 
   def standard_errors(self,c):
-    return sqrt(self.var(c))
+    return np.sqrt(self.variance(c))
 
   def estimate_ci(self,p,c,alpha=0.95):
-    a = stats.distributions.norm.ppf( (1+alpha)/2 )
-    return [ (p-a*e,p+a*e) for p,e in
-                        zip(self.estimates(p),self.standard_errors(c)) ]
+    x = self.estimates(p)
+    e = self.standard_errors(c)*stats.distributions.norm.ppf( (1+alpha)/2 )
+    return np.vstack( (x-e,x+e) ).T
 
   def odds_ratio_ci(self,p,c,alpha=0.95):
-    return exp(self.estimate_ci(p,c,alpha=alpha))
+    return np.exp(self.estimate_ci(p,c,alpha=alpha))
 
 
 ident_re = re.compile('[a-zA-Z_][a-zA-Z_:.0-9]*')
@@ -120,10 +133,6 @@ class PHENOTERM(TERM):
   def estimates(self,p):
     return [p[self.index,0]]
 
-  def var(self,c):
-    i = self.index
-    return [c[i,i]]
-
 
 class INTERCEPT(TERM):
   def __init__(self):
@@ -143,10 +152,6 @@ class INTERCEPT(TERM):
 
   def estimates(self,p):
     return [p[self.index,0]]
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i]]
 
 
 class NO_INTERCEPT(TERM):
@@ -226,13 +231,6 @@ class GENO(GENOTERM):
   def indices(self):
     return [self.index,self.index+1]
 
-  def estimates(self,p):
-    return p[self.index:self.index+2,0].A.flatten()
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i],c[i+1,i+1]]
-
   def __len__(self):
     return 2
 
@@ -259,13 +257,6 @@ class ADOM(GENOTERM):
   def indices(self):
     return [self.index,self.index+1]
 
-  def estimates(self,p):
-    return p[self.index:self.index+2,0].A.flatten()
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i],c[i+1,i+1]]
-
   def __len__(self):
     return 2
 
@@ -287,11 +278,11 @@ class TREND(GENOTERM):
     return [self.index]
 
   def estimates(self,p):
-    return [p[self.index,0],p[self.index,0]*2]
+    return np.array([p[self.index,0],p[self.index,0]*2])
 
-  def var(self,c):
+  def variance(self,c):
     i = self.index
-    return [c[i,i],4*c[i,i]]
+    return np.array([c[i,i],4*c[i,i]])
 
   def __len__(self):
     return 1
@@ -318,11 +309,13 @@ class DOM(GENOTERM):
     return [self.index]
 
   def estimates(self,p):
-    return [p[self.index,0],p[self.index,0]]
+    e = p[self.index,0]
+    return np.array([e,e])
 
-  def var(self,c):
+  def variance(self,c):
     i = self.index
-    return [c[i,i],c[i,i]]
+    v = c[i,i]
+    return np.array([v,v])
 
   def __len__(self):
     return 1
@@ -349,11 +342,11 @@ class REC(GENOTERM):
     return [self.index]
 
   def estimates(self,p):
-    return [0,p[self.index,0]]
+    return np.array([0,p[self.index,0]])
 
-  def var(self,c):
+  def variance(self,c):
     i = self.index
-    return [0,c[i,i]]
+    return np.array([0,c[i,i]])
 
   def __len__(self):
     return 1
@@ -374,13 +367,6 @@ class MISSING(GENOTERM):
   def indices(self):
     return [self.index]
 
-  def estimates(self,p):
-    return [p[self.index,0]]
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i]]
-
   def __len__(self):
     return 1
 
@@ -399,13 +385,6 @@ class NOT_MISSING(GENOTERM):
 
   def indices(self):
     return [self.index]
-
-  def estimates(self,p):
-    return [p[self.index,0]]
-
-  def var(self,c):
-    i = self.index
-    return [c[i,i]]
 
   def __len__(self):
     return 1
@@ -443,11 +422,15 @@ class INTERACTION(COMPOUNDTERM):
   def indices(self):
     return range(self.index,self.index+len(self))
 
+  # FIXME: Not correct for implicitly multi-factor terms
   def estimates(self,p):
-    return p[self.index:self.index+len(self),0].A.flatten()
+    i = np.array(self.indices())
+    return p.A[i,0]
 
-  def var(self,c):
-    return [c[i,i] for i in self.indices()]
+  # FIXME: Not correct for implicitly multi-factor terms
+  def variance(self,c):
+    i = np.array(self.indices())
+    return c.A[i,i]
 
   def effects(self, loci, phenos, i):
     results = []
@@ -527,16 +510,10 @@ class COMBINATION(COMPOUNDTERM):
     return results
 
   def estimates(self,p):
-    results = []
-    for term in self.subterms:
-      results.extend(term.estimates(p))
-    return results
+    return np.hstack(term.estimates(p) for term in self.subterms)
 
-  def var(self,c):
-    results = []
-    for term in self.subterms:
-      results.extend(term.var(c))
-    return results
+  def variance(self,c):
+    return np.hstack(term.variance(c) for term in self.subterms)
 
   def __len__(self):
     return sum(len(term) for term in self.subterms)
@@ -669,7 +646,8 @@ class FormulaParser(object):
 
   def p_expression_func(self, t):
     '''
-    expression : TERM LPAREN name RPAREN
+    expression : TERM LPAREN name  RPAREN
+    expression : TERM LPAREN TIMES RPAREN
     '''
     t[0] = termmap[t[1]](t[3])
 
