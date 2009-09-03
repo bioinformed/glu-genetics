@@ -12,7 +12,7 @@ import csv
 from   operator                  import itemgetter,getitem
 from   itertools                 import islice,chain,imap,izip,repeat
 
-from   numpy                     import array,zeros,isfinite,nan
+import numpy as np
 
 from   glu.lib.utils             import izip_exact, is_str, chunk
 from   glu.lib.fileutils         import autofile,table_reader,table_writer
@@ -57,11 +57,11 @@ def load_lbd_file(filename,options):
       if sopts.exclude is not None and sampleid     in sopts.exclude:
         continue
 
-      genos = genos[8:]
+      genos = np.array(genos[8:],dtype='S1')
       try:
-        scores = array(scores[8:],dtype=float)
+        scores = np.array(scores[8:],dtype=float)
       except ValueError:
-        scores = array( [ float(s) if s!='NaN' else nan for s in scores[8:] ] )
+        scores = np.array( [ float(s) if s!='NaN' else np.nan for s in scores[8:] ] )
 
       yield sampleid,genos,scores
 
@@ -279,9 +279,7 @@ def filter_gc(samples, gcthreshold):
   that threshold are set to missing
   '''
   for sampleid,genos,gcscores in samples:
-    indices = gcscores<=gcthreshold
-    for i in indices:
-      genos[i] = 'U'
+    genos[gcscores<=gcthreshold] = 'U'
     yield sampleid,genos,gcscores
 
 
@@ -355,16 +353,16 @@ class GCSummary(object):
 
   def __iter__(self):
     self.samplestats = samplestats = []
-    locusstats1 = zeros(len(self.loci))
-    locusstats2 = zeros(len(self.loci))
-    locuscounts = zeros(len(self.loci),dtype=int)
+    locusstats1 = np.zeros(len(self.loci))
+    locusstats2 = np.zeros(len(self.loci))
+    locuscounts = np.zeros(len(self.loci),dtype=int)
 
     n = len(self.loci)
 
     for sampleid,genos,gcscores in self.samples:
-      gc = array(gcscores,dtype=float)
+      gc = np.array(gcscores,dtype=float)
 
-      mask = isfinite(gc)
+      mask = np.isfinite(gc)
       gc[~mask] = 0
 
       # Track first two uncentered moments
