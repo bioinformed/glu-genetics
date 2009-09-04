@@ -5,7 +5,7 @@
 .. module:: split
    :synopsis: Split genotype data files
 
-The split module, predictably, is a utility to split a genotype file into
+The :mod:`split` module is a utility to split a single genotype file into
 subsets based on a mapping from sample and/or locus to a partition name.  In
 addition, large data sets can be split into smaller files, based on a
 maximum number of data rows per file.  Also, see the :mod:`transform` module
@@ -46,5 +46,5 @@ Options:
   --defaultsamplegroup=NAME
                         Default group for any unmapped sample
   --defaultlocusgroup=NAME
-                        Default group for any unmapped sample
+                        Default group for any unmapped locus
   --template=NAME       The template for names of the output files

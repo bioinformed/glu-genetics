@@ -435,7 +435,7 @@ def option_parser():
   parser.add_option('--defaultsamplegroup', dest='defaultsamplegroup', metavar='NAME',
                     help='Default group for any unmapped sample')
   parser.add_option('--defaultlocusgroup', dest='defaultlocusgroup', metavar='NAME',
-                    help='Default group for any unmapped sample')
+                    help='Default group for any unmapped locus')
   parser.add_option('--template', dest='template', metavar='NAME', type='str',
                     help='The template for names of the output files')
 

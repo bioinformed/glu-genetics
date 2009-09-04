@@ -4,11 +4,14 @@
 .. module:: transform
    :synopsis: Genotype data transformations
 
-The :mod:`transform` module performs various transformations on genotype
-data files.  These transformations are extremely general and include:
+The :mod:`transform` module is the primary data management component in GLU.
+It allows users to read one or more genotype data files in any supported
+format, apply very general data transformations, and then output a new
+genotype data file in any supported format.  These transformations are
+extremely general and include:
 
-* converting between the various GLU file formats
-* extracting subsets of samples and/or loci
+* converting among the various GLU file formats
+* extracting a subset of samples and/or loci
 * renaming samples and/or loci
 * merging duplicate samples and loci
 * merging multiple input files
@@ -56,7 +59,7 @@ Options:
                         (optional)
     --locusmerge=FILE   Locus concordance statistics output to FILE (optional)
 
-  Filtering and Renaming:
+  Filtering:
 
     --filtermissing     Filters out the samples or loci with missing genotypes
     --includesamples=FILE

@@ -30,7 +30,7 @@ def option_parser():
   mopts = optparse.OptionGroup(parser, 'Genotype Merging and Reporting')
   geno_options(mopts,merge=True)
 
-  filter = optparse.OptionGroup(parser, 'Filtering and Renaming')
+  filter = optparse.OptionGroup(parser, 'Filtering')
   geno_options(filter,filter=True)
 
   trans = optparse.OptionGroup(parser, 'Transformations')
