@@ -27,7 +27,7 @@ from   glu.lib.genolib.encode    import pack_genomatrixstream, recode_genomatrix
                                         encode_genomatrixstream_from_tuples,                 \
                                         encode_genomatrixstream_from_strings,                \
                                         recode_genotriples, encode_genotriples_from_tuples,  \
-                                        encode_genotriples_from_strings
+                                        encode_genotriples_from_strings, genome_merge_loci
 
 # Debugging flag
 DEBUG=False
@@ -163,7 +163,7 @@ class GenotripleStream(GenotypeStream):
         for sample,locus,geno in rows:
           assert isinstance(geno,Genotype)
           assert locus in self.genome.loci
-          assert geno.model is self.genome.loci[locus].model
+          assert geno.model.replaceable_by(self.genome.loci[locus].model)
           yield sample,locus,geno
       return _check_debug(self.use_stream())
 
@@ -864,19 +864,19 @@ class GenomatrixStream(GenotypeStream):
         def _check_debug(rows):
           for (locus,row),model in izip_exact(rows,self.models):
             assert not self.packed or isinstance(row,GenotypeArray)
-            assert not self.packed or model is row.descriptor[0]
-            assert all(g.model is model for g in row)
-            assert model is self.genome.loci[locus].model
+            assert not self.packed or model.replaceable_by(row.descriptor[0])
+            assert all(g.model.replaceable_by(model) for g in row)
+            assert model.replaceable_by(self.genome.loci[locus].model)
             assert all(isinstance(g,Genotype) for g in row)
             yield locus,row
         return _check_debug(self.use_stream())
       else:
-        assert all(self.genome.loci[locus].model in (model,None) for locus,model in izip_exact(self.loci,self.models))
+        #assert all(model.replaceable_by(self.genome.loci[locus].model) for locus,model in izip_exact(self.loci,self.models))
         def _check_debug(rows):
           for sample,row in rows:
             assert all(isinstance(g,Genotype) for g in row)
             assert len(self.models) == len(row)
-            assert all(g.model is model for model,g in izip_exact(self.models,row))
+            assert all(g.model.replaceable_by(model) for model,g in izip_exact(self.models,row))
             yield sample,row
         return _check_debug(self.use_stream())
 
@@ -2213,12 +2213,14 @@ def merge_genomatrixstream(genos, mergefunc):
           model = genos.genome.get_model(label)
 
           # Sanity Check: verify all models are conformable
-          # FIXME: If not, we must need to recode
           assert all(row[0].model.replaceable_by(model) for row in rows)
 
           new_row = mergefunc.merge_locus(samples, label, model, new_row)
           models.append(model)
         else:
+          # Sanity Check: verify all models are conformable
+          assert all(g.model.replaceable_by(model) for row in rows for g,model in izip(row,models))
+
           new_row = mergefunc.merge_sample(label, loci, models, new_row)
 
       # Yield new row
@@ -2405,9 +2407,10 @@ def merge_genomatrixstream_list(genos, mergefunc):
       def _combine(genos):
         for g in genos:
           for row,genos in g:
-            updates[:] = g.updates
+            if g.updates:
+              updates.extend(g.updates)
+              g.updates[:] = []
             yield row,genos
-          updates[:] = []
 
       genos = genos[0].clone(_combine(genos),genome=genome,samples=rowlist,unique=unique,updates=updates,
                              materialized=False)
@@ -2737,8 +2740,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
               else:
                 assert model.replaceable_by(models[i])
 
-            if triples.updates:
-              triples.updates[:] = []
+            triples.updates[:] = []
 
           yield sample,row
     else:
@@ -2963,18 +2965,12 @@ def filter_genomatrixstream_missing(genos):
 
     new_genos = genos.clone(_filter(),loci=None,models=models,materialized=False)
   else:
-    updates = []
     def _filter():
       for lname,row in genos:
-        if genos.updates:
-          updates.extend(genos.updates)
-
         if any(row):
           yield lname,row
-          if updates:
-            updates[:] = []
 
-    new_genos = genos.clone(_filter(),samples=None,updates=updates,materialized=False)
+    new_genos = genos.clone(_filter(),samples=None,materialized=False)
 
   rows = []
 
@@ -3107,20 +3103,7 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
   new_locus = new_genome.loci[new_name]
   new_model = new_locus.model
 
-  if new_model is None:
-    new_locus.model = old_model
-  elif old_model is None:
-    new_locus.model = new_model
-  elif new_model is old_model or old_model.replaceable_by(new_model):
-    new_locus.model = new_model
-  elif new_model.replaceable_by(old_model):
-    new_locus.model = old_model
-  else:
-    # Recoding needed
-    new_locus.model = None
-    return True
-
-  return False
+  return genome_merge_loci(new_locus,old_model)
 
 
 def _genome_rename(old_genome, locusmap, warn=False):
@@ -3462,7 +3445,7 @@ def rename_genomatrixstream_column(genos,colmap,warn=False):
       new_name = colmap.get(old_name, old_name)
       _phenome_merge_individuals(genos.phenome, old_name, phenome, new_name, warn)
 
-    genos = genos.clone(genos.use_stream(), samples=new_columns, phenome=phenome, unique=unique)
+    genos = genos.clone(genos, samples=new_columns, phenome=phenome, unique=unique)
   else:
     genome = Genome()
 
@@ -3470,20 +3453,7 @@ def rename_genomatrixstream_column(genos,colmap,warn=False):
       new_name = colmap.get(old_name,old_name)
       _genome_rename_loci(genos.genome, old_name, genome, new_name, warn)
 
-    # Propogate model updates
-    # FIXME: Can possible do recoding in this step
-    def _rename(genos):
-      for sample,row in genos:
-        if genos.updates:
-          for i,model in genos.updates:
-            lname = genos.loci[i]
-            lname = colmap.get(lname,lname)
-            loc   = genome.loci[lname]
-            assert loc.model is None or loc.model.replaceable_by(model)
-            loc.model = model
-        yield sample,row
-
-    genos = genos.clone(_rename(genos), loci=new_columns, genome=genome, unique=unique, materialized=False)
+    genos = genos.clone(genos, loci=new_columns, genome=genome, unique=unique, materialized=False)
     genos = genos.transformed(recode_models=genome)
 
   return genos
@@ -3577,9 +3547,6 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
     def _filter():
       indexmap = dict( (i,j) for j,i in enumerate(indices) )
       for sample,row in genos:
-        if updates:
-          updates[:] = []
-
         # Process model updates
         if genos.updates:
           for i,model in genos.updates:
@@ -3588,6 +3555,8 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
               assert models[j].replaceable_by(model)
               models[j] = model
               updates.append( (j,model) )
+
+          genos.updates[:] = []
 
         yield sample,pick(row,indices)
 
@@ -3672,9 +3641,15 @@ def reorder_genomatrixstream_columns(genos,labels):
         if genos.updates:
           for i,model in genos.updates:
             j = neworder[i]
-            assert models[j].replaceable_by(model)
-            models[j] = model
-            updates.append( (j,model) )
+            old_model = models[j]
+            if old_model is not model and old_model.replaceable_by(model):
+              models[j] = model
+              updates.append( (j,model) )
+            else:
+              # i.e., an unnecessary model update
+              assert model.replaceable_by(old_model)
+
+          genos.updates[:] = []
 
         yield sample,pick(row, indices)
 

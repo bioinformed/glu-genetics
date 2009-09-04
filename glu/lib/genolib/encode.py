@@ -55,6 +55,23 @@ def _encoding_error(locus,item,model,warn=False):
     raise GenotypeRepresentationError(msg)
 
 
+def genome_merge_loci(loc,new_model):
+  old_model = loc.model
+
+  if old_model is None:
+    loc.model = new_model
+  elif new_model is None or new_model.replaceable_by(old_model):
+    pass
+  elif new_model is old_model or old_model.replaceable_by(new_model):
+    loc.model = new_model
+  else:
+    # Recoding needed
+    loc.model = build_model(alleles=new_model.alleles[1:],base=loc.model)
+    return True
+
+  return False
+
+
 def pack_genomatrixstream(genos):
   '''
   Transform a genomatrix into an internal packed representation
@@ -250,25 +267,17 @@ def recode_genomatrixstream(genos, genome, warn=False):
                                           old_locus.strand, warn)
           loc = genome.loci[lname]
 
-        if loc.model is None:
-          model = loc.model = old_model
-        else:
-          model = loc.model
+        try:
+          genome_merge_loci(loc, old_model)
+        except GenotypeRepresentationError:
+          _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),old_model,warn)
+
+        model = loc.model
 
         # If recoding or packing is required
         if old_model is not model or not packed:
           descr = build_descr(model,n)
-
-          try:
-            row = GenotypeArray(descr,row)
-          except GenotypeLookupError:
-            try:
-              model = loc.model = build_model(alleles=old_model.alleles[1:],base=loc.model)
-            except GenotypeRepresentationError:
-              _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),model,warn)
-
-            descr = build_descr(model,n)
-            row = GenotypeArray(descr,row)
+          row = GenotypeArray(descr,row)
 
         models.append(model)
         yield lname,row
@@ -277,11 +286,11 @@ def recode_genomatrixstream(genos, genome, warn=False):
   elif genos.format=='sdat':
     assert genos.loci is not None and len(genos.loci) == len(genos.models)
 
-    # All loci and models are known
-    recode = False
-    for lname,old_model in izip(genos.loci,genos.models):
+    for i,lname in enumerate(genos.loci):
       old_locus = genos.genome.loci[lname]
+      old_model = old_locus.model or genos.models[i]
 
+      # Fastpath since no merging is necessary-- just fire and forget
       if lname not in genome.loci:
         loc = genome.loci[lname] = old_locus
       else:
@@ -290,53 +299,36 @@ def recode_genomatrixstream(genos, genome, warn=False):
 
         loc = genome.get_locus(lname)
 
-      if loc.model is None:
-        loc.model = old_model
-
-      model = loc.model
-
-      # Check to see if a full recoding or update is necessary
-      if model is not old_model:
-        recode = True
         try:
-          model = loc.model = build_model(alleles=old_model.alleles[1:],base=model)
+          genome_merge_loci(loc, old_model)
         except GenotypeRepresentationError:
-          _encoding_error(lname,set(old_model.alleles)-set(model.alleles),model,warn)
+          _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),old_model,warn)
 
-      models.append(model)
+      models.append(loc.model)
 
-    # FASTPATH: No models change, so return with the updated genome
-    if not recode:
-      assert genos.models == models
-      return genos.clone(genos.use_stream(), genome=genome, materialized=False)
+    # No FASTPATH is generally possible, since other streams may be updating out genome
 
     def _recode_genomatrixstream():
       descr = GenotypeArrayDescriptor(models)
 
       for sample,row in genos:
-        if updates:
-          updates[:] = []
+        if genos.updates:
+          for i,model in genos.updates:
+            loc = genome.get_locus(genos.loci[i])
+            old_model = loc.model
 
-        # Try to yield updated genotype array, hoping that all alleles are represented
-        try:
-          row = GenotypeArray(descr,row)
-        except GenotypeLookupError:
-          for i,lname,geno,model in izip(count(),genos.loci,row,models):
-            if geno not in model:
-              try:
-                new_model = build_model(alleles=geno,base=model)
-              except GenotypeRepresentationError:
-                _encoding_error(lname,set(geno)-set(model.alleles),model,warn)
+            try:
+              genome_merge_loci(loc, model)
+            except GenotypeRepresentationError:
+              _encoding_error(genos.loci[i],set(old_model.alleles)-set(model.alleles),model,warn)
 
-              if new_model is not model:
-                descr[i]  = new_model
-                models[i] = new_model
-                updates.append( (i,model) )
-                loc = genome.get_locus(lname)
-                assert loc.model is None or loc.model.replaceable_by(model)
-                loc.model = new_model
+            if loc.model is not models[i]:
+              updates.append( (i,loc.model) )
+              descr[i] = models[i] = loc.model
 
-          row = GenotypeArray(descr,row)
+          genos.updates[:] = []
+
+        row = GenotypeArray(descr,row)
 
         yield sample,row
 
@@ -505,9 +497,6 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
       descr = GenotypeArrayDescriptor(models)
 
       for sample,row in genos:
-        if updates:
-          updates[:] = []
-
         try:
           row = GenotypeArray(descr,row)
         except GenotypeLookupError:
@@ -720,9 +709,6 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
       cachelist = [{}]*len(columns)
 
       for sample,row in genos:
-        if updates:
-          updates[:] = []
-
         try:
           row = GenotypeArray(descr,imap(getitem, cachelist, row) )
         except errors:
