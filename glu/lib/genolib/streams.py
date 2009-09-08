@@ -27,7 +27,8 @@ from   glu.lib.genolib.encode    import pack_genomatrixstream, recode_genomatrix
                                         encode_genomatrixstream_from_tuples,                 \
                                         encode_genomatrixstream_from_strings,                \
                                         recode_genotriples, encode_genotriples_from_tuples,  \
-                                        encode_genotriples_from_strings, genome_merge_loci
+                                        encode_genotriples_from_strings,                     \
+                                        merge_locus, update_model
 
 # Debugging flag
 DEBUG=False
@@ -2724,21 +2725,26 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
 
     if format=='sdat':
       # Models are not yet final, so updates may be pending
-      models  = [ genome.get_model(locus) for locus in columns ]
+      locs    = [ genome.get_locus_model(locus) for locus in columns ]
+      models  = [ locus.model                   for locus in locs    ]
       updates = []
 
       def _build(genos):
         locmap = dict( (locus,i) for i,locus in enumerate(columns) )
+
         for sample,row in genos:
           # Update models that have changes since last row
           if triples.updates:
             for lname,model in triples.updates:
-              i = locmap[lname]
-              if models[i].replaceable_by(model):
-                models[i] = model
-                updates.append( (i,model) )
-              else:
-                assert model.replaceable_by(models[i])
+              i         = locmap[lname]
+              loc       = locs[i]
+              old_model = loc.model
+              new_model = update_model(loc.model, model)
+              new_model = update_model(models[i], new_model)
+
+              if new_model is not loc.model or new_model is not models[i]:
+                loc.model = models[i] = new_model
+                updates.append( (i,new_model) )
 
             triples.updates[:] = []
 
@@ -3103,7 +3109,7 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
   new_locus = new_genome.loci[new_name]
   new_model = new_locus.model
 
-  return genome_merge_loci(new_locus,old_model)
+  return merge_locus(new_locus,old_model)
 
 
 def _genome_rename(old_genome, locusmap, warn=False):
@@ -3207,15 +3213,11 @@ def rename_genotriples(triples,samplemap,locusmap,warn=False):
         for lname,model in triples.updates:
           new_lname = locusmap.get(lname,lname)
           new_loc   = new_genome.loci[new_lname]
-          if not new_loc.model.replaceable_by(model):
-#            if not model.replaceable_by(new_loc.model):
-#              print '!!! Incompatible models for %s (%s) and %s (%s): %s >< %s' % (lname,model.alleles,
-#                                                                                   new_lname,new_loc.model.alleles,
-#                                                                                   model.genotypes,new_loc.model.genotypes)
-            assert model.replaceable_by(new_loc.model)
-          else:
-            new_genome.loci[new_lname].model = model
-            updates.append( (new_lname,model) )
+          new_model = update_model(new_loc.model, model)
+
+          if new_loc.model is not model:
+            new_loc.model = model
+            updates.append( (new_lname,new_model) )
 
         triples.updates[:] = []
 
@@ -3542,19 +3544,26 @@ def filter_genomatrixstream_by_column(genos,colset,exclude=False):
   else:
     assert len(genos.columns) == len(genos.models)
     models  = pick(genos.models,indices)
+    loci    = [ genos.genome.get_locus(lname) for lname in columns ]
     updates = []
 
     def _filter():
       indexmap = dict( (i,j) for j,i in enumerate(indices) )
       for sample,row in genos:
+
         # Process model updates
         if genos.updates:
           for i,model in genos.updates:
             j = indexmap.get(i)
             if j is not None:
-              assert models[j].replaceable_by(model)
-              models[j] = model
-              updates.append( (j,model) )
+              loc       = loci[j]
+              new_model = update_model(loc.model, model)
+              new_model = update_model(models[j], new_model)
+
+              if new_model is not loc.model or new_model is not models[j]:
+                # No descr update needed
+                loc.model = models[j] = new_model
+                updates.append( (j,new_model) )
 
           genos.updates[:] = []
 
@@ -3636,18 +3645,21 @@ def reorder_genomatrixstream_columns(genos,labels):
 
     def _reorder():
       neworder = map(itemgetter(0),sorted(enumerate(indices), key=itemgetter(1)))
+      loci     = [ genos.genome.get_locus(lname) for lname in new_columns ]
 
       for sample,row in genos:
         if genos.updates:
           for i,model in genos.updates:
             j = neworder[i]
-            old_model = models[j]
-            if old_model is not model and old_model.replaceable_by(model):
-              models[j] = model
-              updates.append( (j,model) )
-            else:
-              # i.e., an unnecessary model update
-              assert model.replaceable_by(old_model)
+
+            loc       = loci[j]
+            new_model = update_model(loc.model,model)
+            new_model = update_model(models[j],new_model)
+
+            if new_model is not loc.model or new_model is not models[j]:
+              # No descr update needed
+              loc.model = models[j] = new_model
+              updates.append( (j,new_model) )
 
           genos.updates[:] = []
 

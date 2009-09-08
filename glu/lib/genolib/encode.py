@@ -55,7 +55,7 @@ def _encoding_error(locus,item,model,warn=False):
     raise GenotypeRepresentationError(msg)
 
 
-def genome_merge_loci(loc,new_model):
+def merge_locus(loc,new_model):
   old_model = loc.model
 
   if old_model is None:
@@ -70,6 +70,18 @@ def genome_merge_loci(loc,new_model):
     return True
 
   return False
+
+
+def update_model(old_model, new_model):
+  if old_model is new_model or old_model.replaceable_by(new_model):
+    return new_model
+
+  # i.e., an unnecessary model update
+  if not new_model.replaceable_by(old_model):
+    raise GenotypeRepresentationError('Invalid model update')
+
+  # Return the old model
+  return old_model
 
 
 def pack_genomatrixstream(genos):
@@ -100,12 +112,40 @@ def pack_genomatrixstream(genos):
   ('l3', [('A', 'A'), (None, None), (None, None)])
   ('l4', [('G', 'T'), (None, None), ('T', 'T')])
   '''
-  def _pack(genos):
-    if genos.format=='sdat':
-      descr = GenotypeArrayDescriptor(genos.models)
+  if not genos.columns:
+    return genos.clone([],packed=True,samples=(),loci=(),models=[])
+
+  if genos.format=='sdat':
+    updates = []
+
+    def _pack(genos):
+      locs   = [ genos.genome.get_locus_model(lname) for lname in genos.loci ]
+      models = []
+
+      for loc,model in izip(locs,genos.models):
+        new_model = loc.model = update_model(loc.model,model)
+        models.append(new_model)
+
+      descr  = GenotypeArrayDescriptor(models)
+
       for label,row in genos:
+        if genos.updates:
+          for i,model in genos.updates:
+            loc       = locs[i]
+            new_model = update_model(loc.model,model)
+            new_model = update_model(models[i],new_model)
+            if new_model is not loc.model or new_model is not models[i]:
+              loc.model = descr[i] = models[i] = new_model
+              updates.append( (i,new_model) )
+
+          genos.updates[:] = []
+
         yield label,GenotypeArray(descr,row)
-    else:
+
+  else:
+    updates = genos.updates
+
+    def _pack(genos):
       n = len(genos.columns)
 
       for lname,row in genos:
@@ -113,10 +153,8 @@ def pack_genomatrixstream(genos):
         descr = build_descr(model,n)
         yield lname,GenotypeArray(descr,row)
 
-  if not genos.columns:
-    return genos.clone([],packed=True,samples=(),loci=(),models=[])
 
-  return genos.clone(_pack(genos),packed=True,materialized=False)
+  return genos.clone(_pack(genos),packed=True,materialized=False,updates=updates)
 
 
 def recode_genomatrixstream(genos, genome, warn=False):
@@ -268,7 +306,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
           loc = genome.loci[lname]
 
         try:
-          genome_merge_loci(loc, old_model)
+          merge_locus(loc, old_model)
         except GenotypeRepresentationError:
           _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),old_model,warn)
 
@@ -300,13 +338,13 @@ def recode_genomatrixstream(genos, genome, warn=False):
         loc = genome.get_locus(lname)
 
         try:
-          genome_merge_loci(loc, old_model)
+          merge_locus(loc, old_model)
         except GenotypeRepresentationError:
           _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),old_model,warn)
 
       models.append(loc.model)
 
-    # No FASTPATH is generally possible, since other streams may be updating out genome
+    # No FASTPATH is generally possible, since other streams may be updating our genome
 
     def _recode_genomatrixstream():
       descr = GenotypeArrayDescriptor(models)
@@ -318,13 +356,13 @@ def recode_genomatrixstream(genos, genome, warn=False):
             old_model = loc.model
 
             try:
-              genome_merge_loci(loc, model)
+              merge_locus(loc, model)
             except GenotypeRepresentationError:
               _encoding_error(genos.loci[i],set(old_model.alleles)-set(model.alleles),model,warn)
 
             if loc.model is not models[i]:
-              updates.append( (i,loc.model) )
               descr[i] = models[i] = loc.model
+              updates.append( (i,loc.model) )
 
           genos.updates[:] = []
 
@@ -508,9 +546,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
               except GenotypeRepresentationError:
                 _encoding_error(columns[i],set(geno)-set(model.alleles),model,warn)
 
-              descr[i]      = model
-              models[i]     = model
-              loci[i].model = model
+              loci[i].model = descr[i] = models[i] = model
               updates.append( (i,model) )
 
             new_row[i] = model[geno]
@@ -729,8 +765,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
               model = loc.model
               if models[i] is not model:
                 # Update model in various locations
-                descr[i]  = model
-                models[i] = model
+                descr[i] = models[i] = model
                 updates.append( (i,model) )
 
               # Update string to genotype cache
@@ -874,13 +909,12 @@ def encode_genotriples_from_tuples(triples,genome,warn=False):
         geno = loc.model[geno]
       except GenotypeLookupError:
         try:
-          new_model = build_model(alleles=geno,base=loc.model)
+          new_model = loc.model = build_model(alleles=geno,base=loc.model)
         except GenotypeRepresentationError:
           _encoding_error(lname,geno,loc.model,warn)
 
         updates.append( (lname,new_model) )
-        assert loc.model is None or loc.model.replaceable_by(new_model)
-        loc.model = new_model
+
         geno = new_model[geno]
 
       yield sample,lname,geno
@@ -938,18 +972,15 @@ def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
         geno = cache[geno]
       except KeyError:
         try:
-          new_model = build_model(alleles=geno,base=loc.model)
+          loc.model = model = build_model(alleles=geno,base=loc.model)
         except GenotypeRepresentationError:
           _encoding_error(lname,geno,model,warn)
 
-        if new_model is not loc.model:
-          assert loc.model is None or loc.model.replaceable_by(new_model)
-          model = loc.model = new_model
-          updates.append( (lname,model) )
+        updates.append( (lname,model) )
 
-          cache = cachemap.get(model)
-          if cache is None:
-            cache = cachemap[model] = mk_cache(model)
+        cache = cachemap.get(model)
+        if cache is None:
+          cache = cachemap[model] = mk_cache(model)
 
         geno = cache[geno] = model[from_string(geno)]
 
