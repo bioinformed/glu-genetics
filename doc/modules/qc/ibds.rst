@@ -58,7 +58,7 @@ are divided by the total number of non-missing comparisons made and reflect
 the proportion of informative genotypes comparisons that share n alleles IBS.
 
 IBD computation assumes knowledge of genotypes frequencies (see the
---frequencies option) or population homogenetity so that genotype
+--frequencies option) or population homogeneity so that genotype
 frequencies may be estimated empirically from the genotype data provided.
 The resulting IBD probabilties reflect the proportion of informative
 genotypes that share n alleles identical by descent.

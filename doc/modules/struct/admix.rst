@@ -56,22 +56,41 @@ Methods
 Admixture proportions are determined by maximizing the likelihood of
 observing each sample in the test set assuming all loci are independent and
 that each genotype appears at least once in each assumed ancestral
-population.  Genotype frequencies are used directly in the likelihood,
-without assuming Hardy-Weinberg proportions.  Thus the penalty for having a
-genotype that is not observed in an ancestral population is proportional to
-the total number of individuals observed in that population.  In small
-samples, this also tends to downwardly bias the estimated genotype
+population.
+
+Formally, we maximize a likelihood to determine mixing proportions of events
+from a series of k Bernoulli distributions (a simplification of a binomial
+mixture problem).  Let F be a (n x k) matrix of known frequencies of n
+events from k distributions.  We wish to solve the following problem:
+
+  .. math::
+          \begin{array}{ll}
+              \mbox{maximize}   & ln(L(x)) = \sum_{j=1}^{s} ln(A x) \\
+              \mbox{subject to} & m_i \geq 0, \quad i=1,\ldots,k    \\
+                                & \sum_{i=1}^{k} m_i = 1.
+          \end{array}
+
+Maximization is performed by the method of Sequential Quadratic Programming
+(SQP).
+
+When model=HWP is selected (default), the admixture likelihood is maximized
+with regard to the observed allele frequencies assuming Hardy-Weinberg
+proportions.
+
+When model=GENO is selected, genotype frequencies are used directly in the
+likelihood, without assuming Hardy-Weinberg proportions.  Thus the penalty
+for having a genotype that is not observed in an ancestral population is
+proportional to the total number of individuals observed in that population.
+In small samples, this also tends to downwardly bias the estimated genotype
 frequencies.
 
 An individual is considered of a given ancestry based on the supplied labels
 and estimated admixture coefficients if their coefficient is greater than a
-given threshold.
-
-Otherwise, an individual who has no single estimated admixture coefficient
-that meets the specified threshold then one of two behaviors result.  If
-only one population group exceeds 1-threshold then the ancestry is deemed
-'ADMIXED' for that population.  Otherwise, a list of populations with
-estimated admixture above 1-threshold is returned.
+given threshold.  Otherwise, the individual has no single estimated
+admixture coefficient that meets the specified threshold.  If only one
+population group exceeds (1-threshold) then the ancestry is deemed 'ADMIXED'
+for that population.  Otherwise, a list of populations with estimated
+admixture above (1-threshold) is returned.
 
 Output
 ======

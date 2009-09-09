@@ -105,8 +105,8 @@ ID    SEX     REGION    SEX\_? SEX_FEMALE SEX_MALE
 010           ALASKA
 ===== ======= ========= ====== ========== ========
 
-which now includes variables for for each non-missing value in the input
-file SEX column.  The default prefix (SEX\_) is used based on the name of the
+which now includes variables for each non-missing value in the input file
+SEX column.  The default prefix (SEX\_) is used based on the name of the
 categorical variable.
 
 To avoid the creation of an indicator variable for "?", the command::

@@ -69,7 +69,7 @@ Genotype and LD estimation options:
     -m D, --maxdist=D   Maximum inter-marker distance in kb for LD comparison
                         (default=200)
     -P p, --hwp=p       Filter out loci that fail to meet a minimum
-                        signficance level (pvalue) for a test Hardy-Weignberg
+                        signficance level (pvalue) for a test Hardy-Weinberg
                         proportion (no default)
 
 LD threshold options:

@@ -63,7 +63,7 @@ def option_parser():
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
                           action='callback', callback=check_option01,
                           help='Filter out loci that fail to meet a minimum signficance level (pvalue) for a '
-                               'test Hardy-Weignberg proportion (no default)')
+                               'test Hardy-Weinberg proportion (no default)')
 
   bingroup = optparse.OptionGroup(parser, 'Binning options')
 
