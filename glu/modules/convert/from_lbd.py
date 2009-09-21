@@ -7,76 +7,22 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 import sys
-import csv
 
-from   operator                  import itemgetter,getitem
-from   itertools                 import islice,chain,imap,izip,repeat
+from   operator                  import getitem
+from   itertools                 import chain, imap, izip, repeat
 
 import numpy as np
 
-from   glu.lib.utils             import izip_exact, is_str, chunk
-from   glu.lib.fileutils         import autofile,table_reader,table_writer
-from   glu.lib.sections          import read_sections
-from   glu.lib.sequence          import norm_snp_seq,complement_base
+from   glu.lib.utils             import izip_exact, is_str
+from   glu.lib.fileutils         import autofile, table_reader, table_writer
+from   glu.lib.sequence          import norm_snp_seq, complement_base
+from   glu.lib.illumina          import read_Illumina_LBD, IlluminaManifest
 
 from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
 from   glu.lib.genolib.phenos    import Phenome, load_phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.io        import save_genostream, geno_options, GenoTransform
 from   glu.lib.genolib.genoarray import build_model, build_descr, GenotypeArray, GenotypeArrayDescriptor
-
-
-def load_lbd_file(filename,options):
-  def parse_gentrain():
-    row = data.next()
-    assert row[1] == 'Gentrain Scores'
-    assert row[2] == ''
-    return map(float,row[3:])
-
-  def parse_loci():
-    row = data.next()
-    assert row[1] == 'locusNames'
-    assert row[2] == ''
-    return row[3:]
-
-  def skiprows(n):
-    for i in xrange(n):
-      data.next()
-
-  def sample_generator(sopts):
-    for genos,scores in chunk(data,2):
-      assert genos[:6] == scores[:6]
-      assert  genos[6] == 'calls'
-      assert scores[6] == 'Score_Call'
-
-      sampleid = genos[0]
-
-      if sopts.include is not None and sampleid not in sopts.include:
-        continue
-
-      if sopts.exclude is not None and sampleid     in sopts.exclude:
-        continue
-
-      genos = np.array(genos[8:],dtype='S1')
-      try:
-        scores = np.array(scores[8:],dtype=float)
-      except ValueError:
-        scores = np.array( [ float(s) if s!='NaN' else np.nan for s in scores[8:] ] )
-
-      yield sampleid,genos,scores
-
-  data = csv.reader(autofile(filename), dialect='csv')
-
-  skiprows(11)
-  gentrain = parse_gentrain()
-  skiprows(3)
-  loci    = parse_loci()
-  skiprows(5)
-  samples = sample_generator(options.samples)
-
-  assert len(gentrain) == len(loci)
-
-  return loci,gentrain,samples
 
 
 def load_abmap(file_or_name,skip=0):
@@ -93,36 +39,6 @@ def load_abmap(file_or_name,skip=0):
     locus,a,b = row[:3]
 
     yield locus,(a,b)
-
-
-def load_illumina_manifest(filename):
-  '''
-  Load an Illumina assay manifest file, parsing out the various sections
-  '''
-  ifile = csv.reader(autofile(filename),dialect='csv')
-  sections = read_sections(ifile)
-
-  while 1:
-    heading,contents = sections.next()
-    attrs = dict(c[:2] for c in islice(contents,10) if len(c) > 1)
-    if 'Assay Format' in attrs:
-      break
-
-  format = attrs['Assay Format']
-
-  # Old style OPA manifest
-  if format == 'Golden Gate':
-    pass
-
-  # Infinium or new Golden Gate
-  # Known formats: Infinium,Infinium II,Infinium 2,Infinium HD Super,GoldenGate
-  elif format.startswith('Infinium') or format == 'GoldenGate':
-    heading,contents = sections.next()
-    assert heading == 'Assay'
-  else:
-    raise ValueError('Unknown manifest format: %s' % format)
-
-  return contents
 
 
 def find_index(header,headings,optional=False):
@@ -154,7 +70,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
   header      = manifest.next()
   assayid_idx = find_index(header,['IlmnID','Ilmn ID'])
   name_idx    = find_index(header,['Name'])
-  snp_idx     = find_index(header,['SNP'])
+  alleles_idx = find_index(header,['SNP'])
   chr_idx     = find_index(header,['Chr'])
   loc_idx     = find_index(header,['MapInfo'])
   cstrand_idx = find_index(header,['CustomerStrand','SourceStrand'])
@@ -163,13 +79,13 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
   probea_idx  = find_index(header,['AlleleA_ProbeSeq'],optional=True)
   probeb_idx  = find_index(header,['AlleleB_ProbeSeq'],optional=True)
 
-  max_idx     = max(topseq_idx,dstrand_idx,cstrand_idx,snp_idx,name_idx,
+  max_idx     = max(topseq_idx,dstrand_idx,cstrand_idx,alleles_idx,name_idx,
                     assayid_idx,probea_idx,probeb_idx)
 
   for assay in manifest:
     assay  += ['']*(max_idx-len(assay)+1)
-    locus   = assay[name_idx]
-    snp     = assay[snp_idx]
+    lname   = assay[name_idx]
+    alleles = assay[alleles_idx]
     chr     = assay[chr_idx] or None
     loc     = assay[loc_idx]
     cstrand = assay[cstrand_idx].lower()
@@ -177,41 +93,43 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
     topseq  = assay[topseq_idx]
     gstrand = assay[assayid_idx].split('_')[-2]
 
+    if chr.startswith('chr'):
+      chr = chr[3:]
     if chr=='Mt':
       chr='M'
 
-    if cstrand not in cstrand in ('top','bot','p','m'):
-      errorhandler('Invalid customer strand %s for %s' % (cstrand,locus))
+    if cstrand not in ('top','bot','p','m'):
+      errorhandler('Invalid customer strand %s for %s' % (cstrand,lname))
       continue
 
     if dstrand not in ('top','bot','p','m'):
-      errorhandler('Invalid design strand %s for %s' % (dstrand,locus))
+      errorhandler('Invalid design strand %s for %s' % (dstrand,lname))
       continue
 
     if gstrand not in 'FRU':
-      errorhandler('Unknown gstrand %s for %s' % (gstrand,locus))
+      errorhandler('Unknown gstrand %s for %s' % (gstrand,lname))
       continue
 
-    if len(snp) != 5 or (snp[0],snp[2],snp[4]) != ('[','/',']'):
-      errorhandler('Invalid SNP alleles %s for %s' % (snp,locus))
+    if len(alleles) != 5 or (alleles[0],alleles[2],alleles[4]) != ('[','/',']'):
+      errorhandler('Invalid SNP alleles %s for %s' % (alleles,lname))
       continue
 
-    a,b = snp[1],snp[3]
+    a,b = alleles[1],alleles[3]
 
     if loc:
       loc = int(loc)
 
     # Handle CNV probes, which can simply be skipped
     if (a,b) == NA:
-      genome.merge_locus(locus, chromosome=chr, location=loc)
+      genome.merge_locus(lname, chromosome=chr, location=loc)
       continue
 
     # Handle indels, which are strand neutral
     elif cstrand in 'pm' and dstrand in 'pm':
       a = indelmap[a]
       b = indelmap[b]
-      genome.merge_locus(locus, chromosome=chr, location=loc)
-      abmap[locus] = (a,b)
+      genome.merge_locus(lname, chromosome=chr, location=loc)
+      abmap[lname] = (a,b)
       continue
 
     # Otherwise, we have a SNP with A and B alleles on the design strand
@@ -220,16 +138,16 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       probeb = assay[probeb_idx]
       if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
         errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
-                         % (a,b,probea[-1],probeb[-1],locus))
-        genome.merge_locus(locus, chromosome=chr, location=loc)
+                         % (a,b,probea[-1],probeb[-1],lname))
+        genome.merge_locus(lname, chromosome=chr, location=loc)
         continue
 
     try:
       tstrand,aa,bb = norm_snp_seq(topseq)
       tstrand       = tstrand.lower()
       if tstrand != 'top':
-        errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % locus)
-        genome.merge_locus(locus, chromosome=chr, location=loc)
+        errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % lname)
+        genome.merge_locus(lname, chromosome=chr, location=loc)
         continue
 
     except ValueError:
@@ -240,8 +158,8 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
 
     # a,b and aa,bb should both be normalized to tstrand and must be equal
     if (a,b) != (aa,bb):
-      errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,locus))
-      genome.merge_locus(locus, chromosome=chr, location=loc)
+      errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,lname))
+      genome.merge_locus(lname, chromosome=chr, location=loc)
       continue
 
     if gstrand != 'U':
@@ -253,7 +171,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       strand  = '+' if forward else '-'
     else:
       if targetstrand in ('forward','reverse') and gstrand == 'U':
-        raise ValueError("Unknown strand for assay '%s'" % locus)
+        raise ValueError("Unknown strand for assay '%s'" % lname)
       strand = Nothing
 
     flip =    ((targetstrand == 'customer'     and tstrand != cstrand)
@@ -269,8 +187,8 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       a,b = complement_base(a),complement_base(b)
       strand = {Nothing:Nothing,'+':'-','-':'+'}[strand]
 
-    genome.merge_locus(locus, chromosome=chr, location=loc, strand=strand)
-    abmap[locus] = (a,b)
+    genome.merge_locus(lname, chromosome=chr, location=loc, strand=strand)
+    abmap[lname] = (a,b)
 
 
 def filter_gc(samples, gcthreshold):
@@ -403,7 +321,7 @@ def option_parser():
   parser.add_option('-m', '--abmap', dest='abmap', metavar='FILE',
                     help='Mappings from A and B probes to other allele codings')
   parser.add_option('-M', '--manifest', dest='manifest', metavar='FILE',
-                    help='Illumina manifest file')
+                    help='Illumina manifest file (BPM or CSV)')
   parser.add_option('-s', '--targetstrand', dest='targetstrand', metavar='T', default='customer',
                     help='Target strand based on Illumina manifest file: ab, top, bottom, forward, '
                          'reverse, customer (default), anticustomer, design, antidesign')
@@ -447,7 +365,7 @@ def main():
 
   if options.manifest:
     sys.stderr.write('Processing Illumina manifest file...')
-    manifest = load_illumina_manifest(options.manifest)
+    manifest = IlluminaManifest(options.manifest)
     parse_manifest(manifest,genome,abmap,targetstrand=options.targetstrand,errorhandler=errorhandler)
     sys.stderr.write('done.\n')
 
@@ -457,11 +375,11 @@ def main():
   transform = GenoTransform.from_options(options)
 
   args = iter(args)
-  loci,gentrain,samples = load_lbd_file(args.next(),transform)
+  loci,gentrain,samples = read_Illumina_LBD(args.next(),transform)
 
   loci = list(loci)
   for arg in args:
-    more_loci,more_gentrain,more_samples = load_lbd_file(arg,transform)
+    more_loci,more_gentrain,more_samples = read_Illumina_LBD(arg,transform)
 
     if list(more_loci) != loci:
       raise RuntimeError('Genotype headers do not match')
