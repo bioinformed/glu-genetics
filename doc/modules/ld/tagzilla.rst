@@ -15,7 +15,7 @@ This user's guide explains the use of the :mod:`ld.tagzilla`. TagZilla chooses
 tag SNPs for any given set of SNPs with genotypes. The TagZilla SNP
 selection algorithm estimates pair-wise r\ :sup:`2` and d' (d-prime) linkage
 disequilibrium (LD) statistics on genotype data from unrelated
-individuals.It then estimates bins using a greedy maximal approach similar
+individuals. It then estimates bins using a greedy maximal approach similar
 to that of Carlson et al. (2004), evaluates all the tags for each bin based
 upon user-specified criteria, and recommends an optimal tag for each bin if
 possible.
@@ -191,10 +191,10 @@ Notes:
 
 -z/--locipertag and -Z/--loglocipertag:
 
-  Both options control the ratio between the tags and loci.If the size of
+  Both options control the ratio between the tags and loci. If the size of
   the bin is too large and thus the number of loci per tag is too big, the
   genotype failure on the tag will lead to losing information on lots of
-  loci surrogated only by that tag.Instead of picking another candidate tag
+  loci surrogated only by that tag. Instead of picking another candidate tag
   from large bin as in a post-process, TagZilla incorporates this user
   requirement into the binning process and generates bins only satisfying
   these requirements.
@@ -377,7 +377,7 @@ FESTA formatted linkage disequilibrium files
 --------------------------------------------
 
 TagZilla can read in these files containing the pre-computed pair-wise LD
-parameter between the SNPs in certain region.For details about the format of
+parameter between the SNPs in certain region. For details about the format of
 these files, user can refer to this link:
 http://www.sph.umich.edu/csg/qin/FESTA/sample_files/
 
@@ -404,7 +404,7 @@ the analysis process.
 
   However, if the first character of the argument on any of these options is
   a colon ':', then the remainder of the argument is processed as a
-  comma-delimited list of loci.For example, -i :rs512331,rs1221. This method
+  comma-delimited list of loci. For example, -i :rs512331,rs1221. This method
   is sometimes convenient when running TagZilla iteratively from the
   command-line.
 
@@ -581,9 +581,9 @@ other-other      LD between non-tags within a bin
 Note that for residual bins, the dispositions for all LD pairs within each
 bin will have a 'residual' qualifier appended to them, and for obligate
 exclude bins, the dispositions for all LD pairs will have an 'excluded'
-qualifier appended to them.Also if the user specifies the '-x' option, the
+qualifier appended to them. Also if the user specifies the '-x' option, the
 'interbin' qualifier will appear in the disposition column for all residual
-LD pairs that sit in the bottom part of this output file.The LD pairs are
+LD pairs that sit in the bottom part of this output file. The LD pairs are
 formed based on each individual genotype input file, i.e., TagZilla doesn't
 look for significant LD among loci in multiple input files. The LD data is
 presorted by rsquared, and then locus1, and then locus2 for each bin.
@@ -660,7 +660,7 @@ There are two possible disposition categories for each locus.
       for details.
 
     * non tag category, there are two possible dispositions: 'exclude' or
-      'other'.Note that for a residual bin, the disposition for all loci in
+      'other'. Note that for a residual bin, the disposition for all loci in
       that bin will have a 'residual' qualifier, and for an obligate exclude
       bin, the disposition for all loci in that bin will have an 'excluded'
       qualifier.

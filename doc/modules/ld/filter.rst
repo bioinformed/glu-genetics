@@ -14,6 +14,8 @@ Usage::
 
   glu ld.filter [options] genotypes...
 
+Options:
+
   -h, --help            show this help message and exit
   -f NAME, --informat=NAME
                         Input genotype format
