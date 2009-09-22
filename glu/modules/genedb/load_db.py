@@ -13,7 +13,7 @@ from   itertools         import chain,islice
 
 from   glu.lib.fileutils import autofile, table_reader, tryint
 
-from   glu.modules.convert.from_lbd import load_illumina_manifest
+from   glu.lib.illumina  import IlluminaManifest
 
 
 DBSNP     = ['data/snp129.txt.gz', 'data/snp128.txt.gz', 'data/snp126.txt.gz']
@@ -285,6 +285,9 @@ def extract_illumina_snps(manifest):
     strand     = strandmap[assay[assayid_idx].split('_')[-2]]
     alleles    = assay[snp_idx][1:-1]
 
+    if chromosome.startswith('chr'):
+      chromosome = chromosome[3:]
+
     if chromosome in ('Mt','MT'):
       chromosome='M'
 
@@ -431,9 +434,9 @@ def main():
   con.execute('PRAGMA journal_mode=OFF;')
   con.execute('PRAGMA cache_size=20000;')
 
-  if 1:
+  if 0:
     genes = [ get_genes('data/seq_gene.md.b36.3.gz'),
-              get_mirbase('data/hsa-v12.gff') ]
+              get_mirbase('data/hsa-v13.gff') ]
     genes = list(chain(*genes))
     load_genes(con,genes)
 
@@ -442,16 +445,16 @@ def main():
     aliases = list(filter_aliases(aliases))
     load_aliases(con,aliases)
 
-  if 1:
+  if 0:
     bands = get_cytobands('data/cytoBand.txt.gz')
     load_cytobands(con,bands)
 
-  if 1:
+  if 0:
     streams  = []
     streams += [ get_goldenpath_dbsnp(s)  for s in DBSNP  ]
     streams += [ get_hapmap_snps(h)       for h in HAPMAP ]
     streams += [ get_goldenpath_arrays(a) for a in ARRAYS ]
-    streams += [ extract_illumina_snps(load_illumina_manifest(m))
+    streams += [ extract_illumina_snps(IlluminaManifest(m))
                    for m in MANIFESTS ]
 
     snps = chain(*streams)
