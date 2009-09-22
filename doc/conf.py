@@ -23,7 +23,7 @@ import sys, os
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.doctest', 'sphinx.ext.pngmath']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['templates']
@@ -44,7 +44,7 @@ copyright = '2009, BioInformed LLC and the U.S. Department of Health & Human Ser
 # The short X.Y version.
 version = '1.0'
 # The full version, including alpha/beta/rc tags.
-release = '1.0a6'
+release = '1.0b1'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
@@ -176,3 +176,7 @@ latex_documents = [
 
 # If false, no module index is generated.
 #latex_use_modindex = True
+
+#pngmath_dvipng_args = ['-gamma 1.5', '-D 110', '-bg Transparent']
+#pngmath_use_preview = True
+

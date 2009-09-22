@@ -9,4 +9,5 @@ LD estimation and tagging
 
   tagzilla
   matrix
+  filter
   surrogates

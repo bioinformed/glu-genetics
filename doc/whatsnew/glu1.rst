@@ -2,6 +2,71 @@
 What's New in GLU 1.0
 *********************
 
+Version 1.0b1 (2009-09-22)
+==========================
+
+The GLU development team is very proud to announce the availability of GLU
+version 1.0 beta 1.  It is the result of a major effort to refine and polish
+our software to make it suitable for a much broader audience.  The process
+is ongoing and has taken far longer than we expected.  We appreciate the
+comments, bug reports, and success stories we've received to date and
+welcome more with the availability of our first beta release.
+
+New features:
+
+* A new module :mod:`struct.admix` has been developed to estimate admixture
+  proportions from a fixed number of presumed ancestral populations by
+  maximizing a simplified admixture likelihood that assumes independent loci
+  and fixed allele frequencies.  This method gives very similar results as
+  STRUCTURE (Pritchard, Stephens & Donnelly, 2000) for this specific
+  problem, but requires only a small fraction of the computational time.
+
+* :mod:`convert.from_lbd` now supports reading Illumina BPM manifest files
+  from Illumina in addition to CSV export files.  Support was also added for
+  parsing manifests for the latest Illumina Infinium II HD and Super HD
+  formats, as well as their newfangled GoldenGate OPA manifests.
+
+* Users may create categorical variables and filter input rows based on
+  field value in :mod:`util.table`, :mod:`util.join`, :mod:`assoc.logit1`,
+  and :mod:`assoc.linear1`.  See :ref:`user_manual-formulae` for more
+  information.
+
+* :mod:`util.table` and :mod:`util.join` allow results to be sorted and to
+  be filtered for only unique results.
+
+* :mod:`qc.ibds` is a new module that estimates pairwise identity by state
+  (IBS) allele sharing and the approximate identity by descent (IBD) sharing
+  assuming a homogeneous population using a method of moments approximation.
+  These statistics are useful for testing for duplicates and close
+  relatives.
+
+* The :mod:`qc.dupcheck`, :mod:`qc.ibds` and :mod:`struct.admix` modules
+  support an interactive progress bar to allow users to track progress and
+  estimate time to completion for long-running jobs.  This feature is
+  enabled via specification of the '-P' option at the command-line.  Future
+  releases will add this functionality to additional modules.
+
+* :mod:`qc.dupcheck` allows specification of specific pairs to test and
+  output of the transitive sets of duplicate samples detected.
+
+* Renamed several TagZilla modules.  We now have :mod:`ld.tagzilla`,
+  :mod:`ld.matrix`, :mod:`ld.filter` and :mod:`ld.surrogates`.
+
+* Many documentation updates and corrections.
+
+Bug fixes:
+
+* Specification of multiple --includeloci/--includesamples and
+  --excludeloci/--excludesamples on the command line will now honor all
+  instances.  Previously, the behavior was to ignore all but the last one.
+  Now, multiple includes result in the intersection of all of the lists and
+  multiple excludes result in the union of all of the lists.
+
+* Properly parse "NaN" GC values in :mod:`convert.from_lbd` when running on
+  Windows.
+
+* Dozens of other minor fixes and tweaks
+
 Version 1.0a6 (2009-01-06)
 ==========================
 

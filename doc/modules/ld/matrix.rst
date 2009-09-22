@@ -2,10 +2,10 @@
 :mod:`ld.matrix` --- Generate a matrix of pairwise LD values
 ============================================================
 
-.. module:: ld.surrogates
+.. module:: ld.matrix
    :synopsis: Generate a matrix of pairwise LD values
 
-.. module:: surrogates
+.. module:: matrix
    :synopsis: Generate a matrix of pairwise LD values
 
 Introduction
