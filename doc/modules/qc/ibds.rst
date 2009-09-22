@@ -9,7 +9,10 @@
    :synopsis: Compute IBS and IBD sharing for pairs of samples
 
 The :mod:`qc.ibds` module compares all possible pairs of samples and
-computes allele sharing identical by state (IBS) and identical by descent (IBD).
+computes allele sharing identical by state (IBS) and identical by descent
+(IBD) assuming a homogeneous population using a method of moments
+approximation.  These statistics are useful for testing for duplicates and
+close relatives.
 
 The input can be any GLU input format, though sdat/sbat/PLINK ped formats
 are optimal.
