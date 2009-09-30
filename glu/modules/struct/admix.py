@@ -155,7 +155,7 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
     return l,df,h
 
   # Set up constraint matrices
-  #   k inequality constaints for x[i]>=0
+  #   k inequality constraints for x[i]>=0
   G = matrix([ [0.]*i + [-1.] + [0]*(k-i-1) for i in range(k) ]).T
   h = matrix([0.]*k)
 
@@ -172,7 +172,7 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
   # Run solver
   sol = solvers.cp(lnL, G, h, A=A, b=b)
 
-  # Return results (paramters, number of iterations, final log-likelihood)
+  # Return results (parameters, number of iterations, final log-likelihood)
   x = np.asarray(sol['x'])
   l = lnL(x)[0]
 

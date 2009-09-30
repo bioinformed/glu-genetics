@@ -333,8 +333,8 @@ def level2_check(parents,children,lname,genos,errbyloc2):
 def eliminate_parents(p1,p1genos,p2,p2genos,children,genos,saved_genos):
   '''
   Eliminate superfluous genotypes of parent1 with respect to parent2 and
-  their children.  Parent2 must be processed seperately, since compatibility
-  is only throughly verified for parent1's genotypes.  Thus, this function
+  their children.  Parent2 must be processed separately, since compatibility
+  is only thoroughly verified for parent1's genotypes.  Thus, this function
   may be called with parent1 and parent2 reversed and all saved genotypes of
   parent2 spared from consideration.
 
@@ -434,7 +434,7 @@ def eliminate_inconsistency(geno, genoset):
 
   @param    geno: Fixed genotype of either a parent or child in a nuclear family
   @type     geno: string
-  @parem genoset: Set of either parents or children of the fixed genotype
+  @param genoset: Set of either parents or children of the fixed genotype
                   that are to be eliminated
   @type  genoset: set of string
 
@@ -647,7 +647,7 @@ def main():
 
   errbyloc3=make_errbyloc3(errbyloc,errbylocf1,errbylocf2)
 
-  # Output genotype errorw by locus
+  # Output genotype errors by locus
   if options.locdet and options.locsum:
     outd = output_file(options.locdet,errbylochead1,errbylochead2)
     outs = output_file(options.locsum,errbylochead1,errbylochead2)

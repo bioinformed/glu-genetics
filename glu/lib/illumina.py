@@ -56,7 +56,7 @@ def readstr(afile):
 
   If the high-bit of the first length byte is set, then a second length byte
   follows with the number of additional 128 character blocks.  This
-  acommodates strings up to length 16,384 (128**2) without ambiguity.  It is
+  accommodates strings up to length 16,384 (128**2) without ambiguity.  It is
   unknown of this scheme scales to additional length bytes, since no strings
   longer than 6,264 bytes have been observed in the wild.
   '''

@@ -212,7 +212,7 @@ class MerlinWriter(object):
 
     datfile  = get_arg(args, ['datfile','dat'])
 
-    # Careful: mapfile=<blank> is intended to supress output
+    # Careful: mapfile=<blank> is intended to suppress output
     if datfile is None:
       datfile = related_file(filename,'dat')
 

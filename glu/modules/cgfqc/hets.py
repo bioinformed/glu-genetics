@@ -131,7 +131,7 @@ def main():
 
   else:
     if options.includeloci or options.excludeloci:
-      raise ValueError('Cannot specift a locus filter for count input')
+      raise ValueError('Cannot specify a locus filter for count input')
 
     counts = read_counts(args[0])
 

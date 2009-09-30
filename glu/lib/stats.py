@@ -63,7 +63,7 @@ def quantile(data, k, presorted=False):
 
   @param      data: sequence of data elements that can be meaningfully ordered
   @type       data: if presorted, sequence.  If not presorted, iterable
-  @param         k: the perventile value in the range [0..1]
+  @param         k: the percentile value in the range [0..1]
   @type          k: float
   @param presorted: Indicator if the input data sequence is supplied in sorted order
                     (default=False)

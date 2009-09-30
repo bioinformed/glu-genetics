@@ -107,8 +107,8 @@ Code lay-out
     cases, abbreviations and technical terms are used which aren't English).
     In addition, string literals and comments must also be in ASCII. The
     only exceptions are (a) test cases testing the non-ASCII features, and
-    (b) names of authors.  Authors whose names are not based on the latin
-    alphabet MUST provide a latin transliteration of their names.
+    (b) names of authors.  Authors whose names are not based on the Latin
+    alphabet MUST provide a Latin transliteration of their names.
 
 Imports
 -------

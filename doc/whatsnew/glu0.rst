@@ -263,7 +263,7 @@ Version 0.93 (2008-04-02)
   formats (via :format=smartpca or :format=eigensoft)
 
 * New utils module for helper modules.  The first is a utility to join two
-  files on a common lookup key.  This is something like the Unix 'join(1)'
+  files on a common look up key.  This is something like the Unix 'join(1)'
   command-line application, except it uses GLU's spiffy table readers.
   This avoids the need for Excel VLOOKUPs and other ad hoc nonsense.  More
   cool utilities to come.
@@ -316,7 +316,7 @@ Version 0.91 (2008-02-08)
 * Restore previous semantics for unambiguous genotypes when merging
   streams
 
-* Fix HapMap loader to accept tri- and quadalleleic data gracefully.
+* Fix HapMap loader to accept tri- and quadallelic data gracefully.
 
 Version 0.90 (2008-02-06)
 =========================

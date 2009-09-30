@@ -161,7 +161,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
   '''
   Returns a new genomatrix with the genotypes encoded with representations
   defined by the supplied genome object.  Locus metadata other than models
-  are merged and discrepencies raise errors, If genotype models change, then
+  are merged and discrepancies raise errors, If genotype models change, then
   all genotypes are recoded to use the same representation provided the
   models are compatible.
 
@@ -281,7 +281,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
   ...   assert genome.get_model(locus) is model
   '''
   # Fastpath for null recoding -- DISABLED due to some operations leaving
-  # streams with inconsistant encoding (like renaming ldat rows)
+  # streams with inconsistent encoding (like renaming ldat rows)
   #if genos.genome is genome:
   #  return genos
 
@@ -371,7 +371,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
         yield sample,row
 
   else:
-    raise ValueError('Uknown format')
+    raise ValueError('Unknown format')
 
   return genos.clone(_recode_genomatrixstream(),models=models,updates=updates,
                      genome=genome,packed=True,materialized=False)
@@ -555,7 +555,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
 
         yield sample,row
   else:
-    raise ValueError('Uknown format')
+    raise ValueError('Unknown format')
 
   return columns,models,updates,genome,_encode()
 
@@ -793,7 +793,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
         yield sample,row
 
   else:
-    raise ValueError('Uknown format')
+    raise ValueError('Unknown format')
 
   return columns,models,updates,genome,_encode()
 

@@ -175,7 +175,7 @@ def pick(sequence, indices):
   '''
   pick(sequence, indices) -> new sequence with elements chosen from the specified indices
 
-  Supports strings, arrays, and sequences with contructors that take a single
+  Supports strings, arrays, and sequences with constructors that take a single
   iterable argument.
 
   @param  sequence: input sequence
@@ -271,8 +271,8 @@ def groups(sequence, key=None):
 
 def unique(sequence, key=None):
   '''
-  Generator to produce the unique first occurance of each item in a
-  sequence.  If key is specified, then the first occurance of each
+  Generator to produce the unique first occurrence of each item in a
+  sequence.  If key is specified, then the first occurrence of each
   key(item) is returned, otherwise the entire item is taken as a key.
   Ordering is stable, since result elements will always appear in the order
   they first first appear in the input sequence.  Keys must be hashable.
@@ -447,11 +447,11 @@ def deprecated_by(msg):
 
 class gcdisabled(object):
   '''
-  Conext manager to temporarily disable Python's cyclic garbage collector.
+  Context manager to temporarily disable Python's cyclic garbage collector.
   The primary use is to avoid thrashing while allocating large numbers of
   non-cyclic objects due to an overly aggressive garbage collector behavior.
 
-  Will disable GC if it is enabled upon entry and renable upon exit:
+  Will disable GC if it is enabled upon entry and re-enable upon exit:
 
   >>> gc.isenabled()
   True

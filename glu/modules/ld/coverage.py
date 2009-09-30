@@ -30,7 +30,7 @@ def option_parser():
   inputgroup.add_option('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
                           help='File containing loci that are excluded from covering another locus')
   inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
-                          help='Ranges of genomic locations to analyze, specified as a comma seperated list of start and '
+                          help='Ranges of genomic locations to analyze, specified as a comma separated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
                                'to be open.  The end coordinate is exclusive and not included in the range.')
   inputgroup.add_option('-D', '--designscores', dest='designscores', metavar='FILE', type='str', action='append',
@@ -62,7 +62,7 @@ def option_parser():
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
                           action='callback', callback=check_option01,
-                          help='Filter out loci that fail to meet a minimum signficance level (pvalue) for a '
+                          help='Filter out loci that fail to meet a minimum significance level (pvalue) for a '
                                'test Hardy-Weinberg proportion (no default)')
 
   bingroup = optparse.OptionGroup(parser, 'Binning options')

@@ -194,7 +194,7 @@ Notes:
   Both options control the ratio between the tags and loci. If the size of
   the bin is too large and thus the number of loci per tag is too big, the
   genotype failure on the tag will lead to losing information on lots of
-  loci surrogated only by that tag. Instead of picking another candidate tag
+  loci covered only by that tag. Instead of picking another candidate tag
   from large bin as in a post-process, TagZilla incorporates this user
   requirement into the binning process and generates bins only satisfying
   these requirements.

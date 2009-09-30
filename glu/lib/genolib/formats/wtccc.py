@@ -29,7 +29,7 @@ def _encode_wtccc(model):
   assert model is not None
 
   if len(model.alleles) > 3:
-    raise ValueError('WTCCC files support only biallic models')
+    raise ValueError('WTCCC files support only allelic models')
 
   genovalues = [ GENOS[0] ]*4
 

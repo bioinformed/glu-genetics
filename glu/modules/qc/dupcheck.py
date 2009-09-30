@@ -123,7 +123,7 @@ def file_pairs(genos, pairfile):
     sample2 = samples.get(row[1])
 
     if sample1 and sample2:
-      pairs.append( (sample1,genos[sample1]),(sample2,genos[sample2]) )
+      pairs.append( ((sample1,genos[sample1]),(sample2,genos[sample2])) )
 
   # FIXME: We may want to implement a progress bar with a spinner for
   # unknown length, since materializing here may be fatal to performance

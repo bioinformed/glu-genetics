@@ -40,7 +40,7 @@ def strict_lower_triangle(n):
 
 
 def strict_lower_triangle_inv(x):
-  '''strict_lower_triangle_inv(x) -> the smallest strictly loweer triangular number n such that strict_lower_triangle(n)<=x'''
+  '''strict_lower_triangle_inv(x) -> the smallest strictly lower triangular number n such that strict_lower_triangle(n)<=x'''
   return int((sqrt(8*x+1)+1)//2)
 
 

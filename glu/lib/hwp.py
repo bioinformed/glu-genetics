@@ -20,11 +20,11 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
   'A Note on Exact Tests of Hardy-Weinberg Equilibrium', Wigginton JE,
   Cutler DJ and Abecasis GR; Am J Hum Genet (2005) 76: 887-93
 
-  @param  hom1_count: Count of observed homogygote 1
+  @param  hom1_count: Count of observed homozygote 1
   @type   hom1_count: int
-  @param   het_count: Count of observed heterogygote
+  @param   het_count: Count of observed heterozygote
   @type    het_count: int
-  @param  hom1_count: Count of observed homogygote 2
+  @param  hom1_count: Count of observed homozygote 2
   @type   hom2_count: int
   @return           : Exact p-value for deviation (2-sided) from Hardy-Weinberg Proportions (HWP)
   @rtype            : float
@@ -58,7 +58,7 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
   if not rare:
     return 1.
 
-  # Compute the expected number of heterogygotes under HWP
+  # Compute the expected number of heterozygotes under HWP
   hets = rare*common/(rare+common)
 
   # Account for rounding error on the number of hets, if the
@@ -66,7 +66,7 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
   if rare%2 != hets%2:
     hets += 1
 
-  # Initialize the expected number of rare and common homogygotes under HWP
+  # Initialize the expected number of rare and common homozygotes under HWP
   hom_r = (rare-hets)/2
   hom_c = (common-hets)/2
 
@@ -87,7 +87,7 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
     probs[h/2+1] = probs[h/2]*4*(hom_r-i)*(hom_c-i) / ((h+1)*(h+2))
 
   # Compute the pvalue by summing the probabilities <= to that of the
-  # observed number of heterogygotes and normalize by the total
+  # observed number of heterozygotes and normalize by the total
   p_obs = probs[het_count/2]
   pvalue = sum(p for p in probs if p <= p_obs)/sum(probs)
 
@@ -98,11 +98,11 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
   '''
   Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
 
-  @param  hom1_count: Count of observed homogygote 1
+  @param  hom1_count: Count of observed homozygote 1
   @type   hom1_count: int
-  @param   het_count: Count of observed heterogygote
+  @param   het_count: Count of observed heterozygote
   @type    het_count: int
-  @param  hom1_count: Count of observed homogygote 2
+  @param  hom1_count: Count of observed homozygote 2
   @type   hom2_count: int
   @return           : asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
   @rtype            : float
@@ -171,11 +171,11 @@ def hwp_biallelic_counts(hom1_count,het_count,hom2_count,exact_threshold=None):
   '''
   Return the asymptotic Hardy-Weinberg Chi-squared value and p-value for the given genotypes
 
-  @param       hom1_count: Count of observed homogygote 1
+  @param       hom1_count: Count of observed homozygote 1
   @type        hom1_count: int
-  @param        het_count: Count of observed heterogygote
+  @param        het_count: Count of observed heterozygote
   @type         het_count: int
-  @param       hom1_count: Count of observed homogygote 2
+  @param       hom1_count: Count of observed homozygote 2
   @type        hom2_count: int
   @param  exact_threshold: threshold for the exact test
   @type   exact_threshold: int

@@ -73,7 +73,7 @@ def complement(s):
 
   @param  s: nucleotide sequence
   @type   s: sequence
-  @return  : complemented seqeuence
+  @return  : complemented sequence
   @rtype   : sequence
 
   >>> s='ambhg'

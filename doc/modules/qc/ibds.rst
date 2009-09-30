@@ -63,7 +63,7 @@ the proportion of informative genotypes comparisons that share n alleles IBS.
 IBD computation assumes knowledge of genotypes frequencies (see the
 --frequencies option) or population homogeneity so that genotype
 frequencies may be estimated empirically from the genotype data provided.
-The resulting IBD probabilties reflect the proportion of informative
+The resulting IBD probabilities reflect the proportion of informative
 genotypes that share n alleles identical by descent.
 
 This algorithm is relatively expensive in terms of both computer memory and

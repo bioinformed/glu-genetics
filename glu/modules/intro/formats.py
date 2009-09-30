@@ -29,7 +29,7 @@ DETAILS:
 
 TRIPLE format:
 
-The GLU triple file format is a tab-delmited ASCII file with exactly three
+The GLU triple file format is a tab-delimited ASCII file with exactly three
 columns of data and one row/line of data per genotype to be stored.  Rows
 may appear in any order and no header line is allowed.
 
@@ -41,7 +41,7 @@ Columns:
                   restriction.
   3. Genotype   : A two character genotype with alleles ' ACGT'.  Genotypes
                   containing one blank are treated as hemizygous, while
-                  genotpes composed of an empty string or two blanks are
+                  genotypes composed of an empty string or two blanks are
                   treated as missing.
 
 Example:
@@ -64,11 +64,11 @@ Row    2..: The name and genotypes from each locus
 
 Column 1  : 'ldat' in the first row, the name of each locus on each
              subsequent row
-Cooumn 2..: subject name in the first row, each of the subject's genotypes
+Column 2..: subject name in the first row, each of the subject's genotypes
             in each subsequent row
 
 Genotypes are coded as a two character string with alleles ' ACGT'.
-Genotypes containing one blank are treated as hemizygous, while genotpes
+Genotypes containing one blank are treated as hemizygous, while genotypes
 composed of an empty string or two blanks are treated as missing.
 
 Example:
@@ -91,11 +91,11 @@ Row    2..: The name and genotypes from each sample
 
 Column 1  : 'sdat' in the first row, the name of each sample on each
             subsequent row
-Cooumn 2..: locus name in the first row, each of the genotypes at that locus
+Column 2..: locus name in the first row, each of the genotypes at that locus
             in each subsequent row
 
 Genotypes are coded as a two character string with alleles ' ACGT'.
-Genotypes containing one blank are treated as hemizygous, while genotpes
+Genotypes containing one blank are treated as hemizygous, while genotypes
 composed of an empty string or two blanks are treated as missing.
 
 Example:

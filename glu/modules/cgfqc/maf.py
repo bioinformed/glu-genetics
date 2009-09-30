@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __gluindex__  = False
-__abstract__  = 'Esimate genotype minor allele frequency'
+__abstract__  = 'Estimate genotype minor allele frequency'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'

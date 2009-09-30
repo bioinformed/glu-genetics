@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __gluindex__  = True
-__abstract__  = 'Detect non-Mendialian inheritance among parents and their offspring'
+__abstract__  = 'Detect non-Mendelian inheritance among parents and their offspring'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'

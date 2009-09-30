@@ -4,7 +4,7 @@
 GLU SOFTWARE LICENSE
 ++++++++++++++++++++
 
-Last ammended: 2008-02-05
+Last amended: 2008-02-05
 
 Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health &
 Human Services. Funded by NCI under Contract N01-CO-12400.

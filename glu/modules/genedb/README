@@ -18,6 +18,7 @@ SNP data:
 	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina300.txt.gz
 	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina550.txt.gz
 	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina650.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina1M.txt.gz
 
 miRBase
 	ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/genomes/hsa.gff

@@ -41,7 +41,7 @@ class UnphasedMarkerRepresentation(object):
     below).
 
     @param    missing_geno_str: canonical missing genotype output string representation, optional
-                                and defautls to Nothing
+                                and defaults to Nothing
     @type     missing_geno_str: str
     @param   missing_geno_strs: missing genotype input strings
     @type    missing_geno_strs: sequence

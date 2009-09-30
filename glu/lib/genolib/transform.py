@@ -22,7 +22,7 @@ map_type = (NoneType,dict)
 
 def load_rename_alleles_file(filename):
   '''
-  Load an allele renameing file
+  Load an allele renaming file
 
   @param filename: a file name or file object
   @type  filename: str or file object
@@ -463,9 +463,9 @@ def prove_unique_transform(transform=None,samples=None,loci=None,unique=False):
 
   @param transform: transformation object (optional)
   @type  transform: GenoTransform object
-  @param   samples: optional set of samples refered to by the triples
+  @param   samples: optional set of samples referred to by the triples
   @type    samples: sequence, set, or None
-  @param      loci: optional set of loci refered to by the triples
+  @param      loci: optional set of loci referred to by the triples
   @type       loci: sequence, set, or None
   @param    unique: flag indicating if repeated elements do not exist within the stream
   @type     unique: bool

@@ -14,7 +14,7 @@ of the available modules, using the command:
 
   glu list
 
-and then learning about the data file formats used by GLU wuth the command:
+and then learning about the data file formats used by GLU with the command:
 
   glu intro.formats
 

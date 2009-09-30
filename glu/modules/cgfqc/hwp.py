@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __gluindex__  = False
-__abstract__  = 'Test genotype data for deviations from Hardy-Weinbery proportions'
+__abstract__  = 'Test genotype data for deviations from Hardy-Weinberg proportions'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -56,7 +56,7 @@ def hwp_output(out,results):
 def save_results(sw,results):
   results.sort()
 
-  rows=[['locus', 'hom1s', 'hets', 'hom2s', 'num', 'p-value', 'aymptotic p-value']]
+  rows=[['locus', 'hom1s', 'hets', 'hom2s', 'num', 'p-value', 'asymptotic p-value']]
   for r,(l,p,p2,hom1,het,hom2) in enumerate(results):
     n = hom1+het+hom2
     pe = repr(p) if p is not None else ''
@@ -117,11 +117,11 @@ def read_counts(filename):
 def filter_counts(data, mingenos, minmaf, mincompletion):
   maxmissing = 1-mincompletion
 
-  for locus,counts,bialleleic_counts in data:
+  for locus,counts,biallelic_counts in data:
     n = sum(counts)
-    m = sum(bialleleic_counts)
+    m = sum(biallelic_counts)
 
-    if sum(bialleleic_counts) < mingenos:
+    if sum(biallelic_counts) < mingenos:
       continue
 
     # Completion does count hemizygotes
@@ -134,13 +134,13 @@ def filter_counts(data, mingenos, minmaf, mincompletion):
 
       # Compute MAF based on non-hemizygous counts only or else users will
       # be confused
-      maf = float(min(2*bialleleic_counts[0]+bialleleic_counts[1],
-                      2*bialleleic_counts[2]+bialleleic_counts[1])) / m
+      maf = float(min(2*biallelic_counts[0]+biallelic_counts[1],
+                      2*biallelic_counts[2]+biallelic_counts[1])) / m
 
       if maf < minmaf:
         continue
 
-    yield locus,counts,bialleleic_counts
+    yield locus,counts,biallelic_counts
 
 
 def main():

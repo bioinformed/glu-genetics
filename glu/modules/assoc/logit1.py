@@ -261,7 +261,7 @@ def main():
     if 0:
       dump_model('%s.csv' % lname, model)
 
-    # R model verfication debugging code
+    # R model verification debugging code
     if 0:
       check_R(model,g)
 

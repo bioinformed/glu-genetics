@@ -227,7 +227,7 @@ def main():
       f.writerow(model.vars)
       f.writerows(model.X.tolist())
 
-    # R model verfication debugging code
+    # R model verification debugging code
     if 0:
       check_R(model,g)
 

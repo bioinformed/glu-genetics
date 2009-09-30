@@ -233,7 +233,7 @@ class TextGenomatrixWriter(object):
     @param rowkey: row identifier
     @type  rowkey: str
     @param  genos: sequence of genotypes in an internal representation, to
-                   be converted to the appropiate string representation by
+                   be converted to the appropriate string representation by
                    the supplied genorepr class.
     @type   genos: sequence
     '''
@@ -252,7 +252,7 @@ class TextGenomatrixWriter(object):
 
     @param rows: sequence of pairs of row key and sequence of genotypes in
                  an internal representation, to be converted to the
-                 appropiate string representation by the supplied genorepr
+                 appropriate string representation by the supplied genorepr
                  class.
     @type  rows: sequence of (str,sequence)
     '''
@@ -522,7 +522,7 @@ class TextGenotripleWriter(object):
     @param  locus: locus identifier
     @type   locus: str
     @param   geno: genotypes internal representation, to be converted to
-                   the appropiate string representation by the supplied
+                   the appropriate string representation by the supplied
                    genorepr class
     @type    geno: genotype representation
     '''

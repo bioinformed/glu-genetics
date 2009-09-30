@@ -76,7 +76,7 @@ def main():
 
   # FIXME: Make generic and use a better high-water mark
   # Unix-specific method to determine if we'll overflow the maximum number
-  # of files desciptors allowed
+  # of files descriptors allowed
   try:
     import resource
     slimit,hlimit = resource.getrlimit(resource.RLIMIT_NOFILE)

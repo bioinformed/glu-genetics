@@ -229,7 +229,7 @@ def main():
   nonempty_genotypes  = nonempty_loci*nonempty_samples
   empty_genotypes     = observed_genotypes - nonempty_genotypes
 
-  # Attempted genotype statistocs
+  # Attempted genotype statistics
   attempted_genotypes = attempted_loci*attempted_samples
   phantom_genotypes   = attempted_genotypes - observed_genotypes
 

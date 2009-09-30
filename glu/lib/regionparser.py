@@ -49,7 +49,7 @@ class Regions(object):
     '''
     Return whether or not the sample-locus pair that was passed in exists in the current regions object
 
-    @param    key: sampel id and locus id
+    @param    key: sample id and locus id
     @type     key: tuple
     @return      : flag indicating if the sample-locus exists in the current regions object
     @rtype       : bool
@@ -68,7 +68,7 @@ class Regions(object):
 
   def __iter__(self):
     '''
-    Iterate through the current regions object for each ssample and locus in each region
+    Iterate through the current regions object for each sample and locus in each region
     '''
     return ((name,samples,loci) for name,(samples,loci) in self.regions.iteritems())
 
@@ -139,7 +139,7 @@ def parse_header(rows):
 def parse_list(rows):
   '''
   Parse either the samples or loci subsection.
-  It sould be one sample or loci per row.
+  It should be one sample or loci per row.
   '''
   aset = set()
   rows = list(rows)

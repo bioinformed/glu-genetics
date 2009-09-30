@@ -19,7 +19,7 @@ from   glu.modules.genedb.find_regions import resolve_features
 from   glu.modules.genedb.queries      import query_snps_by_location
 
 
-HEADER = ['LOCUS','CHRMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
+HEADER = ['LOCUS','CHROMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
           'REGION_START','REGION_END','FEATURE_NAME','FEATURE_STRAND','FEATURE_START','FEATURE_END','FEATURE_TYPE']
 
 

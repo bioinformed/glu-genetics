@@ -321,7 +321,7 @@ class StructureWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-    # Careful: file=<blank> is intended to supress output
+    # Careful: file=<blank> is intended to suppress output
     if mainfile is None:
       mainfile = related_file(filename,'mainparam')
     if extrafile is None:

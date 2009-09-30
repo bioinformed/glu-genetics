@@ -147,7 +147,7 @@ def filter_loci_by_maf(loci, minmaf, minobmaf, include):
 
   mafs = (minmaf,minobmaf)
   for locus in loci:
-    # For mafs[locus.name in include], the index evaluatates to:
+    # For mafs[locus.name in include], the index evaluates to:
     #    False == 0: Choose mafs[0] == minmaf
     #    True  == 1: Choose mafs[1] == minobmaf
     if locus.maf >= mafs[locus.name in include]:
@@ -581,7 +581,7 @@ class BinInfo(NullBinInfo):
 
 def locus_result_sequence(filename, locusmap, exclude):
   '''
-  Returns a generator of BinResult objects for the tagzilla locus ouput
+  Returns a generator of BinResult objects for the tagzilla locus output
   file name.
 
   The locusmap dictionary and the exclude set are filled in incrementally as
@@ -1213,7 +1213,7 @@ def binner(loci, binsets, lddata, includes, get_tags_required=None):
   Greedy tag marker binning algorithm -- similar to the Carlson algorithm.
 
   The binner utilizes the recomputed binsets and lddata which reflect LD
-  values previously filtered against the choosen minimum threshold for bin.
+  values previously filtered against the chosen minimum threshold for bin.
 
   Given a set of binsets and a sequence of loci, the binner iteratively selects
   the largest bin in the following priority order:
@@ -1248,7 +1248,7 @@ def binner(loci, binsets, lddata, includes, get_tags_required=None):
                  'alternate-tag'    if it is a tag in an obligate-include
                                     bin, but not the obligate tag
                  'excluded-tag'     a tag for a bin that contains all
-                                    obligatorily exluded loci
+                                    obligatorily excluded loci
                  'candidate-tag'    a tag for a bin that has more than one
                                     possible non-obligate tag
                  'necessary-tag'    a tag for a bin that has only one tag,
@@ -1291,11 +1291,11 @@ def binner(loci, binsets, lddata, includes, get_tags_required=None):
   @param     loci: A sequence of loci that may appear in the ldpairs
 
   @type    lddata: Sequence of (LNAME1,LNAME2,R-SQUARED,DPRIME)
-  @param   lddata: A sequence of parwise LD information that exceed a given
+  @param   lddata: A sequence of pairwise LD information that exceed a given
                    threshold.  i.e, they must be pre-filtered by the r-squared
                    criteria before being passed to the binner.
   @rtype:          generator for an ordered sequence of BinResult objects
-  @return:         the optimal bins with tags, others, ld informatin etc. for each
+  @return:         the optimal bins with tags, others, ld information etc. for each
   '''
 
   bin_sequence = BinSequence(loci, binsets, lddata, get_tags_required)
@@ -1804,7 +1804,7 @@ def option_parser():
   inputgroup.add_option('-S', '--ldsubset', dest='ldsubset', metavar='FILE', default='',
                           help='File containing loci within the region these loci LD will be analyzed (see -d/--maxdist)')
   inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
-                          help='Ranges of genomic locations to analyze, specified as a comma seperated list of start and '
+                          help='Ranges of genomic locations to analyze, specified as a comma separated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
                                'to be open.  The end coordinate is exclusive and not included in the range.')
   inputgroup.add_option('-D', '--designscores', dest='designscores', metavar='FILE', type='str', action='append',
@@ -1850,7 +1850,7 @@ def option_parser():
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
   genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
                           action='callback', callback=check_option01,
-                          help='Filter out loci that fail to meet a minimum signficance level (pvalue) for a '
+                          help='Filter out loci that fail to meet a minimum significance level (pvalue) for a '
                                'test Hardy-Weinberg proportion (no default)')
 
   bingroup = optparse.OptionGroup(parser, 'Binning options')
@@ -2130,7 +2130,7 @@ def tagzilla_multi(options,args):
           poptags.setdefault(population, set()).update(bin.tags)
           disposition = bin.disposition
 
-          # FIXME: The recommeneded tag must be selected for this method to
+          # FIXME: The recommended tag must be selected for this method to
           #        ensure across-population coverage.
           #        tagselector.select_tags(bin) must be extended to pick the
           #        recommended among several parallel bins.

@@ -352,7 +352,7 @@ def parse_augmented_filename(filename,args):
   '''
   Retrieve option-value pairs from the filename delimited by colon.  Options and values are added to the args dictionary.
 
-  @param  filename: potentially agumented file name string
+  @param  filename: potentially augmented file name string
   @type   filename: str
   @param      args: option dictionary
   @type       args: dict
@@ -406,11 +406,11 @@ def tryfloat(n):
   '''
   Try to coerce an arbitrary object to a float, otherwise return the
   original value.  Existing integer objects are returned as-is without
-  converstion to a floating point value.
+  conversion to a floating point value.
 
   @param s: arbitrary item
   @type  s: object
-  @return : integer coerced value or the orginal value
+  @return : integer coerced value or the original value
   @rtype  : float or object
 
   >>> tryfloat(1)
@@ -445,7 +445,7 @@ def tryint(s):
 
   @param s: arbitrary item
   @type  s: object
-  @return : integer coerced value or the orginal value
+  @return : integer coerced value or the original value
   @rtype  : int or object
 
   >>> tryint(1)
@@ -474,7 +474,7 @@ def tryint1(s):
 
   @param s: arbitrary item
   @type  s: object
-  @return : integer coerced value or the orginal value
+  @return : integer coerced value or the original value
   @rtype  : int or object
 
   >>> tryint1(1)
@@ -745,7 +745,7 @@ def map_reader(filename,unique=True,extra_args=None,**kwargs):
   field considered.  If the skip parameter is used to ignore a certain
   number of lines (e.g., headers) at the beginning of the file.  A default
   parameter may be specified to assign values to keys with empty or
-  non-existant value fields.  Otherwise, the value will be set equal to the
+  non-existent value fields.  Otherwise, the value will be set equal to the
   key.  File loading is delegated to the table_reader function, so refer
   to table_reader for details on supported arguments.
 
@@ -1273,7 +1273,7 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   as either a function argument or by appending ':skip=n', where n is an
   integer, to the filename.
 
-  The columns parameter can be overridden with a comma seperated list of
+  The columns parameter can be overridden with a comma separated list of
   column indices or column ranges (0 based) by appending, e.g.,
   ':columns=1,0,5-10' to the end of the filename.  Simple parsing of column
   headers is supported.  If any non-integer columns are specified, then the
@@ -1998,7 +1998,7 @@ def sort_table(header, table, keys):
 
 def uniq_table(header, table, keys=None):
   '''
-  Generator to produce the unique first occurance of each item in a table.
+  Generator to produce the unique first occurrence of each item in a table.
   Ordering is stable, since result elements will always appear in the order
   they first first appear in the input sequence.
 

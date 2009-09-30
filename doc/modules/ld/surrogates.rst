@@ -53,7 +53,7 @@ Input options:
                         analyzed of the loci that are read
     -R RANGE, --range=RANGE
                         Ranges of genomic locations to analyze, specified as a
-                        comma seperated list of start and end coordinates
+                        comma separated list of start and end coordinates
                         "S-E".  If either S or E is not specified, then the
                         ranges are assumed to be open.  The end coordinate is
                         exclusive and not included in the range.
@@ -83,7 +83,7 @@ Genotype and LD estimation options:
     -m D, --maxdist=D   Maximum inter-marker distance in kb for LD comparison
                         (default=200)
     -P p, --hwp=p       Filter out loci that fail to meet a minimum
-                        signficance level (pvalue) for a test Hardy-Weinberg
+                        significance level (pvalue) for a test Hardy-Weinberg
                         proportion (no default)
 
 LD threshold options:

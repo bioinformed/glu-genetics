@@ -496,7 +496,7 @@ except ImportError:
 
     def categories(self,counts=None):
       '''
-      Count the number of occurances of each genotypes category
+      Count the number of occurrences of each genotypes category
       '''
       return genotype_categories(self,counts)
 
@@ -769,7 +769,7 @@ except ImportError:
 
   def count_genotypes(genos,counts=None,model=None):
     '''
-    Count the number of occurances of each genotypes belonging to a single
+    Count the number of occurrences of each genotypes belonging to a single
     model given a sequence of genotypes.  Counts are returned as a list of
     integers corresponding to the number of each genotype in model.genotype
     observed.
@@ -822,7 +822,7 @@ except ImportError:
 
   def genotype_categories(genos,counts=None):
     '''
-    Count the number of occurances of each genotypes category given a
+    Count the number of occurrences of each genotypes category given a
     sequence of genotypes.  Counts are returned as a list of integers
     corresponding to the number of missing, hemizygote, homozygote, and
     heterozygote genotype oberved.
@@ -857,7 +857,7 @@ except ImportError:
 
   def locus_summary(genos,sample_counts=None,locus_counts=None,model=None):
     '''
-    Count the number of occurances of each n genotypes for a given locus and
+    Count the number of occurrences of each n genotypes for a given locus and
     the category for each sample given a sequence of genotypes at a locus.
     Genotype counts are returned as a list of integers counts corresponding
     to genotype index.  Sample category counts are returned as an n x 4 array
@@ -927,8 +927,8 @@ except ImportError:
 
   def sample_summary(genos,locus_counts=None,sample_counts=None):
     '''
-    Count the number of occurances of each genotype category and the of
-    occurances of each of n genotypes for a given sample.  Genotype category
+    Count the number of occurrences of each genotype category and the of
+    occurrences of each of n genotypes for a given sample.  Genotype category
     counts are returned as a list of integers counts corresponding to
     genotype index.  Per-locus genotype counts are returned as an n x
     max(genos) array with the number of missing, hemizygote, homozygote, and
@@ -1258,7 +1258,7 @@ def locus_genotype_missing_rate(genocounts):
 
 def count_alleles_from_genocounts(model,genocounts):
   '''
-  Count the number of occurances of each allele belonging to the specified
+  Count the number of occurrences of each allele belonging to the specified
   locus model given a set of genotype counts.  Counts are returned as a list
   of integers corresponding to the number of each allele in model.alleles
   oberved.
@@ -1289,7 +1289,7 @@ def count_alleles_from_genocounts(model,genocounts):
 
 def count_alleles_from_genos(model,genos):
   '''
-  Count the number of occurances of each allele belonging to the specified
+  Count the number of occurrences of each allele belonging to the specified
   locus model given a set of genotype counts.  Counts are returned as a list
   of integers corresponding to the number of each allele in model.alleles
   oberved.
@@ -1514,7 +1514,7 @@ def major_allele_from_genos(genos):
 
 def genotype_count_matrix(genos):
   '''
-  Count the number of occurances of each n genotypes for a series of loci.
+  Count the number of occurrences of each n genotypes for a series of loci.
   Genotype counts are returned as an m x n matrix of genotype counts where m
   is the number of loci and n-1 is the maximum number of genotypes at any
   locus, and each row contains integers counts corresponding to genotype
@@ -1536,7 +1536,7 @@ def genotype_count_matrix(genos):
 
       count = count_genotypes(geno)
 
-      # FIXME: Keep a running maxgeno instead of assuming bialleleic SNPs
+      # FIXME: Keep a running maxgeno instead of assuming allelic SNPs
       if len(count) < 4:
         count = count.tolist()+[0]*(4-len(count))
 
@@ -1567,7 +1567,7 @@ class ModelBuilder(object):
     * flag to allow hemizygote genotypes (boolean)
 
   Any combination of alleles, genotypes, and maximum number of alleles may
-  be specified, provided they are consistant and at least one is non-missing
+  be specified, provided they are consistent and at least one is non-missing
   or empty.  Alleles are treated as unordered sets, while genotypes are
   assumed to be ordered based on the desired encoding.
 

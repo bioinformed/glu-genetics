@@ -3,7 +3,7 @@
 from __future__ import division
 
 __abstract__  = '''\
-Fast linkage disequilibrium (LD) estimation for bialleleic
+Fast linkage disequilibrium (LD) estimation for allelic
 SNP genotype data'''
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
@@ -152,7 +152,7 @@ def count_diplotypes(genos1, genos2):
 
 
 def find_heterozygotes(model1,model2,diplo_counts):
-  '''Return exemplar heterozygoes for each locus'''
+  '''Return exemplar heterozygotes for each locus'''
   a1 = set()
   a2 = set()
   for g1,g2,n in diplo_counts:
@@ -186,7 +186,7 @@ def find_hetz(model,alleles):
 
 def estimate_ld_native(c11,c12,c21,c22,dh):
   '''
-  Compute r-squared (pair-wise) measure of linkage disequlibrium for genotypes at two loci
+  Compute r-squared (pair-wise) measure of linkage disequilibrium for genotypes at two loci
 
           Haplotype Counts
           Locus1  Locus2

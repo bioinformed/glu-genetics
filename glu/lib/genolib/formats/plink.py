@@ -257,7 +257,7 @@ class PlinkPedWriter(object):
 
     mapfile  = get_arg(args, ['mapfile','map'])
 
-    # Careful: mapfile=<blank> is intended to supress output
+    # Careful: mapfile=<blank> is intended to suppress output
     if mapfile is None:
       mapfile = related_file(filename,'map')
 
@@ -629,7 +629,7 @@ class PlinkTPedWriter(object):
 
     tfamfile = get_arg(args, ['tfamfile','tfam'])
 
-    # Careful: mapfile=<blank> is intended to supress output
+    # Careful: mapfile=<blank> is intended to suppress output
     if tfamfile is None:
       tfamfile = related_file(filename,'tfam')
 
@@ -864,7 +864,7 @@ def _plink_update_encoding(model, genos, shift):
   n  = len(model.alleles)
 
   if n > 3:
-    raise ValueError('PLINK BIM files support only biallic models')
+    raise ValueError('PLINK BIM files support only allelic models')
 
   a1 = model.alleles[1] if n>1 else None
   a2 = model.alleles[2] if n>2 else None
@@ -1097,7 +1097,7 @@ class PlinkBedWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-    # Careful: file=<blank> is intended to supress output
+    # Careful: file=<blank> is intended to suppress output
     if famfile is None:
       famfile = related_file(filename,'fam')
     if bimfile is None:

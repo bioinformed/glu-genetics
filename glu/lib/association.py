@@ -290,8 +290,8 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
     Row  1  : Column headers
     Rows 2..: Phenotype records
 
-    Column  1  : Subject ID that cooresponds to genotype subject ID
-    Column  2  : Phenotype, either categorical or continious
+    Column  1  : Subject ID that corresponds to genotype subject ID
+    Column  2  : Phenotype, either categorical or continuous
     Columns 3..: Additional integer or real valued covariates
 
   NOTE: Subjects may be repeated to allow for incidence-density and other

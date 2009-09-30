@@ -43,7 +43,7 @@ def encode_loci(genos):
 
     other = [ a for a,n in izip(model.alleles[1:],allelecounts[1:]) if a!=major and n ]
 
-    # Monomorphic or non-bialleleic
+    # Monomorphic or non-biallelic
     if len(other) != 1:
       continue
 

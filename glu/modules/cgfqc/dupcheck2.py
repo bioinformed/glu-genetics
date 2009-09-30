@@ -29,7 +29,7 @@ def write_header(outfile,filename,threshold,mingenos):
   outfile.write('Duplicate sample analysis\n')
   outfile.write('  Input File:     %s\n' % filename)
   outfile.write('  Timestamp:      %s\n' %  time.asctime())
-  outfile.write('  Threshold: %.2f%%; Mininum Counts: %d (see explanation below)\n' % (threshold,mingenos))
+  outfile.write('  Threshold: %.2f%%; Minimum Counts: %d (see explanation below)\n' % (threshold,mingenos))
   outfile.write('''
   This analysis will detect putative duplicate samples within the given
   dataset that share at least %.2f%% of their genotypes in common, provided
@@ -46,7 +46,7 @@ Output:
       duplicate sample-pairs with DIFFERENT phenotypes. These are problematic samples.
     - Concordance results for sample-pairs of three groups:
        1. unexpected
-       2. expected, not detectd
+       2. expected, not detected
        3. expected, detected
 ''' % (threshold,mingenos))
 

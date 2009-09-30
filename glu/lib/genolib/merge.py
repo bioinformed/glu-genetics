@@ -18,7 +18,7 @@ from   glu.lib.genolib.genoarray import Genotype,FORCE_PYTHON
 
 UNAMBIGUOUS,CONCORDANT,CONSENSUS,DISCORDANT,MISSING = range(5)
 CONCORDANCE_HEADER = ['UNAMBIGUOUS_COUNT','CONCORDANT_COUNT','CONSENSUS_COUNT','DISCORDANT_COUNT',
-                      'DISCONCORDANCE_RATE','MISSING_COUNT','CONSENSUS_MISSING_RATE']
+                      'DISCORDANCE_RATE','MISSING_COUNT','CONSENSUS_MISSING_RATE']
 SAMPLE_CONCORDANCE_HEADER = ['SAMPLE_ID']+ CONCORDANCE_HEADER
 LOCUS_CONCORDANCE_HEADER  = ['LOCUS_ID'] + CONCORDANCE_HEADER
 
@@ -532,10 +532,10 @@ except ImportError:
 
     Two statistics objects are maintained, samplestats and locustats.  They
     are dictionaries from sample and locus, respectively, to a five element
-    list contianing the following genotype counts:
+    list containing the following genotype counts:
 
     0) unambiguous:  exactly one genotype and non-missing
-    1) concordant:   two or more concordant non-missing gentypes
+    1) concordant:   two or more concordant non-missing genotypes
     2) consensus:    consensus of two or more non-missing genotypes determined by voting
     3) discordant:   two or more non-missing genotypes that do not meet voting threshold
     4) missing:      zero or more missing genotypes only
@@ -780,13 +780,13 @@ def output_merge_statistics(mergefunc,samplefile=None,locusfile=None):
   >>> locusout  = StringIO.StringIO()
   >>> output_merge_statistics(merger,sampleout,locusout)
   >>> print sampleout.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  SAMPLE_ID   UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCONCORDANCE_RATE     MISSING_COUNT     CONSENSUS_MISSING_RATE
+  SAMPLE_ID   UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCORDANCE_RATE     MISSING_COUNT     CONSENSUS_MISSING_RATE
   s3  2       1       1       0       0.000000        0       0.000000
   s1  0       1       1       1       0.333333        1       0.500000
   s4  1       2       0       1       0.333333        0       0.250000
   s2  2       0       0       1       1.000000        1       0.500000
   >>> print locusout.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  LOCUS_ID    UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCONCORDANCE_RATE     MISSING_COUNT     CONSENSUS_MISSING_RATE
+  LOCUS_ID    UNAMBIGUOUS_COUNT       CONCORDANT_COUNT        CONSENSUS_COUNT DISCORDANT_COUNT        DISCORDANCE_RATE     MISSING_COUNT     CONSENSUS_MISSING_RATE
   l3  2       1       1       0       0.000000        0       0.000000
   l4  0       2       0       1       0.333333        1       0.500000
   l1  1       0       1       1       0.500000        1       0.500000
@@ -817,7 +817,7 @@ def build_concordance_output(stats):
     discord_rate = 0
     if concord_total or discordant:
       discord_rate  = '%.6f' % (float(discordant)/(concord_total+discordant))
-    # calculate the percentage of missing genotypes after mergerd
+    # calculate the percentage of missing genotypes after merge
     missing_rate  = '%.6f' % (float(missing+discordant)/total)
     yield key,unambiguous,concordant,consensus,discordant,discord_rate,missing,missing_rate
 

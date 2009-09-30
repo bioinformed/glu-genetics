@@ -103,14 +103,14 @@ class GenotripleStream(GenotypeStream):
     materialized stream except that it is not marked as being used after
     many operations that would normally consume a non-materialized stream.
     Conversely, a materialized GenotripleStream only supports streaming
-    operatings, with no additional random-access features of a true
+    operations, with no additional random-access features of a true
     materialized class.
 
     @param      triples: sequence of genotriples(str,str,genotype representation)
     @type       triples: sequence
-    @param      samples: optional set of samples refered to by the triples
+    @param      samples: optional set of samples referred to by the triples
     @type       samples: sequence, set, or None
-    @param         loci: optional set of loci refered to by the triples
+    @param         loci: optional set of loci referred to by the triples
     @type          loci: sequence, set, or None
     @param       genome: genome descriptor
     @type        genome: Genome instance
@@ -247,9 +247,9 @@ class GenotripleStream(GenotypeStream):
 
     @param      triples: sequence of genotriples(str,str,genotype representation)
     @type       triples: sequence
-    @param      samples: optional set of samples refered to by the triples. Default is None
+    @param      samples: optional set of samples referred to by the triples. Default is None
     @type       samples: sequence, set, or None
-    @param         loci: optional set of loci refered to by the triples. Default is None
+    @param         loci: optional set of loci referred to by the triples. Default is None
     @type          loci: sequence, set, or None
     @param        order: sort order, 'sample' or 'locus', or None, Default is None
     @type         order: str or None
@@ -294,9 +294,9 @@ class GenotripleStream(GenotypeStream):
     @type       triples: sequence
     @param     genorepr: internal representation of genotypes
     @type      genorepr: UnphasedMarkerRepresentation or similar object
-    @param      samples: optional set of samples refered to by the triples. Default is None
+    @param      samples: optional set of samples referred to by the triples. Default is None
     @type       samples: sequence, set, or None
-    @param         loci: optional set of loci refered to by the triples. Default is None
+    @param         loci: optional set of loci referred to by the triples. Default is None
     @type          loci: sequence, set, or None
     @param        order: sort order, 'sample' or 'locus', or None, Default is None
     @type         order: str or None
@@ -430,7 +430,7 @@ class GenotripleStream(GenotypeStream):
     materialized stream except that it is not marked as being used after
     many operations that would normally consume a non-materialized stream.
     Conversely, a materialized GenomatrixStream only supports streaming
-    operatings, with no additional random-access features of a true
+    operations, with no additional random-access features of a true
     materialized class.
     '''
     if self.materialized:
@@ -504,7 +504,7 @@ class GenotripleStream(GenotypeStream):
 
     triples = self
 
-    # Filter missing genotyes
+    # Filter missing genotypes
     if transform.filter_missing_genotypes:
       triples = filter_genotriples_missing(triples)
 
@@ -755,8 +755,8 @@ class GenomatrixStream(GenotypeStream):
     Metadata on the stream can be supplied, including the samples, loci,
     ordering, and uniqueness of each genotype. Samples and loci are a list
     of identifiers that correspond to the precise order of the rows or
-    columns.  ldat formated matrix streams must have samples specified, sdat
-    formated matrix streams must have loci specified.  Otherwise, the
+    columns.  ldat formatted matrix streams must have samples specified, sdat
+    formatted matrix streams must have loci specified.  Otherwise, the
     optional metadata are used to optimize many operations and must be
     accurate or else incorrect results are virtually guaranteed.  When in
     doubt, do not specify them, as each algorithm can compensate, although
@@ -767,7 +767,7 @@ class GenomatrixStream(GenotypeStream):
     non- materialized stream except that it is not marked as being used
     after many operations that would normally consume a non-materialized
     stream.  Conversely, a materialized GenomatrixStream only supports
-    streaming operatings, with no additional random-access features of a
+    streaming operations, with no additional random-access features of a
     true materialized class.
 
     @param        genos: genomatrix stream
@@ -939,13 +939,13 @@ class GenomatrixStream(GenotypeStream):
     if len(genos) == 1:
       genos = genos[0].transformed(mergefunc=mergefunc)
 
-    # Inputs are all matricies, without knowledge of uniqueness of rows.
+    # Inputs are all matrices, without knowledge of uniqueness of rows.
     elif formats <= set(['ldat','sdat']):
       genos = [ (g.as_ldat() if format=='ldat' else g.as_sdat()) for g in genos ]
       genos = merge_genomatrixstream_list(genos, mergefunc)
 
     # Very general strategy of converting all inputs to genotriples, sorting
-    # by the appopriate clustering, and transforming into ldat or sdat.
+    # by the appropriate clustering, and transforming into ldat or sdat.
     # Unfortunately, very slow.
     else:
       order = 'locus' if format=='ldat' else 'sample'
@@ -1241,7 +1241,7 @@ class GenomatrixStream(GenotypeStream):
     materialized stream except that it is not marked as being used after
     many operations that would normally consume a non-materialized stream.
     Conversely, a materialized GenomatrixStream only supports streaming
-    operatings, with no additional random-access features of a true
+    operations, with no additional random-access features of a true
     materialized class.
     '''
     if self.materialized:
@@ -1324,11 +1324,11 @@ class GenomatrixStream(GenotypeStream):
     # 1) Row include and exclude
     #    o update row metadata, since it would be lost otherwise
     # 2) Column include and exclude
-    #    o column metadata is readily avaialble via the stream head, so no
+    #    o column metadata is readily available via the stream head, so no
     #      need to maintain it
     # 3) Update unique-status of the resulting matrix
     # 4) Rename rows and columns
-    #    o again, update row medatadata
+    #    o again, update row metadata
     # 5) Adjust representation
     # 6) Order and repack
 
@@ -2031,7 +2031,7 @@ def merge_genomatrixstream(genos, mergefunc):
   @type       genos: sequence
   @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
   @type   mergefunc: callable
-  @return          : merged unpacked genomatix stream
+  @return          : merged unpacked genomatrix stream
   @rtype           : generator
 
   >>> loci = ('l1','l2','l3')
@@ -2165,7 +2165,7 @@ def merge_genomatrixstream(genos, mergefunc):
   # We must materialize all streams, so ensure they are packed
   genos = genos.transformed(repack=True)
 
-  # Form mappings from old schemas to new
+  # Form mappings from old schema to new
   column_dest = [ new_columns.setdefault(c,len(new_columns)) for c in genos.columns ]
 
   # Invert row and column dictionaries to recover insertion orderings
@@ -2237,7 +2237,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
   identical row or column labels into a single genotype matrix stream using
   the specified merge function.
 
-  All input matricies must meet the following requirements:
+  All input matrices must meet the following requirements:
     1) share the same orientation (either sdat or ldat)
     2) share the same genotype representation
 
@@ -2261,7 +2261,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
   @type       genos: sequence
   @param  mergefunc: function to merge multiple genotypes into a consensus genotype.
   @type   mergefunc: callable
-  @return          : merged unpacked genomatix stream
+  @return          : merged unpacked genomatrix stream
   @rtype           : generator
 
   Test slow-path for heterogeneous schema:
@@ -2476,7 +2476,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
           # (place_list understands None is a null list)
           new_row = [None]*clen
 
-          # Iterate over input rows and schema, find the cooresponding column
+          # Iterate over input rows and schema, find the corresponding column
           # mappings, and append the relevant genotypes
           last = 0
           for i,rows in merge_rows.pop(label).iteritems():
@@ -2508,7 +2508,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
   genos = [ g.transformed(repack=True) for g in genos ]
 
   for i,g in enumerate(genos):
-    # Collect columns and form mappings from old schemas to new
+    # Collect columns and form mappings from old schema to new
     for j,column in enumerate(g.columns):
       k=new_columns.setdefault(column,len(new_columns))
       c=merge_columns[i]
@@ -2547,7 +2547,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
         # (place_list understands None is a null list)
         new_row = [None]*n
 
-        # Iterate over input rows and schema, find the cooresponding column
+        # Iterate over input rows and schema, find the corresponding column
         # mappings, and append the relevant genotypes
         for i,rows in merge_rows.pop(label).iteritems():
           j,k  = merge_columns[i]
@@ -4017,7 +4017,7 @@ def transpose_generator(columns, rows, m=32):
   '''
   Transpose a matrix of row labels and row data generating one column of
   data at a time.  Return a generator of the columns of data stored in rows,
-  yielding sucessive column labels and column data.
+  yielding successive column labels and column data.
 
   Requires the input data to be fully materialized, but allows results to be
   streamed.

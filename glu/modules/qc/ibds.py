@@ -130,7 +130,7 @@ def main():
 
   sys.stderr.write('Loading genotypes...\n')
 
-  # Materialize only if genotypes for frequency estimatation are also the test set
+  # Materialize only if genotypes for frequency estimation are also the test set
   if not options.frequencies:
     genos = genos.as_sdat().materialize()
 

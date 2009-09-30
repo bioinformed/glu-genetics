@@ -274,7 +274,7 @@ class EigensoftSmartPCAWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-    # Careful: file=<blank> is intended to supress output
+    # Careful: file=<blank> is intended to suppress output
     if snpfile is None:
       snpfile = related_file(filename,'snp')
     if indfile is None:
@@ -329,7 +329,7 @@ class EigensoftSmartPCAWriter(object):
 
     # Non-biallelic locus
     if len(other) > 1:
-      # FIXME: Non-bi-alleleic locus, so emit a warning
+      # FIXME: Non-biallelic locus, so emit a warning
       return
     if len(other) == 1:
       other = other[0]

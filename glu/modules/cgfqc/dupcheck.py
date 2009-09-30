@@ -28,7 +28,7 @@ from   glu.lib.genolib.merge     import get_genomerger
 from   glu.lib.genolib.genoarray import genoarray_concordance
 
 
-# Here for comparison purposes to experiment with unoptomized genotype
+# Here for comparison purposes to experiment with unoptimized genotype
 # comparisons
 def block_pair_generator(samples,blocksize=100):
   '''

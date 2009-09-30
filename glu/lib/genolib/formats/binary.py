@@ -72,7 +72,7 @@ class BinaryGenomatrixWriter(object):
     @param       format: text string output in the first header field to
                          indicate data format (default is blank)
     @type        format: str
-    @param       header: column lables
+    @param       header: column labels
     @type        header: list of str
     @param       genome: genome descriptor
     @type        genome: Genome instance
@@ -200,7 +200,7 @@ class BinaryGenomatrixWriter(object):
     @param rowkey: row identifier
     @type  rowkey: str
     @param  genos: genotypes in an internal representation, to
-                   be converted to the appropiate string representation by
+                   be converted to the appropriate string representation by
                    the supplied genorepr class.
     @type   genos: sequence
     '''
@@ -225,7 +225,7 @@ class BinaryGenomatrixWriter(object):
 
     @param rows: sequence of pairs of row key and sequence of genotypes in
                  an internal representation, to be converted to the
-                 appropiate string representation by the supplied genorepr
+                 appropriate string representation by the supplied genorepr
                  class.
     @type  rows: sequence of (str,sequence)
     '''
@@ -332,7 +332,7 @@ class BinaryGenotripleWriter(object):
   '''
   Object to write genotype triple data to a compressed binary file
 
-  Triples must be suppled in the form:
+  Triples must be supplied in the form:
 
     1. Sample name
     2. Locus name
@@ -434,7 +434,7 @@ class BinaryGenotripleWriter(object):
     @param    locus: locus identifier
     @type     locus: str
     @param     geno: genotypes internal representation, to be converted to
-                     the appropiate string representation by the supplied
+                     the appropriate string representation by the supplied
                      genorepr class
     @type      geno: genotype representation
     '''

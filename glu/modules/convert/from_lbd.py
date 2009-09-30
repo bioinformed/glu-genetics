@@ -300,7 +300,7 @@ class GCSummary(object):
       mu  = locusstats1/locuscounts
 
       # Compute std.dev from sqrt(E(X**2) - E(X)**2), with compensation for
-      # the inherant numerical problems with the approach
+      # the inherent numerical problems with the approach
       var = locusstats2/locuscounts - mu**2
       var[var < 0] = 0
       std = var**0.5
