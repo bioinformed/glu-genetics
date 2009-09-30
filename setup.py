@@ -26,8 +26,9 @@ if sys.version_info < min_python_version:
   sys.exit(1)
 
 import distutils
-from   setuptools import setup, find_packages, Extension
-
+from   setuptools           import setup, find_packages, Extension
+from   numpy.distutils.core import setup as numpy_setup
+    
 import numpy
 
 def get_version():
@@ -57,8 +58,15 @@ Operating System :: Microsoft :: Windows
 
 #entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
 
-if __name__ == '__main__':
-  setup(name             = 'glu',
+
+def glmnet_config(parent_package='', top_path=None):
+  from numpy.distutils.misc_util import Configuration
+  config = Configuration('_glmnet', parent_package, top_path)
+  return config.add_extension('glu.lib.glm._glmnet', sources=['glu/lib/glm/glmnet.pyf','glu/lib/glm/GLMnet.f'])
+                
+
+def main():
+  numpy_setup(name             = 'glu',
         version          = get_version(),
         author           = 'Kevin Jacobs',
         author_email     = 'jacobske@mail.nih.gov',
@@ -89,4 +97,9 @@ if __name__ == '__main__':
                                                                                'glu/lib/genolib/_ld.c'],
                                                                     include_dirs = [numpy.get_include()]),
                         Extension('glu.modules.ld.pqueue',    sources = ['glu/modules/ld/pqueue.c']),
+                        glmnet_config('glu.lib'),
                       ])
+
+
+if __name__ == '__main__':
+  main()

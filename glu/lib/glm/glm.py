@@ -100,7 +100,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> resids
   array([ 0.34])
 
-  Rank, singluar Values, and right-hand singular vectors:
+  Rank, singular Values, and right-hand singular vectors:
 
   >>> rank
   3
@@ -140,7 +140,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> resids
   array([ 2.48])
 
-  Rank, singluar Values, and right-hand singular vectors:
+  Rank, singular Values, and right-hand singular vectors:
 
   >>> rank
   3
@@ -178,7 +178,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> np.allclose(resids, 2.36769765e-31)
   True
 
-  Rank, singluar Values, and right-hand singular vectors:
+  Rank, singular Values, and right-hand singular vectors:
 
   >>> rank
   3
@@ -216,7 +216,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> np.allclose(resids, 2.36769765e-31)
   True
 
-  Rank, singluar Values, and right-hand singular vectors:
+  Rank, singular Values, and right-hand singular vectors:
 
   >>> rank
   3
@@ -303,6 +303,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   vt     = v[:min(m,n)]
   beta   = x[:n]
 
+  # FIXME: These should be un-squared residuals or else why bother?
   if n<m and rank==n:
     resids = (x[n:]**2).sum(axis=0)
   else:
@@ -479,7 +480,7 @@ def sqrtm_eig(x):
 
 def sqrtm_symmetric(x,cond=1e-7):
   '''
-  Compute the square root y of x such that y*y = x, where x is a symmetic
+  Compute the square root y of x such that y*y = x, where x is a symmetric
   positive semi-definite matrix and * is standard matrix multiplication.
   Computation is performed by symmetric eigenvalue decomposition.
 
@@ -506,7 +507,7 @@ def sqrtm_symmetric(x,cond=1e-7):
 
 def sqrtm_symmetric2(x):
   '''
-  Compute the square root y of x such that y*y = x, where x is a symmetic
+  Compute the square root y of x such that y*y = x, where x is a symmetric
   positive semi-definite matrix and * is standard matrix multiplication.
   Computation is performed by singular value decomposition of the lower
   Cholesky factorization of x (algorithm by Golub and Van Loan).
@@ -665,7 +666,7 @@ def block_cholesky(w,lower=True):
   where + and * are defined as element-wise addition and multiplication over
   vectors.
 
-  Elements of L can be defermined in a manner akin to the Cholesky-Crout
+  Elements of L can be determined in a manner akin to the Cholesky-Crout
   algorithm:
 
   L11 = sqrt(A11)
@@ -850,11 +851,11 @@ def linreg(y, X, add_mean=False):
   Full-rank Example
   -----------------
 
-  >>> X = np.matrix([[ 0.60, 1.20, 3.90],
-  ...                [ 5.00, 4.00, 2.50],
-  ...                [ 1.00,-4.00,-5.50],
-  ...                [-1.00,-2.00,-6.50],
-  ...                [-4.20,-8.40,-4.80]])
+  >>> X = np.matrix([[1.00,  0.60, 1.20, 3.90],
+  ...                [1.00,  5.00, 4.00, 2.50],
+  ...                [1.00,  1.00,-4.00,-5.50],
+  ...                [1.00, -1.00,-2.00,-6.50],
+  ...                [1.00, -4.20,-8.40,-4.80]])
   >>> y = np.matrix([3, 4, -1, -5, -1]).T
 
   Least-squares Fit:
@@ -864,13 +865,14 @@ def linreg(y, X, add_mean=False):
   Results:
 
   >>> beta.T
-  matrix([[ 0.95333333, -0.84333333,  0.90666667]])
-  >>> np.allclose(ss, 0.16999999999999987)
+  matrix([[ 0.1517341 ,  0.9022158 , -0.8039499 ,  0.90558767]])
+  >>> np.allclose(ss, 0.28901734104046217)
   True
   >>> cov
-  matrix([[ 0.06222222, -0.04222222,  0.01333333],
-          [-0.04222222,  0.05444444, -0.02888889],
-          [ 0.01333333, -0.02888889,  0.02666667]])
+  matrix([[ 0.4515896 , -0.15213552,  0.11721259, -0.0032113 ],
+          [-0.15213552,  0.11347499, -0.08170984,  0.01441519],
+          [ 0.11721259, -0.08170984,  0.08486762, -0.0297224 ],
+          [-0.0032113 ,  0.01441519, -0.0297224 ,  0.0266895 ]])
 
   Rank Deficient Example
   ----------------------
@@ -1010,8 +1012,9 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
     eta1 = X*b
 
     # Compute expected values and linear predictors
-    mu0  = 1/(1+np.exp(eta1)).A
-    mu1  = np.exp(eta1).A*mu0
+    e    = np.exp(eta1)
+    mu0  = 1/(1+e).A
+    mu1  = e.A*mu0
     eta0 = np.log(mu0)
 
     # Compute likelihood
@@ -1251,11 +1254,8 @@ class GLogit(object):
     # This is cheaper than computing the full SVD of X, since U is not required
     _,_,_,_,_,s,vt = linear_least_squares(XX,np.ones( (XX.shape[0],1) ))
 
-    for i in xrange(len(s)):
-      if s[i] < COND:
-        s[i] = 0.
-      else:
-        s[i] = s[i]**2
+    s[s<COND] = 0
+    s = s**2
 
     info = np.dot(vt.T,(s*vt.T).T)
 
