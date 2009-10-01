@@ -9,10 +9,6 @@ import re
 
 import numpy as np
 
-from   ply    import lex,yacc
-
-from   scipy  import stats
-
 
 try:
   import glu.lib.formula_parsetab as parsetab
@@ -97,8 +93,9 @@ class TERM(object):
     return np.sqrt(self.variance(c))
 
   def estimate_ci(self,p,c,alpha=0.95):
+    import scipy.stats
     x = self.estimates(p)
-    e = self.standard_errors(c)*stats.distributions.norm.ppf( (1+alpha)/2 )
+    e = self.standard_errors(c)*scipy.stats.distributions.norm.ppf( (1+alpha)/2 )
     return np.vstack( (x-e,x+e) ).T
 
   def odds_ratio_ci(self,p,c,alpha=0.95):
@@ -549,6 +546,8 @@ def get_term(name):
 
 class FormulaParser(object):
   def __init__(self, parsetab=parsetab):
+    from ply import lex,yacc
+
     self.lexer  = lex.lex(module=self)
     self.parser = yacc.yacc(module=self,tabmodule=parsetab,start='formula')
 

@@ -10,7 +10,4 @@ from glu.lib.genolib.genoarray import genoarray_concordance, pick, \
                                       build_model, build_descr
 from glu.lib.genolib.streams   import GenomatrixStream, GenotripleStream
 from glu.lib.genolib.io        import load_genostream, save_genostream, geno_options
-from glu.lib.genolib.reprs     import get_genorepr, snp
-from glu.lib.genolib.merge     import get_genomerger
-from glu.lib.genolib.locus     import load_genome
-from glu.lib.genolib.transform import GenoTransform
+from glu.lib.genolib.reprs     import snp

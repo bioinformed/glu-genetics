@@ -21,8 +21,6 @@ __genoformats__ = [
 from   operator                  import itemgetter
 from   itertools                 import groupby
 
-import tables
-
 from   glu.lib.utils             import izip_exact,is_str,gcdisabled
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
                                         namefile
@@ -34,13 +32,6 @@ from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,bu
 
 GENOMATRIX_COMPAT_VERSION,GENOMATRIX_VERSION=1,3
 GENOTRIPLE_COMPAT_VERSION,GENOTRIPLE_VERSION=1,3
-
-
-class TripleDesc(tables.IsDescription):
-  sample = tables.Int32Col(pos=0)
-  locus  = tables.Int32Col(pos=1)
-  geno   = tables.Int32Col(pos=2)
-
 
 CLOSED,NOTOPEN,OPEN = range(3)
 STRANDS   = [None,'+','-']
@@ -126,6 +117,8 @@ class BinaryGenomatrixWriter(object):
     ('l2', [(None, None), ('T', 'T'), ('G', 'T')])
     ('l3', [('A', 'T'), ('A', 'T'), ('T', 'T')])
     '''
+    import tables
+
     if extra_args is None:
       args = kwargs
     else:
@@ -167,6 +160,8 @@ class BinaryGenomatrixWriter(object):
       self.filters = tables.Filters(fletcher32=True)
 
   def _open(self,row1):
+    import tables
+
     self.gfile  = tables.openFile(self.filename,mode='w')
 
     format = {'lbat':'ldat','sbat':'sdat'}[self.format]
@@ -374,6 +369,8 @@ class BinaryGenotripleWriter(object):
     @param    chunksize: size of chunks to write/compress in bytes
     @type     chunksize: int
     '''
+    import tables
+
     if extra_args is None:
       args = kwargs
     else:
@@ -417,6 +414,11 @@ class BinaryGenotripleWriter(object):
       self.filters = tables.Filters(complevel=5,complib='zlib',shuffle=True,fletcher32=True)
     else:
       self.filters = tables.Filters(fletcher32=True)
+
+    class TripleDesc(tables.IsDescription):
+      sample = tables.Int32Col(pos=0)
+      locus  = tables.Int32Col(pos=1)
+      geno   = tables.Int32Col(pos=2)
 
     self.genotypes = self.gfile.createTable(self.gfile.root, 'genotypes', TripleDesc,
                               'Sequence of encoded sample, locus, genotype triples',
@@ -594,6 +596,8 @@ def load_genotriples_binary(filename,format,genome=None,phenome=None,extra_args=
   ('s1', 'l3', ('A', 'A'))
   ('s2', 'l2', ('C', 'C'))
   '''
+  import tables
+
   if extra_args is None:
     args = kwargs
   else:
@@ -665,6 +669,8 @@ def save_strings(gfile,name,data,filters=None,maxlen=None):
   @param  maxlen: maximum string length, or None to autodetect
   @type   maxlen: int or None
   '''
+  import tables
+
   if maxlen is None:
     try:
       maxlen = max(len(s) for s in data)
@@ -702,6 +708,8 @@ def save_models(gfile, loci, genome, models, filters=None, ignoreloci=False):
   @param filters: compression and filter settings to apply
   @type  filters: PyTables HDF5 file filter instance
   '''
+  import tables
+
   allelemap = {}
   ad = allelemap.setdefault
   al = allelemap.__len__
@@ -946,6 +954,8 @@ def save_phenos(gfile, samples, phenome, filters=None, ignorephenos=False):
   @param filters: compression and filter settings to apply
   @type  filters: PyTables HDF5 file filter instance
   '''
+  import tables
+
   namemap  = {None:0}
 
   #####
@@ -1194,6 +1204,8 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   #('l2', [(None, None), ('C', 'T'), ('C', 'T')])
   #('l3', [('T', 'T'), ('G', 'T'), ('G', 'G')])
   '''
+  import tables
+
   if extra_args is None:
     args = kwargs
   else:

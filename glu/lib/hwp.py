@@ -6,8 +6,6 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-from scipy         import stats
-
 from glu.lib.utils import izip_exact
 
 
@@ -111,6 +109,8 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
   >>> hwp_chisq_biallelic(hom1_count, het_count, hom2_count)
   0.87188388159827424
   '''
+  import scipy.stats
+
   n = hom1_count + het_count + hom2_count
 
   if not n:
@@ -126,7 +126,7 @@ def hwp_chisq_biallelic(hom1_count, het_count, hom2_count):
      +  score( het_count, 2*n*p*q)
      +  score(hom2_count,   n*q*q))
 
-  return float(stats.distributions.chi2.sf(xx,1))
+  return float(scipy.stats.distributions.chi2.sf(xx,1))
 
 
 def biallelic_counts(model,counts):

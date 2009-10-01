@@ -343,7 +343,7 @@ class AspellLinux(object):
 Aspell = AspellLinux
 
 
-if __name__ == '__main__':
+def test():
   # TODO: more test cases
   a = Aspell(("lang", "en"))
   print a.check("when")

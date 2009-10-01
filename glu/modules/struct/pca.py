@@ -11,7 +11,6 @@ import sys
 from   itertools                 import izip,islice
 
 import numpy as np
-import scipy.linalg
 
 try:
   import cvxopt, cvxopt.blas, cvxopt.lapack
@@ -83,6 +82,8 @@ def pca_cov_numpy(cov,n=None):
 
   The time complexity of PCA using SVD is O(n*m**2)
   '''
+  import scipy.linalg
+
   cov = np.asarray(cov)
 
   shape = cov.shape

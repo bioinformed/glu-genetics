@@ -14,7 +14,6 @@ from   collections               import defaultdict
 from   itertools                 import izip,ifilter,imap,chain,groupby
 
 from   glu.lib.utils             import as_set,tally,izip_exact,gcdisabled
-from   glu.lib.imerge            import imerge
 from   glu.lib.xtab              import xtab,rowsby
 
 from   glu.lib.genolib.reprs     import snp
@@ -1925,6 +1924,8 @@ def combine_sorted_genotriple_list(triplelist):
   >>> combined.order
   'sample'
   '''
+  from glu.lib.imerge import imerge
+
   # Make sure that input list is materialized and can be iterated
   if not isinstance(triplelist, list):
     triplelist = list(triplelist)

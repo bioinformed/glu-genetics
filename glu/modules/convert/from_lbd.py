@@ -11,8 +11,6 @@ import sys
 from   operator                  import getitem
 from   itertools                 import chain, imap, izip, repeat
 
-import numpy as np
-
 from   glu.lib.utils             import izip_exact, is_str
 from   glu.lib.fileutils         import autofile, table_reader, table_writer
 from   glu.lib.sequence          import norm_snp_seq, complement_base
@@ -21,7 +19,9 @@ from   glu.lib.illumina          import read_Illumina_LBD, IlluminaManifest
 from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
 from   glu.lib.genolib.phenos    import Phenome, load_phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
-from   glu.lib.genolib.io        import save_genostream, geno_options, GenoTransform
+from   glu.lib.genolib.io        import save_genostream, geno_options
+from   glu.lib.genolib.transform import GenoTransform
+
 from   glu.lib.genolib.genoarray import build_model, build_descr, GenotypeArray, GenotypeArrayDescriptor
 
 
@@ -270,6 +270,8 @@ class GCSummary(object):
     self.samples  = samples
 
   def __iter__(self):
+    import numpy as np
+
     self.samplestats = samplestats = []
     locusstats1 = np.zeros(len(self.loci))
     locusstats2 = np.zeros(len(self.loci))

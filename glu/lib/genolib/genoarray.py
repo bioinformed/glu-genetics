@@ -12,8 +12,9 @@ __all__ = ['Genotype','UnphasedMarkerModel','GenotypeArray','GenotypeArrayDescri
            'GenotypeLookupError','GenotypeRepresentationError']
 
 
-import numpy as np
 from   itertools     import izip,chain
+
+import numpy as np
 
 from   glu.lib.utils import izip_exact
 
@@ -825,7 +826,7 @@ except ImportError:
     Count the number of occurrences of each genotypes category given a
     sequence of genotypes.  Counts are returned as a list of integers
     corresponding to the number of missing, hemizygote, homozygote, and
-    heterozygote genotype oberved.
+    heterozygote genotype observed.
 
     @param genos: sequence of genotype objects belonging to model
     @type  genos: sequence of Genotype instances
@@ -862,7 +863,7 @@ except ImportError:
     Genotype counts are returned as a list of integers counts corresponding
     to genotype index.  Sample category counts are returned as an n x 4 array
     with the number of missing, hemizygote, homozygote, and heterozygote
-    genotypes oberved for each sample.
+    genotypes observed for each sample.
 
     @param         genos: genotypes belonging to a single model
     @type          genos: sequence
@@ -932,7 +933,7 @@ except ImportError:
     counts are returned as a list of integers counts corresponding to
     genotype index.  Per-locus genotype counts are returned as an n x
     max(genos) array with the number of missing, hemizygote, homozygote, and
-    heterozygote genotypes oberved for each sample.
+    heterozygote genotypes observed for each sample.
 
     @param         genos: genotypes belonging to a single model
     @type          genos: sequence
@@ -1261,7 +1262,7 @@ def count_alleles_from_genocounts(model,genocounts):
   Count the number of occurrences of each allele belonging to the specified
   locus model given a set of genotype counts.  Counts are returned as a list
   of integers corresponding to the number of each allele in model.alleles
-  oberved.
+  observed.
 
   @param model: model for all genotypes
   @type  model: UnphasedMarkerModel
@@ -1292,7 +1293,7 @@ def count_alleles_from_genos(model,genos):
   Count the number of occurrences of each allele belonging to the specified
   locus model given a set of genotype counts.  Counts are returned as a list
   of integers corresponding to the number of each allele in model.alleles
-  oberved.
+  observed.
 
   @param model: model for all genotypes
   @type  model: UnphasedMarkerModel

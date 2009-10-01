@@ -61,8 +61,8 @@ Operating System :: Microsoft :: Windows
 
 def glmnet_config(parent_package='', top_path=None):
   from numpy.distutils.misc_util import Configuration
-  config = Configuration('_glmnet', parent_package, top_path)
-  return config.add_extension('glu.lib.glm._glmnet', sources=['glu/lib/glm/glmnet.pyf','glu/lib/glm/GLMnet.f'])
+  config = Configuration('glm', parent_package, top_path)
+  return config.add_extension('_glmnet', sources=['glu/lib/glm/glmnet.pyf','glu/lib/glm/GLMnet.f'])
                 
 
 def main():

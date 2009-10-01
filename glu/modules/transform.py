@@ -9,9 +9,9 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.genolib.merge   import get_genomerger, output_merge_statistics
-from   glu.lib.genolib.streams import GenoTransform
-from   glu.lib.genolib.io      import transform_files, geno_options
+from   glu.lib.genolib.merge     import get_genomerger, output_merge_statistics
+from   glu.lib.genolib.transform import GenoTransform
+from   glu.lib.genolib.io        import transform_files, geno_options
 
 
 def option_parser():

@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 import scipy.sparse, scipy.linalg
 
-import _glmnet
+import glu.lib.glm._glmnet
 
 from   glu.lib.fileutils import table_reader
 

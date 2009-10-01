@@ -13,7 +13,6 @@ __all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumera
            'gcdisabled','chunk']
 
 import gc
-import array
 import warnings
 import collections
 
@@ -192,6 +191,8 @@ def pick(sequence, indices):
   >>> pick('abcdefg', [1,3,5])
   'bdf'
   '''
+  import array
+
   if isinstance(sequence,array.array):
     return type(sequence)(sequence.typecode, (sequence[i] for i in indices) )
   elif isinstance(sequence, str):

@@ -20,7 +20,6 @@ __genoformats__ = [
   ('load_plink_bed', 'save_plink_bed', 'PlinkBedWriter',  'sdat', ['plink_sbed','sbed'],      None ) ]
 
 
-import numpy  as np
 import string
 
 from   operator                  import getitem
@@ -912,6 +911,8 @@ def load_plink_bed(filename,format,genome=None,phenome=None,extra_args=None,**kw
   Homozygote 2      BB    11     11     10
   Heterozygote      AB    01     10     11
   '''
+  import numpy  as np
+
   if extra_args is None:
     args = kwargs
   else:

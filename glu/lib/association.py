@@ -14,7 +14,6 @@ from   operator           import itemgetter
 
 from   numpy              import array,matrix,asarray,asanyarray,zeros, \
                                  exp,nan,abs,arange,median,inf,minimum
-from   scipy              import stats
 
 from   glu.lib.utils      import tally,as_set,is_str
 from   glu.lib.fileutils  import namefile,list_reader,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
@@ -154,10 +153,10 @@ def contingency_analysis(c,mincell=5,minmargin=15):
     return nan,0,array([],dtype=float)
 
   if c.min() <= mincell:
-    import rpy
+    import scipy.stats, rpy
     cc = rpy.array(c.tolist())
     p = rpy.r.fisher_test(cc, conf_int=False, workspace=500000)['p.value']
-    t = stats.distributions.chi2.ppf(1-p,df)
+    t = scipy.stats.distributions.chi2.ppf(1-p,df)
 
   else:
     m1 = c.sum(axis=0)
@@ -245,7 +244,8 @@ def permutations_needed(p_hat, w, g):
   >>> permutations_needed(0.00001, 0.2, 0.95)
   9603552
   '''
-  return int(ceil((1-p_hat)/(w*w*p_hat) * stats.distributions.norm.ppf( (g+1)/2. )**2))
+  import scipy.stats
+  return int(ceil((1-p_hat)/(w*w*p_hat) * scipy.stats.distributions.norm.ppf( (g+1)/2. )**2))
 
 
 def normalize(row,n):
@@ -805,11 +805,13 @@ def variable_summary(out, x, categorical_limit=5, verbose=1):
 # FIXME: Needs a better name
 # FIXME: Needs docs+tests
 def print_results(out,locus_model,linear_model,verbose=1):
+  import scipy.stats
+
   b     = linear_model.beta.T
   stde  = linear_model.W.diagonal().A**.5
   z     = b.A/stde
   oddsr = exp(b)
-  p     = 2*stats.distributions.norm.cdf(-abs(z))
+  p     = 2*scipy.stats.distributions.norm.cdf(-abs(z))
 
   vars = locus_model.vars or linear_model.vars or \
          [ 'Covariate_%02d' % i for i in xrange(linear_model.X.shape[1]) ]
@@ -855,13 +857,15 @@ def print_results(out,locus_model,linear_model,verbose=1):
 # FIXME: Needs a better name
 # FIXME: Needs docs+tests
 def print_results_linear(out,locus_model,linear_model,verbose=1):
+  import scipy.stats
+
   y     = linear_model.y
   b     = linear_model.beta.T
   stde  = (linear_model.ss*linear_model.W.diagonal()).A**0.5
   t     = b.A/stde
   oddsr = exp(b)
   n,m   = linear_model.X.shape
-  p     = 2*stats.distributions.t.cdf(-abs(t),n-m)
+  p     = 2*scipy.stats.distributions.t.cdf(-abs(t),n-m)
 
   vars = locus_model.vars or linear_model.vars or \
          [ 'Covariate_%02d' % i for i in xrange(linear_model.X.shape[1]) ]

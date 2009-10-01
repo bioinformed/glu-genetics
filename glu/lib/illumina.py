@@ -10,8 +10,6 @@ import csv
 import struct
 import traceback
 
-import numpy as np
-
 from   glu.lib.utils     import chunk
 from   glu.lib.fileutils import autofile,parse_augmented_filename,guess_format,get_arg
 from   glu.lib.sections  import read_sections
@@ -140,6 +138,8 @@ class IlluminaManifest(object):
 
 
   def _load_bpm(self,filename):
+    import numpy as np
+
     self.filename = filename
     stats         = os.stat(filename)
     filesize      = stats.st_size
@@ -275,6 +275,8 @@ class IlluminaManifest(object):
 
 
 def read_Illumina_IDAT(filename):
+  import numpy as np
+
   s = os.stat(filename)
 
   filesize = s.st_size
@@ -454,6 +456,8 @@ def read_Illumina_LBD(filename,options):
       data.next()
 
   def sample_generator(sopts):
+    import numpy as np
+
     for genos,scores in chunk(data,2):
       assert genos[:6] == scores[:6]
       assert  genos[6] == 'calls'

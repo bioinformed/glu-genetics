@@ -12,7 +12,6 @@ __revision__  = '$Id$'
 import sys
 
 import numpy as np
-import scipy.optimize
 
 from   itertools                 import izip
 

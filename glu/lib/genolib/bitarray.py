@@ -162,10 +162,10 @@ def test_bits(get, set, data, pos, value, width):
 def main():
   import time
   import array
-  import numpy
+  import numpy as np
 
   def mknumpy(bytes):
-    return numpy.array(bytes,dtype='uint8')
+    return np.array(bytes,dtype='uint8')
 
   def mkarray(bytes):
     return array.array('B',bytes)

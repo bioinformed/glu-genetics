@@ -13,7 +13,7 @@ import sys
 
 from   itertools                 import izip
 
-import numpy
+import numpy as np
 
 from   glu.lib.fileutils         import autofile,hyphen,list_reader,table_writer
 from   glu.lib.hwp               import hwp_biallelic

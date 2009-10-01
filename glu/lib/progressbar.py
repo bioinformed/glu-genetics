@@ -34,7 +34,7 @@ is given by a number of widgets. A widget is an object that may
 display differently depending on the state of the progress. There are
 three types of widget:
 - a string, which always shows itself;
-- a ProgressBarWidget, which may return a diferent value every time
+- a ProgressBarWidget, which may return a different value every time
 it's update method is called; and
 - a ProgressBarWidgetHFill, which is like ProgressBarWidget, except it
 expands to fill the remaining width of the line.

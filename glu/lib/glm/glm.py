@@ -12,7 +12,7 @@ from itertools    import izip
 import numpy as np
 
 from scipy        import linalg
-from scipy.linalg import lapack,calc_lwork,eig,eigh,svd,cholesky,norm,LinAlgError
+from scipy.linalg import svd,cholesky,norm,LinAlgError
 
 CONV = 1e-8
 COND = 1e-8
@@ -227,6 +227,8 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
          [-0.98717469,  0.15197524, -0.04888411],
          [ 0.0881574 ,  0.77423153,  0.62673265]])
   '''
+  from scipy.linalg import lapack,calc_lwork
+
   a1,b1 = map(np.asarray,(a,b))
 
   if len(a1.shape) != 2:
@@ -473,6 +475,8 @@ def sqrtm_eig(x):
   >>> error > 1e-14
   True
   '''
+  from scipy.linalg import eig
+
   d,e = eig(x)
   d = (d**0.5).astype(float)
   return np.dot(e,(d*e).T).astype(float)
@@ -500,6 +504,8 @@ def sqrtm_symmetric(x,cond=1e-7):
   >>> error < 1e-14
   True
   '''
+  from scipy.linalg import eigh
+
   d,e = eigh(x)
   d[d<cond] = 0
   return np.dot(e,((d**0.5)*e).T).astype(float)
