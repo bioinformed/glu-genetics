@@ -14,6 +14,9 @@ from   glu.lib.utils     import chunk
 from   glu.lib.fileutils import autofile,parse_augmented_filename,guess_format,get_arg
 from   glu.lib.sections  import read_sections
 
+# Credit for a large proportion of the reverse-engineering in this module
+# goes to the R/BioConductor project, who in turn were helped by Keith
+# Baggerly.
 
 IDAT_FIELD_CODES = { 1000 : 'nSNPsRead',
                       102 : 'IlluminaID',
@@ -25,11 +28,11 @@ IDAT_FIELD_CODES = { 1000 : 'nSNPsRead',
                       400 : 'RedGreen',
                       401 : 'Manifest',
                       402 : 'Barcode',
-                      403 : 'ChipType',
-                      404 : 'Stripe',
-                      405 : 'Unknown1',
+                      403 : 'Format',
+                      404 : 'Label',
+                      405 : 'OPA',
                       406 : 'SampleID',
-                      407 : 'Unknown2',
+                      407 : 'Descr',
                       408 : 'Plate',
                       409 : 'Well',
                       510 : 'Unknown3' }
@@ -316,9 +319,8 @@ def read_Illumina_IDAT(filename):
     print '  ','file size',filesize
 
   snp_count = illumina_ids = sds = means = bead_counts = midblock \
-            = red_green = manifest = barcode = chip_type = stripe \
-            = unknown1 = sampleid = unknown2 = plate = well       \
-            = unknown3 = None
+            = red_green = manifest = barcode = format = label     \
+            = opa = sampleid = descr = plate = well = unknown3 = None
   runinfo   = []
 
   if 'nSNPsRead' in fields:
@@ -358,25 +360,25 @@ def read_Illumina_IDAT(filename):
     idat.seek(fields['Barcode'])
     barcode = readstr(idat)
 
-  if 'ChipType' in fields:
-    idat.seek(fields['ChipType'])
-    chip_type = readstr(idat)
+  if 'Format' in fields:
+    idat.seek(fields['Format'])
+    format = readstr(idat)
 
-  if 'Stripe' in fields:
-    idat.seek(fields['Stripe'])
-    stripe = readstr(idat)
+  if 'Label' in fields:
+    idat.seek(fields['Label'])
+    label = readstr(idat)
 
-  if 'Unknown1' in fields:
-    idat.seek(fields['Unknown1'])
-    unknown1 = readstr(idat)
+  if 'OPA' in fields:
+    idat.seek(fields['OPA'])
+    opa = readstr(idat)
 
   if 'SampleID' in fields:
     idat.seek(fields['SampleID'])
     sampleid = readstr(idat)
 
-  if 'Unknown2' in fields:
-    idat.seek(fields['Unknown2'])
-    unknown2 = readstr(idat)
+  if 'Descr' in fields:
+    idat.seek(fields['Descr'])
+    descr = readstr(idat)
 
   if 'Plate' in fields:
     idat.seek(fields['Plate'])
@@ -390,7 +392,6 @@ def read_Illumina_IDAT(filename):
     idat.seek(fields['Unknown3'])
     unknown3 = readstr(idat)
 
-  # Who cares about RunInfo anyway?
   if 'RunInfo' in fields:
     idat.seek(fields['RunInfo'])
 
@@ -407,8 +408,8 @@ def read_Illumina_IDAT(filename):
 
   if 0:
     print 'filename:',filename
-    print 'version:',version
-    print 'unknown0:',unknown0
+    print 'idat_version:',version
+    print 'offset:',unknown0
     print 'snp_count:',snp_count
     print 'Illumina IDs:',illumina_ids[:5]
     print 'SDs:',sds[:5]
@@ -418,11 +419,11 @@ def read_Illumina_IDAT(filename):
     print 'RedGreen:',red_green
     print 'manifest:',manifest
     print 'barcode:',barcode
-    print 'chip_type:',chip_type
-    print 'stripe:',stripe
-    print 'unknown1:',printable(unknown1)
+    print 'format:',format
+    print 'label:',label
+    print 'opa:',printable(opa)
     print 'sampleid:',sampleid
-    print 'unknown2:',printable(unknown2)
+    print 'descr:',printable(descr)
     print 'plate:',plate
     print 'well:',well
     print 'unknown3:',printable(unknown3)
@@ -498,10 +499,11 @@ def main():
     read_Illumina_IDAT('test/4583987055_R02C01_Grn.idat')
     read_Illumina_IDAT('test/4583987055_R02C01_Red.idat')
     read_Illumina_IDAT('test/4196813065_A_Grn.idat')
-    #read_Illumina_IDAT('test/1495210050_A_Red.idat')
+    read_Illumina_IDAT('test/1495210050_A_Red.idat')
 
+  if 0:
     import glob
-    for filename in glob.iglob('/mnt/nfs/gigantor/vol1/GWAS/Scans/Prostate/3/builds/3/delivery/ATBC/genotypes/rawdata/*/*.idat'):
+    for filename in glob.iglob('/home/jacobske/projects/CGEMS/Scans/TGS/Old_Raw/GWAS_Raw_Data/DATA/AdvProstate/repeat/MEC/*.idat'):
       read_Illumina_IDAT(filename)
 
   if 0:
@@ -523,7 +525,7 @@ def main():
     print 'SNPs:',manifest1.snp_count
     print 'rows:',len(list(manifest1))
 
-  if 1:
+  if 0:
     manifest2 = IlluminaManifest('test/HumanHap300_(v1.0.0).csv')
     print 'filename:',manifest2.filename
     print 'SNPs:',manifest2.snp_count
