@@ -59,9 +59,9 @@ Operating System :: Microsoft :: Windows
 #entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
 
 
-def glmnet_config(parent_package='', top_path=None):
+def glmnet_config():
   from numpy.distutils.misc_util import Configuration
-  config = Configuration('glm', parent_package, top_path)
+  config = Configuration('glm', 'glu.lib')
   return config.add_extension('_glmnet', sources=['glu/lib/glm/glmnet.pyf','glu/lib/glm/GLMnet.f'])
                 
 
@@ -97,7 +97,7 @@ def main():
                                                                                'glu/lib/genolib/_ld.c'],
                                                                     include_dirs = [numpy.get_include()]),
                         Extension('glu.modules.ld.pqueue',    sources = ['glu/modules/ld/pqueue.c']),
-                        glmnet_config('glu.lib'),
+                        glmnet_config(),
                       ])
 
 
