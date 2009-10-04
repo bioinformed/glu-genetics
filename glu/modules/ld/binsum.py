@@ -62,7 +62,7 @@ def main():
   sumfile = autofile(hyphen(options.sumfile,sys.stdout), 'w')
 
   if [infofile,sumfile].count(sys.stdout) > 1:
-    sys.stderr.write('ERROR: More than one output file directed to standad out.\n')
+    sys.stderr.write('ERROR: More than one output file directed to standard out.\n')
     return
 
   subset  = set()

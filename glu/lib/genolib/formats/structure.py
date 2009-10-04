@@ -150,8 +150,7 @@ USING PRIOR POPULATION INFO
 
 OUTPUT OPTIONS
 
-#define PRINTKLD %(PRINTKLD)s       // Print estimated Kullback-Leibler diver-
-                            //     gence to screen during the run
+#define PRINTKLD %(PRINTKLD)s       // Print estimated Kullback-Leibler divergence to screen during the run
 #define PRINTLAMBDA %(PRINTLAMBDA)s       // Print current value(s) of lambda to screen
 #define PRINTQSUM %(PRINTQSUM)s       // Print summary of current population membership to screen
 

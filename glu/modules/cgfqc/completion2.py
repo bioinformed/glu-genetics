@@ -201,7 +201,7 @@ def count_missing(genotriples):
 
 def process_expected(regions,loccomp,samcomp,samempty,locempty):
   '''
-  Populate the statistics with addtional information
+  Populate the statistics with additional information
   '''
   for locus,counts in loccomp.iteritems():
     if regions:

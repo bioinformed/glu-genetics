@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 __gluindex__  = True
-__abstract__  = 'Check concordance betweeen a reference and comparison genotypes set'
+__abstract__  = 'Check concordance between a reference and comparison genotype set'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'

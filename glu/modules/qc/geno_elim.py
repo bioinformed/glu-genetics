@@ -81,7 +81,7 @@ def build_uninformative_genoset(alleles):
 
 def build_nuclear_families(pedfile,individuals):
   '''
-  Build nuclear familes based on a pedigree file
+  Build nuclear families based on a pedigree file
   @param     pedfile: pedigree file
   @type      pedfile: str
   @param individuals: genotyped individuals

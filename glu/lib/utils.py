@@ -462,7 +462,7 @@ class gcdisabled(object):
   >>> print gc.isenabled()
   True
 
-  Will not reenable if GC was disabled upon entry:
+  Will not re-enable if GC was disabled upon entry:
 
   >>> gc.disable()
   >>> gc.isenabled()

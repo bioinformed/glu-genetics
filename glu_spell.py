@@ -1,10 +1,13 @@
+'''
+Spell check the GLU source code
+'''
+
 import re
 import os
 import string
 import tokenize
-# -*- coding: iso-8859-2 -*-
 
-# Borrows code from Wojciech MuXa's Aspell module (BSD licensed)
+# Borrows Aspell code from Wojciech MuXa's Aspell module (BSD licensed)
 #
 # Original author: Wojciech Mula
 #          e-mail: wojciech_mula@poczta.onet.pl
@@ -14,7 +17,7 @@ try:
   import ctypes
   import ctypes.util
 except ImportError:
-  raise ImportError("ctypes library is needed")
+  raise ImportError('ctypes library is needed')
 
 
 class AspellError(Exception): pass
@@ -22,24 +25,24 @@ class AspellConfigError(AspellError): pass
 class AspellSpellerError(AspellError): pass
 
 
-class AspellLinux(object):
-  """
+class Aspell(object):
+  '''
   Aspell speller object.  Allows to check spelling, get suggested
   spelling list, manage user dictionarias, and other.
-  
+
   Must be closed with 'close' method, or one may experience
   problems, like segfaults.
-  """
+  '''
 
   def __init__(self, configkeys=None, libname=None):
-    """
+    '''
     Parameters:
     * configkeys - list of configuration parameters;
       each element is a pair key & value (both strings)
       if None, then default configuration is used
     * libname - explicity set aspell library name;
       if None then default name is used
-    """
+    '''
     if libname is None:
       libname = ctypes.util.find_library('aspell')
     self.__lib = ctypes.CDLL(libname)
@@ -53,15 +56,15 @@ class AspellLinux(object):
 
     # 2. parse configkeys arg.
     if configkeys is not None:
-      assert type(configkeys) in [tuple, list], "Tuple or list expeced"
+      assert isinstance(configkeys, (tuple,list)), 'Tuple or list expeced'
       if len(configkeys) == 2 and \
-         type(configkeys[0]) is str and \
-         type(configkeys[1]) is str:
+         isinstance(configkeys[0], str) and \
+         isinstance(configkeys[1], str):
         configkeys = [configkeys]
 
       for key, value in configkeys:
-        assert type(key) is str, "Key must be string"
-        assert type(value) is str, "Value must be string"
+        assert isinstance(key, str), 'Key must be string'
+        assert isinstance(value, str), 'Value must be string'
         if not self.__lib.aspell_config_replace(config, key, value):
           raise self._aspell_config_error(config)
 
@@ -75,128 +78,105 @@ class AspellLinux(object):
 
     self.__speller = self.__lib.to_aspell_speller(possible_error)
 
-
   def check(self, word):
-    """
+    '''
     Check if word is present in main, personal or session
     dictionary.  Boolean value is returned
-    """
-    if type(word) is str:
-      return bool(
-        self.__lib.aspell_speller_check(
-          self.__speller,
-          word,
-          len(word)
-        ))
-    else:
-      raise TypeError("String expeced")
+    '''
+    if not isinstance(word,str):
+      raise TypeError('String expeced')
 
+    return bool(self.__lib.aspell_speller_check(self.__speller,word,len(word)))
 
   def suggest(self, word):
-    """
+    '''
     Return list of spelling suggestions of given word.
     Works even if word is correct.
-    """
-    if type(word) is str:
-      return self._aspellwordlist(
-        self.__lib.aspell_speller_suggest(
-          self.__speller,
-          word,
-          len(word)
-        ))
-    else:
-      raise TypeError("String expeced")
+    '''
+    if not isinstance(word,str):
+      raise TypeError('String expeced')
 
+    return self._aspellwordlist(
+      self.__lib.aspell_speller_suggest(
+        self.__speller,word,len(word)))
 
   def personal_dict(self, word=None):
-    """
+    '''
     Aspell's personal dictionary is a user defined, persistent
     list of word (saved in certain file).
 
     If 'word' is not given, then method returns list of words stored in
     dict.  If 'word' is given, then is added to personal dict.  New words
     are not saved automatically, method 'save_all' have to be call.
-    """
+    '''
     if word is not None:
       # add new word
-      assert type(word) is str, "String expeced"
+      assert isinstance(word, str), 'String expeced'
       self.__lib.aspell_speller_add_to_personal(
-        self.__speller,
-        word,
-        len(word)
-      )
+        self.__speller,word,len(word))
       self._aspell_check_error()
     else:
       # return list of words from personal dictionary
       return self._aspellwordlist(
-        self.__lib.aspell_speller_personal_word_list(self.__speller)
-      )
-  
+        self.__lib.aspell_speller_personal_word_list(self.__speller))
+
 
   def session_dict(self, word=None, clear=False):
-    """
+    '''
     Aspell's session dictionary is a user defined, volatile
     list of word, that is destroyed with aspell object.
 
     If 'word' is None, then list of words from session dictionary
     is returned.  If 'word' is present, then is added to dict.
     If 'clear' is True, then session dictionary is cleared.
-    """
+    '''
     if clear:
       self.__lib.aspell_speller_clear_session(self.__speller)
       self._aspell_check_error()
       return
 
-
     if word is not None:
       # add new word
-      assert type(word) is str, "String expeced"
+      assert isinstance(word, str), 'String expeced'
       self.__lib.aspell_speller_add_to_session(
         self.__speller,
         word,
-        len(word)
-      )
+        len(word))
       self._aspell_check_error()
     else:
       # return list of words from personal dictionary
       return self._aspellwordlist(
-        self.__lib.aspell_speller_session_word_list(self.__speller)
-      )
-  
+        self.__lib.aspell_speller_session_word_list(self.__speller))
+
 
   def add_replacement_pair(self, misspelled, correct):
-    """
+    '''
     Add replacement pair, i.e. pair of misspelled and correct
     word.  It affects on order of words appear on list returned
     by 'suggest' method.
-    """
-    assert type(misspelled) is str, "String is required"
-    assert type(correct) is str, "String is required"
+    '''
+    assert isinstance(misspelled,str), 'String is required'
+    assert isinstance(correct,str), 'String is required'
 
-    self.__lib.aspell_speller_store_replacement(
-      self.__speller,
-      misspelled,
-      len(misspelled),
-      correct,
-      len(correct)
-    )
+    self.__lib.aspell_speller_store_replacement(self.__speller,
+               misspelled,len(misspelled),correct,len(correct))
     self._aspell_check_error()
-  
+
 
   def save_all(self):
-    """
+    '''
     Saves all words added to personal or session dictionary to
     the apell's defined file.
-    """
+    '''
     self.__lib.aspell_speller_save_all_word_lists(self.__speller)
     self._aspell_check_error()
-  
+
 
   def configkeys(self):
-    """
+    '''
     Returns list of all available config keys that can be passed
     to contructor.
-    
+
     List contains a 3-tuples:
     1. key name
     2. default value of type:
@@ -207,8 +187,8 @@ class AspellLinux(object):
     3. short description
        if None, then this key is undocumented is should not
        be used, unless one know what really do
-    """
-    
+    '''
+
     config = self.__lib.aspell_speller_config(self.__speller)
     if config is None:
       raise AspellConfigError("Can't get speller's config")
@@ -219,18 +199,17 @@ class AspellLinux(object):
 
     class KeyInfo(ctypes.Structure):
       _fields_ = [
-        ("name",  ctypes.c_char_p),
-        ("type",  ctypes.c_int),
-        ("default",  ctypes.c_char_p),
-        ("desc",  ctypes.c_char_p),
-        ("flags",  ctypes.c_int),
-        ("other_data", ctypes.c_int),
-      ]
+        ('name',       ctypes.c_char_p),
+        ('type',       ctypes.c_int),
+        ('default',    ctypes.c_char_p),
+        ('desc',       ctypes.c_char_p),
+        ('flags',      ctypes.c_int),
+        ('other_data', ctypes.c_int)]
 
     key_next = self.__lib.aspell_key_info_enumeration_next
     key_next.restype = ctypes.POINTER(KeyInfo)
 
-    list = []
+    config = []
     while True:
       key_info = key_next(keys_enum)
       if not key_info:
@@ -240,59 +219,34 @@ class AspellLinux(object):
 
       if key_info.type == 0:
         # string
-        list.append((
-          key_info.name,
-          key_info.default,
-          key_info.desc,
-        ))
-
+        config.append( (key_info.name,key_info.default,key_info.desc) )
       elif key_info.type == 1:
         # integer
-        list.append((
-          key_info.name,
-          int(key_info.default),
-          key_info.desc,
-        ))
+        config.append( (key_info.name,int(key_info.default),key_info.desc) )
       elif key_info.type == 2:
         # boolean
-        if key_info.default.lower() == 'true':
-          list.append((
-            key_info.name,
-            True,
-            key_info.desc,
-          ))
-        else:
-          list.append((
-            key_info.name,
-            False,
-            key_info.desc,
-          ))
+        default = key_info.default.lower() == 'true'
+        config.append( (key_info.name,default,key_info.desc) )
       elif key_info.type == 3:
         # list
-        list.append((
-          key_info.name,
-          key_info.default.split(),
-          key_info.desc,
-          ))
+        config.append( (key_info.name,key_info.default.split(),key_info.desc) )
 
     self.__lib.delete_aspell_key_info_enumeration(keys_enum)
-    return list
-
+    return config
 
   def close(self):
-    """
+    '''
     Close aspell speller object.
-    """
+    '''
     self.__lib.delete_aspell_speller(self.__speller)
-  
 
   # XXX: internal function, do not call directly
   def _aspellwordlist(self, wordlist_id):
-    """
+    '''
     XXX: internal function
 
     Converts aspell list into python list.
-    """
+    '''
     elements = self.__lib.aspell_word_list_elements(wordlist_id)
     list = []
     while True:
@@ -305,67 +259,62 @@ class AspellLinux(object):
 
     self.__lib.delete_aspell_string_enumeration(elements)
     return list
-  
 
   def _aspell_config_error(self, config):
-    """
+    '''
     XXX: internal function
 
     Raise excpetion if operation of speller config
     caused an error.  Additionaly destroy config object.
-    """
-    # make exception object & copy error msg 
+    '''
+    # make exception object & copy error msg
     exc = AspellConfigError(
       ctypes.c_char_p(
         self.__lib.aspell_config_error_message(config)
       ).value
     )
-  
+
     # then destroy config objcet
     self.__lib.delete_aspell_config(config)
 
     # and then raise exception
     raise exc
 
-
   def _aspell_check_error(self):
-    """
+    '''
     XXX: internal function
 
     Raise exception if previous speller operation
     caused an error.
-    """
+    '''
     if self.__lib.aspell_speller_error(self.__speller) != 0:
       msg = self.__lib.aspell_speller_error_message(self.__speller)
       raise AspellSpellerError(msg)
-#class
-
-Aspell = AspellLinux
 
 
 def test():
   # TODO: more test cases
-  a = Aspell(("lang", "en"))
-  print a.check("when")
-  print a.suggest("wehn")
-  a.add_replacement_pair("wehn", "ween")
-  print a.suggest("wehn")
+  a = Aspell(('lang', 'en'))
+  print a.check('when')
+  print a.suggest('wehn')
+  a.add_replacement_pair('wehn', 'ween')
+  print a.suggest('wehn')
 
   print a.session_dict()
-  print a.check("pyaspell")
-  a.session_dict("pyaspell")
+  print a.check('pyaspell')
+  a.session_dict('pyaspell')
   print a.session_dict()
-  print a.check("pyaspell")
+  print a.check('pyaspell')
   a.session_dict(clear=True)
   print a.session_dict()
-  
+
   a.close()
 
 
 def main():
-  a = Aspell(("lang", "en"))
+  a = Aspell(('lang', 'en'))
 
-  for word in open('glu.words'):
+  for word in open('glu_words.lst'):
     a.personal_dict(word.strip())
 
   re_split = re.compile('[^A-Za-z]+').split
@@ -382,7 +331,7 @@ def main():
         if lword not in seen and not a.check(word):
           seen.add(lword)
           print '%-25s [%04d:%03d+%03d]: %s' % (filename, srow, scol, wordn, word) # ,a.suggest(word)
-        
+
   for path,dirs,filenames in os.walk('glu'):
     if '.svn' in dirs:
       dirs.remove('.svn')
@@ -391,7 +340,7 @@ def main():
         srcfile = os.path.join(path,filename)
         src = open(srcfile)
         tokenize.tokenize(src.readline,processStrings)
-    
+
 
 if __name__ == '__main__':
   main()

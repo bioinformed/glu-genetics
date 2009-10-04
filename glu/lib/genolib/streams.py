@@ -1744,7 +1744,7 @@ def sort_genotriples(triples,order,locusorder=None,sampleorder=None,maxincore=10
   lexicographical order.
 
   This current version fully materializes the input triple-stream and
-  performs the sort in core memory.  Future versions will honor the incore
+  performs the sort in core memory.  Future versions will honor the in-core
   parameter and spill very large streams to disk and perform a multi-phase
   offline merge sort.
 
