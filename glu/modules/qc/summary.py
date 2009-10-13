@@ -204,7 +204,7 @@ def main():
                                   transform=options, hyphen=sys.stdin)
 
   loci,locus_counts,samples,sample_counts = summarize(genos)
-  sample_totals = sum(sample_counts, numpy.zeros(4))
+  sample_totals = sum(sample_counts, np.zeros(4))
 
   assert len(loci)*len(samples) == sample_totals.sum()
 
