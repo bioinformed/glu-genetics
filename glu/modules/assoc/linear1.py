@@ -169,7 +169,7 @@ def main():
 
     null_model = models.build_model(options.null,fixedloci)
 
-    if not null_model:
+    if not null_model or not null_model.valid(minmaf=options.minmaf, mingenos=options.mingenos):
       raise ValueError('Cannot construct null model')
 
     # Obtain estimates of covariate effects under the null
@@ -212,6 +212,10 @@ def main():
                '%.3f' % m.maf,
                '|'.join(map(str,m.counts)),
                str(n) ]
+
+    if not model.valid(minmaf=options.minmaf, mingenos=options.mingenos):
+      out.writerow(result)
+      continue
 
     g = Linear(model.y,model.X,vars=model.vars)
 

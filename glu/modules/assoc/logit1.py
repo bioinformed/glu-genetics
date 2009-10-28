@@ -20,7 +20,7 @@ from   glu.lib.fileutils   import autofile,hyphen,table_writer
 from   glu.lib.glm         import GLogit,LinAlgError
 
 from   glu.lib.genolib     import geno_options
-from   glu.lib.association import build_models,print_results,format_pvalue,TREND,NO_INTERCEPT
+from   glu.lib.association import build_models,print_results,format_pvalue,TREND,INTERCEPT,NO_INTERCEPT,GENOTERM
 
 
 def option_parser():
@@ -187,8 +187,11 @@ def main():
 
   null_model = models.build_model(options.null,fixedloci)
 
-  if not null_model:
+  if not null_model or not null_model.valid(minmaf=options.minmaf, mingenos=options.mingenos):
     raise ValueError('Cannot construct null model')
+
+  if not null_model.valid(minmaf=options.minmaf, mingenos=options.mingenos):
+    raise ValueError('Invalid null model')
 
   # Obtain estimates of covariate effects under the null
   null = GLogit(null_model.y,null_model.X,vars=null_model.vars)
@@ -223,19 +226,25 @@ def main():
       t.name = lname
 
     base_model = NO_INTERCEPT()+TREND(lname)
+    for term in options.model.expand_terms():
+      if not isinstance(term,(INTERCEPT,GENOTERM)):
+        base_model += term
     for fixed in fixedloci:
       base_model += TREND(fixed)
-    base = models.build_model(base_model,lmap,mingenos=0)
+
+    base = models.build_model(base_model,lmap)
 
     if not base:
-      out.writerow(result)
+      out.writerow(result + ['NO BASE'])
       continue
 
     counts = zeros( (len(null.categories),3), dtype=int )
-    for pheno,geno in izip(base.y,base.X):
-      counts[pheno[0,0],geno[0,0]] += 1
+    if len(base.y.flat) and len(base.X.flat):
+      for pheno,geno in izip(base.y.A[:,0],base.X.A[:,0]):
+        counts[pheno,geno] += 1
 
     mafs = (counts*[0.,0.5,1.]).sum(axis=1)/counts.sum(axis=1)
+    mafs[~isfinite(mafs)] = 0
 
     m = base.model_loci[lname]
     result += ['|'.join(m.alleles),
@@ -245,7 +254,7 @@ def main():
 
     model = models.build_model(options.model,lmap)
 
-    if not model:
+    if not model.valid(minmaf=options.minmaf, mingenos=options.mingenos):
       out.writerow(result)
       continue
 

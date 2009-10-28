@@ -167,12 +167,11 @@ class NO_INTERCEPT(TERM):
 
 class GENOTERM(TERM):
   def effect_names(self, loci=None):
-    if loci is None:
+    if loci is None or loci[self.name].genocount < 2:
       return [quote_ident('%s:het' % self.name), quote_ident('%s:hom' % self.name)]
 
     lmodel = loci[self.name]
-    if lmodel.genocount < 2:
-      return []
+
     return [ quote_ident('%s:%s%s' % (self.name,lmodel.alleles[0],lmodel.alleles[1])),
              quote_ident('%s:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1])) ]
 
@@ -217,12 +216,10 @@ class GENO(GENOTERM):
     return genos
 
   def term_names(self, loci=None):
-    if loci is None:
+    if loci is None or loci[self.name].genocount < 3:
       return [quote_ident('%s:het' % self.name), quote_ident('%s:hom' % self.name)]
 
     lmodel = loci[self.name]
-    if lmodel.genocount < 3:
-      return []
     return [ quote_ident('%s:%s' % (self.name,''.join(g))) for g in lmodel.tests[1:] ]
 
   def indices(self):
@@ -242,12 +239,10 @@ class ADOM(GENOTERM):
     return ([0,0],[1,1],[2,0])[lmodel.genomap[geno]]
 
   def term_names(self, loci=None):
-    if loci is None:
+    if loci is None or loci[self.name].genocount < 3:
       return [quote_ident('%s:trend' % self.name), quote_ident('%s:domdev' % self.name)]
 
     lmodel = loci[self.name]
-    if lmodel.genocount < 3:
-      return []
     return [ quote_ident('%s:trend:%s'     % (self.name,lmodel.alleles[1])),
              quote_ident('%s:domdev:%s%s'  % (self.name,lmodel.alleles[0],lmodel.alleles[1])) ]
 
@@ -264,11 +259,10 @@ class TREND(GENOTERM):
     return [ lmodel.genomap.get(lmodel.genos[i]) ]
 
   def term_names(self, loci=None):
-    if loci is None:
+    if loci is None or loci[self.name].genocount < 2:
       return [quote_ident('%s:trend' % self.name)]
+
     lmodel = loci[self.name]
-    if lmodel.genocount < 2:
-      return []
     return [quote_ident('%s:trend:%s' % (self.name,lmodel.alleles[1]))]
 
   def indices(self):
@@ -295,11 +289,10 @@ class DOM(GENOTERM):
     return [ int(genomap.get(geno)>0) ]
 
   def term_names(self, loci=None):
-    if loci is None:
+    if loci is None or loci[self.name].genocount < 2:
       return [quote_ident('%s:dom' % self.name)]
+
     lmodel = loci[self.name]
-    if lmodel.genocount < 2:
-      return []
     return [quote_ident('%s:dom:%s' % (self.name,lmodel.alleles[1])) ]
 
   def indices(self):
@@ -328,11 +321,10 @@ class REC(GENOTERM):
     return [ int(genomap.get(geno)>1) ]
 
   def term_names(self, loci=None):
-    if loci is None:
+    if loci is None or loci[self.name].genocount < 2:
       return [quote_ident('%s:rec' % self.name)]
+
     lmodel = loci[self.name]
-    if lmodel.genocount < 2:
-      return []
     return [quote_ident('%s:rec:%s%s' % (self.name,lmodel.alleles[1],lmodel.alleles[1])) ]
 
   def indices(self):
@@ -357,8 +349,6 @@ class MISSING(GENOTERM):
       return [0]
 
   def term_names(self, loci=None):
-    if loci is not None and not loci[self.name].genocount:
-      return []
     return [quote_ident('%s:missing' % self.name)]
 
   def indices(self):
@@ -376,8 +366,6 @@ class NOT_MISSING(GENOTERM):
       return [1]
 
   def term_names(self, loci=None):
-    if self.loci is not None and not loci[self.name].genocount:
-      return []
     return [quote_ident('%s:not_missing' % self.name)]
 
   def indices(self):

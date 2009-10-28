@@ -507,8 +507,7 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   reference_alleles = map_reader(options.refalleles) if options.refalleles else None
 
   models = LocusModelBuilder(samples,header,phenos,
-                             reference_alleles=reference_alleles,
-                             minmaf=options.minmaf,mingenos=options.mingenos)
+                             reference_alleles=reference_alleles)
 
   parse_formulae(options,models)
 
@@ -598,49 +597,74 @@ class BiallelicLocusModel(object):
     self.maf          = estimate_maf(self.genocounts)
     self.alleles      = map(itemgetter(0),sorted(self.allelecounts.iteritems(),key=itemgetter(1),reverse=True))
 
-    if len(self.alleles) != 2:
-      return
-
-    a1,a2 = self.alleles
-
-    if reference_allele is not None:
+    if reference_allele is not None and self.alleles:
       if reference_allele not in self.alleles:
         msg = 'Invalid reference allele %s specified for locus %s.  Alleles found: %s'
         raise ValueError(msg % (reference_allele,lname,', '.join(self.alleles)))
 
-      if a1 != reference_allele:
-        self.alleles = a1,a2 = a2,a1
+    model = genos[0].model
+    self.tests = []
 
-    model        = genos[0].model
-    self.tests   = [ model.add_genotype( (a1,a1) ),
+    if len(self.alleles) == 1:
+      a1 = self.alleles[0]
+      self.tests = [ model.add_genotype( (a1,a1) ) ]
+
+    if len(self.alleles) > 1:
+      a1,a2 = self.alleles
+
+      if reference_allele is not None:
+        if a1 != reference_allele:
+          self.alleles = a1,a2 = a2,a1
+
+      self.tests = [ model.add_genotype( (a1,a1) ),
                      model.add_genotype( (a1,a2) ),
                      model.add_genotype( (a2,a2) ) ]
+
     self.counts  = [ self.genocounts.get(g,0) for g in self.tests ]
     self.genomap = dict( (g,i) for i,g in enumerate(self.tests) )
 
 
 class LocusModel(object):
-  def __init__(self, formula, y, X, pheno, vars, loci, model_loci, pids):
-    self.formula    = formula
-    self.y          = y
-    self.X          = X
-    self.pheno      = pheno
-    self.vars       = vars
-    self.loci       = loci
-    self.model_loci = model_loci
-    self.pids       = pids
+  def __init__(self, formula, y, X, pheno, vars, loci, model_loci, pids, geno_indices):
+    self.formula      = formula
+    self.y            = y
+    self.X            = X
+    self.pheno        = pheno
+    self.vars         = vars
+    self.loci         = loci
+    self.model_loci   = model_loci
+    self.pids         = pids
+    self.geno_indices = geno_indices
+
+  def valid(self, minmaf=0.01, mingenos=10):
+    for lmodel in self.model_loci.itervalues():
+      if len(lmodel.alleles) != 2 or lmodel.maf < minmaf:
+        return False
+
+    if not len(self.y):
+      return False
+
+    # Do not fit models with no contrast
+    if len(set(self.y.flat)) < 2:
+      return False
+
+    # FIXME: What does mingenos mean in a world with arbitrary formulae?
+    if self.geno_indices and mingenos:
+      colcounts0 = (self.X.A[:,self.geno_indices]==0).sum(axis=0)
+      colcounts1 = (self.X.A[:,self.geno_indices]!=0).sum(axis=0)
+      colcounts  = minimum(colcounts0, colcounts1)
+      if colcounts.min() < mingenos:
+        return False
+
+    return True
 
 
 # FIXME: Needs docs+tests
 class LocusModelBuilder(object):
-  def __init__(self,locus_header,pheno_header,phenos,
-                    reference_alleles=None,minmaf=0.01,mingenos=10):
-
+  def __init__(self,locus_header,pheno_header,phenos,reference_alleles=None):
     self.locus_header      = locus_header
     self.pheno_header      = pheno_header
     self.reference_alleles = reference_alleles or {}
-    self.minmaf            = minmaf
-    self.mingenos          = mingenos
 
     # Ensure phenotypes are materialized
     try:
@@ -652,7 +676,7 @@ class LocusModelBuilder(object):
     self.geno_indices = dict( (pid,i) for i,pid in enumerate(locus_header) if pid in pidset )
     self.phenos       = [ p for p in phenos if p[0] in self.geno_indices ]
 
-  def build_model(self,term,loci,mingenos=None):
+  def build_model(self,term,loci):
     genoterms    = []
     phenoterms   = []
     interactions = []
@@ -701,15 +725,10 @@ class LocusModelBuilder(object):
           except (ValueError,TypeError):
             raise ValueError("Cannot find phenotype column '%s'" % t.name)
 
-    model_names = []
-    model_terms = []
     model_loci  = {}
-
     for lname in set(term.loci()):
       ref    = self.reference_alleles.get(lname)
       lmodel = BiallelicLocusModel(lname,loci[lname],self.geno_indices,ref)
-      if len(lmodel.alleles) != 2 or lmodel.maf < self.minmaf:
-        return None
       model_loci[lname] = lmodel
 
     model_names = term.term_names(model_loci)
@@ -734,28 +753,10 @@ class LocusModelBuilder(object):
       y.append([stat])
       X.append(effects)
 
-    if not y:
-      return None
-
-    # Do not fit models with no contrast
-    if len(set(i[0] for i in y)) < 2:
-      return None
-
     y = matrix(y, dtype=float)
     X = matrix(X, dtype=float)
 
-    if mingenos is None:
-      mingenos = self.mingenos
-
-    # FIXME: What does mingenos mean in a world with arbitrary formulae?
-    if geno_indices and mingenos:
-      colcounts0 = (X.A[:,geno_indices]==0).sum(axis=0)
-      colcounts1 = (X.A[:,geno_indices]!=0).sum(axis=0)
-      colcounts  = minimum(colcounts0, colcounts1)
-      if colcounts.min() < self.mingenos:
-        return None
-
-    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci,pids)
+    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci,pids,geno_indices)
 
 
 def variable_summary(out, x, categorical_limit=5, verbose=1):
