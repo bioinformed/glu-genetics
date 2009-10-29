@@ -597,11 +597,6 @@ class BiallelicLocusModel(object):
     self.maf          = estimate_maf(self.genocounts)
     self.alleles      = map(itemgetter(0),sorted(self.allelecounts.iteritems(),key=itemgetter(1),reverse=True))
 
-    if reference_allele is not None and self.alleles:
-      if reference_allele not in self.alleles:
-        msg = 'Invalid reference allele %s specified for locus %s.  Alleles found: %s'
-        raise ValueError(msg % (reference_allele,lname,', '.join(self.alleles)))
-
     model = genos[0].model
     self.tests = []
 
@@ -612,7 +607,11 @@ class BiallelicLocusModel(object):
     if len(self.alleles) > 1:
       a1,a2 = self.alleles
 
-      if reference_allele is not None:
+      if reference_allele is not None and self.alleles:
+        if reference_allele not in self.alleles:
+          msg = 'Invalid reference allele %s specified for locus %s.  Alleles found: %s'
+          raise ValueError(msg % (reference_allele,lname,', '.join(self.alleles)))
+
         if a1 != reference_allele:
           self.alleles = a1,a2 = a2,a1
 
