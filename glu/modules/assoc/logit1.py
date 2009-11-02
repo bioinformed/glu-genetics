@@ -235,7 +235,7 @@ def main():
     base = models.build_model(base_model,lmap)
 
     if not base:
-      out.writerow(result + ['NO BASE'])
+      out.writerow(result)
       continue
 
     counts = zeros( (len(null.categories),3), dtype=int )
