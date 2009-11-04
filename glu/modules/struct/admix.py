@@ -373,7 +373,6 @@ def load(options,args):
 
           hom1 = geno_counts[i,inds[0]]
           hets = geno_counts[i,inds[1]]
-          hom2 = geno_counts[i,inds[2]]
 
           p    = (2*hom1+hets)/n
 

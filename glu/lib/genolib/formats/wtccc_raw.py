@@ -77,8 +77,6 @@ def load_wtccc_raw(filename,format,genome=None,phenome=None,extra_args=None,**kw
     local_intern = intern
     local_strip  = str.strip
 
-    gmap = {'-':'  '}
-
     for row in rows:
       if len(row) != n:
         raise ValueError('Invalid WTCCC raw row on line %d of %s' % (rows.line_num+1,namefile(filename)))

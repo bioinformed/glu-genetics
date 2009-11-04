@@ -1417,7 +1417,7 @@ class TableWriter(object):
 
     # Try to resolve column headings without a header row
     try:
-      self.indices = indices = resolve_column_headers(None,columns,drop)
+      self.indices = resolve_column_headers(None,columns,drop)
     except ValueError:
       self.indices = None
 
@@ -1701,7 +1701,6 @@ def _xlate_xls_row_str(book,values,types):
   Translate a sequence of native Excel values and types into strings
   '''
   import xlrd
-  from   datetime  import date,time,datetime
 
   row = []
   t = set(types)

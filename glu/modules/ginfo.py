@@ -69,7 +69,7 @@ def ginfo(filename,options,out):
       pheno_map = {PHENO_UNKNOWN:'',PHENO_UNAFFECTED:'UNAFFECTED',PHENO_AFFECTED:'AFFECTED'}
 
       for sample in genos.samples:
-        phenos = genos.phenome.get_phenos(sample)
+        phenos = phenome.get_phenos(sample)
         sex    = sex_map[phenos.sex]
         pheno  = pheno_map[phenos.phenoclass]
 

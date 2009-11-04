@@ -277,8 +277,6 @@ class GCSummary(object):
     locusstats2 = np.zeros(len(self.loci))
     locuscounts = np.zeros(len(self.loci),dtype=int)
 
-    n = len(self.loci)
-
     for sampleid,genos,gcscores in self.samples:
       gc = np.array(gcscores,dtype=float)
 

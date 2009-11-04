@@ -102,8 +102,6 @@ def discover_modules():
     if name.startswith(prefix):
       name = name[len(prefix):]
 
-    formats = getattr(module,'__genoformats__')
-
     yield name,module
 
 

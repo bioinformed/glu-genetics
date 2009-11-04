@@ -930,9 +930,7 @@ class GenomatrixStream(GenotypeStream):
     if format not in ('sdat','ldat'):
       raise ValueError("Invalid genomatrix format '%s'.  Must be either sdat or ldat" % format)
 
-    formats  = set(g.format for g in genos)
-    informat = list(formats)[0] if len(formats)==1 else None
-    headers  = [ g.columns for g in genos ] if informat in ('ldat','sdat') else None
+    formats = set(g.format for g in genos)
 
     # Single input is trivial -- just merge
     if len(genos) == 1:
@@ -1870,7 +1868,6 @@ def combine_unsorted_genotriple_list(triplelist):
   # Extract parts of all of the triples
   samples = [ triples.samples  for triples in triplelist ]
   loci    = [ triples.loci     for triples in triplelist ]
-  order   = [ triples.order    for triples in triplelist ]
   unique  = [ triples.unique   for triples in triplelist ]
 
   # If any of the triples have unknown samples or loci, mark the results as unknown
@@ -2414,8 +2411,8 @@ def merge_genomatrixstream_list(genos, mergefunc):
               g.updates[:] = []
             yield row,genos
 
-      genos = genos[0].clone(_combine(genos),genome=genome,samples=rowlist,unique=unique,updates=updates,
-                             materialized=False)
+      genos = genos[0].clone(_combine(genos),genome=genome,phenome=phenome,samples=rowlist,
+                             unique=unique,updates=updates,materialized=False)
     else:
       models = []
       def _combine(genos):
@@ -2424,8 +2421,8 @@ def merge_genomatrixstream_list(genos, mergefunc):
             models.append(model)
             yield labelrow
 
-      genos = genos[0].clone(_combine(genos),models=models,genome=genome,loci=rowlist,
-                             unique=unique,materialized=False)
+      genos = genos[0].clone(_combine(genos),models=models,genome=genome,phenome=phenome,
+                             loci=rowlist,unique=unique,materialized=False)
 
     # Merge if not unique
     genos = genos.merged(mergefunc)
@@ -2479,7 +2476,6 @@ def merge_genomatrixstream_list(genos, mergefunc):
 
           # Iterate over input rows and schema, find the corresponding column
           # mappings, and append the relevant genotypes
-          last = 0
           for i,rows in merge_rows.pop(label).iteritems():
             new_row[dranges[i]] = pick_columns(rows) if len(rows)>1 else rows[0]
 
@@ -2495,7 +2491,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
         yield label,new_row
 
     return genos[0].clone(_merger(),samples=samples,loci=loci,models=models,genome=genome,
-                                    packed=False,materialized=False,unique=True)
+                                    phenome=phenome,packed=False,materialized=False,unique=True)
 
   #######
 
@@ -2577,7 +2573,7 @@ def merge_genomatrixstream_list(genos, mergefunc):
       yield label,new_row
 
   return genos[0].clone(_merger(),samples=samples,loci=loci,models=models,genome=genome,
-                                  packed=False,materialized=False,unique=True)
+                                  phenome=phenome,packed=False,materialized=False,unique=True)
 
 
 #######################################################################################
@@ -2739,7 +2735,6 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
             for lname,model in triples.updates:
               i         = locmap[lname]
               loc       = locs[i]
-              old_model = loc.model
               new_model = update_model(loc.model, model)
               new_model = update_model(models[i], new_model)
 
@@ -3108,7 +3103,6 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
                                    strand=old_locus.strand, warn=warn)
 
   new_locus = new_genome.loci[new_name]
-  new_model = new_locus.model
 
   return merge_locus(new_locus,old_model)
 

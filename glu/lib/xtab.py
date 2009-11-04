@@ -65,8 +65,6 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
   ('l3', [['BB', 'BB', 'AB'], []])
   '''
   get0 = itemgetter(0)
-  get1 = itemgetter(1)
-  get2 = itemgetter(2)
 
   columns = list(columns)
 

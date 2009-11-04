@@ -147,7 +147,6 @@ def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup,
       groupcols = [ (key,indices,pick(genos.columns,indices))
                     for key,indices in groupcols.iteritems() ]
     else:
-      descrcache = {}
       groupcols = [ (key,indices,pick(genos.columns,indices))
                     for key,indices in groupcols.iteritems() ]
 
@@ -160,7 +159,6 @@ def genomatrix_multiplexer(genos, samplegroups, locusgroups, defaultsamplegroup,
         if not rowgroup:
           continue
         for columngroup,indices,header in groupcols:
-          grow = pick(row,indices)
           yield (rowgroup,columngroup),header,(rowkey,pick(row,indices))
 
   elif columngroups:

@@ -1373,8 +1373,6 @@ class GLogitScoreTest(object):
     assert y.shape[1] == 1
     assert y.shape[0] == X.shape[0]
 
-    n = X.shape[1]
-
     # Form linear predictors and expected values for the current data
     # using the estimates under the null
     b = np.vsplit(self.beta,k)

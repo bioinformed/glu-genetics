@@ -491,7 +491,6 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
   if format=='ldat':
     def _encode():
       n = len(columns)
-      m = genome.max_alleles+1
 
       def get_alleles(genos):
         alleles = set(a for g in set(genos) for a in g)
@@ -670,7 +669,6 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
   if format=='ldat':
     def _encode():
       n = len(columns)
-      m = genome.max_alleles+1
 
       cachemap     = {}
       from_strings = genorepr.from_strings
@@ -715,13 +713,10 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
         yield lname,row
 
   elif format=='sdat':
-    n = len(columns)
     loci      = []
     cachemap  = {}
-    cachelist = []
 
     to_string    = genorepr.to_string
-    from_strings = genorepr.from_strings
 
     def mk_cache(model):
       cache = dict( (to_string(g),g) for g in model.genotypes )
@@ -760,7 +755,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
                 try:
                   loc.model = build_model(alleles=geno,base=loc.model)
                 except GenotypeRepresentationError:
-                  _encoding_error(columns[i],set(geno)-set(model.alleles),model,warn)
+                  _encoding_error(columns[i],set(geno)-set(model.alleles),loc.model,warn)
 
               model = loc.model
               if models[i] is not model:

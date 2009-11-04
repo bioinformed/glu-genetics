@@ -15,8 +15,8 @@ from   operator           import itemgetter
 from   numpy              import array,matrix,asarray,asanyarray,zeros, \
                                  exp,nan,abs,arange,median,inf,minimum
 
-from   glu.lib.utils      import tally,as_set,is_str
-from   glu.lib.fileutils  import namefile,list_reader,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
+from   glu.lib.utils      import tally
+from   glu.lib.fileutils  import namefile,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
                                  subset_variables,create_categorical_variables
 from   glu.lib.genolib    import load_genostream,pick
 from   glu.lib.genolib.transform import _union_options, _intersect_options
@@ -491,7 +491,6 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   phenos        = list(phenos)
   subjects      = set(p[0] for p in phenos)
   keep          = subjects.copy()
-  phenocount1   = len(phenos)
 
   loci,fixedloci,samples = _load_loci(genofile,options,keep)
 
@@ -863,7 +862,6 @@ def print_results_linear(out,locus_model,linear_model,verbose=1):
   b     = linear_model.beta.T
   stde  = (linear_model.ss*linear_model.W.diagonal()).A**0.5
   t     = b.A/stde
-  oddsr = exp(b)
   n,m   = linear_model.X.shape
   p     = 2*scipy.stats.distributions.t.cdf(-abs(t),n-m)
 

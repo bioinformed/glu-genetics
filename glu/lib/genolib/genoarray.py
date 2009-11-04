@@ -2460,12 +2460,12 @@ def bench_categories():
     #for i in xrange(n):
     #  genotype_categories2(genos)
 
-    t5 = time.clock()
+    #t5 = time.clock()
 
     #for i in xrange(n):
     #  genotype_categories2(genoslist)
 
-    t6 = time.clock()
+    #t6 = time.clock()
 
     print 'b=%d .counts    = %f' % (descr.homogeneous,t2-t1)
     print 'b=%d counts(g)  = %f' % (descr.homogeneous,t3-t2)

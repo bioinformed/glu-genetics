@@ -8,7 +8,6 @@ __revision__  = '$Id$'
 import os
 import csv
 import struct
-import traceback
 
 from   glu.lib.utils     import chunk
 from   glu.lib.fileutils import autofile,parse_augmented_filename,guess_format,get_arg
@@ -148,17 +147,16 @@ class IlluminaManifest(object):
     filesize      = stats.st_size
     bpm           = autofile(filename,'rb')
     read          = bpm.read
-    readline      = bpm.readline
 
     signature     = read(3)
 
     if signature != 'BPM':
-      raise ValueError('Invalid BPM file signature: %s' % printable(sig))
+      raise ValueError('Invalid BPM file signature: %s' % printable(signature))
 
     self.version = struct.unpack('<BL', read(5))
 
     if self.version != (1,4):
-      raise ValueError('Invalid BPM version number (%d.%d)' % version)
+      raise ValueError('Invalid BPM version number (%d.%d)' % self.version)
 
     self.manifest_name = readstr(bpm)
     self.controls      = [ c.split(',') for c in readstr(bpm).split('\n') if c ]
@@ -261,15 +259,15 @@ class IlluminaManifest(object):
 
     if 0:
       print 'filename:',filename
-      print 'version',version
-      print 'manifest_name:',manifest_name
+      print 'version',self.version
+      print 'manifest_name:',self.manifest_name
       print 'Controls:'
-      for i,control in enumerate(controls):
+      for i,control in enumerate(self.controls):
         print '  %02d' % (i+1),printable(','.join(control))
-      print 'snp_count:',snp_count
-      print 'snp_entries:',snp_entries[:10],snp_entries[-10:]
-      print 'snp_names:',snp_names[:10]+snp_names[-10:]
-      print 'snp_types:',snp_types[:10],snp_types[-10:]
+      print 'snp_count:',self.snp_count
+      print 'snp_entries:',self.snp_entries[:10],self.snp_entries[-10:]
+      print 'snp_names:',self.snp_names[:10]+self.snp_names[-10:]
+      print 'snp_types:',self.snp_types[:10],self.snp_types[-10:]
 
     self.manifest_data = _manifest_rows()
 

@@ -470,8 +470,6 @@ except (ImportError,IOError):
 
 
 try:
-  from signal import alarm
-
   class IntervalTimer(object):
     def __init__(self, interval=1):
       self.interval = interval

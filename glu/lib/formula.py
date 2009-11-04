@@ -232,7 +232,6 @@ class GENO(GENOTERM):
 class ADOM(GENOTERM):
   def effects(self, loci, phenos, i):
     lmodel  = loci[self.name]
-    genomap = loci[self.name].genomap
     geno    = lmodel.genos[i]
     if geno not in lmodel.genomap:
       return [None]
