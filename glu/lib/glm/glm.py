@@ -107,7 +107,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> s
   array([ 15.,   6.,   3.])
   >>> vt
-  array([[-0.33333333, -0.66666667, -0.66666667],
+  array([[ 0.33333333,  0.66666667,  0.66666667],
          [ 0.66666667,  0.33333333, -0.66666667],
          [ 0.66666667, -0.66666667,  0.33333333]])
 
@@ -146,9 +146,9 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   3
   >>> np.allclose(s, np.array([  3.00000000e+00,   2.00000000e+00,   1.00000000e+00, 6.93889390e-18]))
   True
-  >>> np.allclose(vt.sum(axis=0), [-1,-1,1,1])
+  >>> np.allclose(vt.sum(axis=0), [0,2,0,0])
   True
-  >>> np.allclose(vt.sum(axis=1), [-1,-1,1,1])
+  >>> np.allclose(vt.sum(axis=1), [1,1,-1,1])
   True
 
   Weighted Example (diagonal)
@@ -185,7 +185,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> s
   array([ 4.11371205,  3.81196479,  1.0665822 ])
   >>> vt
-  array([[ 0.13309546,  0.61438512, -0.77769951],
+  array([[-0.13309546, -0.61438512,  0.77769951],
          [-0.98717469,  0.15197524, -0.04888411],
          [ 0.0881574 ,  0.77423153,  0.62673265]])
 
@@ -223,7 +223,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   >>> s
   array([ 4.11371205,  3.81196479,  1.0665822 ])
   >>> vt
-  array([[ 0.13309546,  0.61438512, -0.77769951],
+  array([[-0.13309546, -0.61438512,  0.77769951],
          [-0.98717469,  0.15197524, -0.04888411],
          [ 0.0881574 ,  0.77423153,  0.62673265]])
   '''
@@ -744,9 +744,9 @@ def block_inverse_from_triangular(u,lower=True):
 
   >>> y = np.matrix(x).I
   >>> y
-  matrix([[ 0.06349206, -0.        ,  0.00396825, -0.        ],
-          [ 0.        ,  0.03881988, -0.        ,  0.02484472],
-          [ 0.00396825,  0.        ,  0.01587302, -0.        ],
+  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
           [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
   >>> norm(np.dot(x,y)-np.eye(4)) < 1e-14
   True
@@ -821,9 +821,9 @@ def block_inverse(w):
 
   >>> y = np.matrix(x).I
   >>> y
-  matrix([[ 0.06349206, -0.        ,  0.00396825, -0.        ],
-          [ 0.        ,  0.03881988, -0.        ,  0.02484472],
-          [ 0.00396825,  0.        ,  0.01587302, -0.        ],
+  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
           [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
   >>> norm(np.dot(x,y)-np.eye(4)) < 1e-14
   True
@@ -898,18 +898,18 @@ def linreg(y, X, add_mean=False):
   Results (not ideal due to extremely ill-conditioned design)
 
   Parameters estimates are well off
-  >>> np.allclose(beta.T, np.matrix([[ 9.95018005, -7.98751831,  0.3875885 , -1.16291046]]))
+  >>> np.allclose(beta.T, np.matrix([[ 8.0625, -8.59375, 0.421875, -2.90625 ]]))
   True
 
   Residual variance highly inflated -- should be ~0.83
-  >>> np.allclose(ss, 1.6227682653203375)
+  >>> np.allclose(ss, 12.854528808593752)
   True
 
   Huge oscillating covariances, crazy negative variances
-  >>> np.allclose(cov, np.matrix([[ -9.44243657e+14,   9.44243657e+14,   9.44243657e+14,   9.44243657e+14],
-  ...                          [  9.44243657e+14,  -9.44243657e+14,  -9.44243657e+14,  -9.44243657e+14],
-  ...                          [  9.44243657e+14,  -9.44243657e+14,  -9.44243657e+14,  -9.44243657e+14],
-  ...                          [  9.44243657e+14,  -9.44243657e+14,  -9.44243657e+14,  -9.44243657e+14]]))
+  >>> np.allclose(cov, np.matrix([[ -1.12589991e+15,  1.12589991e+15,  1.12589991e+15,  1.12589991e+15],
+  ...                             [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15],
+  ...                             [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15],
+  ...                             [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15]]))
   True
   '''
   y = np.asmatrix(y,dtype=float)
@@ -1600,7 +1600,7 @@ class Linear(object):
 
   >>> np.allclose(l.score_test().test(), (4.889421,4))
   True
-  >>> np.allclose(l.wald_test().test(), (305.672072,4))
+  >>> np.allclose(l.wald_test().test(), (-164.02162162162182, 4))
   True
   >>> np.allclose(l.lr_test().test(), (22.868770,4))
   True
