@@ -483,7 +483,7 @@ def encode_genomatrixstream_from_tuples(columns, genos, format, genome=None,
     genome = Genome()
 
   if not columns:
-    return columns,[],genome,[]
+    return columns,[],[],genome,[]
 
   models  = []
   updates = []
