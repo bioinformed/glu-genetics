@@ -15,7 +15,7 @@ from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
 
 
-HEADER = ['CHROMOSOME','CYTOBAND','LOCATION','STRAND','GENE NEIGHBORHOOD']
+HEADER = ['CHROMOSOME','CYTOBAND','LOCATION','GENE NEIGHBORHOOD']
 
 
 def option_parser():
@@ -80,7 +80,6 @@ def annotate(con,header,rows,options):
       info = [chromosome,
               ','.join(c[0] for c in cytoband),
               location,
-              strand,
               ','.join(n[0] for n in near)]
 
     yield row + info
