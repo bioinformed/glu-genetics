@@ -17,7 +17,7 @@ from   numpy              import array,matrix,asarray,asanyarray,zeros, \
 
 from   glu.lib.utils      import tally
 from   glu.lib.fileutils  import namefile,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
-                                 subset_variables,create_categorical_variables
+                                 subset_variables,filter_expr,column_exprs,create_categorical_variables
 from   glu.lib.genolib    import load_genostream,pick
 from   glu.lib.genolib.transform import _union_options, _intersect_options
 from   glu.lib.formula    import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
@@ -281,8 +281,9 @@ def strip_trailing_empty(row):
 
 
 # FIXME: Needs docs+tests
-def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None,includevar=None,
-                         excludevar=None,allowdups=False,verbose=1,errs=sys.stderr):
+def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None,columnexpr=None,
+                         includevar=None,excludevar=None,filterexpr=None,allowdups=False,
+                         verbose=1,errs=sys.stderr):
   '''
   Load phenotypes from a tab-delimited file
 
@@ -308,8 +309,14 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
   if categorical:
     header,phenos = create_categorical_variables(header,phenos,categorical)
 
+  if columnexpr:
+    header,phenos = column_exprs(header,phenos,columnexpr)
+
   if includevar or excludevar:
     header,phenos = subset_variables(header,phenos,includevar,excludevar)
+
+  if filterexpr:
+    header,phenos = filter_expr(header,phenos,filterexpr)
 
   indices = resolve_column_headers(header,[pid,pheno])
   if columns is not None:
@@ -485,8 +492,9 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
 
   verbose       = options.verbose
   header,phenos = load_phenos(phenofile,pid=options.pid,pheno=options.pheno,columns=covs,deptype=deptype,
-                                        categorical=options.categorical,includevar=options.includevar,
-                                        excludevar=options.excludevar,allowdups=options.allowdups,
+                                        categorical=options.categorical,columnexpr=options.columnexpr,
+                                        includevar=options.includevar,excludevar=options.excludevar,
+                                        filterexpr=options.filterexpr,allowdups=options.allowdups,
                                         verbose=verbose,errs=errs)
   phenos        = list(phenos)
   subjects      = set(p[0] for p in phenos)

@@ -11,7 +11,7 @@ import csv
 from   operator      import itemgetter
 from   itertools     import islice,izip,chain
 
-from   glu.lib.utils import is_str,as_set,peekfirst,deprecated_by,unique
+from   glu.lib.utils import is_str,as_set,peekfirst,deprecated_by,unique,tally
 
 
 __all__ = ['autofile','namefile','hyphen',
@@ -1901,7 +1901,7 @@ def cook_table(table, options):
   '''
   Create categorical variables, subset and sort table
   '''
-  vars = ['categorical','includevar','excludevar','sort','uniq']
+  vars = ['categorical','columnexpr','includevar','excludevar','filterexpr','sort','uniq']
 
   if not any(getattr(options,var) for var in vars):
     return table
@@ -1916,8 +1916,14 @@ def cook_table(table, options):
   if getattr(options,'categorical',None):
     header,table = create_categorical_variables(header,table,options.categorical)
 
+  if getattr(options, 'columnexpr', None):
+    header,table = column_exprs(header,table,options.filterexpr)
+
   if getattr(options,'includevar',None) or getattr(options,'excludevar',None):
     header,table = subset_variables(header,table,options.includevar,options.excludevar)
+
+  if getattr(options, 'filterexpr', None):
+    header,table = filter_expr(header,table,options.filterexpr)
 
   if getattr(options,'sort',None):
     header,table = sort_table(header,table,options.sort)
@@ -1962,6 +1968,15 @@ def sort_table(header, table, keys):
   ['2', 'F', '9e9']
   ['3', 'M', '-9']
 
+  >>> h,d = sort_table(header,data,'*')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', '?', 'abc']
+  ['2', 'F', '9e9']
+  ['3', 'M', '-9']
+
   >>> h,d = sort_table(header,data,['b','a'])
   >>> h
   ['a', 'b', 'c']
@@ -1970,6 +1985,15 @@ def sort_table(header, table, keys):
   ['1', '?', 'abc']
   ['2', 'F', '9e9']
   ['3', 'M', '-9']
+
+  >>> h,d = sort_table(header,data,['c','*'])
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', 'M', '-9']
+  ['2', 'F', '9e9']
+  ['1', '?', 'abc']
 
   >>> h,d = sort_table(header,data,'c,a')
   >>> h
@@ -1985,7 +2009,10 @@ def sort_table(header, table, keys):
 
   indices  = []
   for key in keys:
-    indices.extend(resolve_column_headers(header, key))
+    if key == '*':
+      indices.extend( range(len(header)) )
+    else:
+      indices.extend(resolve_column_headers(header, key))
 
   if not indices:
     return header,table
@@ -2026,13 +2053,14 @@ def uniq_table(header, table, keys=None):
   ['2', 'F', '9e9']
   ['1', '?', 'abc']
 
-  >>> h,d = uniq_table(header,data,'a')
+  >>> h,d = uniq_table(header,data,'*')
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
   ...   print row
   ['3', 'M', '-9']
   ['2', 'F', '9e9']
+  ['3.0', 'F', '-9']
   ['1', '?', 'abc']
 
   >>> h,d = uniq_table(header,data,['b','a'])
@@ -2061,9 +2089,13 @@ def uniq_table(header, table, keys=None):
 
   indices  = []
   for key in keys:
-    indices.extend(resolve_column_headers(header, key))
+    if key == '*':
+      indices.extend( range(len(header)) )
+    else:
+      indices.extend(resolve_column_headers(header, key))
 
-  assert indices
+  if not indices:
+    return header,table
 
   return header,unique(table,key=_key_func(indices))
 
@@ -2205,6 +2237,198 @@ def subset_variables(header,data,include=None,exclude=None):
       header,data = subset_variable(header,data,var,exclude=values)
 
   return header,data
+
+
+def column_exprs(header,data,exprs,use_globals=None):
+  '''
+  Create a new column based on a Python expression.
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = column_exprs(header,data,"d=1 if fields[a] in ('1','2') else 0")
+  >>> h
+  ['a', 'b', 'c', 'd']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '1']
+  ['2', 'F', '', '1']
+  ['3', '?', '1', '0']
+
+  >>> h,d = column_exprs(header,data,["d=int(fields[a])**2","e=1 if fields[a] in ('1','2') else 0"])
+  >>> h
+  ['a', 'b', 'c', 'd', 'e']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '1', '1']
+  ['2', 'F', '', '4', '1']
+  ['3', '?', '1', '9', '0']
+  '''
+  if is_str(exprs):
+    exprs = [exprs]
+  else:
+    exprs = exprs or []
+
+  for cexpr in exprs:
+    var,expr = cexpr.split('=',1)
+    header,data = column_expr(header,data,var,expr,use_globals)
+
+  return header,data
+
+
+def _make_expr_env(header,use_globals=None):
+  use_globals = use_globals or {'__builtins__':__builtins__}
+  indices     = use_globals['indices'] = {}
+  counts      = tally(header)
+
+  for i,h in enumerate(header):
+    if counts[h] == 1:
+      indices[h] = i
+
+      spaces = ' ' in h
+      digit  = h[0] in '0123456789'
+
+      # Try to fix up h
+      if spaces or digit:
+        if spaces:
+          h = h.replace(' ','_')
+        if digit:
+          h = '_' + h
+
+        # If fixups make h ambiguous, do not set
+        if h in counts:
+          continue
+
+      use_globals[h] = i
+
+  return use_globals
+
+
+def column_expr(header,data,column,expr,use_globals=None):
+  '''
+  Create a new column based on a Python expression.
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = column_expr(header,data,'d',"1 if fields[a] in ('1','2') else 0")
+  >>> h
+  ['a', 'b', 'c', 'd']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '1']
+  ['2', 'F', '', '1']
+  ['3', '?', '1', '0']
+
+  >>> h,d = column_expr(header,data,'d',"(int(fields[a])+2)**2")
+  >>> h
+  ['a', 'b', 'c', 'd']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '', '9']
+  ['2', 'F', '', '16']
+  ['3', '?', '1', '25']
+  '''
+  code        = compile(expr,'<expression: %s>' % expr, 'eval')
+  use_globals = _make_expr_env(header,use_globals)
+
+  def _column_expr(data, code, use_globals):
+    for row in data:
+      use_globals['fields'] = row
+      result = eval(code, use_globals)
+      yield row + [str(result)]
+
+  header = header + [column]
+  return header,_column_expr(data, code, use_globals)
+
+
+def filter_expr(header,data,expr,use_globals=None):
+  '''
+  Subset rows of a table based on a Python expression that evaluates to True
+  or False.  Only rows that evaluate to True are retained.
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = filter_expr(header,data,"fields[a] in ('1','2')")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = filter_expr(header,data,"int(fields[a]) <= 2 and fields[b]=='M'")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+
+  >>> h,d = filter_expr(header,data,["int(fields[a]) <= 2","fields[b]=='M'"])
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+
+  >>> h,d = filter_expr(header,data,"fields[b]!='?'")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = filter_expr(header,data,"fields[c]")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', '?', '1']
+
+  >>> h,d = filter_expr(header,data,"not fields[c]")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = filter_expr(header,data,"fields[2]==''")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+
+  >>> h,d = filter_expr(header,data,"fields[c]")
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', '?', '1']
+  '''
+  if not is_str(expr):
+    expr      = ' and '.join('(%s)' % e for e in expr)
+
+  code        = compile(expr,'<expression: %s>' % expr, 'eval')
+  use_globals = _make_expr_env(header,use_globals)
+
+  def _filter_expr(data, code, use_globals):
+    for row in data:
+      use_globals['fields'] = row
+      if eval(code, use_globals):
+        yield row
+
+  return header,_filter_expr(data, code, use_globals)
 
 
 def create_categorical_variable(header,data,variable,prefix=None,ref=None,include=None,exclude=None,
