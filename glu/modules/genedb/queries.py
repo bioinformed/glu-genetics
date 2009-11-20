@@ -37,19 +37,13 @@ def query_gene_neighborhood(con,chromosome,location,up,dn):
   sql = '''
   SELECT   featureName,chromosome,orientation,chrStart,chrEnd
   FROM     gene
-  WHERE    orientation = '+'
-    AND    chromosome = ?
-    AND    ? BETWEEN (chrStart - ?) AND (chrEnd + ?)
-  UNION
-  SELECT   featureName,chromosome,orientation,chrStart,chrEnd
-  FROM     gene
-  WHERE    orientation = '-'
-    AND    chromosome = ?
-    AND    ? BETWEEN (chrStart - ?) AND (chrEnd + ?)
+  WHERE    chromosome  = ?
+    AND  ((orientation = '+' AND ? BETWEEN (chrStart - ?) AND (chrEnd + ?))
+       OR (orientation = '-' AND ? BETWEEN (chrStart - ?) AND (chrEnd + ?)))
   ORDER BY chromosome,chrStart;
   '''
   cur = con.cursor()
-  cur.execute(sql, (chromosome,location,up,dn,chromosome,location,dn,up))
+  cur.execute(sql, (chromosome,location,up,dn,location,dn,up))
   return cur.fetchall()
 
 
