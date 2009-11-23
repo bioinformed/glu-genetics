@@ -14,6 +14,7 @@ from   itertools          import izip,chain
 from   collections        import defaultdict
 from   operator           import itemgetter
 
+import numpy as np
 from   numpy              import array,asarray,asanyarray,zeros,dot,outer, \
                                  exp,nan,abs,arange,median,inf,minimum
 
@@ -515,8 +516,7 @@ def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
 
   reference_alleles = map_reader(options.refalleles) if options.refalleles else None
 
-  models = LocusModelBuilder(samples,header,phenos,
-                             reference_alleles=reference_alleles)
+  models = LocusModelBuilder(samples,header,phenos,reference_alleles=reference_alleles)
 
   parse_formulae(options,models)
 
@@ -598,22 +598,27 @@ def estimate_maf(genocounts):
 class BiallelicLocusModel(object):
   def __init__(self, lname, genos, geno_indices, reference_allele=None):
     self.lname        = lname
-    self.genos        = genos
-    genos             = pick(genos, geno_indices.itervalues())
-    self.allelecounts = tally(a for g in genos if g for a in g if a)
-    self.genocounts   = tally(genos)
+    #self.genos        = genos
+    self.valid_genos  = pick(genos, geno_indices)
+    self.genocounts   = tally(self.valid_genos)
     self.genocount    = len([ 1 for g,n in self.genocounts.iteritems() if g and n ])
     self.maf          = estimate_maf(self.genocounts)
-    self.alleles      = map(itemgetter(0),sorted(self.allelecounts.iteritems(),key=itemgetter(1),reverse=True))
 
-    model = genos[0].model
+    self.allelecounts = allelecounts = defaultdict(int)
+    for geno,n in self.genocounts.iteritems():
+      for a in (a for g in geno if g for a in g if a):
+        allelecounts[a] += n
+
+    self.alleles      = map(itemgetter(0),sorted(allelecounts.iteritems(),key=itemgetter(1),reverse=True))
+
+    model = self.valid_genos[0].model
     self.tests = []
 
     if len(self.alleles) == 1:
       a1 = self.alleles[0]
       self.tests = [ model.add_genotype( (a1,a1) ) ]
 
-    if len(self.alleles) > 1:
+    elif len(self.alleles) > 1:
       a1,a2 = self.alleles
 
       if reference_allele is not None and self.alleles:
@@ -628,12 +633,13 @@ class BiallelicLocusModel(object):
                      model.add_genotype( (a1,a2) ),
                      model.add_genotype( (a2,a2) ) ]
 
-    self.counts  = [ self.genocounts.get(g,0) for g in self.tests ]
-    self.genomap = dict( (g,i) for i,g in enumerate(self.tests) )
+    self.counts   = [ self.genocounts.get(g,0) for g in self.tests ]
+    self.genomap  = dict( (g,i) for i,g in enumerate(self.tests) )
+    self.genovals = np.array([ self.genomap.get(g,nan) for g in self.valid_genos ], dtype=float)
 
 
 class LocusModel(object):
-  def __init__(self, formula, y, X, pheno, vars, loci, model_loci, pids, geno_indices):
+  def __init__(self, formula, y, X, pheno, vars, loci, model_loci, pids, geno_columns):
     self.formula      = formula
     self.y            = y
     self.X            = X
@@ -642,7 +648,7 @@ class LocusModel(object):
     self.loci         = loci
     self.model_loci   = model_loci
     self.pids         = pids
-    self.geno_indices = geno_indices
+    self.geno_columns = geno_columns
 
   def valid(self, minmaf=0.01, mingenos=10):
     for lmodel in self.model_loci.itervalues():
@@ -657,9 +663,9 @@ class LocusModel(object):
       return False
 
     # FIXME: What does mingenos mean in a world with arbitrary formulae?
-    if self.geno_indices and mingenos:
-      colcounts0 = (self.X[:,self.geno_indices]==0).sum(axis=0)
-      colcounts1 = (self.X[:,self.geno_indices]!=0).sum(axis=0)
+    if self.geno_columns and mingenos:
+      colcounts0 = (self.X[:,self.geno_columns]==0).sum(axis=0)
+      colcounts1 = (self.X[:,self.geno_columns]!=0).sum(axis=0)
       colcounts  = minimum(colcounts0, colcounts1)
       if colcounts.min() < mingenos:
         return False
@@ -680,9 +686,10 @@ class LocusModelBuilder(object):
     except TypeError:
       phenos = list(phenos)
 
-    pidset            = set(p[0] for p in phenos)
-    self.geno_indices = dict( (pid,i) for i,pid in enumerate(locus_header) if pid in pidset )
-    self.phenos       = [ p for p in phenos if p[0] in self.geno_indices ]
+    pidset            = set(p[0] for p in phenos) & set(locus_header)
+    self.phenos       = np.array([ p for p in phenos if p[0] in pidset], dtype=object)
+    locus_idx         = dict( (pid,i) for i,pid in enumerate(locus_header) )
+    self.geno_indices = [ locus_idx[p[0]] for p in self.phenos ]
 
   def build_model(self,term,loci):
     genoterms    = []
@@ -710,13 +717,13 @@ class LocusModelBuilder(object):
       term += t
 
     index = 0
-    geno_indices = []
+    geno_columns = []
     for t in term.terms():
       n = len(t)
       if n:
         t.index = index
         if t.loci():
-          geno_indices.extend( range(index,index+n) )
+          geno_columns.extend( range(index,index+n) )
         index += n
 
     for t in term.expand_terms():
@@ -746,25 +753,22 @@ class LocusModelBuilder(object):
     if k != len(term):
       return None
 
-    X = []
-    y = []
-    pids = []
-    for row in self.phenos:
-      pid  = row[0]
-      stat = row[1]
+    m    = self.phenos.shape[0]
+    pids = self.phenos[:,0]
+    y    = np.array(self.phenos[:,1], dtype=float).reshape( (-1,1) )
+    X    = np.zeros( (m,k), dtype=float )
 
-      effects = term.effects(model_loci, row, self.geno_indices[pid])
-      if None in effects:
-        continue
+    i = 0
+    for effect in term.effects(model_loci, self.phenos):
+      n = effect.shape[1]
+      X[:,i:i+n] = effect
+      i += n
 
-      pids.append(pid)
-      y.append([stat])
-      X.append(effects)
+    mask = np.isfinite(X.sum(axis=1)) & np.isfinite(y.reshape(-1))
+    y = y[mask,:]
+    X = X[mask,:]
 
-    y = array(y, dtype=float)
-    X = array(X, dtype=float)
-
-    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci,pids,geno_indices)
+    return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci,pids,geno_columns)
 
 
 def variable_summary(out, x, categorical_limit=5, verbose=1):

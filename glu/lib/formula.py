@@ -112,8 +112,8 @@ def quote_ident(name):
 
 
 class PHENOTERM(TERM):
-  def effects(self, loci, phenos, i):
-    return [phenos[self.pindex]]
+  def effects(self, loci, phenos):
+    return [ phenos[:,self.pindex].reshape( (-1,1) ) ]
 
   def term_names(self, loci=None):
     return [quote_ident(self.name)]
@@ -132,8 +132,9 @@ class INTERCEPT(TERM):
   def __init__(self):
     self.name = None
 
-  def effects(self, loci, phenos, i):
-    return [1]
+  def effects(self, loci, phenos):
+    n = len(phenos)
+    return [ np.ones( (n,1), dtype=float ) ]
 
   def term_names(self, loci=None):
     return ['_intercept']
@@ -152,8 +153,9 @@ class NO_INTERCEPT(TERM):
   def __init__(self):
     self.name = None
 
-  def effects(self, loci, phenos, i):
-    return []
+  def effects(self, loci, phenos):
+    n = len(phenos)
+    return [ np.empty( (n,0), dtype=float ) ]
 
   def term_names(self, loci=None):
     return []
@@ -177,13 +179,7 @@ class NULL(GENOTERM):
   def __init__(self, name=None):
     self.name = name
 
-  def effects(self, loci, phenos, i):
-    if self.name is None:
-      return []
-
-    lmodel = loci[self.name]
-    if lmodel.genos[i] not in lmodel.genomap:
-      return [None]
+  def effects(self, loci, phenos):
     return []
 
   def term_names(self, loci=None):
@@ -197,20 +193,17 @@ class NULL(GENOTERM):
 
 
 class GENO(GENOTERM):
-  def effects(self, loci, phenos, i):
-    lmodel  = loci[self.name]
-    genomap = lmodel.genomap
-    geno    = lmodel.genos[i]
+  def effects(self, loci, phenos):
+    vals = loci[self.name].genovals
+    n    = vals.shape[0]
+    mask = ~np.isfinite(vals)
 
-    if geno not in genomap:
-      return [None]
+    genos = np.zeros( (n,2), dtype=float)
+    genos[vals==1,0] = 1
+    genos[vals==2,1] = 1
+    genos[mask]      = np.nan
 
-    genos = [0,0]
-    j = genomap[geno]
-    if j:
-      genos[j-1] = 1
-
-    return genos
+    return [ genos ]
 
   def term_names(self, loci=None):
     if loci is None or loci[self.name].genocount < 3:
@@ -227,12 +220,17 @@ class GENO(GENOTERM):
 
 
 class ADOM(GENOTERM):
-  def effects(self, loci, phenos, i):
-    lmodel  = loci[self.name]
-    geno    = lmodel.genos[i]
-    if geno not in lmodel.genomap:
-      return [None]
-    return ([0,0],[1,1],[2,0])[lmodel.genomap[geno]]
+  def effects(self, loci, phenos):
+    vals = loci[self.name].genovals
+    n    = vals.shape[0]
+    mask = ~np.isfinite(vals)
+
+    genos = np.zeros( (n,2), dtype=float)
+    genos[vals==1] = [1,1]
+    genos[vals==2] = [2,0]
+    genos[mask]    = np.nan
+
+    return [ genos ]
 
   def term_names(self, loci=None):
     if loci is None or loci[self.name].genocount < 3:
@@ -250,9 +248,8 @@ class ADOM(GENOTERM):
 
 
 class TREND(GENOTERM):
-  def effects(self, loci, phenos, i):
-    lmodel = loci[self.name]
-    return [ lmodel.genomap.get(lmodel.genos[i]) ]
+  def effects(self, loci, phenos):
+    return [ loci[self.name].genovals.reshape( (-1,1) ) ]
 
   def term_names(self, loci=None):
     if loci is None or loci[self.name].genocount < 2:
@@ -276,13 +273,11 @@ class TREND(GENOTERM):
 
 
 class DOM(GENOTERM):
-  def effects(self, loci, phenos, i):
-    lmodel  = loci[self.name]
-    genomap = lmodel.genomap
-    geno    = lmodel.genos[i]
-    if geno not in genomap:
-      return [None]
-    return [ int(genomap.get(geno)>0) ]
+  def effects(self, loci, phenos):
+    genos = loci[self.name].genovals.copy()
+    mask  = genos>0
+    genos[mask] = 1
+    return [ genos.reshape( (-1,1) ) ]
 
   def term_names(self, loci=None):
     if loci is None or loci[self.name].genocount < 2:
@@ -308,13 +303,11 @@ class DOM(GENOTERM):
 
 
 class REC(GENOTERM):
-  def effects(self, loci, phenos, i):
-    lmodel  = loci[self.name]
-    genomap = lmodel.genomap
-    geno    = lmodel.genos[i]
-    if geno not in genomap:
-      return [None]
-    return [ int(genomap.get(geno)>1) ]
+  def effects(self, loci, phenos):
+    genos = loci[self.name].genovals.copy()
+    genos[genos==1] = 0
+    genos[genos==2] = 1
+    return [ genos.reshape( (-1,1) ) ]
 
   def term_names(self, loci=None):
     if loci is None or loci[self.name].genocount < 2:
@@ -338,11 +331,8 @@ class REC(GENOTERM):
 
 
 class MISSING(GENOTERM):
-  def effects(self, loci, phenos, i):
-    if loci[self.name].genos[i]:
-      return [1]
-    else:
-      return [0]
+  def effects(self, loci, phenos):
+    return [ np.isfinite(loci[self.name].genovals).astype(float).reshape( (-1,1) ) ]
 
   def term_names(self, loci=None):
     return [quote_ident('%s:missing' % self.name)]
@@ -355,11 +345,8 @@ class MISSING(GENOTERM):
 
 
 class NOT_MISSING(GENOTERM):
-  def effects(self, loci, phenos, i):
-    if loci[self.name].genos[i]:
-      return [0]
-    else:
-      return [1]
+  def effects(self, loci, phenos):
+    return [ (~np.isfinite(loci[self.name].genovals)).astype(float).reshape( (-1,1) ) ]
 
   def term_names(self, loci=None):
     return [quote_ident('%s:not_missing' % self.name)]
@@ -413,37 +400,35 @@ class INTERACTION(COMPOUNDTERM):
     i = np.array(self.indices())
     return c[i,i]
 
-  def effects(self, loci, phenos, i):
-    results = []
+  def effects(self, loci, phenos):
+    results = None
     for term in self.subterms:
-      effects = term.effects(loci,phenos,i)
-      if None in effects:
-        return [None]
+      effects = term.effects(loci,phenos)
       if not results:
-        results = list(effects)
+        results = effects
       else:
         results = [ t1*t2 for t1 in results for t2 in effects ]
     return results
 
   def term_names(self, loci=None):
-    results = []
+    results = None
     for term in self.subterms:
       names = term.term_names(loci)
 
       if not results:
-        results.extend(names)
+        results = names
       else:
         results = [ '%s*%s' % (t1,t2) for t1 in results for t2 in names ]
 
     return results
 
   def effect_names(self, loci=None):
-    results = []
+    results = None
     for term in self.subterms:
       names = term.effect_names(loci)
 
       if not results:
-        results.extend(names)
+        results = names
       else:
         results = [ '%s*%s' % (t1,t2) for t1 in results for t2 in names ]
 
@@ -469,12 +454,10 @@ class COMBINATION(COMPOUNDTERM):
       results.extend(term.indices())
     return results
 
-  def effects(self, loci, phenos, i):
+  def effects(self, loci, phenos):
     results = []
     for term in self.subterms:
-      effects = term.effects(loci,phenos,i)
-      if None in effects:
-        return [None]
+      effects = term.effects(loci,phenos)
       results.extend(effects)
     return results
 
@@ -535,10 +518,8 @@ class FormulaParser(object):
     self.lexer  = lex.lex(module=self)
     self.parser = yacc.yacc(module=self,tabmodule=parsetab,start='formula')
 
-
   def parse(self, s):
     return self.parser.parse(s,lexer=self.lexer)
-
 
   tokens = ('ONE', 'ZERO',
             'PLUS','TIMES','EQUALS',
