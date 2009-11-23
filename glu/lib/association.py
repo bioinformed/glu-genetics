@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __abstract__  = 'library for association testing'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
@@ -12,7 +14,7 @@ from   itertools          import izip,chain
 from   collections        import defaultdict
 from   operator           import itemgetter
 
-from   numpy              import array,matrix,asarray,asanyarray,zeros, \
+from   numpy              import array,asarray,asanyarray,zeros,dot,outer, \
                                  exp,nan,abs,arange,median,inf,minimum
 
 from   glu.lib.utils      import tally
@@ -125,7 +127,7 @@ def contingency_analysis(c,mincell=5,minmargin=15):
   array([[ 0.5       ,  0.11111111],
          [ 2.        ,  0.33333333]])
   '''
-  c = asanyarray(c,dtype=int)
+  c = asarray(c,dtype=int)
 
   if not c.size:
     return nan,0,array([],dtype=float)
@@ -161,8 +163,8 @@ def contingency_analysis(c,mincell=5,minmargin=15):
   else:
     m1 = c.sum(axis=0)
     m2 = c.sum(axis=1)
-    e  = matrix(m2).T*matrix(m1)/float(sum(m1))
-    t  = float(((c-e).A**2/e).sum())
+    e  = outer(m2,m1)/m1.sum()
+    t  = ((c-e)**2/e).sum()
 
   ors = zeros( (m-1,n-1), dtype=float )
 
@@ -656,8 +658,8 @@ class LocusModel(object):
 
     # FIXME: What does mingenos mean in a world with arbitrary formulae?
     if self.geno_indices and mingenos:
-      colcounts0 = (self.X.A[:,self.geno_indices]==0).sum(axis=0)
-      colcounts1 = (self.X.A[:,self.geno_indices]!=0).sum(axis=0)
+      colcounts0 = (self.X[:,self.geno_indices]==0).sum(axis=0)
+      colcounts1 = (self.X[:,self.geno_indices]!=0).sum(axis=0)
       colcounts  = minimum(colcounts0, colcounts1)
       if colcounts.min() < mingenos:
         return False
@@ -759,8 +761,8 @@ class LocusModelBuilder(object):
       y.append([stat])
       X.append(effects)
 
-    y = matrix(y, dtype=float)
-    X = matrix(X, dtype=float)
+    y = array(y, dtype=float)
+    X = array(X, dtype=float)
 
     return LocusModel(term,y,X,self.pheno_header[1],model_names,loci,model_loci,pids,geno_indices)
 
@@ -814,9 +816,9 @@ def variable_summary(out, x, categorical_limit=5, verbose=1):
 def print_results(out,locus_model,linear_model,verbose=1):
   import scipy.stats
 
-  b     = linear_model.beta.T
-  stde  = linear_model.W.diagonal().A**.5
-  z     = b.A/stde
+  b     = linear_model.beta.reshape(-1)
+  stde  = linear_model.W.diagonal()**.5
+  z     = b/stde
   oddsr = exp(b)
   p     = 2*scipy.stats.distributions.norm.cdf(-abs(z))
 
@@ -845,8 +847,8 @@ def print_results(out,locus_model,linear_model,verbose=1):
     out.write('Variable                       Coef.   Std.Err.     OR        Z      Pr > |Z| \n')
     out.write('------------------------ ----------- ---------- ---------- ------- -----------\n')
     for k,var in enumerate(vars):
-      pv = format_pvalue(p[0,k],10)
-      out.write('%-25s %10.6f %10.6f %10.6f %7.2f %s\n' % (var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],pv))
+      pv = format_pvalue(p[k],10)
+      out.write('%-25s %10.6f %10.6f %10.6f %7.2f %s\n' % (var,b[k],stde[k],oddsr[k],z[k],pv))
     out.write('\n')
   else:
     out.write('TYPE       Variable                  Coef.   Std.Err.     OR        Z      Pr > |Z| \n')
@@ -854,8 +856,8 @@ def print_results(out,locus_model,linear_model,verbose=1):
     for i,cat in enumerate(linear_model.categories[1:]):
       for j,var in enumerate(vars):
         k = i*n+j
-        pv = format_pvalue(p[0,k],10)
-        out.write('%-10s %-20s %10.6f %10.6f %10.6f %7.2f %s\n' % (cat,var,b[0,k],stde[0,k],oddsr[0,k],z[0,k],pv))
+        pv = format_pvalue(p[k],10)
+        out.write('%-10s %-20s %10.6f %10.6f %10.6f %7.2f %s\n' % (cat,var,b[k],stde[k],oddsr[k],z[k],pv))
       out.write('\n')
 
   out.write('\n')
@@ -867,9 +869,9 @@ def print_results_linear(out,locus_model,linear_model,verbose=1):
   import scipy.stats
 
   y     = linear_model.y
-  b     = linear_model.beta.T
-  stde  = (linear_model.ss*linear_model.W.diagonal()).A**0.5
-  t     = b.A/stde
+  b     = linear_model.beta.reshape(-1)
+  stde  = (linear_model.ss*linear_model.W.diagonal())**0.5
+  t     = b/stde
   n,m   = linear_model.X.shape
   p     = 2*scipy.stats.distributions.t.cdf(-abs(t),n-m)
 
@@ -890,8 +892,8 @@ def print_results_linear(out,locus_model,linear_model,verbose=1):
   out.write('Variable                  Coef.   Std.Err.    T     Pr > |T| \n')
   out.write('------------------- ----------- ---------- ------- ----------\n')
   for i,var in enumerate(vars):
-    pv = format_pvalue(p[0,i])
-    out.write('%-20s %10.6f %10.6f %7.2f %s\n' % (var,b[0,i],stde[0,i],t[0,i],pv))
+    pv = format_pvalue(p[i])
+    out.write('%-20s %10.6f %10.6f %7.2f %s\n' % (var,b[i],stde[i],t[i],pv))
   out.write('\n')
 
 

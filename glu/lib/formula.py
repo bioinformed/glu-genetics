@@ -76,18 +76,18 @@ class TERM(object):
 
   def estimates(self,p):
     inds = np.array(self.indices())
-    return p.A[inds,0]
+    return p[inds].reshape(-1)
 
   def odds_ratios(self,p):
     return np.exp(self.estimates(p))
 
   def variance(self,c):
     inds = np.array(self.indices())
-    return c.A[inds,inds]
+    return c[inds,inds]
 
   def covariance(self,c):
     inds = np.array(self.indices())
-    return c.A[inds,:][:,inds]
+    return c[inds,:][:,inds]
 
   def standard_errors(self,c):
     return np.sqrt(self.variance(c))
@@ -127,9 +127,6 @@ class PHENOTERM(TERM):
   def indices(self):
     return [self.index]
 
-  def estimates(self,p):
-    return [p[self.index,0]]
-
 
 class INTERCEPT(TERM):
   def __init__(self):
@@ -147,8 +144,8 @@ class INTERCEPT(TERM):
   def indices(self):
     return [self.index]
 
-  def estimates(self,p):
-    return [p[self.index,0]]
+  def x_estimates(self,p):
+    return [p[self.index]]
 
 
 class NO_INTERCEPT(TERM):
@@ -268,7 +265,7 @@ class TREND(GENOTERM):
     return [self.index]
 
   def estimates(self,p):
-    return np.array([p[self.index,0],p[self.index,0]*2])
+    return np.array([p[self.index],p[self.index]*2])
 
   def variance(self,c):
     i = self.index
@@ -298,7 +295,7 @@ class DOM(GENOTERM):
     return [self.index]
 
   def estimates(self,p):
-    e = p[self.index,0]
+    e = p[self.index]
     return np.array([e,e])
 
   def variance(self,c):
@@ -330,7 +327,7 @@ class REC(GENOTERM):
     return [self.index]
 
   def estimates(self,p):
-    return np.array([0,p[self.index,0]])
+    return np.array([0,p[self.index]])
 
   def variance(self,c):
     i = self.index
@@ -407,14 +404,14 @@ class INTERACTION(COMPOUNDTERM):
     return range(self.index,self.index+len(self))
 
   # FIXME: Not correct for implicitly multi-factor terms
-  def estimates(self,p):
+  def x_estimates(self,p):
     i = np.array(self.indices())
-    return p.A[i,0]
+    return p[i]
 
   # FIXME: Not correct for implicitly multi-factor terms
-  def variance(self,c):
+  def x_variance(self,c):
     i = np.array(self.indices())
-    return c.A[i,i]
+    return c[i,i]
 
   def effects(self, loci, phenos, i):
     results = []
@@ -494,7 +491,7 @@ class COMBINATION(COMPOUNDTERM):
     return results
 
   def estimates(self,p):
-    return np.hstack(term.estimates(p) for term in self.subterms)
+    return np.hstack(term.estimates(p).reshape(-1) for term in self.subterms)
 
   def variance(self,c):
     return np.hstack(term.variance(c) for term in self.subterms)

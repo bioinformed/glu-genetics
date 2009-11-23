@@ -1,18 +1,19 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __abstract__  = 'Generalized linear models'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-from math         import pi
-from itertools    import izip
+from   math         import pi
+from   itertools    import izip
 
-# Import Python numerical libraries (from http://scipy.org/)
 import numpy as np
 
-from scipy        import linalg
-from scipy.linalg import svd,cholesky,norm,LinAlgError
+from   numpy        import dot
+from   scipy.linalg import svd,cholesky,norm,inv,schur,rsf2csf,LinAlgError
 
 CONV = 1e-8
 COND = 1e-8
@@ -27,15 +28,15 @@ def bmat2d(data):
   ...               [2.,4.,1.],
   ...               [0.,1.,4.]])
   >>> y = np.array([[1.,0.,0.],
-  ...              [0.,1.,0.],
-  ...              [0.,0.,1.]])
+  ...               [0.,1.,0.],
+  ...               [0.,0.,1.]])
   >>> bmat2d([[x,y],[y,x]])
-  matrix([[ 4.,  1.,  1.,  1.,  0.,  0.],
-          [ 2.,  4.,  1.,  0.,  1.,  0.],
-          [ 0.,  1.,  4.,  0.,  0.,  1.],
-          [ 1.,  0.,  0.,  4.,  1.,  1.],
-          [ 0.,  1.,  0.,  2.,  4.,  1.],
-          [ 0.,  0.,  1.,  0.,  1.,  4.]])
+  array([[ 4.,  1.,  1.,  1.,  0.,  0.],
+         [ 2.,  4.,  1.,  0.,  1.,  0.],
+         [ 0.,  1.,  4.,  0.,  0.,  1.],
+         [ 1.,  0.,  0.,  4.,  1.,  1.],
+         [ 0.,  1.,  0.,  2.,  4.,  1.],
+         [ 0.,  0.,  1.,  0.,  1.,  4.]])
   '''
   #n = [ d.shape[0]    for d in data[0] ]
   #m = [ d[0].shape[1] for d in data    ]
@@ -50,7 +51,7 @@ def bmat2d(data):
     for j in xrange(len(data)):
       b[i*n:(i+1)*n,:][:,j*m:(j+1)*m] = data[i][j]
 
-  return np.asmatrix(b)
+  return np.asarray(b)
 
 
 # Derived from SciPy's linalg.lstsq routine, though heavily modified and
@@ -76,12 +77,12 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Full-rank Example
   -----------------
 
-  >>> X = np.matrix([[ 0.60, 1.20, 3.90],
-  ...                [ 5.00, 4.00, 2.50],
-  ...                [ 1.00,-4.00,-5.50],
-  ...                [-1.00,-2.00,-6.50],
-  ...                [-4.20,-8.40,-4.80]])
-  >>> y = np.matrix([3, 4, -1, -5, -1]).T
+  >>> X = np.array([[ 0.60, 1.20, 3.90],
+  ...               [ 5.00, 4.00, 2.50],
+  ...               [ 1.00,-4.00,-5.50],
+  ...               [-1.00,-2.00,-6.50],
+  ...               [-4.20,-8.40,-4.80]])
+  >>> y = np.array([3, 4, -1, -5, -1]).T
 
   Least-squares Fit:
 
@@ -90,15 +91,15 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Results:
 
   >>> beta.T
-  array([[ 0.95333333, -0.84333333,  0.90666667]])
+  array([ 0.95333333, -0.84333333,  0.90666667])
   >>> ss
-  array([ 0.17])
+  0.16999999999999976
   >>> cov
   array([[ 0.06222222, -0.04222222,  0.01333333],
          [-0.04222222,  0.05444444, -0.02888889],
          [ 0.01333333, -0.02888889,  0.02666667]])
   >>> resids
-  array([ 0.34])
+  0.33999999999999952
 
   Rank, singular Values, and right-hand singular vectors:
 
@@ -114,13 +115,13 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Rank Deficient Example
   ----------------------
 
-  >>> X = np.matrix([[0.05,  0.05, 0.25, -0.25],
+  >>> X = np.array([[0.05,  0.05, 0.25, -0.25],
   ...                [0.25,  0.25, 0.05, -0.05],
   ...                [0.35,  0.35, 1.75, -1.75],
   ...                [1.75,  1.75, 0.35, -0.35],
   ...                [0.30, -0.30, 0.30,  0.30],
   ...                [0.40, -0.40, 0.40,  0.40]])
-  >>> y = np.matrix([1, 2, 3, 4, 5, 6]).T
+  >>> y = np.array([1, 2, 3, 4, 5, 6]).T
 
   Least-squares Fit:
 
@@ -129,16 +130,16 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Results:
 
   >>> beta.T
-  array([[ 4.96666667, -2.83333333,  4.56666667,  3.23333333]])
+  array([ 4.96666667, -2.83333333,  4.56666667,  3.23333333])
   >>> ss
-  array([ 0.82666667])
+  0.82666666666666699
   >>> cov
   array([[ 0.34027778, -0.15972222,  0.21527778,  0.28472222],
          [-0.15972222,  0.34027778, -0.28472222, -0.21527778],
          [ 0.21527778, -0.28472222,  0.34027778,  0.15972222],
          [ 0.28472222, -0.21527778,  0.15972222,  0.34027778]])
   >>> resids
-  array([ 2.48])
+  2.4800000000000009
 
   Rank, singular Values, and right-hand singular vectors:
 
@@ -154,12 +155,12 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Weighted Example (diagonal)
   ---------------------------
 
-  >>> X = np.matrix([[-0.57, -1.28,  -0.39],
+  >>> X = np.array([[-0.57, -1.28,  -0.39],
   ...                [-1.93,  1.08,  -0.31],
   ...                [ 2.30,  0.24,  -0.40],
   ...                [-0.02,  1.03,  -1.43]])
-  >>> y = np.matrix([1.31,-4.01,5.56,3.22]).T
-  >>> w = np.matrix([0.5,1,2,5])
+  >>> y = np.array([1.31,-4.01,5.56,3.22]).T
+  >>> w = np.array([0.5,1,2,5])
 
   Least-squares Fit:
 
@@ -168,7 +169,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Results:
 
   >>> beta.T
-  array([[ 2., -1., -3.]])
+  array([ 2., -1., -3.])
   >>> np.allclose(ss, 2.36769765e-31)
   True
   >>> cov
@@ -192,11 +193,11 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Weighted Example (general)
   ---------------------------
 
-  >>> X = np.matrix([[-0.57, -1.28,  -0.39],
+  >>> X = np.array([[-0.57, -1.28,  -0.39],
   ...                [-1.93,  1.08,  -0.31],
   ...                [ 2.30,  0.24,  -0.40],
   ...                [-0.02,  1.03,  -1.43]])
-  >>> y = np.matrix([1.31,-4.01,5.56,3.22]).T
+  >>> y = np.array([1.31,-4.01,5.56,3.22]).T
   >>> w = np.diag([0.5,1,2,5])
 
   Least-squares Fit:
@@ -206,7 +207,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   Results:
 
   >>> beta.T
-  array([[ 2., -1., -3.]])
+  array([ 2., -1., -3.])
   >>> np.allclose(ss, 2.36769765e-31)
   True
   >>> cov
@@ -309,7 +310,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   if n<m and rank==n:
     resids = (x[n:]**2).sum(axis=0)
   else:
-    resids = ((np.asarray(b)-np.dot(a1,beta))**2).sum(axis=0)
+    resids = ((b1-np.dot(a1,beta))**2).sum(axis=0)
 
   # Estimated residual variance
   if m>rank:
@@ -373,8 +374,8 @@ def sqrtm(x):
     raise ValueError('Non-matrix input to matrix function')
 
   # Refactor into complex Schur form
-  T,Z = linalg.schur(A)
-  T,Z = linalg.rsf2csf(T,Z)
+  T,Z = schur(A)
+  T,Z = rsf2csf(T,Z)
   n,n = T.shape
 
   # Compute upper triangular square root R of T a column at a tim
@@ -548,10 +549,10 @@ def bdiag_to_mat(x):
   >>> w22 = np.array([64.,25.])
   >>> w12 = np.array([-4.,-16.])
   >>> bdiag_to_mat([[w11,w12],[w12,w22]])
-  matrix([[ 16.,   0.,  -4.,   0.],
-          [  0.,  36.,   0., -16.],
-          [ -4.,   0.,  64.,   0.],
-          [  0., -16.,   0.,  25.]])
+  array([[ 16.,   0.,  -4.,   0.],
+         [  0.,  36.,   0., -16.],
+         [ -4.,   0.,  64.,   0.],
+         [  0., -16.,   0.,  25.]])
   '''
   n = len(x)
   m = [ [None]*n for i in xrange(n) ]
@@ -573,15 +574,15 @@ def bdiag_copy(x):
   >>> x=bdiag_copy(w)
   >>> w[0][0] *= 2
   >>> bdiag_to_mat(x)  # Not changed
-  matrix([[ 16.,   0.,  -4.,   0.],
-          [  0.,  36.,   0., -16.],
-          [ -4.,   0.,  64.,   0.],
-          [  0., -16.,   0.,  25.]])
+  array([[ 16.,   0.,  -4.,   0.],
+         [  0.,  36.,   0., -16.],
+         [ -4.,   0.,  64.,   0.],
+         [  0., -16.,   0.,  25.]])
   >>> bdiag_to_mat(w)  # Changed
-  matrix([[ 32.,   0.,  -4.,   0.],
-          [  0.,  72.,   0., -16.],
-          [ -4.,   0.,  64.,   0.],
-          [  0., -16.,   0.,  25.]])
+  array([[ 32.,   0.,  -4.,   0.],
+         [  0.,  72.,   0., -16.],
+         [ -4.,   0.,  64.,   0.],
+         [  0., -16.,   0.,  25.]])
   '''
   k = len(x)
   return [ [ x[i][j].copy() for j in xrange(k) ] for i in xrange(k) ]
@@ -612,19 +613,19 @@ def block_cholesky(w,lower=True):
   >>> w   = [[w11,w12],[w12,w22]]
   >>> x   = bdiag_to_mat(w)
   >>> x
-  matrix([[ 16.,   0.,  -4.,   0.],
-          [  0.,  36.,   0., -16.],
-          [ -4.,   0.,  64.,   0.],
-          [  0., -16.,   0.,  25.]])
+  array([[ 16.,   0.,  -4.,   0.],
+         [  0.,  36.,   0., -16.],
+         [ -4.,   0.,  64.,   0.],
+         [  0., -16.,   0.,  25.]])
 
   Perform a lower Cholesky decomposition on the expanded form:
 
-  >>> l = np.matrix(cholesky(x.astype(float),lower=1))
+  >>> l = np.array(cholesky(x.astype(float),lower=1))
   >>> l
-  matrix([[ 4.        ,  0.        ,  0.        ,  0.        ],
-          [ 0.        ,  6.        ,  0.        ,  0.        ],
-          [-1.        ,  0.        ,  7.93725393,  0.        ],
-          [ 0.        , -2.66666667,  0.        ,  4.22952585]])
+  array([[ 4.        ,  0.        ,  0.        ,  0.        ],
+         [ 0.        ,  6.        ,  0.        ,  0.        ],
+         [-1.        ,  0.        ,  7.93725393,  0.        ],
+         [ 0.        , -2.66666667,  0.        ,  4.22952585]])
 
   Verify x=l*l':
 
@@ -635,10 +636,10 @@ def block_cholesky(w,lower=True):
 
   >>> l2 = bdiag_to_mat(block_cholesky(w))
   >>> l2
-  matrix([[ 4.        ,  0.        ,  0.        ,  0.        ],
-          [ 0.        ,  6.        ,  0.        ,  0.        ],
-          [-1.        ,  0.        ,  7.93725393,  0.        ],
-          [ 0.        , -2.66666667,  0.        ,  4.22952585]])
+  array([[ 4.        ,  0.        ,  0.        ,  0.        ],
+         [ 0.        ,  6.        ,  0.        ,  0.        ],
+         [-1.        ,  0.        ,  7.93725393,  0.        ],
+         [ 0.        , -2.66666667,  0.        ,  4.22952585]])
 
   Verify the factorization matches the expanded version above and solves x=l*l':
 
@@ -735,19 +736,19 @@ def block_inverse_from_triangular(u,lower=True):
   >>> w   = [[w11,w12],[w12,w22]]
   >>> x   = bdiag_to_mat(w)
   >>> x
-  matrix([[ 16.,   0.,  -4.,   0.],
-          [  0.,  36.,   0., -16.],
-          [ -4.,   0.,  64.,   0.],
-          [  0., -16.,   0.,  25.]])
+  array([[ 16.,   0.,  -4.,   0.],
+         [  0.,  36.,   0., -16.],
+         [ -4.,   0.,  64.,   0.],
+         [  0., -16.,   0.,  25.]])
 
   Find the inverse using the expanded form:
 
-  >>> y = np.matrix(x).I
+  >>> y = inv(x)
   >>> y
-  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
-          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
-          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
-          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+  array([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+         [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+         [ 0.00396825,  0.        ,  0.01587302,  0.        ],
+         [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
   >>> norm(np.dot(x,y)-np.eye(4)) < 1e-14
   True
 
@@ -757,10 +758,10 @@ def block_inverse_from_triangular(u,lower=True):
   >>> l = block_cholesky(w)
   >>> z = bdiag_to_mat(block_inverse_from_triangular(l))
   >>> z
-  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
-          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
-          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
-          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+  array([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+         [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+         [ 0.00396825,  0.        ,  0.01587302,  0.        ],
+         [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
 
   Verify the solution matches above and solves x*y=I:
 
@@ -812,19 +813,19 @@ def block_inverse(w):
   >>> w   = [[w11,w12],[w12,w22]]
   >>> x   = bdiag_to_mat(w)
   >>> x
-  matrix([[ 16.,   0.,  -4.,   0.],
-          [  0.,  36.,   0., -16.],
-          [ -4.,   0.,  64.,   0.],
-          [  0., -16.,   0.,  25.]])
+  array([[ 16.,   0.,  -4.,   0.],
+         [  0.,  36.,   0., -16.],
+         [ -4.,   0.,  64.,   0.],
+         [  0., -16.,   0.,  25.]])
 
   Find the inverse using the expanded form:
 
-  >>> y = np.matrix(x).I
+  >>> y = inv(x)
   >>> y
-  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
-          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
-          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
-          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+  array([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+         [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+         [ 0.00396825,  0.        ,  0.01587302,  0.        ],
+         [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
   >>> norm(np.dot(x,y)-np.eye(4)) < 1e-14
   True
 
@@ -832,10 +833,10 @@ def block_inverse(w):
 
   >>> z = bdiag_to_mat(block_inverse(w))
   >>> z
-  matrix([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
-          [ 0.        ,  0.03881988,  0.        ,  0.02484472],
-          [ 0.00396825,  0.        ,  0.01587302,  0.        ],
-          [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
+  array([[ 0.06349206,  0.        ,  0.00396825,  0.        ],
+         [ 0.        ,  0.03881988,  0.        ,  0.02484472],
+         [ 0.00396825,  0.        ,  0.01587302,  0.        ],
+         [ 0.        ,  0.02484472,  0.        ,  0.05590062]])
 
   Verify the solution matches above and solves x*y=I:
 
@@ -849,7 +850,7 @@ def block_inverse(w):
 
 
 def grand_mean(X):
-  return np.bmat([ np.ones((len(X),1)), X ])
+  return np.bmat([ np.ones((len(X),1)), X ]).A
 
 
 def linreg(y, X, add_mean=False):
@@ -857,12 +858,12 @@ def linreg(y, X, add_mean=False):
   Full-rank Example
   -----------------
 
-  >>> X = np.matrix([[1.00,  0.60, 1.20, 3.90],
-  ...                [1.00,  5.00, 4.00, 2.50],
-  ...                [1.00,  1.00,-4.00,-5.50],
-  ...                [1.00, -1.00,-2.00,-6.50],
-  ...                [1.00, -4.20,-8.40,-4.80]])
-  >>> y = np.matrix([3, 4, -1, -5, -1]).T
+  >>> X = np.array([[1.00,  0.60, 1.20, 3.90],
+  ...               [1.00,  5.00, 4.00, 2.50],
+  ...               [1.00,  1.00,-4.00,-5.50],
+  ...               [1.00, -1.00,-2.00,-6.50],
+  ...               [1.00, -4.20,-8.40,-4.80]])
+  >>> y = np.array([3, 4, -1, -5, -1]).T
 
   Least-squares Fit:
 
@@ -871,25 +872,25 @@ def linreg(y, X, add_mean=False):
   Results:
 
   >>> beta.T
-  matrix([[ 0.1517341 ,  0.9022158 , -0.8039499 ,  0.90558767]])
+  array([ 0.1517341 ,  0.9022158 , -0.8039499 ,  0.90558767])
   >>> np.allclose(ss, 0.28901734104046217)
   True
   >>> cov
-  matrix([[ 0.4515896 , -0.15213552,  0.11721259, -0.0032113 ],
-          [-0.15213552,  0.11347499, -0.08170984,  0.01441519],
-          [ 0.11721259, -0.08170984,  0.08486762, -0.0297224 ],
-          [-0.0032113 ,  0.01441519, -0.0297224 ,  0.0266895 ]])
+  array([[ 0.4515896 , -0.15213552,  0.11721259, -0.0032113 ],
+         [-0.15213552,  0.11347499, -0.08170984,  0.01441519],
+         [ 0.11721259, -0.08170984,  0.08486762, -0.0297224 ],
+         [-0.0032113 ,  0.01441519, -0.0297224 ,  0.0266895 ]])
 
   Rank Deficient Example
   ----------------------
 
-  >>> X = np.matrix([[0.05,  0.05, 0.25, -0.25],
-  ...                [0.25,  0.25, 0.05, -0.05],
-  ...                [0.35,  0.35, 1.75, -1.75],
-  ...                [1.75,  1.75, 0.35, -0.35],
-  ...                [0.30, -0.30, 0.30,  0.30],
-  ...                [0.40, -0.40, 0.40,  0.40]])
-  >>> y = np.matrix([1, 2, 3, 4, 5, 6]).T
+  >>> X = np.array([[0.05,  0.05, 0.25, -0.25],
+  ...               [0.25,  0.25, 0.05, -0.05],
+  ...               [0.35,  0.35, 1.75, -1.75],
+  ...               [1.75,  1.75, 0.35, -0.35],
+  ...               [0.30, -0.30, 0.30,  0.30],
+  ...               [0.40, -0.40, 0.40,  0.40]])
+  >>> y = np.array([1, 2, 3, 4, 5, 6]).T
 
   Least-squares Fit (or lack thereof):
 
@@ -898,22 +899,26 @@ def linreg(y, X, add_mean=False):
   Results (not ideal due to extremely ill-conditioned design)
 
   Parameters estimates are well off
-  >>> np.allclose(beta.T, np.matrix([[ 8.0625, -8.59375, 0.421875, -2.90625 ]]))
+  >>> np.allclose(beta.T, np.array([ 9. , -8. , -1.5, -4. ]))
   True
 
   Residual variance highly inflated -- should be ~0.83
-  >>> np.allclose(ss, 12.854528808593752)
+
+  >>> np.allclose(ss, 5.9875)
   True
 
   Huge oscillating covariances, crazy negative variances
-  >>> np.allclose(cov, np.matrix([[ -1.12589991e+15,  1.12589991e+15,  1.12589991e+15,  1.12589991e+15],
-  ...                             [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15],
-  ...                             [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15],
-  ...                             [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15]]))
+  >>> np.allclose(cov, np.array([[ -1.12589991e+15,  1.12589991e+15,  1.12589991e+15,  1.12589991e+15],
+  ...                            [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15],
+  ...                            [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15],
+  ...                            [  1.12589991e+15, -1.12589991e+15, -1.12589991e+15, -1.12589991e+15]]))
   True
   '''
-  y = np.asmatrix(y,dtype=float)
-  X = np.asmatrix(X,dtype=float)
+  y = np.asarray(y,dtype=float)
+  X = np.asarray(X,dtype=float)
+
+  #if len(y.shape) == 1:
+  #  y = y[:,np.newaxis]
 
   # Add type specific means, if requested
   if add_mean:
@@ -925,9 +930,9 @@ def linreg(y, X, add_mean=False):
   # Fit using normal equations
   # FIXME: not a good idea for numerical stability when posed with
   # rank-deficient or ill-conditioned designs
-  W  = (X.T*X).I
-  b  = W*X.T*y
-  ss = ((y - X*b).A**2).sum()/(n-m)
+  W  = inv(dot(X.T,X))
+  b  = dot(W,dot(X.T,y))
+  ss = ((y - dot(X,b))**2).sum()/(n-m)
   return b,W,ss
 
 
@@ -950,9 +955,9 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   ...   row = map(float,row)
   ...   D.append(row)
 
-  >>> D=np.asmatrix(D,dtype=float)
+  >>> D=np.asarray(D,dtype=float)
 
-  Extract dependent variable (first column) and design matrix (following columns)
+  Extract dependent variable (first column) and design array (following columns)
 
   >>> y,X = D[:,0].astype(int),D[:,1:]
 
@@ -962,11 +967,11 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
 
   Compute standard errors
 
-  >>> stde = W.diagonal().A**.5
+  >>> stde = W.diagonal()**.5
 
   Compute Z-statistics
 
-  >>> z = b.T.A/stde
+  >>> z = b.T/stde
 
   Show results
 
@@ -979,7 +984,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   >>> print 'beta =',b.T
   beta = [[-6.36346994 -1.02410605  0.11904492]]
   >>> print 'stde =',stde
-  stde = [[ 3.21389766  1.17107845  0.05497905]]
+  stde = [ 3.21389766  1.17107845  0.05497905]
   >>> print 'Z =',z
   Z = [[-1.97998524 -0.87449825  2.16527797]]
   >>> print 'X2 =',z**2
@@ -990,8 +995,14 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   >>> print 'score test=%.6f df=%d' % GLogit(y,X,add_mean=True).score_test().test()
   score test=7.584906 df=2
   '''
-  y = np.asmatrix(y,dtype=int)
-  X = np.asmatrix(X,dtype=float)
+  y = np.asarray(y,dtype=int)
+  X = np.asarray(X,dtype=float)
+
+  if len(y.shape)==1:
+    y = y[:,np.newaxis]
+
+  if y.shape[0] != X.shape[0]:
+    raise ValueError('incompatible dimensions')
 
   # Add type specific means, if requested
   if add_mean:
@@ -1007,7 +1018,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   if initial_beta is not None:
     b = initial_beta
   else:
-    b = np.asmatrix(np.zeros((m,1), dtype=float))
+    b = np.zeros((m,1), dtype=float)
     b[0,0] = np.log(m1/(1-m1))
 
   # Initialize likelihood to -infinity
@@ -1015,12 +1026,12 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
 
   # Iterate until convergence
   for i in xrange(max_iterations):
-    eta1 = X*b
+    eta1 = dot(X,b)
 
     # Compute expected values and linear predictors
     e    = np.exp(eta1)
-    mu0  = 1/(1+e).A
-    mu1  = e.A*mu0
+    mu0  = 1/(1+e)
+    mu1  = e*mu0
     eta0 = np.log(mu0)
 
     # Compute likelihood
@@ -1036,14 +1047,11 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
     w = mu1 * (1-mu1)
 
     # Update regression estimates
-    z = (y - mu1)/w + eta1.A
+    z = (y - mu1)/w + eta1
     b,ss,W,resids,rank,s,vt = linear_least_squares(X,z,weights=w)
 
   else:
     raise LinAlgError('logit estimator failed to converge')
-
-  b = np.asmatrix(b,dtype=float)
-  W = np.asmatrix(W,dtype=float)
 
   # Return log-likelihood, regression estimates, and covariance matrix
   return L,b,W
@@ -1068,7 +1076,7 @@ class GLogit(object):
   ...     continue
   ...   D.append([float(f) for f in row])
 
-  >>> D=np.asmatrix(D,dtype=float)
+  >>> D=np.asarray(D,dtype=float)
 
   Extract dependent variable (first column) and design matrix (following columns)
 
@@ -1081,11 +1089,11 @@ class GLogit(object):
 
   Compute standard errors
 
-  >>> stde = W.diagonal().A**.5
+  >>> stde = W.diagonal()**.5
 
   Compute Z-statistics
 
-  >>> z = b.T.A/stde
+  >>> z = b.T/stde
 
   Show results
 
@@ -1097,8 +1105,8 @@ class GLogit(object):
   beta = [[-1.88217996  0.98705921 -0.64389914  0.88946435 -1.20321646  0.28228558
     -0.10708623 -1.79131151]]
   >>> print 'ss =',stde
-  ss = [[ 0.40248124  0.41178981  0.34356069  0.52534808  0.31897576  0.32796594
-     0.30673956  1.04647716]]
+  ss = [ 0.40248124  0.41178981  0.34356069  0.52534808  0.31897576  0.32796594
+    0.30673956  1.04647716]
   >>> print 'Z =',z
   Z = [[-4.67644149  2.39699764 -1.87419331  1.69309528 -3.77212504  0.86071615
     -0.34911126 -1.71175403]]
@@ -1116,8 +1124,11 @@ class GLogit(object):
   lr test=18.218406 df=6
   '''
   def __init__(self, y, X, ref=None, vars=None, add_mean=False, max_iterations=50):
-    y = np.asmatrix(y,dtype=int)
-    X = np.asmatrix(X,dtype=float)
+    y = np.asarray(y,dtype=int)
+    X = np.asarray(X,dtype=float)
+
+    if len(y.shape) == 1:
+      y = y[:,np.newaxis]
 
     assert y.shape[1] == 1
     assert y.shape[0] == X.shape[0]
@@ -1126,7 +1137,7 @@ class GLogit(object):
     if add_mean:
       X = grand_mean(X)
 
-    categories = np.unique(y.A.ravel())
+    categories = np.unique(y.ravel())
 
     if ref is None:
       ref = categories[0]
@@ -1171,7 +1182,7 @@ class GLogit(object):
     if initial_beta is None:
       b = []
       for i in xrange(k):
-        bi = np.asmatrix(np.zeros(m), dtype=float).T
+        bi      = np.zeros( (m,1), dtype=float)
         bi[0,0] = np.log(mu[i]/(1-mu.sum()))
         b.append(bi)
     else:
@@ -1182,7 +1193,7 @@ class GLogit(object):
 
     # Iterate until convergence
     for iteration in xrange(max_iterations):
-      eta = [ np.asarray(np.dot(X,bi)) for bi in b ]
+      eta = [ np.dot(X,bi) for bi in b ]
 
       # Compute expected values and linear predictors
       mu0  = 1/(1+np.exp(eta).sum(axis=0))
@@ -1216,8 +1227,6 @@ class GLogit(object):
 
       # Update model fit
       beta,ss,W,resids,rank,s,vt = linear_least_squares(XX,zz,cond=COND)
-      beta = np.asmatrix(beta,dtype=float)
-      W    = np.asmatrix(W,dtype=float)
       b    = np.vsplit(beta,k)
 
     else:
@@ -1283,7 +1292,7 @@ class GLogit(object):
     # This is cheaper than computing the full SVD of X, since U is not required
     _,_,W,_,_,_,_ = linear_least_squares(XX,np.ones( (XX.shape[0],1) ))
 
-    return np.asmatrix(W)
+    return W
 
 
   def dependent_vector(self,mu,eta,iw,uw):
@@ -1294,9 +1303,9 @@ class GLogit(object):
     '''
     k  = len(iw)
     y  = self.y_ord
-    yy = [ ((y==i+1) - mu[i]).A.reshape(-1) for i in xrange(k) ]
+    yy = [ ((y==i+1) - mu[i]).reshape(-1) for i in xrange(k) ]
     zz = [ [eta[i]+np.sum((iw[i][j]*yy[j]) for j in xrange(k)).reshape(-1,1)] for i in xrange(k) ]
-    return np.bmat([ [np.sum(uw[i][j]*zz[j][0].T for j in xrange(i,k)).T] for i in xrange(k) ])
+    return np.bmat([ [np.sum(uw[i][j]*zz[j][0].T for j in xrange(i,k)).T] for i in xrange(k) ]).A
 
 
   def design_matrix(self,uw):
@@ -1311,7 +1320,7 @@ class GLogit(object):
     XX = [ [z]*k for i in xrange(k) ]
     for i in xrange(k):
       for j in xrange(i,k):
-        XX[i][j] = (uw[i][j]*X.T.A).T
+        XX[i][j] = (uw[i][j]*X.T).T
     return bmat2d(XX)
 
 
@@ -1354,8 +1363,8 @@ class GLogitScoreTest(object):
 
     # Augment null beta with zeros for all parameters to be tested
     null_indices = (i for i in xrange(n*k) if i not in indices)
-    beta = np.asmatrix(np.zeros((X.shape[1]*k,1), dtype=float))
-    for b,i in izip(self.null.beta.A.ravel(),null_indices):
+    beta = np.zeros((X.shape[1]*k,1), dtype=float)
+    for b,i in izip(self.null.beta.ravel(),null_indices):
       beta[i,0] = b
 
     self.beta    = beta
@@ -1377,12 +1386,12 @@ class GLogitScoreTest(object):
     # using the estimates under the null
     b = np.vsplit(self.beta,k)
 
-    eta = [ X*bi for bi in b ]
+    eta = [ dot(X,bi) for bi in b ]
 
     # Compute expected values and linear predictors
-    mu0  = 1/(1+np.sum(np.exp(etai) for etai in eta)).A
-    eta0 = np.log(mu0)
-    mu   = [ np.exp(eta[i]).A*mu0 for i in xrange(k) ]
+    mu0  = 1/(1+np.sum(np.exp(etai) for etai in eta))
+    #eta0 = np.log(mu0)
+    mu   = [ np.exp(eta[i])*mu0 for i in xrange(k) ]
 
     # Form weights and blocks of the expected information matrix
     self.w = self.model.update_weights(mu)
@@ -1391,27 +1400,26 @@ class GLogitScoreTest(object):
     self.W = self.model.covariance_matrix(self.w)
 
     # Compute scores
-    self.scores = np.bmat([ (y==i+1) - mu[i] for i in xrange(k) ])
+    self.scores = np.bmat([ (y==i+1) - mu[i] for i in xrange(k) ]).A
 
 
   def test(self):
     scores  = self.scores
     indices = self.indices
     W       = self.W
-    m       = len(scores)
     df      = len(indices)
     X       = self.model.X
     n       = X.shape[1]
 
     # Compute score vectors with the full design matrix
     indices = np.array(indices, dtype=int)
-    s       = np.asmatrix(( X[:,indices%n].A*scores[:,indices//n].A ).sum(axis=0))
+    s       = (X[:,indices%n]*scores[:,indices//n]).sum(axis=0)
 
     # Extract the covariance matrix of the score parameters
     V = W.take(indices,axis=0).take(indices,axis=1)
 
     # Compute score test statistic
-    x2 = float((s*V*s.T)[0,0])
+    x2 = float(dot(s,dot(V,s.T)))
 
     return x2,df
 
@@ -1453,13 +1461,12 @@ class GLogitWaldTest(object):
   def test(self):
     indices = self.indices
     beta    = self.model.beta
-    W       = self.model.W
     df      = len(indices)
 
     # FIXME: Use robust inverse of covariance matrix
     b  = beta[indices,:]
-    w  = self.model.covariance_matrix(self.model.weights)[indices,:][:,indices].I
-    x2 = float((b.T*w*b)[0,0])
+    w  = inv(self.model.covariance_matrix(self.model.weights)[indices,:][:,indices])
+    x2 = float(dot(b.T,dot(w,b)))
 
     return x2,df
 
@@ -1507,12 +1514,12 @@ class Linear(object):
   Full-rank Example
   -----------------
 
-  >>> X = np.matrix([[ 0.60, 1.20, 3.90],
+  >>> X = np.array([[ 0.60, 1.20, 3.90],
   ...                [ 5.00, 4.00, 2.50],
   ...                [ 1.00,-4.00,-5.50],
   ...                [-1.00,-2.00,-6.50],
   ...                [-4.20,-8.40,-4.80]])
-  >>> y = np.matrix([3, 4, -1, -5, -1]).T
+  >>> y = np.array([3, 4, -1, -5, -1]).T
 
   Least-squares Fit:
 
@@ -1521,11 +1528,11 @@ class Linear(object):
 
   Results:
 
-  >>> np.allclose(l.beta.T, np.matrix([[ 0.1517341 ,  0.9022158 , -0.8039499 ,  0.90558767]]))
+  >>> np.allclose(l.beta.T, np.array([[ 0.1517341 ,  0.9022158 , -0.8039499 ,  0.90558767]]))
   True
   >>> np.allclose(l.ss,0.28901734104046128)
   True
-  >>> np.allclose(l.W, np.matrix([[ 0.4515896 , -0.15213552,  0.11721259, -0.0032113 ],
+  >>> np.allclose(l.W, np.array([[ 0.4515896 , -0.15213552,  0.11721259, -0.0032113 ],
   ...                          [-0.15213552,  0.11347499, -0.08170984,  0.01441519],
   ...                          [ 0.11721259, -0.08170984,  0.08486762, -0.0297224 ],
   ...                          [-0.0032113 ,  0.01441519, -0.0297224 ,  0.0266895 ]]))
@@ -1545,8 +1552,7 @@ class Linear(object):
 
   >>> import rpy
   >>> rpy.set_default_mode(rpy.NO_CONVERSION)
-  >>> X,y=X.A,y.A
-  >>> data = rpy.r.data_frame(x1=X[:,0],x2=X[:,1],x3=X[:,2],y=y[:,0])
+  >>> data = rpy.r.data_frame(x1=X[:,0],x2=X[:,1],x3=X[:,2],y=y)
   >>> linear_model = rpy.r.lm(rpy.r("y ~ x1+x2+x3"), data=data)
   >>> null_model   = rpy.r.lm(rpy.r("y ~ 1"), data=data)
   >>> rpy.set_default_mode(rpy.BASIC_CONVERSION)
@@ -1568,13 +1574,13 @@ class Linear(object):
   Rank Deficient Example
   ----------------------
 
-  >>> X = np.matrix([[0.05,  0.05, 0.25, -0.25],
+  >>> X = np.array([[0.05,  0.05, 0.25, -0.25],
   ...                [0.25,  0.25, 0.05, -0.05],
   ...                [0.35,  0.35, 1.75, -1.75],
   ...                [1.75,  1.75, 0.35, -0.35],
   ...                [0.30, -0.30, 0.30,  0.30],
   ...                [0.40, -0.40, 0.40,  0.40]])
-  >>> y = np.matrix([1, 2, 3, 4, 5, 6]).T
+  >>> y = np.array([1, 2, 3, 4, 5, 6]).T
 
   Least-squares Fit:
 
@@ -1583,11 +1589,11 @@ class Linear(object):
 
   Results:
 
-  >>> np.allclose(l.beta.T, np.matrix([[ 1.18918919,  3.81711712, -2.31801802,  3.41711712,  2.71801802]]))
+  >>> np.allclose(l.beta.T, np.array([[ 1.18918919,  3.81711712, -2.31801802,  3.41711712,  2.71801802]]))
   True
   >>> np.allclose(l.ss, 0.19351351351351354)
   True
-  >>> np.allclose(l.W, np.matrix([[ 0.67567568, -0.65315315,  0.29279279, -0.65315315, -0.29279279],
+  >>> np.allclose(l.W, np.array([[ 0.67567568, -0.65315315,  0.29279279, -0.65315315, -0.29279279],
   ...                          [-0.65315315,  0.97165916, -0.44275526,  0.84665916,  0.56775526],
   ...                          [ 0.29279279, -0.44275526,  0.46715465, -0.56775526, -0.34215465],
   ...                          [-0.65315315,  0.84665916, -0.56775526,  0.97165916,  0.44275526],
@@ -1600,7 +1606,7 @@ class Linear(object):
 
   >>> np.allclose(l.score_test().test(), (4.889421,4))
   True
-  >>> np.allclose(l.wald_test().test(), (-164.02162162162182, 4))
+  >>> np.allclose(l.wald_test().test(), (-201.10990990991002, 4))
   True
   >>> np.allclose(l.lr_test().test(), (22.868770,4))
   True
@@ -1611,8 +1617,7 @@ class Linear(object):
   obvious):
 
   >>> rpy.set_default_mode(rpy.NO_CONVERSION)
-  >>> X,y=X.A,y.A
-  >>> data = rpy.r.data_frame(x1=X[:,0],x2=X[:,1],x3=X[:,2],x4=X[:,3],y=y[:,0])
+  >>> data = rpy.r.data_frame(x1=X[:,0],x2=X[:,1],x3=X[:,2],x4=X[:,3],y=y)
   >>> linear_model = rpy.r.lm(rpy.r("y ~ x1+x2+x3+x4"), data=data)
   >>> null_model   = rpy.r.lm(rpy.r("y ~ 1"), data=data)
   >>> rpy.set_default_mode(rpy.BASIC_CONVERSION)
@@ -1632,8 +1637,11 @@ class Linear(object):
   22.8687697922
   '''
   def __init__(self, y, X, vars=None, add_mean=False):
-    y = np.asmatrix(y,dtype=float)
-    X = np.asmatrix(X,dtype=float)
+    y = np.asarray(y,dtype=float)
+    X = np.asarray(X,dtype=float)
+
+    if len(y.shape) == 1:
+      y = y[:,np.newaxis]
 
     assert y.shape[1] == 1
     assert y.shape[0] == X.shape[0]
@@ -1666,8 +1674,8 @@ class Linear(object):
     L      = -(n/2.)*(1+np.log(2*pi)-np.log(n)+np.log(resids.sum()))
 
     self.L      = L
-    self.beta   = np.asmatrix(beta,dtype=float)
-    self.W      = np.asmatrix(W,dtype=float)
+    self.beta   = beta
+    self.W      = W
     self.ss     = ss.sum()
     self.resids = resids.sum()
     self.rank   = rank
@@ -1706,14 +1714,14 @@ class LinearScoreTest(object):
     self.null.fit()
 
     # Augment null beta with zeros for all parameters to be tested
-    beta = np.asmatrix(np.zeros((n,1), dtype=float))
-    for b,i in izip(self.null.beta.A.ravel(),null_indices):
+    beta = np.zeros((n,1), dtype=float)
+    for b,i in izip(self.null.beta.ravel(),null_indices):
       beta[i,0] = b
 
     self.model   = model
     self.beta    = beta
     self.indices = indices
-    self.scores  = model.y - X*beta
+    self.scores  = model.y - dot(X,beta)
 
 
   def test(self):
@@ -1726,13 +1734,13 @@ class LinearScoreTest(object):
 
     # Compute score vectors with the full design matrix
     indices = np.asarray(indices, dtype=int)
-    s = np.asmatrix(( X[:,indices].A*scores.A ).sum(axis=0))
+    s = (X[:,indices]*scores).sum(axis=0)
 
     # Extract the covariance matrix of the score parameters
     V = W[indices,:][:,indices]/ss
 
     # Compute score test statistic
-    x2 = float((s*V*s.T)[0,0])
+    x2 = float(dot(s,dot(V,s.T)))
 
     return x2,df
 
@@ -1773,8 +1781,8 @@ class LinearWaldTest(object):
 
     # FIXME: Use robust inverse of covariance matrix
     b  = beta[indices,:]
-    w  = self.model.W[indices,:][:,indices].I/ss
-    x2 = float((b.T*w*b)[0,0])
+    w  = inv(W[indices,:][:,indices])/ss
+    x2 = float(dot(b.T,dot(w,b)))
 
     return x2,df
 

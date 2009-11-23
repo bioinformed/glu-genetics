@@ -5,4 +5,4 @@ __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Departmen
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-from glu.lib.glm.glm import *
+from glu.lib.glm.glm import linear_least_squares, linreg, logit, GLogit, Linear, LinAlgError

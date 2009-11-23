@@ -101,8 +101,8 @@ def check_R(model,g):
   from   numpy import array,allclose
 
   vars = [ v.replace(':','.').replace('+','p').replace('-','m').replace('_','.') for v in model.vars[1:] ]
-  frame = dict( (v,model.X[:,i+1].A.reshape(-1)) for i,v in enumerate(vars) )
-  frame['y'] = model.y.A.reshape(-1)
+  frame = dict( (v,model.X[:,i+1].reshape(-1)) for i,v in enumerate(vars) )
+  frame['y'] = model.y.reshape(-1)
   formula = 'y ~ ' + ' + '.join(v.replace(':','.') for v in vars)
 
   rpy.set_default_mode(rpy.NO_CONVERSION)
@@ -112,9 +112,9 @@ def check_R(model,g):
 
   coef  = r.coefficients(mod)
   coef  = array([coef['(Intercept)']] + [ coef[v] for v in vars ],dtype=float)
-  coef2 = g.beta.A.reshape(-1)
+  coef2 = g.beta.reshape(-1)
 
-  #assert allclose(coef,g.beta.A.reshape(-1),atol=1e-6)
+  #assert allclose(coef,g.beta.reshape(-1),atol=1e-6)
   #assert allclose(r.vcov(mod),g.W,atol=1e-6)
 
 

@@ -103,8 +103,8 @@ def check_R(model,g):
   from   numpy import array,allclose
 
   vars = [ v.replace(':','.').replace('+','p').replace('-','m').replace('_','.') for v in model.vars[1:] ]
-  frame = dict( (v,model.X[:,i+1].A.reshape(-1)) for i,v in enumerate(vars) )
-  frame['y'] = model.y.A.reshape(-1)
+  frame = dict( (v,model.X[:,i+1].reshape(-1)) for i,v in enumerate(vars) )
+  frame['y'] = model.y.reshape(-1)
   formula = 'y ~ ' + ' + '.join(v.replace(':','.') for v in vars)
 
   rpy.set_default_mode(rpy.NO_CONVERSION)
@@ -114,9 +114,9 @@ def check_R(model,g):
 
   coef  = r.coefficients(mod)
   coef  = array([coef['(Intercept)']] + [ coef[v] for v in vars ],dtype=float)
-  coef2 = g.beta.A.reshape(-1)
+  coef2 = g.beta.reshape(-1)
 
-  #assert allclose(coef,g.beta.A.reshape(-1),atol=1e-6)
+  #assert allclose(coef,g.beta.reshape(-1),atol=1e-6)
   #assert allclose(r.vcov(mod),g.W,atol=1e-6)
 
 
@@ -244,7 +244,7 @@ def main():
 
     counts = zeros( (len(null.categories),3), dtype=int )
     if len(base.y.flat) and len(base.X.flat):
-      for pheno,geno in izip(base.y.A[:,0],base.X.A[:,0]):
+      for pheno,geno in izip(base.y[:,0],base.X[:,0]):
         counts[pheno,geno] += 1
 
     mafs = (counts*[0.,0.5,1.]).sum(axis=1)/counts.sum(axis=1)
