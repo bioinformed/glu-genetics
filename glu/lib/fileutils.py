@@ -1917,7 +1917,7 @@ def cook_table(table, options):
     header,table = create_categorical_variables(header,table,options.categorical)
 
   if getattr(options, 'columnexpr', None):
-    header,table = column_exprs(header,table,options.filterexpr)
+    header,table = column_exprs(header,table,options.columnexpr)
 
   if getattr(options,'includevar',None) or getattr(options,'excludevar',None):
     header,table = subset_variables(header,table,options.includevar,options.excludevar)
@@ -2239,7 +2239,7 @@ def subset_variables(header,data,include=None,exclude=None):
   return header,data
 
 
-def column_exprs(header,data,exprs,use_globals=None):
+def column_exprs(header,data,exprs,env=None):
   '''
   Create a new column based on a Python expression.
 
@@ -2248,7 +2248,7 @@ def column_exprs(header,data,exprs,use_globals=None):
   ...           ['2','F','' ],
   ...           ['3','?','1']]
 
-  >>> h,d = column_exprs(header,data,"d=1 if fields[a] in ('1','2') else 0")
+  >>> h,d = column_exprs(header,data,"d=1 if a in ('1','2') else 0")
   >>> h
   ['a', 'b', 'c', 'd']
   >>> for row in d:
@@ -2257,7 +2257,7 @@ def column_exprs(header,data,exprs,use_globals=None):
   ['2', 'F', '', '1']
   ['3', '?', '1', '0']
 
-  >>> h,d = column_exprs(header,data,["d=int(fields[a])**2","e=1 if fields[a] in ('1','2') else 0"])
+  >>> h,d = column_exprs(header,data,["d=int(a)**2","e=1 if a in ('1','2') else 0"])
   >>> h
   ['a', 'b', 'c', 'd', 'e']
   >>> for row in d:
@@ -2273,15 +2273,16 @@ def column_exprs(header,data,exprs,use_globals=None):
 
   for cexpr in exprs:
     var,expr = cexpr.split('=',1)
-    header,data = column_expr(header,data,var,expr,use_globals)
+    header,data = column_expr(header,data,var,expr,env)
 
   return header,data
 
 
-def _make_expr_env(header,use_globals=None):
-  use_globals = use_globals or {'__builtins__':__builtins__}
-  indices     = use_globals['indices'] = {}
-  counts      = tally(header)
+def _make_expr_env(code,header,env=None):
+  env     = env or {'__builtins__':__builtins__}
+  indices = env['indices'] = {}
+  counts  = tally(header)
+  headers = {}
 
   for i,h in enumerate(header):
     if counts[h] == 1:
@@ -2301,12 +2302,14 @@ def _make_expr_env(header,use_globals=None):
         if h in counts:
           continue
 
-      use_globals[h] = i
+      headers[h] = i
 
-  return use_globals
+  fields = [ (name,headers[name]) for name in code.co_names if name in headers ]
+
+  return env,fields
 
 
-def column_expr(header,data,column,expr,use_globals=None):
+def column_expr(header,data,column,expr,env=None):
   '''
   Create a new column based on a Python expression.
 
@@ -2315,7 +2318,7 @@ def column_expr(header,data,column,expr,use_globals=None):
   ...           ['2','F','' ],
   ...           ['3','?','1']]
 
-  >>> h,d = column_expr(header,data,'d',"1 if fields[a] in ('1','2') else 0")
+  >>> h,d = column_expr(header,data,'d',"1 if a in ('1','2') else 0")
   >>> h
   ['a', 'b', 'c', 'd']
   >>> for row in d:
@@ -2324,7 +2327,7 @@ def column_expr(header,data,column,expr,use_globals=None):
   ['2', 'F', '', '1']
   ['3', '?', '1', '0']
 
-  >>> h,d = column_expr(header,data,'d',"(int(fields[a])+2)**2")
+  >>> h,d = column_expr(header,data,'d',"(int(a)+2)**2")
   >>> h
   ['a', 'b', 'c', 'd']
   >>> for row in d:
@@ -2333,20 +2336,25 @@ def column_expr(header,data,column,expr,use_globals=None):
   ['2', 'F', '', '16']
   ['3', '?', '1', '25']
   '''
-  code        = compile(expr,'<expression: %s>' % expr, 'eval')
-  use_globals = _make_expr_env(header,use_globals)
+  code       = compile(expr,'<expression: %s>' % expr, 'eval')
+  env,fields = _make_expr_env(code,header,env)
 
-  def _column_expr(data, code, use_globals):
+  def _column_expr(data, code, fields, env):
     for row in data:
-      use_globals['fields'] = row
-      result = eval(code, use_globals)
+      # Create environment bindings
+      env['fields'] = row
+      for name,index in fields:
+        env[name] = row[index]
+
+      result = eval(code, env)
+
       yield row + [str(result)]
 
   header = header + [column]
-  return header,_column_expr(data, code, use_globals)
+  return header,_column_expr(data, code, fields, env)
 
 
-def filter_expr(header,data,expr,use_globals=None):
+def filter_expr(header,data,expr,env=None):
   '''
   Subset rows of a table based on a Python expression that evaluates to True
   or False.  Only rows that evaluate to True are retained.
@@ -2356,7 +2364,7 @@ def filter_expr(header,data,expr,use_globals=None):
   ...           ['2','F','' ],
   ...           ['3','?','1']]
 
-  >>> h,d = filter_expr(header,data,"fields[a] in ('1','2')")
+  >>> h,d = filter_expr(header,data,"a in ('1','2')")
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
@@ -2364,21 +2372,21 @@ def filter_expr(header,data,expr,use_globals=None):
   ['1', 'M', '']
   ['2', 'F', '']
 
-  >>> h,d = filter_expr(header,data,"int(fields[a]) <= 2 and fields[b]=='M'")
+  >>> h,d = filter_expr(header,data,"int(a) <= 2 and b=='M'")
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
   ...   print row
   ['1', 'M', '']
 
-  >>> h,d = filter_expr(header,data,["int(fields[a]) <= 2","fields[b]=='M'"])
+  >>> h,d = filter_expr(header,data,["int(a) <= 2","b=='M'"])
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
   ...   print row
   ['1', 'M', '']
 
-  >>> h,d = filter_expr(header,data,"fields[b]!='?'")
+  >>> h,d = filter_expr(header,data,"b!='?'")
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
@@ -2386,14 +2394,14 @@ def filter_expr(header,data,expr,use_globals=None):
   ['1', 'M', '']
   ['2', 'F', '']
 
-  >>> h,d = filter_expr(header,data,"fields[c]")
+  >>> h,d = filter_expr(header,data,"c")
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
   ...   print row
   ['3', '?', '1']
 
-  >>> h,d = filter_expr(header,data,"not fields[c]")
+  >>> h,d = filter_expr(header,data,"not c")
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
@@ -2409,7 +2417,7 @@ def filter_expr(header,data,expr,use_globals=None):
   ['1', 'M', '']
   ['2', 'F', '']
 
-  >>> h,d = filter_expr(header,data,"fields[c]")
+  >>> h,d = filter_expr(header,data,"c")
   >>> h
   ['a', 'b', 'c']
   >>> for row in d:
@@ -2417,18 +2425,22 @@ def filter_expr(header,data,expr,use_globals=None):
   ['3', '?', '1']
   '''
   if not is_str(expr):
-    expr      = ' and '.join('(%s)' % e for e in expr)
+    expr     = ' and '.join('(%s)' % e for e in expr)
 
-  code        = compile(expr,'<expression: %s>' % expr, 'eval')
-  use_globals = _make_expr_env(header,use_globals)
+  code       = compile(expr,'<expression: %s>' % expr, 'eval')
+  env,fields = _make_expr_env(code,header,env)
 
-  def _filter_expr(data, code, use_globals):
+  def _filter_expr(data, code, fields, env):
     for row in data:
-      use_globals['fields'] = row
-      if eval(code, use_globals):
+      # Create environment bindings
+      env['fields'] = row
+      for name,index in fields:
+        env[name] = row[index]
+
+      if eval(code, env):
         yield row
 
-  return header,_filter_expr(data, code, use_globals)
+  return header,_filter_expr(data, code, fields, env)
 
 
 def create_categorical_variable(header,data,variable,prefix=None,ref=None,include=None,exclude=None,
