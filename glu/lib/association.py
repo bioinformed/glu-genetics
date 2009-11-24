@@ -692,6 +692,9 @@ class LocusModelBuilder(object):
     self.geno_indices = [ locus_idx[p[0]] for p in self.phenos ]
 
   def build_model(self,term,loci):
+    if not len(self.phenos):
+      return None
+
     genoterms    = []
     phenoterms   = []
     interactions = []
