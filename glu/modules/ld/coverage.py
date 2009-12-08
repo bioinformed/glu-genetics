@@ -92,7 +92,7 @@ def main():
 
   exclude = set()
 
-  tags = set(list_reader(args[0][1]))
+  tags = set(list_reader(args[0]))
 
   args = args[1:]
 
