@@ -35,8 +35,8 @@ def admixture_log_likelihood_python(f,x):
   ...               [0.75, 0.25, 0.25]])
   >>> x = np.array([0.25, 0.50, 0.25])
 
-  >>> admixture_log_likelihood_python(f,x)
-  -3.6150156523923886
+  >>> np.allclose(admixture_log_likelihood_python(f,x), -3.6150156523923)
+  True
   '''
   return np.log(np.dot(f,x)).sum()
 
@@ -50,8 +50,9 @@ def admixture_log_likelihood_derivative_python(f,x):
   ...               [0.75, 0.25, 0.25]])
   >>> x = np.array([0.25, 0.50, 0.25])
 
-  >>> admixture_log_likelihood_derivative_python(f,x)
-  array([ 4.80952381,  4.78571429,  5.61904762])
+  >>> d=admixture_log_likelihood_derivative_python(f,x)
+  >>> np.allclose(d, [ 4.80952381,  4.78571429,  5.61904762])
+  True
   '''
   return (f/np.dot(f,x)[:,np.newaxis]).sum(axis=0)
 
@@ -71,11 +72,13 @@ try:
     ...               [0.25, 0.50, 0.50],
     ...               [0.75, 0.25, 0.25]])
     >>> x = np.array([0.25, 0.50, 0.25])
-    >>> admixture_log_likelihood_c(f,x)
-    -3.6150156523923886
 
-    >>> admixture_log_likelihood_derivative_c(f,x)
-    array([ 4.80952381,  4.78571429,  5.61904762])
+    >>> np.allclose(admixture_log_likelihood_c(f,x), -3.6150156523923)
+    True
+
+    >>> d=admixture_log_likelihood_derivative_c(f,x)
+    >>> np.allclose(d, [ 4.80952381,  4.78571429,  5.61904762])
+    True
     '''
 
 except ImportError:
