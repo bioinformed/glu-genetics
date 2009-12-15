@@ -15,7 +15,7 @@ from   collections        import defaultdict
 from   operator           import itemgetter
 
 import numpy as np
-from   numpy              import array,asarray,asanyarray,zeros,dot,outer, \
+from   numpy              import array,asarray,asanyarray,zeros,outer, \
                                  exp,nan,abs,arange,median,inf,minimum
 
 from   glu.lib.utils      import tally
