@@ -292,7 +292,7 @@ def read_Illumina_IDAT(filename):
   version, = struct.unpack('<L', idat.read(4))
 
   if version != 3:
-    raise ValueError('Invalid IDAT version number: %d' % version)
+    return dict(filename=filename,version=version)
 
   unknown0,field_count = struct.unpack('<LL', idat.read(8))
 
@@ -435,6 +435,12 @@ def read_Illumina_IDAT(filename):
       print '  code_version:',code_version
 
     print
+
+  return dict(filename=filename, version=version, offset=unknown0,snp_count=snp_count,
+              illumina_ids=illumina_ids,sds=sds,means=means,bead_counts=bead_counts,midblock=midblock,
+              red_green=red_green,manifest=manifest,barcode=barcode,format=format,label=label,
+              opa=opa,sampleid=sampleid,descr=descr,plate=plate,well=well,unknown3=unknown3,
+              runinfo=runinfo)
 
 
 def read_Illumina_LBD(filename,options):
