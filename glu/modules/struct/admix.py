@@ -26,6 +26,63 @@ ABSTOL=1e-6
 RELTOL=1e-9
 
 
+def admixture_log_likelihood_python(f,x):
+  '''
+  >>> f = np.array([[0.25, 0.50, 0.25],
+  ...               [0.50, 0.25, 1.00],
+  ...               [0.50, 1.00, 1.00],
+  ...               [0.25, 0.50, 0.50],
+  ...               [0.75, 0.25, 0.25]])
+  >>> x = np.array([0.25, 0.50, 0.25])
+
+  >>> admixture_log_likelihood_python(f,x)
+  -3.6150156523923886
+  '''
+  return np.log(np.dot(f,x)).sum()
+
+
+def admixture_log_likelihood_derivative_python(f,x):
+  '''
+  >>> f = np.array([[0.25, 0.50, 0.25],
+  ...               [0.50, 0.25, 1.00],
+  ...               [0.50, 1.00, 1.00],
+  ...               [0.25, 0.50, 0.50],
+  ...               [0.75, 0.25, 0.25]])
+  >>> x = np.array([0.25, 0.50, 0.25])
+
+  >>> admixture_log_likelihood_derivative_python(f,x)
+  array([ 4.80952381,  4.78571429,  5.61904762])
+  '''
+  return (f/np.dot(f,x)[:,np.newaxis]).sum(axis=0)
+
+
+try:
+  from glu.modules.struct._admix import admixture_log_likelihood as admixture_log_likelihood_c, \
+                                        admixture_log_likelihood_derivative as admixture_log_likelihood_derivative_c
+
+  admixture_log_likelihood = admixture_log_likelihood_c
+  admixture_log_likelihood_derivative = admixture_log_likelihood_derivative_c
+
+  def test_admixture_log_likelihood():
+    '''
+    >>> f = np.array([[0.25, 0.50, 0.25],
+    ...               [0.50, 0.25, 1.00],
+    ...               [0.50, 1.00, 1.00],
+    ...               [0.25, 0.50, 0.50],
+    ...               [0.75, 0.25, 0.25]])
+    >>> x = np.array([0.25, 0.50, 0.25])
+    >>> admixture_log_likelihood_c(f,x)
+    -3.6150156523923886
+
+    >>> admixture_log_likelihood_derivative_c(f,x)
+    array([ 4.80952381,  4.78571429,  5.61904762])
+    '''
+
+except ImportError:
+  admixture_log_likelihood = admixture_log_likelihood_python
+  admixture_log_likelihood_derivative = admixture_log_likelihood_derivative_python
+
+
 def estimate_admixture_em(f,x0=None,iters=100):
   '''
   Problem: Maximize a likelihood to determine mixing proportions a series of
@@ -54,14 +111,13 @@ def estimate_admixture_em(f,x0=None,iters=100):
   n,k = f.shape
 
   if x0 is None:
-    x = np.ones((k,))/k
+    x = np.ones(k)/k
   else:
     # Ensure we copy, since iterations update x in place
     x = np.array(x0)
 
   for i in xrange(iters):
-    u  = np.dot(f,x)[:,np.newaxis]
-    x *= (f/u).sum(axis=0)/n
+    x *= admixture_log_likelihood_derivative(f,x)/n
 
   return x
 
@@ -102,8 +158,8 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
   x0  = matrix(x0)
 
   # Precompute cross-products of population frequencies (columns of f) for the Hessian
-  ff = [ [ f[:,i][:,np.newaxis]*f[:,j][:,np.newaxis] if i>=j else 0 for j in range(k) ]
-                                                                    for i in range(k) ]
+  ff = [ [ (f[:,i]*f[:,j])[:,np.newaxis] if i>=j else 0 for j in range(k) ]
+                                                        for i in range(k) ]
 
   # Store last function values, since the solver seems to want to
   # re-evaluate them several times
@@ -117,7 +173,7 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
       return 0,x0
 
     # Do not check constraints or else optimization will often get "stuck"
-    x = np.asarray(x, dtype=float)
+    x = np.asarray(x, dtype=float).reshape(-1)
 
     # Check to see if we've just solved this case
     if last:
@@ -132,23 +188,24 @@ def estimate_admixture_cvxopt(f, x0, maxiters=25, failover=True):
     iters[0] += 1
 
     # Compute mixture probabilities and log-likelihood
-    u  =  np.dot(f,x)
-    l  = -np.log(u).sum()
+    l  = -admixture_log_likelihood(f,x)
 
     if not np.isfinite(l):
       return None
 
     # Compute derivatives
-    df = matrix( -(f/u).sum(axis=0), tc='d').T
+    df = -admixture_log_likelihood_derivative(f,x)
+    df = matrix(df, tc='d').T
 
     if z is None:
       last[:] = [x+0,None,l,df,None]
       return l,df
 
     # Compute Hessian, if requested
-    u2 = u**2
-    h  = matrix([ [ z[0]*(ff[i][j]/u2).sum() if i>=j else 0 for i in range(k) ]
-                                                            for j in range(k) ], tc='d')
+    u2 = (np.dot(f,x)**2)[:,np.newaxis]
+    h  = [ [ z[0]*(ff[i][j]/u2).sum() if i>=j else 0 for i in range(k) ]
+                                                     for j in range(k) ]
+    h  = matrix(h, tc='d')
 
     last[:] = [x+0,z[0],l,df,h]
     return l,df,h
@@ -224,23 +281,15 @@ def estimate_admixture_sqp(f, x0, failover=True):
     # Do not check constraints or else optimization will often get "stuck"
     iters[0] += 1
 
-    u =  np.dot(f,x)
-    l = -np.log(u).sum()
+    l = -admixture_log_likelihood(f,x)
 
     if not np.isfinite(l):
       return np.inf
 
-    last[:] = np.array(x),u[:,np.newaxis]
     return l
 
   def dlnL(x):
-    # Compute derivatives
-    if np.abs(x-last[0]).sum()==0:
-      u = last[1]
-    else:
-      u = np.dot(f,x)[:,np.newaxis]
-
-    return -(f/u).sum(axis=0)
+    return -admixture_log_likelihood_derivative(f,x)
 
   # Define equality constraints and derivatives
   # Weight norms since that seems to push estimates away from bounds (should
@@ -317,6 +366,49 @@ def progress_bar(samples, sample_count):
   return progress_loop(samples, length=sample_count, units='samples', update_interval=update_interval)
 
 
+def compute_frequencies(freq_model,sample_count,models,geno_counts):
+  # Set missing genotypes to zero
+  geno_counts[:,0] = 0
+
+  if freq_model.upper() == 'GENO':
+    # Set each genotype to be observed at least once
+    np.clip(geno_counts,1,1e300,out=geno_counts)
+    geno_counts[:,0] = 0
+
+    # Compute frequencies
+    n = geno_counts.sum(axis=1)[:,np.newaxis]
+    geno_freqs = geno_counts/n
+
+  elif freq_model.upper() == 'HWP':
+    geno_freqs = np.zeros(geno_counts.shape, dtype=float)
+
+    for i,model in enumerate(models):
+      n = 2*geno_counts[i].sum()
+
+      if not n or len(model.alleles)!=3:
+        p = 1/sample_count
+      else:
+        a,b  =  model.alleles[1:3]
+        inds = (model[a,a].index,
+                model[a,b].index,
+                model[b,b].index)
+
+        hom1 = geno_counts[i,inds[0]]
+        hets = geno_counts[i,inds[1]]
+
+        p    = (2*hom1+hets)/n
+
+      q = 1-p
+
+      geno_freqs[i,inds[0]] =   p*p
+      geno_freqs[i,inds[1]] = 2*p*q
+      geno_freqs[i,inds[2]] =   q*q
+  else:
+    raise ValueError('Invalid genotype likelihood model specified: %s' % model)
+
+  return geno_freqs
+
+
 def load(options,args):
   # Load samples to test
   sys.stderr.write('Loading %s...\n' % args[0])
@@ -343,46 +435,9 @@ def load(options,args):
     locusset &= set(pop_loci)
     loci = [ l for l in loci if l in locusset ]
     mask = np.array([ l in locusset for l in pop_loci ],dtype=bool)
+
     geno_counts = geno_counts[mask]
-
-    # Set missing genotypes to zero
-    geno_counts[:,0] = 0
-
-    if options.model.upper() == 'GENO':
-      # Set each genotype to be observed at least once
-      np.clip(geno_counts,1,1e300,out=geno_counts)
-      geno_counts[:,0] = 0
-
-      # Compute frequencies
-      n = geno_counts.sum(axis=1)[:,np.newaxis]
-      geno_freqs = geno_counts/n
-
-    elif options.model.upper() == 'HWP':
-      geno_freqs = np.zeros(geno_counts.shape, dtype=float)
-
-      for i,model in enumerate(genos.models):
-        n = 2*geno_counts[i].sum()
-
-        if not n or len(model.alleles)!=3:
-          p = 1/len(genos.samples)
-        else:
-          a,b  =  model.alleles[1:3]
-          inds = (model[a,a].index,
-                  model[a,b].index,
-                  model[b,b].index)
-
-          hom1 = geno_counts[i,inds[0]]
-          hets = geno_counts[i,inds[1]]
-
-          p    = (2*hom1+hets)/n
-
-        q = 1-p
-
-        geno_freqs[i,inds[0]] =   p*p
-        geno_freqs[i,inds[1]] = 2*p*q
-        geno_freqs[i,inds[2]] =   q*q
-    else:
-      raise ValueError('Invalid genotype likelihood model specified: %s' % options.model)
+    geno_freqs  = compute_frequencies(options.model,len(genos.samples),genos.models,geno_counts)
 
     # Append to list of source populations
     pops.append( (pop_loci,geno_freqs) )
@@ -394,6 +449,8 @@ def load(options,args):
   for i,(pop_loci,geno_freqs) in enumerate(pops):
     mask = np.array([ (l in locusset) for l in pop_loci ], dtype=bool)
     pops[i] = geno_freqs[mask]
+
+  pops = np.array(pops, dtype=float)
 
   return test,pops
 
@@ -418,6 +475,16 @@ def build_labels(options,args):
     labels.append('POP%d' % (len(labels)+1))
 
   return labels
+
+
+def individual_frequencies(pops,genos):
+  # Compute genotype frequencies
+  ind     = np.asarray(genotype_indices(genos), dtype=int)
+  mask    = ind>0
+  indices = np.where(mask)[0]
+  ind     = ind[mask]
+  f       = pops[:,indices,ind].T
+  return f
 
 
 def option_parser():
@@ -463,20 +530,22 @@ def main():
 
   for sample,genos in test:
     # Compute genotype frequencies
-    ind     = np.asarray(genotype_indices(genos), dtype=int)
-    mask    = ind>0
-    indices = np.arange(len(ind))
-    f       = np.array([ pop[indices,ind][mask] for pop in pops ], dtype=float).T
+    f      = individual_frequencies(pops,genos)
 
     # Find feasible starting values
-    x0      = estimate_admixture_em(f,iters=0)
+    x0     = estimate_admixture_em(f,iters=0)
 
     # Estimate admixture
-    x,l,it  = estimate_admixture_sqp(f, x0)
+    x,l,it = estimate_admixture_sqp(f, x0)
 
     ipop = classify_ancestry(labels, x, options.threshold)
     out.writerow([sample]+['%.4f' % a for a in x] + [ipop])
 
 
-if __name__=='__main__':
+def _test():
+  import doctest
+  return doctest.testmod()
+
+
+if __name__ == '__main__':
   main()
