@@ -12,7 +12,7 @@ import sys
 from   glu.lib.fileutils          import table_reader,table_writer,tryint
 
 from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name
+from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
@@ -62,31 +62,52 @@ def resolve_feature(con,feature,options):
   upsnps      = coalesce(tryint(feature[7]), options.upsnps)
   downsnps    = coalesce(tryint(feature[8]), options.downsnps)
 
+  found = False
+
   if (start is not None and end is None) or (is_int(start) and is_int(end) and start+1==end):
     feature = 'SNP'
-  elif chr and start and end:
+    found = True
+
+  if not found and chr and start and end:
+    found = True
     geneinfo = query_genes_by_name(con,name)
     if any( (chr,start,end) == (gi[2],gi[3],gi[4]) for gi in geneinfo):
       feature = 'GENE'
     else:
       feature = 'REGION'
-  else:
+
+  if not found:
     geneinfo = query_genes_by_name(con,name)
     if len(geneinfo) == 1:
       name,chr,start,end,strand = geneinfo[0][1:6]
       feature = geneinfo[0][6]
+      found = True
     elif len(geneinfo) > 1:
+      feature = 'AMBIGUOUS GENE'
+      found = True
+
+  if not found:
+    cytoinfo = query_cytoband_by_name(con,name)
+    if cytoinfo:
+      chr,start,end,color = cytoinfo
+      strand = '+'
+      feature = 'CYTOBAND'
+      found = True
+
+  if not found:
+    snpinfo = query_snps_by_name(con,name)
+    if len(snpinfo)==1:
+      lname,chr,start,strand = snpinfo[0]
+      end = start+1
+      feature = 'SNP'
+      found = True
+
+    elif len(snpinfo) > 1:
       feature = 'AMBIGUOUS'
-    else:
-      snpinfo = query_snps_by_name(con,name)
-      if len(snpinfo)==1:
-        lname,chr,start,strand = snpinfo[0]
-        end = start+1
-        feature = 'SNP'
-      elif len(snpinfo) > 1:
-        feature = 'AMBIGUOUS'
-      else:
-        feature = 'UNKNOWN'
+      found = True
+
+  if not found:
+    feature = 'UNKNOWN'
 
   return name,chr,strand,start,end,upbases,downbases,upsnps,downsnps,feature
 

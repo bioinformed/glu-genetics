@@ -73,6 +73,48 @@ def query_cytoband_by_location(con,chr,loc):
   return cur.fetchall()
 
 
+def query_cytoband_by_name(con,name):
+  sql1 = '''
+  SELECT   chromosome,start,stop,color
+  FROM     cytoband
+  WHERE    band = ?;
+  '''
+
+  cur = con.cursor()
+  cur.execute(sql1, (name,))
+  results = cur.fetchall()
+
+  if len(results) == 1:
+    return results[0]
+  elif len(results) > 1:
+    raise KeyError('Ambiguous cytoband "%s"' % name)
+
+  sql2 = '''
+  SELECT   chromosome,MIN(start),MAX(stop),""
+  FROM     cytoband
+  WHERE    band LIKE (? || "%")
+  GROUP BY chromosome;
+  '''
+
+  if not name or ('p' not in name and 'q' not in name):
+    return None
+
+  cname = name
+  if name[-1] in '0123456789':
+    cname += '.'
+
+  cur = con.cursor()
+  cur.execute(sql2, (cname,))
+  results = cur.fetchall()
+
+  if not results:
+    return None
+  if len(results) == 1:
+    return results[0]
+  else:
+    raise KeyError('Ambiguous cytoband "%s"' % name)
+
+
 def query_snps_by_name(con,name):
   sql = '''
   SELECT   lname,chromosome,location,strand
