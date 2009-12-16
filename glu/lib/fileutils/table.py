@@ -522,6 +522,11 @@ def resolve_column_headers(header,include,exclude=None):
   @type       exclude: list of strings, integers, or 2-tuples for ranges
   @return            : resolved header line
   @rtype             : sequence of strs
+
+  >>> resolve_column_headers(['a','b','c'],'*')
+  [0, 1, 2]
+  >>> resolve_column_headers(['a','b','c'],['c','*'],'b')
+  [2, 0]
   '''
   if isinstance(include,int):
     include = [include]
@@ -536,12 +541,26 @@ def resolve_column_headers(header,include,exclude=None):
   else:
     indices = []
     for column in include:
+      # Wildcards add all un-used indices at that position once all headers are resolved
+      if column=='*' and '*' not in header:
+        indices.append('*')
+        continue
+
       col = resolve_column_header(header,column)
       if isinstance(col,tuple):
         indices.extend( xrange(col[0],col[1]+1) )
       else:
         indices.append(col)
 
+  # Add all un-used indices at the position of the first wildcard
+  if '*' in indices:
+    iset    = set(indices)
+    iset.discard('*')
+    star    = [ i for i in range(len(header)) if i not in iset ]
+    index   = indices.index('*')
+    indices = indices[:index]+star+[ i for i in indices[index+1:] if i != '*' ]
+
+  # Remove indices for any desired exclusions
   if exclude:
     exclude_indices = set(resolve_column_headers(header,exclude))
     indices = [ i for i in indices if i not in exclude_indices ]
