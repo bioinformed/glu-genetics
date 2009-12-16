@@ -18,7 +18,7 @@ __all__ = ['list_reader', 'map_reader', 'table_reader', 'table_writer',
            'resolve_column_headers', 'resolve_column_header', 'table_columns']
 
 
-TABLE_FORMATS = set(['xls','csv','dta'])
+TABLE_FORMATS = set(['xls','csv','dta','stata'])
 
 
 def _literal_list(filename):
@@ -828,8 +828,11 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   elif format in ('delimited','tsv','csv'):
     from glu.lib.fileutils.formats.delimited import table_reader_delimited
     rows = table_reader_delimited(name, extra_args=args)
+  elif format in ('dta','stata'):
+    from glu.lib.fileutils.formats.stata import table_reader_stata
+    rows = table_reader_stata(name, extra_args=args)
   else:
-    raise NotImplementedError("File format '%s' is not supported" % format)
+    raise NotImplementedError("Reading file format '%s' is not supported" % format)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -1040,7 +1043,7 @@ def table_writer(filename,extra_args=None,**kwargs):
     from glu.lib.fileutils.formats.delimited import delimited_table_writer
     writer = delimited_table_writer(name, extra_args=args)
   else:
-    raise NotImplementedError("File format '%s' is not supported" % format)
+    raise NotImplementedError("Writing to file format '%s' is not supported" % format)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))

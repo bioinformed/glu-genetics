@@ -12,9 +12,7 @@ from   glu.lib.fileutils.auto   import guess_format, autofile
 from   glu.lib.fileutils.parser import parse_augmented_filename, trybool, get_arg
 
 
-__all__ = ['list_reader', 'map_reader', 'table_reader', 'table_writer',
-           'resolve_column_headers', 'resolve_column_header', 'table_columns',
-           'get_csv_dialect']
+__all__ = ['get_csv_dialect','table_reader_delimited','delimited_table_writer']
 
 
 TABLE_FORMATS = set(['xls','csv','dta'])
