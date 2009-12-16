@@ -57,10 +57,20 @@ def admixture_log_likelihood_derivative_python(f,x):
   return (f/np.dot(f,x)[:,np.newaxis]).sum(axis=0)
 
 
+def individual_frequencies_python(populations,ind):
+  mask    = ind>0
+  indices = np.where(mask)[0]
+  ind     = ind[mask]
+  f       = populations[:,indices,ind].T
+  return f
+
+
 try:
-  from glu.modules.struct._admix import admixture_log_likelihood as admixture_log_likelihood_c, \
+  from glu.modules.struct._admix import individual_frequencies as individual_frequencies_c, \
+                                        admixture_log_likelihood as admixture_log_likelihood_c, \
                                         admixture_log_likelihood_derivative as admixture_log_likelihood_derivative_c
 
+  individual_frequencies = individual_frequencies_c
   admixture_log_likelihood = admixture_log_likelihood_c
   admixture_log_likelihood_derivative = admixture_log_likelihood_derivative_c
 
@@ -82,6 +92,7 @@ try:
     '''
 
 except ImportError:
+  individual_frequencies = individual_frequencies_python
   admixture_log_likelihood = admixture_log_likelihood_python
   admixture_log_likelihood_derivative = admixture_log_likelihood_derivative_python
 
@@ -276,7 +287,6 @@ def estimate_admixture_sqp(f, x0, failover=True):
 
   # Store last function values, since the solver seems to want to
   # re-evaluate them several times
-  last  = []
   iters = [0]
 
   # Build likelihood function
@@ -480,16 +490,6 @@ def build_labels(options,args):
   return labels
 
 
-def individual_frequencies(pops,genos):
-  # Compute genotype frequencies
-  ind     = np.asarray(genotype_indices(genos), dtype=int)
-  mask    = ind>0
-  indices = np.where(mask)[0]
-  ind     = ind[mask]
-  f       = pops[:,indices,ind].T
-  return f
-
-
 def option_parser():
   import optparse
 
@@ -533,7 +533,7 @@ def main():
 
   for sample,genos in test:
     # Compute genotype frequencies
-    f      = individual_frequencies(pops,genos)
+    f      = individual_frequencies(pops,genotype_indices(genos))
 
     # Find feasible starting values
     x0     = estimate_admixture_em(f,iters=0)

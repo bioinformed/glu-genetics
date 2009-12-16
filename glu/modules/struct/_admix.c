@@ -20,11 +20,15 @@ See GLU license for terms by running: glu license
 #include <float.h>
 #include "numpy/arrayobject.h"
 
-#define Array_CheckType(op)    (PyArray_CheckExact(op)              && \
-                                PyArray_CHKFLAGS(op,NPY_CARRAY_RO)  && \
-                                PyArray_ISONESEGMENT(op)            && \
-                                PyArray_TYPE(op)==PyArray_DOUBLE)
+#define Array_CheckTypeDouble(op)    (PyArray_CheckExact(op)              && \
+                                      PyArray_CHKFLAGS(op,NPY_CARRAY_RO)  && \
+                                      PyArray_ISONESEGMENT(op)            && \
+                                      PyArray_TYPE(op)==PyArray_DOUBLE)
 
+#define Array_CheckTypeUint(op)      (PyArray_CheckExact(op)              && \
+                                      PyArray_CHKFLAGS(op,NPY_CARRAY_RO)  && \
+                                      PyArray_ISONESEGMENT(op)            && \
+                                      PyArray_TYPE(op)==PyArray_UINT)
 
 PyObject *
 admixture_log_likelihood(PyObject *self, PyObject *args)
@@ -38,13 +42,13 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 	if(!PyArg_ParseTuple(args, "OO", &frequencies, &mixture))
 		return NULL;
 
-	if(!Array_CheckType(frequencies) || PyArray_NDIM(frequencies)!=2)
+	if(!Array_CheckTypeDouble(frequencies) || PyArray_NDIM(frequencies)!=2)
 	{
 		PyErr_SetString(PyExc_TypeError, "frequencies must be a 2d float ndarray");
 		return NULL;
 	}
 
-	if(!Array_CheckType(mixture) || PyArray_NDIM(mixture)!=1)
+	if(!Array_CheckTypeDouble(mixture) || PyArray_NDIM(mixture)!=1)
 	{
 		PyErr_SetString(PyExc_TypeError, "mixture parameters must be a 1d float ndarray");
 		return NULL;
@@ -93,15 +97,15 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 		{
 			double ll = f[0]*x[0] + f[1]*x[1];
 
-	                lpart_try = lpart*ll;
+			lpart_try = lpart*ll;
 
-	                if(lpart_try>DBL_MIN)
+			if(lpart_try>DBL_MIN)
 			{
 				/* If not, accept the value */
 				lpart = lpart_try;
 			}
 			else
-	                {
+			{
 				logl += log(lpart)-log_DBL_MAX;
 				lpart = DBL_MAX*ll;
 			}
@@ -115,15 +119,15 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 		{
 			double ll = f[0]*x[0] + f[1]*x[1] + f[2]*x[2];
 
-	                lpart_try = lpart*ll;
+			lpart_try = lpart*ll;
 
-	                if(lpart_try>DBL_MIN)
+			if(lpart_try>DBL_MIN)
 			{
 				/* If not, accept the value */
 				lpart = lpart_try;
 			}
 			else
-	                {
+			{
 				logl += log(lpart)-log_DBL_MAX;
 				lpart = DBL_MAX*ll;
 			}
@@ -137,15 +141,15 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 		{
 			double ll = f[0]*x[0] + f[1]*x[1] + f[2]*x[2] + f[3]*x[3];
 
-	                lpart_try = lpart*ll;
+			lpart_try = lpart*ll;
 
-	                if(lpart_try>DBL_MIN)
+			if(lpart_try>DBL_MIN)
 			{
 				/* If not, accept the value */
 				lpart = lpart_try;
 			}
 			else
-	                {
+			{
 				logl += log(lpart)-log_DBL_MAX;
 				lpart = DBL_MAX*ll;
 			}
@@ -159,15 +163,15 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 		{
 			double ll = f[0]*x[0] + f[1]*x[1] + f[2]*x[2] + f[3]*x[3] + f[4]*x[4];
 
-	                lpart_try = lpart*ll;
+			lpart_try = lpart*ll;
 
-	                if(lpart_try>DBL_MIN)
+			if(lpart_try>DBL_MIN)
 			{
 				/* If not, accept the value */
 				lpart = lpart_try;
 			}
 			else
-	                {
+			{
 				logl += log(lpart)-log_DBL_MAX;
 				lpart = DBL_MAX*ll;
 			}
@@ -182,15 +186,15 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 			double ll = f[0]*x[0] + f[1]*x[1] + f[2]*x[2]
 			          + f[3]*x[3] + f[4]*x[4] + f[5]*x[5];
 
-	                lpart_try = lpart*ll;
+			lpart_try = lpart*ll;
 
-	                if(lpart_try>DBL_MIN)
+			if(lpart_try>DBL_MIN)
 			{
 				/* If not, accept the value */
 				lpart = lpart_try;
 			}
 			else
-	                {
+			{
 				logl += log(lpart)-log_DBL_MAX;
 				lpart = DBL_MAX*ll;
 			}
@@ -207,15 +211,15 @@ admixture_log_likelihood(PyObject *self, PyObject *args)
 			for(j=0; j<k; ++j,++f,++x)
 				ll += (*f) * (*x);
 
-	                lpart_try = lpart*ll;
+			lpart_try = lpart*ll;
 
-	                if(lpart_try>DBL_MIN)
+			if(lpart_try>DBL_MIN)
 			{
 				/* If not, accept the value */
 				lpart = lpart_try;
 			}
 			else
-	                {
+			{
 				logl += log(lpart)-log_DBL_MAX;
 				lpart = DBL_MAX*ll;
 			}
@@ -239,13 +243,13 @@ admixture_log_likelihood_derivative(PyObject *self, PyObject *args)
 	if(!PyArg_ParseTuple(args, "OO", &frequencies, &mixture))
 		return NULL;
 
-	if(!Array_CheckType(frequencies) || PyArray_NDIM(frequencies)!=2)
+	if(!Array_CheckTypeDouble(frequencies) || PyArray_NDIM(frequencies)!=2)
 	{
 		PyErr_SetString(PyExc_TypeError, "frequencies must be a 2d float ndarray");
 		return NULL;
 	}
 
-	if(!Array_CheckType(mixture) || PyArray_NDIM(mixture)!=1)
+	if(!Array_CheckTypeDouble(mixture) || PyArray_NDIM(mixture)!=1)
 	{
 		PyErr_SetString(PyExc_TypeError, "mixture parameters must be a 1d float ndarray");
 		return NULL;
@@ -273,110 +277,182 @@ admixture_log_likelihood_derivative(PyObject *self, PyObject *args)
 	 */
 	if(k==2)
 	{
-                x = (double *)PyArray_DATA(mixture);
-                d = (double *)PyArray_DATA(derivative);
+		x = (double *)PyArray_DATA(mixture);
+		d = (double *)PyArray_DATA(derivative);
 
-	        for(i=0; i<n; ++i,f+=k)
-	        {
-	                /* Pass 1: Compute denominator */
+		for(i=0; i<n; ++i,f+=k)
+		{
+			/* Pass 1: Compute denominator */
 			double u = 1/(f[0]*x[0] + f[1]*x[1]);
 
-	                /* Pass 2: Accumulate derivative */
+			/* Pass 2: Accumulate derivative */
 			d[0] += f[0]*u;
 			d[1] += f[1]*u;
-	        }
+		}
 	}
 	else if(k==3)
 	{
-                x = (double *)PyArray_DATA(mixture);
-                d = (double *)PyArray_DATA(derivative);
+		x = (double *)PyArray_DATA(mixture);
+		d = (double *)PyArray_DATA(derivative);
 
-	        for(i=0; i<n; ++i,f+=k)
-	        {
-	                /* Pass 1: Compute denominator */
+		for(i=0; i<n; ++i,f+=k)
+		{
+			/* Pass 1: Compute denominator */
 			double u = 1/(f[0]*x[0] + f[1]*x[1] + f[2]*x[2]);
 
-	                /* Pass 2: Accumulate derivative */
+			/* Pass 2: Accumulate derivative */
 			d[0] += f[0]*u;
 			d[1] += f[1]*u;
 			d[2] += f[2]*u;
-	        }
+		}
 	}
 	else if(k==4)
 	{
-                x = (double *)PyArray_DATA(mixture);
-                d = (double *)PyArray_DATA(derivative);
+		x = (double *)PyArray_DATA(mixture);
+		d = (double *)PyArray_DATA(derivative);
 
-	        for(i=0; i<n; ++i,f+=k)
-	        {
-	                /* Pass 1: Compute denominator */
+		for(i=0; i<n; ++i,f+=k)
+		{
+			/* Pass 1: Compute denominator */
 			double u = 1/(f[0]*x[0] + f[1]*x[1] + f[2]*x[2] + f[3]*x[3]);
 
-	                /* Pass 2: Accumulate derivative */
+			/* Pass 2: Accumulate derivative */
 			d[0] += f[0]*u;
 			d[1] += f[1]*u;
 			d[2] += f[2]*u;
 			d[3] += f[3]*u;
-	        }
+		}
 	}
 	else if(k==5)
 	{
-                x = (double *)PyArray_DATA(mixture);
-                d = (double *)PyArray_DATA(derivative);
+		x = (double *)PyArray_DATA(mixture);
+		d = (double *)PyArray_DATA(derivative);
 
-	        for(i=0; i<n; ++i,f+=k)
-	        {
-	                /* Pass 1: Compute denominator */
+		for(i=0; i<n; ++i,f+=k)
+		{
+			/* Pass 1: Compute denominator */
 			double u = 1/(f[0]*x[0] + f[1]*x[1] + f[2]*x[2] + f[3]*x[3] + f[4]*x[4]);
 
-	                /* Pass 2: Accumulate derivative */
+			/* Pass 2: Accumulate derivative */
 			d[0] += f[0]*u;
 			d[1] += f[1]*u;
 			d[2] += f[2]*u;
 			d[3] += f[3]*u;
 			d[4] += f[4]*u;
-	        }
+		}
 	}
 	else if(k==6)
 	{
-                x = (double *)PyArray_DATA(mixture);
-                d = (double *)PyArray_DATA(derivative);
+		x = (double *)PyArray_DATA(mixture);
+		d = (double *)PyArray_DATA(derivative);
 
-	        for(i=0; i<n; ++i,f+=k)
-	        {
-	                /* Pass 1: Compute denominator */
+		for(i=0; i<n; ++i,f+=k)
+		{
+			/* Pass 1: Compute denominator */
 			double u = 1/(f[0]*x[0] + f[1]*x[1] + f[2]*x[2]
 			            + f[3]*x[3] + f[4]*x[4] + f[5]*x[5]);
 
-	                /* Pass 2: Accumulate derivative */
+			/* Pass 2: Accumulate derivative */
 			d[0] += f[0]*u;
 			d[1] += f[1]*u;
 			d[2] += f[2]*u;
 			d[3] += f[3]*u;
 			d[4] += f[4]*u;
 			d[5] += f[5]*u;
-	        }
+		}
 	}
 	else
 	{
-	        for(i=0; i<n; ++i)
-	        {
-	                double  u  = 0;
-	                double *ff = f;
+		for(i=0; i<n; ++i)
+		{
+			double  u  = 0;
+			double *ff = f;
 
-	                /* Pass 1: Compute denominator */
-	                x = (double *)PyArray_DATA(mixture);
-	                for(j=0; j<k; ++j,++f,++x)
-	                        u += (*f) * (*x);
+			/* Pass 1: Compute denominator */
+			x = (double *)PyArray_DATA(mixture);
+			for(j=0; j<k; ++j,++f,++x)
+				u += (*f) * (*x);
 
-	                /* Pass 2: Accumulate derivative */
-	                d = (double *)PyArray_DATA(derivative);
-                        u = 1/u;
-	                for(j=0,f=ff; j<k; ++j,++f,++d)
-	                        *d += (*f)*u;
-	        }
+			/* Pass 2: Accumulate derivative */
+			d = (double *)PyArray_DATA(derivative);
+			u = 1/u;
+			for(j=0,f=ff; j<k; ++j,++f,++d)
+				*d += (*f)*u;
+		}
 	}
 	return derivative;
+}
+
+
+PyObject *
+individual_frequencies(PyObject *self, PyObject *args)
+{
+	PyObject *populations, *genotypes, *frequencies;
+	npy_intp freqency_dims[2];
+	double *dest;
+	Py_ssize_t n, k, g, m, i, j;
+	unsigned int *genos, nonmissing;
+
+	if(!PyArg_ParseTuple(args, "OO", &populations, &genotypes))
+		return NULL;
+
+	if(!Array_CheckTypeDouble(populations) || PyArray_NDIM(populations)!=3)
+	{
+		PyErr_SetString(PyExc_TypeError, "frequencies must be a 3d float ndarray");
+		return NULL;
+	}
+
+	if(!Array_CheckTypeUint(genotypes) || PyArray_NDIM(genotypes)!=1)
+	{
+		PyErr_SetString(PyExc_TypeError, "genotypes must be a 1d float ndarray");
+		return NULL;
+	}
+
+	k = PyArray_DIMS(populations)[0];
+	n = PyArray_DIMS(populations)[1];
+	g = PyArray_DIMS(populations)[2];
+	m = PyArray_DIMS(genotypes)[0];
+
+	if(m != n)
+	{
+		PyErr_Format(PyExc_ValueError, "unexpected number of genotpes %zd.  Expected %zd",
+		                                m, k);
+		return NULL;
+	}
+
+	/* Count non-missing genotypes to determine dimensions of the frequency matrix */
+	genos = (unsigned int *)PyArray_DATA(genotypes);
+	for(i=0, nonmissing=0; i<n; ++i)
+		if(genos[i]) ++nonmissing;
+
+	freqency_dims[0] = nonmissing;
+	freqency_dims[1] = k;
+	frequencies = PyArray_SimpleNew(2,freqency_dims,NPY_DOUBLE);
+	if(!frequencies) return NULL;
+
+	dest =        (double *)PyArray_DATA(frequencies);
+	genos = (unsigned int *)PyArray_DATA(genotypes);
+
+	/* For each locus */
+	for(i=0; i<n; ++i)
+	{
+		/* Get the individual's i'th genotype and skip missing values */
+		unsigned int geno = genos[i];
+		if(!geno) continue;
+
+		/* Verify genotype index is in bounds */
+		if(geno > g)
+		{
+			Py_DECREF(frequencies);
+			PyErr_SetString(PyExc_IndexError, "Invalid genotype index");
+			return NULL;
+		}
+
+		/* Fill frequency of geno for each population */
+		for(j=0; j<k; ++j, ++dest)
+			*dest = *(double *)PyArray_GETPTR3(populations, j, i, geno);
+	}
+	return frequencies;
 }
 
 
@@ -386,10 +462,12 @@ init_admix(void)
 	PyObject *m;
 
 	static PyMethodDef admixmodule_methods[] = {
-	       {"admixture_log_likelihood", (PyCFunction)admixture_log_likelihood, METH_VARARGS,
-	        "Compute admixture likelihood for given population frequencies and admixture estimates"},
-	       {"admixture_log_likelihood_derivative", (PyCFunction)admixture_log_likelihood_derivative, METH_VARARGS,
-	        "Compute the derivative of the admixture likelihood for given population frequencies and admixture estimates"},
+		{"admixture_log_likelihood", (PyCFunction)admixture_log_likelihood, METH_VARARGS,
+		 "Compute admixture likelihood for given population frequencies and admixture estimates"},
+		{"admixture_log_likelihood_derivative", (PyCFunction)admixture_log_likelihood_derivative, METH_VARARGS,
+		 "Compute the derivative of the admixture likelihood for given population frequencies and admixture estimates"},
+		{"individual_frequencies", (PyCFunction)individual_frequencies, METH_VARARGS,
+		 "Select population frequencies for a given individual's genotype indices"},
 	       {NULL}  /* Sentinel */
 	};
 
