@@ -20,11 +20,12 @@ __genoformats__ = [
 
 import csv
 
-from   glu.lib.fileutils         import autofile,list_reader,table_writer,namefile,trybool,\
-                                        parse_augmented_filename,get_arg,get_csv_dialect
+from   glu.lib.fileutils                   import autofile,list_reader,table_writer,namefile, \
+                                                  trybool,parse_augmented_filename,get_arg
+from   glu.lib.fileutils.formats.delimited import get_csv_dialect
 
-from   glu.lib.genolib.streams   import GenotripleStream,GenomatrixStream
-from   glu.lib.genolib.reprs     import get_genorepr
+from   glu.lib.genolib.streams             import GenotripleStream,GenomatrixStream
+from   glu.lib.genolib.reprs               import get_genorepr
 
 
 def load_genomatrix_text(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):

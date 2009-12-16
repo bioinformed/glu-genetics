@@ -16,10 +16,10 @@ __genoformats__ = [
 
 import re
 
-from   glu.lib.fileutils         import autofile,namefile,parse_augmented_filename,get_arg, \
-                                        get_csv_dialect,trybool,list_reader
-
-from   glu.lib.genolib.streams   import GenotripleStream
+from   glu.lib.fileutils                   import autofile,namefile,parse_augmented_filename, \
+                                                  get_arg, trybool,list_reader
+from   glu.lib.fileutils.formats.delimited import get_csv_dialect
+from   glu.lib.genolib.streams             import GenotripleStream
 
 
 def load_prettybase(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
