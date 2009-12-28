@@ -8,7 +8,7 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils   import table_reader,table_writer,cook_table
+from   glu.lib.fileutils   import table_reader,table_writer,cook_table,table_options
 
 
 def option_parser():
@@ -17,22 +17,11 @@ def option_parser():
 
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-c', '--categorical', dest='categorical', metavar='VAR', action='append',
-                    help='Create indicator variables based on values of VAR')
-  parser.add_option('--columnexpr', dest='columnexpr', metavar='VAR=EXPR', action='append',
-                    help='Add a new column VAR with the value determined by expression EXPR')
-  parser.add_option('--includevar', dest='includevar', metavar='VAR=VAL', action='append',
-                    help='Include only records with variable VAR equal to VAL')
-  parser.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
-                    help='Exclude all records with variable VAR equal to VAL')
-  parser.add_option('--filterexpr', dest='filterexpr', metavar='EXPR', action='append',
-                    help='Filter all records where EXPR is not true')
-  parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
-                    help='Sort rows based on values in column VAR')
-  parser.add_option('-u', '--uniq', dest='uniq', action='store_true',
-                    help='Produce only unique rows by collapsing consecutive duplicate rows')
+  table_options(parser)
+
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
+
   return parser
 
 

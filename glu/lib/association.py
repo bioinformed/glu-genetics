@@ -20,7 +20,7 @@ from   numpy              import array,asarray,asanyarray,zeros,outer, \
 
 from   glu.lib.utils      import tally
 from   glu.lib.fileutils  import namefile,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
-                                 subset_variables,filter_expr,column_exprs,create_categorical_variables
+                                 cook_table
 from   glu.lib.genolib    import load_genostream,pick
 from   glu.lib.genolib.transform import _union_options, _intersect_options
 from   glu.lib.formula    import INTERCEPT,NO_INTERCEPT,GENOTERM,PHENOTERM,COMBINATION, \
@@ -303,23 +303,12 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
         times with potentially different phenotypes.
   '''
   phenos = table_reader(filename,want_header=True)
+  phenos = cook_table(phenos)
 
   try:
     header = strip_trailing_empty(phenos.next())
   except StopIteration:
     raise ValueError('Empty phenotype file')
-
-  if categorical:
-    header,phenos = create_categorical_variables(header,phenos,categorical)
-
-  if columnexpr:
-    header,phenos = column_exprs(header,phenos,columnexpr)
-
-  if includevar or excludevar:
-    header,phenos = subset_variables(header,phenos,includevar,excludevar)
-
-  if filterexpr:
-    header,phenos = filter_expr(header,phenos,filterexpr)
 
   indices = resolve_column_headers(header,[pid,pheno])
   if columns is not None:

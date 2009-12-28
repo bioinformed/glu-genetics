@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-__abstract__  = 'file related utility functions'
+__abstract__  = 'fileutils delmited text file support'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -14,8 +14,6 @@ from   glu.lib.fileutils.parser import parse_augmented_filename, trybool, get_ar
 
 __all__ = ['get_csv_dialect','table_reader_delimited','delimited_table_writer']
 
-
-TABLE_FORMATS = set(['xls','csv','dta'])
 
 # Create more standard aliases for Python CSV module dialects.  'excel' is
 # now available as 'csv' and 'excel-tab' is now available as 'tsv'.

@@ -15,16 +15,37 @@ from   glu.lib.fileutils.table  import resolve_column_headers, resolve_column_he
 
 
 __all__ = ['cook_table', 'sort_table', 'uniq_table', 'subset_variables',
-           'create_categorical_variables', 'column_exprs', 'filter_expr']
+           'create_categorical_variables', 'column_exprs', 'filter_expr',
+           'table_query','table_options']
+
+
+def table_options(parser):
+  parser.add_option('-c', '--categorical', dest='categorical', metavar='VAR', action='append',
+                    help='Create indicator variables based on values of VAR')
+  parser.add_option('--columnexpr', dest='columnexpr', metavar='VAR=EXPR', action='append',
+                    help='Add a new column VAR with the value determined by expression EXPR')
+  parser.add_option('--includevar', dest='includevar', metavar='VAR=VAL', action='append',
+                    help='Include only records with variable VAR equal to VAL')
+  parser.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
+                    help='Exclude all records with variable VAR equal to VAL')
+  parser.add_option('--filterexpr', dest='filterexpr', metavar='EXPR', action='append',
+                    help='Filter all records where EXPR is not true')
+  parser.add_option('--query', dest='query', metavar='SQL', action='append',
+                    help='Execute in-memory SQL query on all records')
+  parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
+                    help='Sort rows based on values in column VAR')
+  parser.add_option('-u', '--uniq', dest='uniq', action='store_true',
+                    help='Produce only unique rows by collapsing consecutive duplicate rows')
+  return parser
 
 
 def cook_table(table, options):
   '''
   Create categorical variables, subset and sort table
   '''
-  vars = ['categorical','columnexpr','includevar','excludevar','filterexpr','sort','uniq']
+  vars = ['categorical','columnexpr','includevar','excludevar','filterexpr','sort','uniq','query']
 
-  if not any(getattr(options,var) for var in vars):
+  if not any(getattr(options,var,None) for var in vars):
     return table
 
   table = iter(table)
@@ -39,6 +60,9 @@ def cook_table(table, options):
 
   if getattr(options, 'columnexpr', None):
     header,table = column_exprs(header,table,options.columnexpr)
+
+  if getattr(options, 'query'):
+    header,table = query_table_list(header,table,options.query)
 
   if getattr(options,'includevar',None) or getattr(options,'excludevar',None):
     header,table = subset_variables(header,table,options.includevar,options.excludevar)
@@ -669,7 +693,7 @@ def create_categorical_variable(header,data,variable,prefix=None,ref=None,includ
   return header,_make_category()
 
 
-def create_categorical_variables(header,phenos,categorical):
+def create_categorical_variables(header,data,categorical):
   '''
   >>> header =  ['a','b','c']
   >>> data   = [['1','M','' ],
@@ -708,9 +732,67 @@ def create_categorical_variables(header,phenos,categorical):
       if arg in ('ref','include','exclude'):
         opts[arg] = set(v.strip() for v in val.split(','))
 
-    header,phenos = create_categorical_variable(header,phenos,var,**opts)
+    header,data = create_categorical_variable(header,data,var,**opts)
 
-  return header,phenos
+  return header,data
+
+
+def query_table(header,data,query):
+  '''
+  Execute an SQL query on a table using an in-memory temporary SQLite table
+
+  >>> header =  ['a','b','c']
+  >>> data   = [['1','M','' ],
+  ...           ['2','F','' ],
+  ...           ['3','?','1']]
+
+  >>> h,d = query_table(header,data,'SELECT * FROM data')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['1', 'M', '']
+  ['2', 'F', '']
+  ['3', '?', '1']
+
+  >>> h,d = query_table(header,data,'SELECT * FROM data WHERE a="3"')
+  >>> h
+  ['a', 'b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['3', '?', '1']
+
+  >>> h,d = query_table(header,data,'SELECT b,c FROM data WHERE a="3"')
+  >>> h
+  ['b', 'c']
+  >>> for row in d:
+  ...   print row
+  ['?', '1']
+  '''
+  import sqlite3
+  from   glu.lib.fileutils.formats.sqlite import SQLiteWriter, table_reader_sqlite
+
+  con = sqlite3.connect(':memory:')
+
+  writer = SQLiteWriter('',con=con,table='data')
+  writer.writerow(header)
+  writer.writerows(data)
+
+  reader = iter(table_reader_sqlite('',con=con,query=query))
+  return reader.next(),reader
+
+
+def query_table_list(header,data,queries):
+  '''
+  Execute multiple sequential SQL table queries.
+
+  The current implementation isn't ideal, since in-memory tables are
+  re-created for each query.
+  '''
+  for query in queries:
+    header,data = query_table(header,data,query)
+
+  return header,data
 
 
 def _test():
