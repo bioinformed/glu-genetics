@@ -18,7 +18,7 @@ import numpy as np
 from   numpy              import array,asarray,asanyarray,zeros,outer, \
                                  exp,nan,abs,arange,median,inf,minimum
 
-from   glu.lib.utils      import tally
+from   glu.lib.utils      import Counter
 from   glu.lib.fileutils  import namefile,map_reader,table_reader,table_columns,resolve_column_headers,tryint1,\
                                  cook_table
 from   glu.lib.genolib    import load_genostream,pick
@@ -332,7 +332,7 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
       else:
         header[i] = 'Covariate_%02d' % (i-1)
 
-  dups = [ (h,n) for h,n in tally(header).iteritems() if n>1 ]
+  dups = [ (h,n) for h,n in Counter(header).iteritems() if n>1 ]
   if dups:
     if verbose > 0:
       errs.write('[ERROR] Duplicate headers detected (n=%d)' % len(dups))
@@ -589,7 +589,7 @@ class BiallelicLocusModel(object):
     self.lname        = lname
     #self.genos        = genos
     self.valid_genos  = pick(genos, geno_indices)
-    self.genocounts   = tally(self.valid_genos)
+    self.genocounts   = Counter(self.valid_genos)
     self.genocount    = len([ 1 for g,n in self.genocounts.iteritems() if g and n ])
     self.maf          = estimate_maf(self.genocounts)
 
@@ -784,7 +784,7 @@ def variable_summary(out, x, categorical_limit=5, verbose=1):
         min=0, mean=49.5, median=49.5, max=99, sd=28.8661
   '''
   x    = asarray(x).ravel()
-  dist = tally(x)
+  dist = Counter(x)
   n    = len(dist)
 
   if not n:

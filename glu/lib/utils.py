@@ -13,11 +13,13 @@ __all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumera
            'gcdisabled','chunk']
 
 import gc
-import warnings
-import collections
 
-from   functools import update_wrapper
-from   itertools import izip, count, chain, islice, repeat
+from   itertools        import izip, count, chain, islice, repeat
+
+import glu.lib.pycompat
+from   glu.lib.pycompat import *
+
+__all__ += glu.lib.pycompat.__all__
 
 
 def as_set(items):
@@ -96,14 +98,11 @@ def tally(seq):
   @rtype     : dict
 
   >>> tally(['A','B','A','C','A','C','D'])
-  defaultdict(<type 'int'>, {'A': 3, 'C': 2, 'B': 1, 'D': 1})
+  Counter({'A': 3, 'C': 2, 'B': 1, 'D': 1})
   >>> tally(('A','B','A','C','A','C','D'))
-  defaultdict(<type 'int'>, {'A': 3, 'C': 2, 'B': 1, 'D': 1})
+  Counter({'A': 3, 'C': 2, 'B': 1, 'D': 1})
   '''
-  d = collections.defaultdict(int)
-  for item in seq:
-    d[item] += 1
-  return d
+  return Counter(seq)
 
 
 def ilen(seq):
@@ -417,7 +416,10 @@ def deprecated(func):
 
   (Doctest skipped because warnings are not displayed properly)
   '''
+  from functools import update_wrapper
+
   def deprecated_wrapper(*args, **kwargs):
+    import warnings
     warnings.warn('Call to deprecated function %s.' % func.__name__,
                   category=DeprecationWarning, stacklevel=2)
     return func(*args, **kwargs)
@@ -436,8 +438,11 @@ def deprecated_by(msg):
 
   (Doctest skipped because warnings are not displayed properly)
   '''
+  from functools import update_wrapper
+
   def deprecated(func):
     def deprecated_wrapper(*args, **kwargs):
+      import warnings
       warnings.warn('Call to function %s which has been deprecated by %s.' %
                     (func.__name__,msg), category=DeprecationWarning, stacklevel=2)
       return func(*args, **kwargs)

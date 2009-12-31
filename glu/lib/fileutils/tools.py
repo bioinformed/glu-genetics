@@ -9,7 +9,7 @@ __revision__  = '$Id$'
 from   operator                 import itemgetter
 from   itertools                import chain
 
-from   glu.lib.utils            import is_str,as_set,unique,tally
+from   glu.lib.utils            import is_str,as_set,unique,Counter
 from   glu.lib.fileutils.parser import parse_augmented_name, tryfloat
 from   glu.lib.fileutils.table  import resolve_column_headers, resolve_column_header_atom
 
@@ -426,7 +426,7 @@ def column_exprs(header,data,exprs,env=None):
 def _make_expr_env(code,header,env=None):
   env     = env or {'__builtins__':__builtins__}
   indices = env['indices'] = {}
-  counts  = tally(header)
+  counts  = Counter(header)
   headers = {}
 
   for i,h in enumerate(header):

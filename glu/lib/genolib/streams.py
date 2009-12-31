@@ -13,7 +13,7 @@ from   operator                  import itemgetter
 from   collections               import defaultdict
 from   itertools                 import izip,ifilter,imap,chain,groupby
 
-from   glu.lib.utils             import as_set,tally,izip_exact,gcdisabled
+from   glu.lib.utils             import as_set,Counter,izip_exact,gcdisabled
 from   glu.lib.xtab              import xtab,rowsby
 
 from   glu.lib.genolib.reprs     import snp
@@ -1697,13 +1697,13 @@ def unique_check_genomatrixstream(genos):
   assert genos.columns is not None
 
   if genos.loci is not None:
-    dup_loci = [ (k,n) for k,n in tally(genos.loci).iteritems() if n>1 ]
+    dup_loci = [ (k,n) for k,n in Counter(genos.loci).iteritems() if n>1 ]
     if dup_loci:
       msg = ','.join( '%s:%d' % kv for kv in dup_loci )
       raise NonUniqueError('Non-unique loci: %s' % msg)
 
   if genos.samples is not None:
-    dup_samples = [ (k,n) for k,n in tally(genos.samples).iteritems() if n>1 ]
+    dup_samples = [ (k,n) for k,n in Counter(genos.samples).iteritems() if n>1 ]
     if dup_samples:
       msg = ','.join( '%s:%d' % kv for kv in dup_samples )
       raise NonUniqueError('Non-unique samples: %s' % msg)
@@ -1879,8 +1879,8 @@ def combine_unsorted_genotriple_list(triplelist):
   # Otherwise, count the samples and loci to determine if they are unique
   # and consolidate the sets
   if samples is not None and loci is not None:
-    samples = tally(chain(*samples))
-    loci    = tally(chain(*loci))
+    samples = Counter(chain(*samples))
+    loci    = Counter(chain(*loci))
     unique  = all( v<=1 for v in chain(samples.itervalues(),loci.itervalues()) )
     samples = set(samples)
     loci    = set(loci)
@@ -1952,8 +1952,8 @@ def combine_sorted_genotriple_list(triplelist):
   # Otherwise, count the samples and loci to determine if they are unique
   # and consolidate the sets
   if samples is not None and loci is not None:
-    samples = tally(chain(*samples))
-    loci    = tally(chain(*loci))
+    samples = Counter(chain(*samples))
+    loci    = Counter(chain(*loci))
     unique  = all( v<=1 for v in chain(samples.itervalues(),loci.itervalues()) )
   else:
     unique  = False

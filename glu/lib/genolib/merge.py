@@ -10,7 +10,7 @@ from   operator                  import itemgetter
 from   itertools                 import izip,dropwhile,repeat,imap
 from   collections               import defaultdict
 
-from   glu.lib.utils             import tally
+from   glu.lib.utils             import Counter
 from   glu.lib.fileutils         import table_writer
 
 from   glu.lib.genolib.genoarray import Genotype,FORCE_PYTHON
@@ -237,7 +237,7 @@ except ImportError:
         return UNAMBIGUOUS,geno
 
     # Slow path
-    genocounts = tally(g for g in genos if g)
+    genocounts = Counter(g for g in genos if g)
 
     if not genocounts:
       return MISSING,model[None,None]
@@ -325,7 +325,7 @@ class Vote(object):
         return UNAMBIGUOUS,geno
 
     # Slow path
-    genocounts = tally(g for g in genos if g)
+    genocounts = Counter(g for g in genos if g)
 
     if not genocounts:
       return MISSING,model[None,None]
@@ -450,7 +450,7 @@ class Ordered(object):
         return UNAMBIGUOUS,geno
 
     # Slow path
-    genocounts = tally(g for g in genos if g)
+    genocounts = Counter(g for g in genos if g)
 
     if not genocounts:
       return MISSING,model[None,None]
