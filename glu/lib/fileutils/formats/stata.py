@@ -12,10 +12,10 @@ the PyDTA package (http://presbrey.mit.edu/PyDTA).
 '''
 
 from   struct                   import unpack, calcsize
-from   itertools                import chain, izip
+from   itertools                import izip
 
-from   glu.lib.fileutils.auto   import guess_format, autofile, hyphen
-from   glu.lib.fileutils.parser import parse_augmented_filename, trybool, get_arg
+from   glu.lib.fileutils.auto   import autofile, hyphen
+from   glu.lib.fileutils.parser import parse_augmented_filename, get_arg
 
 
 __all__ = ['table_reader_stata']
@@ -237,7 +237,7 @@ class StataReader(object):
     -----
     If missing_values is True during instantiation of StataReader then
     observations with StataMissingValue(s) are not filtered and should
-    be handled by your applcation.
+    be handled by your application.
     '''
 
     try:

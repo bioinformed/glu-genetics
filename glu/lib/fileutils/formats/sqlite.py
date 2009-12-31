@@ -123,7 +123,7 @@ class SQLiteWriter(object):
 
       if m < n:
         row  = list(row)
-        row += none[n-m]
+        row += nones[n-m]
       else:
         row  = row[:n]
 

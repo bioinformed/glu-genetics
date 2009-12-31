@@ -16,7 +16,7 @@ from   glu.lib.fileutils.table  import resolve_column_headers, resolve_column_he
 
 __all__ = ['cook_table', 'sort_table', 'uniq_table', 'subset_variables',
            'create_categorical_variables', 'column_exprs', 'filter_expr',
-           'table_query','table_options']
+           'query_table','table_options']
 
 
 def table_options(parser):
