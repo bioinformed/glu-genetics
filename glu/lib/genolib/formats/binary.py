@@ -1191,18 +1191,6 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
   ('s1', [('A', 'A'), (None, None), ('T', 'T')])
   ('s2', [(None, None), ('C', 'T'), ('G', 'T')])
   ('s3', [('A', 'T'), ('C', 'T'), ('G', 'G')])
-
-  # Disabled for now
-  #>>> genos = load_genomatrix_binary(f.name,'lbat')
-  #>>> genos.format
-  #'ldat'
-  #>>> genos.columns
-  #('s1', 's2', 's3')
-  #>>> for row in genos:
-  #...   print row
-  #('l1', [('A', 'A'), (None, None), ('A', 'T')])
-  #('l2', [(None, None), ('C', 'T'), ('C', 'T')])
-  #('l3', [('T', 'T'), ('G', 'T'), ('G', 'G')])
   '''
   import tables
 
@@ -1248,23 +1236,27 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
 
   if format_found in ('sdat','sbat'):
     format_found = 'sbat'
+    gformat      = 'sdat'
     samples      = rows
     loci         = columns
   elif format_found in ('ldat','lbat'):
     format_found = 'lbat'
+    gformat      = 'ldat'
     samples      = columns
     loci         = rows
   else:
     raise ValueError('Unknown genomatrix format: %s' % format_found)
+
+  if format != format_found:
+    raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
+                        % (namefile(filename),format,format_found))
 
   unique = len(set(columns))==len(columns) and len(set(rows))==len(rows)
 
   file_genome,file_models = load_models(gfile,loci,version,compat_version,ignoreloci)
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
-  if format == format_found == 'sbat':
-    gformat = 'sdat'
-
+  if format == 'sbat':
     with gcdisabled():
       models = list(file_models)
 
@@ -1278,17 +1270,17 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
       for i in xrange(chunks):
         start,stop = stop,stop+chunksize
         labels = rows[start:stop]
-        chunk  = gfile.root.genotypes[start:stop,:]
+        chunk  = gfile.root.genotypes[start:stop]
+
         for j,label in enumerate(labels):
           g = GenotypeArray(descr)
-          g.data = chunk[j,:]
+          g.data = chunk[j]
 
           yield label,g
 
       gfile.close()
 
-  elif format == format_found == 'lbat':
-    gformat = 'ldat'
+  elif format == 'lbat':
     models  = []
 
     def _load():
@@ -1299,21 +1291,18 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
       for i in xrange(chunks):
         start,stop = stop,stop+chunksize
         labels = rows[start:stop]
-        chunk  = gfile.root.genotypes[start:stop,:]
+        chunk  = gfile.root.genotypes[start:stop]
+
         for j,label in enumerate(labels):
           model = file_models.next()
           descr = build_descr(model,len(samples))
           g = GenotypeArray(descr)
-          g.data = chunk[j,:]
+          g.data = chunk[j]
 
           models.append(model)
           yield label,g
 
       gfile.close()
-
-  else:
-    raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
-                        % (namefile(filename),format,format_found))
 
   genos = GenomatrixStream(_load(),gformat,samples=samples,loci=loci,models=models,genome=file_genome,
                                          phenome=phenome,unique=unique,packed=True)
