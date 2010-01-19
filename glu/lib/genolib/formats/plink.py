@@ -49,7 +49,7 @@ PHENO_RMAP = {PHENO_UNKNOWN:'0',PHENO_UNAFFECTED:'1',PHENO_AFFECTED:'2'}
 PARENT_MAP = {'0':None}
 
 CHR_MAP    = {'0':None,'23':'X','24':'Y','25':'XY','26':'M'}
-CHR_RMAP   = {None:'0','':'0','X':'23','Y':'24','XY':'25','M':'26','MT':26}
+CHR_RMAP   = {None:'0','':'0','X':'23','Y':'24','XY':'25','M':'26','MT':'26'}
 
 
 # Only ASCII is currently supported
