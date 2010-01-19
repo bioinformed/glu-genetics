@@ -116,7 +116,7 @@ def table_reader_excel(filename,strdata=True,extra_args=None,**kwargs):
   if compressed_filename(name):
     raise IOError('Cannot read compressed Excel file')
 
-  book = xlrd.open_workbook(name)
+  book = xlrd.open_workbook(name,on_demand=True)
 
   try:
     sheet = book.sheet_by_name(sheet)
