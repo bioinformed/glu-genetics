@@ -284,9 +284,7 @@ def strip_trailing_empty(row):
 
 
 # FIXME: Needs docs+tests
-def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None,columnexpr=None,
-                         includevar=None,excludevar=None,filterexpr=None,allowdups=False,
-                         verbose=1,errs=sys.stderr):
+def load_phenos(filename,options,columns=None,deptype=int,errs=sys.stderr):
   '''
   Load phenotypes from a tab-delimited file
 
@@ -303,14 +301,14 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
         times with potentially different phenotypes.
   '''
   phenos = table_reader(filename,want_header=True)
-  phenos = cook_table(phenos)
+  phenos = cook_table(phenos,options)
 
   try:
     header = strip_trailing_empty(phenos.next())
   except StopIteration:
     raise ValueError('Empty phenotype file')
 
-  indices = resolve_column_headers(header,[pid,pheno])
+  indices = resolve_column_headers(header,[options.pid,options.pheno])
   if columns is not None:
     indices.extend(resolve_column_headers(header,columns))
   else:
@@ -334,9 +332,9 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
 
   dups = [ (h,n) for h,n in Counter(header).iteritems() if n>1 ]
   if dups:
-    if verbose > 0:
+    if options.verbose > 0:
       errs.write('[ERROR] Duplicate headers detected (n=%d)' % len(dups))
-    if verbose > 1:
+    if options.verbose > 1:
       for h,n in sorted(dups, key=itemgetter(1,0), reverse=True):
         errs.write('         %-12s : %2d\n' % (h,n))
     raise ValueError('Invalid repeated heading in phenotype header')
@@ -353,7 +351,7 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
 
       if '' in row:
         dropped += 1
-        if verbose > 1:
+        if options.verbose > 1:
           j = row.index('')
           errs.write(warn_msg % (row[0],i+2,header[j]))
         continue
@@ -364,29 +362,29 @@ def load_phenos(filename,pid=0,pheno=1,columns=None,deptype=int,categorical=None
 
       yield row
 
-    if verbose:
+    if options.verbose:
       errs.write(note_msg % (namefile(filename),len(header)-2,i+1-dropped,dropped,len(subjects)))
 
     # Check for duplicate subjects
     dups = [ (pid,n) for pid,n in subjects.iteritems() if n>1 ]
     if dups:
-      if verbose > 0:
-        if allowdups:
+      if options.verbose > 0:
+        if options.allowdups:
           errs.write('[NOTICE] Duplicate subjects (n=%d)\n' % len(dups))
         else:
           errs.write('[ERROR] Duplicate subjects (n=%d)\n' % len(dups))
 
-      if verbose > 1:
+      if options.verbose > 1:
           for pid,n in sorted(dups, key=itemgetter(1,0), reverse=True):
             errs.write('         %-12s : %2d\n' % (pid,n))
 
-      if not allowdups:
+      if not options.allowdups:
         raise ValueError('Duplicate subjects detected')
 
   return header,_phenos()
 
 
-def _load_loci(filename,options,keep):
+def load_loci(filename,options,keep):
   if options.includesamples:
     keep &= _union_options(options.includesamples)
 
@@ -473,33 +471,29 @@ def parse_formulae(options,models):
 def build_models(phenofile, genofile, options, deptype=int, errs=sys.stderr):
   warn_msg = '[WARNING] Subject "%s" excluded from analysis\n'
 
+  # Collect the dependant and independent variables from the model, if specified
   if options.model is not None:
     pheno,options.model = FormulaParser().parse(options.model)
     if pheno is not None:
       options.pheno = pheno
     covs = set(t.name for t in options.model.expand_terms() if isinstance(t,PHENOTERM))
   else:
-    pheno  = covs = None
-    covs = None
+    pheno = covs = None
 
-  verbose       = options.verbose
-  header,phenos = load_phenos(phenofile,pid=options.pid,pheno=options.pheno,columns=covs,deptype=deptype,
-                                        categorical=options.categorical,columnexpr=options.columnexpr,
-                                        includevar=options.includevar,excludevar=options.excludevar,
-                                        filterexpr=options.filterexpr,allowdups=options.allowdups,
-                                        verbose=verbose,errs=errs)
-  phenos        = list(phenos)
-  subjects      = set(p[0] for p in phenos)
-  keep          = subjects.copy()
+  header,phenos = load_phenos(phenofile,options,columns=covs,deptype=deptype,errs=errs)
 
-  loci,fixedloci,samples = _load_loci(genofile,options,keep)
+  phenos   = list(phenos)
+  subjects = set(p[0] for p in phenos)
+  keep     = subjects.copy()
+
+  loci,fixedloci,samples = load_loci(genofile,options,keep)
 
   if subjects != keep:
     phenos = [ p for p in phenos if p[0] in keep ]
 
-    if verbose > 0:
+    if options.verbose > 0:
       errs.write('[NOTICE] After exclusions, %d subjects remain, %d subjects excluded\n' % (len(phenos),len(subjects)-len(keep)))
-    if verbose > 1:
+    if options.verbose > 1:
       for pid in sorted(subjects-keep):
         errs.write(warn_msg % pid)
 
