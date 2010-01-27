@@ -86,7 +86,7 @@ def load_plink_map(filename,genome):
 
     chr   = fields[0]
     lname = fields[1]
-    gdist = int(fields[2])      if fields[2] else None
+    gdist = float(fields[2])    if fields[2] else None
     pdist = abs(int(fields[3])) if fields[3] else None
 
     if not lname:
@@ -552,7 +552,7 @@ def load_plink_tped(filename,format,genome=None,phenome=None,extra_args=None,**k
 
         chr   = fields[0] or None
         lname = fields[1]
-        gdist = int(fields[2])      if fields[2] else None
+        gdist = float(fields[2])    if fields[2] else None
         pdist = abs(int(fields[3])) if fields[3] else None
 
         if not lname:
@@ -813,7 +813,7 @@ def load_plink_bim(filename,genome):
 
     chr     = CHR_MAP.get(fields[0].upper(),fields[0])
     locus   = fields[1]
-    gdist   = int(fields[2])      if fields[2] else None
+    gdist   = float(fields[2])    if fields[2] else None
     pdist   = abs(int(fields[3])) if fields[3] else None
     allele1 = fields[4]
     allele2 = fields[5]
@@ -840,7 +840,9 @@ def load_plink_bim(filename,genome):
       elif a:
         genos = [(a,a)]
       elif b:
-        raise RuntimeError('Invalid BIM locus model: (%s/%s)' % (a,b))
+        assert b!='-'
+        a = '-'
+        genos = [(a,a),(b,b),(a,b)]
       else:
         genos = []
 
