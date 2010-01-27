@@ -20,9 +20,12 @@ def _rowstream(data, rowkeyfunc, colkeyfunc, valuefunc):
 
 def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
   '''
-  Build genomatrix from genotriples when the necessary columns are given. Genotypes from the same row and column are grouped   together. Empty list will be used for missing genotypes.
+  Build genomatrix from genotriples when the necessary columns are given.
+  Genotypes from the same row and column are grouped together.  Empty list
+  will be used for missing genotypes.
 
-  The columns that is passed in will be returned first followed by A generator of the genomatrix which is built
+  The columns that is passed in will be returned first followed by a
+  generator of the resulting table.
 
   @param          data: genotriple stream
   @type           data: sequence
@@ -94,12 +97,16 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
   return columns,_rowsby()
 
 
-def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
+def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None, roworder=None, colorder=None):
   '''
-  Build genomatrix from genotriples. Genotypes from the same row and column are grouped together.
-  Missing genotypes default to None.
+  Build a table of rows by columns from a sequence that can be interpreted
+  as a triple of (row key, column key, value).  Values with the same row and
+  column keys are grouped together.  Cells with no values default to None.
 
-  The list of colkeys and rowkeys will be returned first followed by A generator of the genomatrix which is built
+  The list of colkeys and rowkeys will be returned first followed by a
+  generator of the table rows.  Row and column keys appear in the optional
+  roworder and colorder parameters.  All other keys will be in same order
+  they are first observed in the data sequence.
 
   @param          data: genotriple stream
   @type           data: sequence
@@ -111,6 +118,10 @@ def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
   @type      valuefunc: function
   @param aggregatefunc: function to aggregate columns
   @type  aggregatefunc: function
+  @param      roworder: ordered row keys
+  @type       roworder: sequence
+  @param      colorder: ordered column keys
+  @type       colorder: sequence
   @return             : genomatrix
   @rtype              : genomatrix generator
 
@@ -144,8 +155,8 @@ def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
   get1 = itemgetter(1)
   get2 = itemgetter(2)
 
-  rowkeys  = {}
-  colkeys  = {}
+  rowkeys  = dict( (rowkey,i) for i,rowkey in enumerate(roworder or []) )
+  colkeys  = dict( (colkey,i) for i,colkey in enumerate(colorder or []) )
   datalist = []
 
   # Pass 1: Build row, column, and data list
@@ -191,4 +202,3 @@ def _test():
 
 if __name__ == '__main__':
   _test()
-
