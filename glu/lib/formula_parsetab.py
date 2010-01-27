@@ -4,9 +4,9 @@
 
 _lr_method = 'LALR'
 
-_lr_signature = 'V\xa7=\xde\xff}m\x9ax\xa0c"\xb2\x1c\xed\''
+_lr_signature = 'Q|\x91\xe6\xb1\x1a\xf1\x9c\x87\xe3\x1f\xfe\x15_\x81\x80'
 
-_lr_action_items = {'TERM':([0,6,11,14,15,],[1,1,1,1,1,]),'IDENT':([0,6,10,11,14,15,],[2,2,2,2,2,2,]),'RPAREN':([2,4,5,8,12,13,16,17,19,20,21,22,23,],[-3,-4,-8,-7,-10,19,22,23,-9,-5,-6,-11,-12,]),'QUOTED':([0,6,10,11,14,15,],[4,4,4,4,4,4,]),'EQUALS':([2,3,4,],[-3,11,-4,]),'ONE':([0,6,11,14,15,],[8,8,8,8,8,]),'ZERO':([0,6,11,14,15,],[5,5,5,5,5,]),'PLUS':([2,3,4,5,8,9,12,13,18,19,20,21,22,23,],[-3,-10,-4,-8,-7,14,-10,14,14,-9,-5,-6,-11,-12,]),'LPAREN':([0,1,6,11,14,15,],[6,10,6,6,6,6,]),'TIMES':([2,3,4,5,8,9,10,12,13,18,19,20,21,22,23,],[-3,-10,-4,-8,-7,15,17,-10,15,15,-9,15,-6,-11,-12,]),'$end':([2,3,4,5,7,8,9,12,18,19,20,21,22,23,],[-3,-10,-4,-8,0,-7,-2,-10,-1,-9,-5,-6,-11,-12,]),}
+_lr_action_items = {'TERM':([0,6,11,12,15,16,],[1,1,1,1,1,1,]),'IDENT':([0,6,10,11,12,15,16,],[2,2,2,2,2,2,2,]),'RPAREN':([2,4,5,8,13,14,17,18,21,22,23,24,25,],[-4,-5,-9,-8,-11,21,24,25,-10,-6,-7,-12,-13,]),'QUOTED':([0,6,10,11,12,15,16,],[4,4,4,4,4,4,4,]),'EQUALS':([2,3,4,],[-4,12,-5,]),'ONE':([0,6,11,12,15,16,],[8,8,8,8,8,8,]),'ZERO':([0,6,11,12,15,16,],[5,5,5,5,5,5,]),'PLUS':([2,3,4,5,8,9,13,14,19,20,21,22,23,24,25,],[-4,-11,-5,-9,-8,15,-11,15,15,15,-10,-6,-7,-12,-13,]),'LPAREN':([0,1,6,11,12,15,16,],[6,10,6,6,6,6,6,]),'DISTRIB':([2,3,4,],[-4,11,-5,]),'TIMES':([2,3,4,5,8,9,10,13,14,19,20,21,22,23,24,25,],[-4,-11,-5,-9,-8,16,18,-11,16,16,16,-10,16,-7,-12,-13,]),'$end':([2,3,4,5,7,8,9,13,19,20,21,22,23,24,25,],[-4,-11,-5,-9,0,-8,-3,-11,-2,-1,-10,-6,-7,-12,-13,]),}
 
 _lr_action = { }
 for _k, _v in _lr_action_items.items():
@@ -15,7 +15,7 @@ for _k, _v in _lr_action_items.items():
       _lr_action[_x][_k] = _y
 del _lr_action_items
 
-_lr_goto_items = {'formula':([0,],[7,]),'expression':([0,6,11,14,15,],[9,13,18,20,21,]),'name':([0,6,10,11,14,15,],[3,12,16,12,12,12,]),}
+_lr_goto_items = {'formula':([0,],[7,]),'expression':([0,6,11,12,15,16,],[9,14,19,20,22,23,]),'name':([0,6,10,11,12,15,16,],[3,13,17,13,13,13,13,]),}
 
 _lr_goto = { }
 for _k, _v in _lr_goto_items.items():
@@ -25,16 +25,17 @@ for _k, _v in _lr_goto_items.items():
 del _lr_goto_items
 _lr_productions = [
   ("S'",1,None,None,None),
-  ('formula',3,'p_formula','formula.py',598),
-  ('formula',1,'p_formula2','formula.py',604),
-  ('name',1,'p_name','formula.py',610),
-  ('name',1,'p_name','formula.py',611),
-  ('expression',3,'p_expression_binop','formula.py',617),
-  ('expression',3,'p_expression_binop','formula.py',618),
-  ('expression',1,'p_expression_one','formula.py',625),
-  ('expression',1,'p_expression_zero','formula.py',631),
-  ('expression',3,'p_expression_paren','formula.py',637),
-  ('expression',1,'p_expression_var','formula.py',643),
-  ('expression',4,'p_expression_func','formula.py',649),
-  ('expression',4,'p_expression_func','formula.py',650),
+  ('formula',3,'p_formula','formula.py',563),
+  ('formula',3,'p_formula','formula.py',564),
+  ('formula',1,'p_formula2','formula.py',570),
+  ('name',1,'p_name','formula.py',576),
+  ('name',1,'p_name','formula.py',577),
+  ('expression',3,'p_expression_binop','formula.py',583),
+  ('expression',3,'p_expression_binop','formula.py',584),
+  ('expression',1,'p_expression_one','formula.py',591),
+  ('expression',1,'p_expression_zero','formula.py',597),
+  ('expression',3,'p_expression_paren','formula.py',603),
+  ('expression',1,'p_expression_var','formula.py',609),
+  ('expression',4,'p_expression_func','formula.py',615),
+  ('expression',4,'p_expression_func','formula.py',616),
 ]

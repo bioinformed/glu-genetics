@@ -522,7 +522,7 @@ class FormulaParser(object):
     return self.parser.parse(s,lexer=self.lexer)
 
   tokens = ('ONE', 'ZERO',
-            'PLUS','TIMES','EQUALS',
+            'PLUS','TIMES','EQUALS','DISTRIB',
             'LPAREN','RPAREN', 'TERM', 'IDENT', 'QUOTED')
 
   # Tokens
@@ -531,6 +531,7 @@ class FormulaParser(object):
   t_PLUS    = r'\+'
   t_TIMES   = r'\*'
   t_EQUALS  = r'='
+  t_DISTRIB = r'~'
   t_LPAREN  = r'\('
   t_RPAREN  = r'\)'
 
@@ -559,7 +560,8 @@ class FormulaParser(object):
 
   def p_formula(self, t):
     '''
-    formula : name EQUALS expression
+    formula : name EQUALS  expression
+    formula : name DISTRIB expression
     '''
     t[0] = t[1],t[3]
 
