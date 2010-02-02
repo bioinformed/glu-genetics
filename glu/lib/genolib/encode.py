@@ -699,7 +699,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
         try:
           loc.model = build_model(alleles,base=loc.model)
         except GenotypeRepresentationError:
-          _encoding_error(lname,set(alleles)-set(loc.model.alleles),model,warn)
+          _encoding_error(lname,set(alleles)-set(loc.model.alleles),loc.model,warn)
 
         cache = cachemap.get(loc.model)
         if cache is None:
