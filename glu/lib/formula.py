@@ -102,13 +102,19 @@ class TERM(object):
     return np.exp(self.estimate_ci(p,c,alpha=alpha))
 
 
-ident_re = re.compile('[a-zA-Z_][a-zA-Z_:.0-9]*')
+ident_re = re.compile('^[a-zA-Z_][a-zA-Z_:.0-9]*$')
 
+#FIXME: literal escaping is not yet implemented
 def quote_ident(name):
-  if not ident_re.match(name):
-    return "'%s'" % name
-  else:
+  if ident_re.match(name):
     return name
+  elif "'" not in name:
+    return "'%s'" % name
+  elif '"' not in name:
+    return '"%s"' % name
+  else:
+    #FIXME: literal escaping is not yet implemented
+    return "'%s'" % name.replace('"','\\"')
 
 
 class PHENOTERM(TERM):
@@ -541,6 +547,7 @@ class FormulaParser(object):
       t.type = 'TERM'
     return t
 
+  #FIXME: literal escaping is not yet implemented
   def t_QUOTED(self, t):
     r'\'([^\\\n]|(\\.))*?\'|"([^\\\n]|(\\.))*?"'
     t.value = t.value[1:-1]
