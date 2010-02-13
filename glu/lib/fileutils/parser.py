@@ -109,7 +109,7 @@ def parse_augmented_filename(filename,args):
   filename_save = filename
   while not os.path.exists(filename) and ':' in filename:
     filename,arg = filename.rsplit(':',1)
-    kv = arg.split('=')
+    kv = arg.split('=',1)
 
     if len(kv) > 2:
       raise ValueError("Invalid augmented filename argument in '%s'" % filename_save)

@@ -510,7 +510,7 @@ def resolve_column_header(header,column):
   raise
 
 
-def resolve_column_headers(header,include,exclude=None):
+def resolve_column_headers(header,include=None,exclude=None):
   '''
   @param       header: header line of the input file
   @type        header: sequence of strs
@@ -568,7 +568,25 @@ def resolve_column_headers(header,include,exclude=None):
   return indices
 
 
-def table_columns(rows, columns, drop=None, header=None, want_header=False):
+def parse_rename(rename):
+  if not rename:
+    return None
+
+  if isinstance(rename,str):
+    rename = [ r.split('=') for r in rename.split(',') ]
+
+  rdict = {}
+  if isinstance(rename, (list,tuple)):
+    for r in rename:
+      if len(r) != 2:
+        raise ValueError('Invalid column rename: %s' % str(r))
+      rdict[r[0]] = r[1]
+    rename = rdict
+
+  return rename
+
+
+def table_columns(rows, columns, drop=None, rename=None, header=None, want_header=False):
   '''
   Return a rows from a sequence for columns specified by name or number. A
   single row of column headers may be embedded within the row sequence or
@@ -633,7 +651,8 @@ def table_columns(rows, columns, drop=None, header=None, want_header=False):
   >>> list(table_columns([['loc1'],['loc2'],['loc1','loc1'],['loc2']],['c2','c1'],header=['c1','c2']))
   [['', 'loc1'], ['', 'loc2'], ['loc1', 'loc1'], ['', 'loc2']]
   '''
-  rows = iter(rows)
+  rows   = iter(rows)
+  rename = parse_rename(rename)
 
   # All columns are to be returned
   if not columns and not drop:
@@ -647,12 +666,18 @@ def table_columns(rows, columns, drop=None, header=None, want_header=False):
         # Process row 1 (may or may not be a header)
         row = map(str.strip,row)
         n   = len(row)
+
+        if rename:
+          row = [ rename.get(h,h) for h in row ]
+
         yield row
 
       else:
         header = map(str.strip,header)
         n      = len(header)
         if want_header:
+          if rename:
+            header = [ rename.get(h,h) for h in header ]
           yield header
 
       for row in rows:
@@ -679,9 +704,12 @@ def table_columns(rows, columns, drop=None, header=None, want_header=False):
   if not want_header:
     header = None
 
-  def _table_reader_columns():
+  def _table_reader_columns(header):
     if header is not None:
-      yield [ header[j] for j in indices ]
+      header = [ header[j] for j in indices ]
+      if rename:
+        header = [ rename.get(h,h) for h in header ]
+      yield header
 
     # Build result rows
     for row in rows:
@@ -689,7 +717,7 @@ def table_columns(rows, columns, drop=None, header=None, want_header=False):
       result  = [ (row[j].strip() if j<m else '') for j in indices ]
       yield result
 
-  return _table_reader_columns()
+  return _table_reader_columns(header)
 
 
 def table_reader(filename,want_header=False,extra_args=None,**kwargs):
@@ -835,6 +863,7 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
   drop    = get_arg(args, ['d','drop'])
+  rename  = get_arg(args, ['r','rename'])
   header  = get_arg(args, ['h','header'])
 
   if header is not None and isinstance(header,str):
@@ -862,35 +891,45 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   if skip:
     rows = islice(rows,skip,None)
 
-  return table_columns(rows,columns,drop,header=header,want_header=want_header)
+  return table_columns(rows,columns,drop=drop,rename=rename,header=header,want_header=want_header)
 
 
 class TableWriter(object):
   '''
   Write selected columns to a lower-level tabular data writer object
   '''
-  def __init__(self, writer, columns, drop):
+  def __init__(self, writer, columns, drop, rename):
     self.writer  = writer
     self.columns = columns
     self.drop    = drop
+    self.header  = None
+    self.rename  = parse_rename(rename)
+    self.indices = None
 
-    # Try to resolve column headings without a header row
-    try:
-      self.indices = resolve_column_headers(None,columns,drop)
-    except ValueError:
-      self.indices = None
+  def _write_header(self, header):
+    self.indices = indices = resolve_column_headers(header,self.columns,self.drop)
+
+    m      = len(header)
+    header = [ (header[j] if j<m else '') for j in indices ]
+
+    if self.rename:
+      rename = self.rename
+      header = [ rename.get(h,h) for h in header ]
+
+    self.writer.writerow(header)
 
   def writerows(self, rows):
     indices = self.indices
 
     if indices is None:
-      # Infer indices from the first row if needed
+      rows = iter(rows)
       try:
-        row,rows = peekfirst(rows)
+        header = rows.next()
       except IndexError:
         return
 
-      self.indices = indices = resolve_column_headers(row,self.columns,self.drop)
+      self._write_header(header)
+      indices = self.indices
 
     for row in rows:
       m = len(row)
@@ -902,11 +941,11 @@ class TableWriter(object):
 
     # First row and indices require header information
     if indices is None:
-      self.indices = indices = resolve_column_headers(row,self.columns,self.drop)
-
-    m = len(row)
-    row = [ (row[j] if j<m else '') for j in indices ]
-    self.writer.writerow(row)
+      self._write_header(row)
+    else:
+      m = len(row)
+      row = [ (row[j] if j<m else '') for j in indices ]
+      self.writer.writerow(row)
 
 
 ##########################################################################
@@ -1056,6 +1095,7 @@ def table_writer(filename,extra_args=None,**kwargs):
   format  = get_arg(args, ['format'], guess_format(name, TABLE_FORMATS)) or 'tsv'
   columns = get_arg(args, ['c','cols','columns'])
   drop    = get_arg(args, ['d','drop'])
+  rename  = get_arg(args, ['r','rename'])
 
   format  = format.lower()
   if format in ('xls','excel'):
@@ -1073,9 +1113,11 @@ def table_writer(filename,extra_args=None,**kwargs):
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  # Use a wrapper writer object to handle column selectors
-  if columns is not None or drop:
-    writer = TableWriter(writer, columns, drop)
+  # Use a wrapper writer object to handle column selectors and header renaming
+  # FIXME: Header renaming without column selectors could be much more
+  #        efficient as a special case
+  if columns is not None or drop or rename:
+    writer = TableWriter(writer, columns, drop, rename)
 
   return writer
 
