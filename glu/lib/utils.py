@@ -85,6 +85,40 @@ def is_str(s):
   return isinstance(s, basestring)
 
 
+def constant_function(value):
+  '''
+  constant_function(value) -> lambda: value
+
+  Return a trivial function that takes no arguments and returns only value.
+  This is semantically equivalent to "lambda : value", except roughly twice
+  as fast (at the expense of being obscure (not that lambda isn't obscure
+  these days)).
+
+  Based on: http://code.activestate.com/recipes/502215/
+
+  Why bother?  The primary use-case envisioned is to provide a more
+  efficient default values to collections.defaultdict.
+
+  >>> c = constant_function(1)
+  >>> c()
+  1
+  >>> c()
+  1
+
+  >>> c = constant_function('foo')
+  >>> c()
+  'foo'
+  >>> c()
+  'foo'
+
+  >>> from collections import defaultdict
+  >>> d = defaultdict(c)
+  >>> d[99]
+  'foo'
+  '''
+  return repeat(value).next
+
+
 def tally(seq):
   '''
   tally(sequence) -> { item:count,... }
@@ -489,7 +523,9 @@ class gcdisabled(object):
       gc.enable()
 
 
-def chunk(iterable, size, **kwargs):
+_chunk_nothing=object()
+
+def chunk(iterable, size, pad=_chunk_nothing):
   '''
   Generator that breaks an iterable into tuples of chunks (tuples) of a
   given size.  The optional keyword parameter 'pad' if the last block is
@@ -500,15 +536,19 @@ def chunk(iterable, size, **kwargs):
   [(0, 1, 2), (3, 4, 5), (6,)]
   >>> list(chunk(xrange(7), 3, pad=None))
   [(0, 1, 2), (3, 4, 5), (6, None, None)]
+  >>> list(chunk(reversed(xrange(7)), 3, pad=-1))
+  [(6, 5, 4), (3, 2, 1), (0, -1, -1)]
   '''
   iterable = iter(iterable)
-  pad = kwargs.get('pad')
   while True:
     block = tuple(islice(iterable,size))
+
     if not block:
-        break
-    if len(block) < size and 'pad' in kwargs:
+      break
+
+    if pad is not _chunk_nothing and len(block) < size:
       block = tuple(chain(block, repeat(pad, size-len(block))))
+
     yield block
 
 
