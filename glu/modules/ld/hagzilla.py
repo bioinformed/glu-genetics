@@ -27,15 +27,15 @@ from   glu.modules.genedb.queries import query_snps_by_location, query_gene_by_n
 #FIXME: Make even moe configurable
 HAPPATH='/usr/local/share/hapmap/'
 
-DATA = { 'hapmap27' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+DATA = { 'hapmap27' : dict(   genome='genedb_ncbi36.3_dbsnp130',
                            genotypes=HAPPATH+'build27/glu/hapmap_%(POP)s_%(CHR)s_r27_fwd_nr_b36.lbat'),
-         'hapmap26' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+         'hapmap26' : dict(   genome='genedb_ncbi36.3_dbsnp130',
                            genotypes=HAPPATH+'build26/forward/non-redundant/hapmap_%(POP)s_%(CHR)s_r26_fwd_nr_b36.lbat'),
-         'hapmap23' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+         'hapmap23' : dict(   genome='genedb_ncbi36.3_dbsnp130',
                             pedigree=HAPPATH+'hapmap_pedigree.tsv',
                            genotypes=HAPPATH+'build23/rs_strand/non-redundant/genotypes_chr%(CHR)s_%(POP)s_r23a_nr.b36.txt.gz',
                               format='hapmap'),
-         'hapmap22' : dict(   genome='genedb_ncbi36.3_dbsnp129',
+         'hapmap22' : dict(   genome='genedb_ncbi36.3_dbsnp130',
                             pedigree=HAPPATH+'hapmap_pedigree.tsv',
                            genotypes=HAPPATH+'build22/rs_strand/non-redundant/genotypes_chr%(CHR)s_%(POP)s_r22_nr.b36.txt.gz',
                               format='hapmap'),
@@ -121,6 +121,8 @@ def run_tagzilla(config,outdir,project,gene,dprime,r2,populations,chromosome,snp
       command.append(cmdprefix)
 
     command.append('glu ld.tagzilla')
+
+    command.append('--filternonfounders')
 
     command.append('-s subset')
     file('subset','w').write('\n'.join(snps))
