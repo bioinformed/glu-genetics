@@ -1976,6 +1976,8 @@ def tagzilla_single(options,args):
 
   if options.exclude:
     exclude = set(list_reader(options.exclude))
+  elif options.designscores:
+    exclude = set()
 
   includes     = Includes(include_typed, include_untyped)
   designscores = build_design_score(options.designscores,options.designdefault)
@@ -2075,6 +2077,8 @@ def tagzilla_multi(options,args):
 
   if options.exclude:
     exclude = set(list_reader(options.exclude))
+  elif options.designscores:
+    exclude = set()
 
   includes     = Includes(include_typed, include_untyped)
   designscores = build_design_score(options.designscores,options.designdefault)

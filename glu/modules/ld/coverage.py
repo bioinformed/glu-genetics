@@ -98,6 +98,8 @@ def main():
 
   if options.exclude:
     exclude = set(list_reader(options.exclude))
+  elif options.designscores:
+    exclude = set()
 
   designscores = build_design_score(options.designscores)
 
