@@ -430,6 +430,9 @@ def _make_expr_env(code,header,env=None):
   headers = {}
 
   for i,h in enumerate(header):
+    if not h:
+      continue
+
     if counts[h] == 1:
       indices[h] = i
 
