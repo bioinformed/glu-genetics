@@ -420,7 +420,7 @@ def option_parser():
   usage = 'usage: %prog [options] genotypes'
   parser = optparse.OptionParser(usage=usage)
 
-  geno_options(parser,input=True)
+  geno_options(parser,input=True,output=True)
 
   parser.add_option('-d', '--destdir', dest='destdir', default='',
                     help='Destination directory for output files.  Write to input file directory by default.')
@@ -448,7 +448,7 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
-  filename = options.template if options.template else args[0]
+  filename = options.template or args[0]
 
   # FIXME: Must know about augmented filenames
   if filename == '-':
@@ -460,7 +460,9 @@ def main():
   genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
                                   genome=options.loci,phenome=options.pedigree,hyphen=sys.stdin)
 
-  outformat = guess_outformat(args[0]) or options.informat or genos.format
+  outformat = (options.outformat or guess_outformat(options.template)
+            or guess_outformat(args[0]) or options.informat or genos.format)
+
   split(genos, outformat, prefix, suffix, options)
 
 
