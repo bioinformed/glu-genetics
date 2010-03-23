@@ -14,7 +14,7 @@ __revision__  = '$Id$'
 # maintained from the Python stdlib for ease of maintenance.
 
 
-__all__ = []
+__all__ = ['namedtuple','Counter']
 
 import sys        as _sys
 import heapq      as _heapq
@@ -25,9 +25,9 @@ from   keyword   import iskeyword as _iskeyword
 from   itertools import repeat as _repeat, starmap as _starmap, ifilter as _ifilter
 
 
-if not hasattr(collections, 'namedtuple'):
-    __all__ += ['namedtuple']
-
+if hasattr(collections, 'namedtuple'):
+    namedtuple = collections.namedtuple
+else:
     def namedtuple(typename, field_names, verbose=False):
         """Returns a new subclass of tuple with named fields.
 
@@ -131,9 +131,9 @@ if not hasattr(collections, 'namedtuple'):
 ###  Counter
 ########################################################################
 
-if not hasattr(collections, 'Counter'):
-    __all__ += ['Counter']
-
+if hasattr(collections, 'Counter'):
+    Counter = collections.Counter
+else:
     Mapping = (dict,)
 
 
