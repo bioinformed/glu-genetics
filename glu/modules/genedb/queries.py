@@ -11,6 +11,8 @@ def query_genes_by_name(con,gene):
   SELECT   a.Alias,g.featureName,g.chromosome,g.chrStart,g.chrEnd,g.orientation,g.featureType
   FROM     alias a, gene g
   WHERE    g.geneID = a.geneID
+    AND    g.chrStart<>""
+    AND    g.chrEnd<>""
     AND    a.Alias %s
   ORDER BY g.chromosome,MIN(g.chrStart,g.chrEnd);
   '''
