@@ -1661,7 +1661,6 @@ class ModelBuilder(object):
       if genotypes and not alleles:
         alleles = tuple(sorted(set(a for g in genotypes for a in g if a is not None)))
 
-
       if alleles and not max_alleles:
         max_alleles = len(alleles)
 
