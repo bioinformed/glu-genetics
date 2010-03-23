@@ -2,21 +2,21 @@
 
 from __future__ import with_statement
 
-__abstract__  = 'WTCCC genotype format output object'
+__abstract__  = 'FUD genotype format output object'
 __copyright__ = 'Copyright (c) 2007-2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-__all__       = ['WTCCCWriter', 'save_wtccc']
+__all__       = ['FUDWriter', 'save_fud']
 
 __genoformats__ = [
   #LOADER        SAVER          WRITER       PFORMAT  ALIAS    EXTS
-  ('load_wtccc', 'save_wtccc', 'WTCCCWriter', 'ldat', 'wtccc', None) ]
+  ('load_fud',   'save_fud',    'FUDWriter', 'ldat',  None,    'fud') ]
 
 
-from   itertools                 import izip, imap
+import csv
 
-from   glu.lib.fileutils         import autofile,parse_augmented_filename,get_arg,guess_related_file,trybool,namefile
+from   glu.lib.fileutils         import autofile,parse_augmented_filename,get_arg,trybool,namefile
 
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.phenos    import Phenome
@@ -24,78 +24,42 @@ from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.genoarray import GenotypeArray,build_model,build_descr
 
 
-GENOS = [ ['0','0','0'],
-          ['1','0','0'],
-          ['0','1','0'],
-          ['0','0','1'] ]
+HEADER_START = ['SNP','Chromosome','Position','AlleleA','AlleleB']
 
 
-def _encode_wtccc(model):
+def _encode_fud(model):
   assert model is not None
 
   if len(model.alleles) > 3:
     raise ValueError('WTCCC files support only biallelic models')
 
-  genovalues = [ GENOS[0] ]*4
+  genovalues = [-1]*4
 
   allele1,allele2 = (model.alleles[1:]+[None,None])[:2]
 
   if allele1:
-    genovalues[ model[allele1,allele1].index ] = GENOS[1]
+    genovalues[ model[allele1,allele1].index ] = 0
   if allele2:
-    genovalues[ model[allele2,allele2].index ] = GENOS[3]
+    genovalues[ model[allele2,allele2].index ] = 2
   if allele1 and allele2:
-    genovalues[ model[allele1,allele2].index ] = GENOS[2]
+    genovalues[ model[allele1,allele2].index ] = 1
 
   return allele1,allele2,genovalues
 
 
-def _decode_wtccc(model,a,b,threshold,fields):
-  if threshold<0.50:
-    raise ValueError
-  aa = model[a,a]
-  ab = model[a,b]
-  bb = model[b,b]
-  nn = model[None,None]
+def _decode_fud(model,a,b,fields):
+  remap = [model[None,None]]*4
 
-  for p_aa,p_ab,p_bb in izip(*[imap(float,fields)]*3):
-    if p_aa>threshold:
-      geno = aa
-    elif p_ab>threshold:
-      geno = ab
-    elif p_bb>threshold:
-      geno = bb
-    else:
-      geno = nn
+  remap[0]  = model[a,a]
+  remap[1]  = model[a,b]
+  remap[2]  = model[b,b]
 
-    yield geno
+  return ( remap[int(round(float(g)))] for g in fields )
 
 
-def load_wtccc_samples(filename):
-  sfile = autofile(filename)
-  header = sfile.next().split()
-
-  if header[:3] != ['ID_1','ID_2','missing']:
-    raise ValueError('Invalid header found for WTCCC sample file %s' % namefile(filename))
-
-  header2 = sfile.next().split()
-
-  if header2[:3] != ['0','0','0']:
-    raise ValueError('Invalid header2 found for WTCCC sample file %s' % namefile(filename))
-
-  for line_num,line in enumerate(sfile):
-    fields = line.split()
-    if len(fields) < 3:
-      raise ValueError('Invalid WTCCC sample data on line %d of %s' % (line_num+1,namefile(filename)))
-
-    sample = '%s:%s' % (fields[0],fields[1])
-
-    yield sample
-
-
-def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_fud(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
-  See http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html
+  FUD format
 
   @param     filename: file name or file object
   @type      filename: str or file object
@@ -116,15 +80,15 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
   >>> from StringIO import StringIO
   >>> data = StringIO(
-  ... '0 l1 0 A G 1 0 0 0 1 0 0 0 1\\n'
-  ... '0 l2 0 C G 0 0 0 0 1 0 0 0 0\\n'
-  ... '0 l3 0 C T 0 1 0 1 0 0 0 1 0\\n')
-  >>> samples = StringIO('ID_1 ID_2 missing\\n0 0 0 0 0 0\\nf1 s1 0\\nf1 s2 0\\nf1 s3 0\\n')
-  >>> genos = load_wtccc(data,samples=samples)
+  ... 'SNP\\tChromosome\\tPosition\\tAlleleA\\tAlleleB\\ts1\\ts2\\ts3\\n'
+  ... 'l1\\t0\\tl1\\tA\\tG\\t0\\t1\\t2\\n'
+  ... 'l2\\t0\\tl2\\tC\\tG\\t-1\\t1\\t-1\\n'
+  ... 'l3\\t0\\tl3\\tC\\tT\\t1\\t0\\t1\\n')
+  >>> genos = load_fud(data,'fud')
   >>> genos.format
   'ldat'
   >>> genos.columns
-  ('f1:s1', 'f1:s2', 'f1:s3')
+  ('s1', 's2', 's3')
   >>> for row in genos:
   ...   print row
   ('l1', [('A', 'A'), ('A', 'G'), ('G', 'G')])
@@ -140,20 +104,15 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   filename  = parse_augmented_filename(filename,args)
 
   unique    = trybool(get_arg(args, ['unique'], True))
-  samples   = get_arg(args, ['samples','s']) or guess_related_file(filename,['lst'])
-  threshold = float(get_arg(args, ['threshold','t'], 0.95))
-
-  if samples is None:
-    raise ValueError('Sample file must be specified when loading WTCCC files')
-
-  if threshold<0.50:
-    raise ValueError('WTCCC genotype confidence threshold must be greater than 0.5')
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-  samples = list(load_wtccc_samples(samples))
-  gfile   = autofile(filename)
+  gfile   = csv.reader(autofile(filename),dialect='excel-tab')
+  header  = gfile.next()
+
+  assert header[:5] == HEADER_START
+  samples = header[5:]
 
   if phenome is None:
     phenome = Phenome()
@@ -162,21 +121,19 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   models = []
   file_genome = Genome()
 
-  def _load_wtccc():
+  def _load_fud():
     m           = len(samples)
-    n           = 5+m*3
+    n           = 5+m
     modelcache  = {}
 
     for line_num,row in enumerate(gfile):
-      fields = row.split()
+      if len(row) != n:
+        raise ValueError('Invalid FUD row on line %d of %s' % (line_num+1,namefile(filename)))
 
-      if len(fields) != n:
-        raise ValueError('Invalid WTCCC row on line %d of %s' % (line_num+1,namefile(filename)))
-
-      chrom   = fields[0]
-      lname   = fields[1]
-      loc     = fields[2]
-      a,b     = fields[3:5]
+      lname   = row[0]
+      chrom   = row[1]
+      loc     = row[2]
+      a,b     = row[3:5]
       alleles = a,b
 
       if chrom.startswith('chr'):
@@ -184,13 +141,6 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
       if chrom.upper()=='MT':
         chrom = 'M'
-      elif chrom not in ('X','Y','XY','M'):
-        try:
-          chrom = int(chrom)
-          if chrom < 1 or chrom > 22:
-            chrom = None
-        except ValueError:
-          chrom = None
 
       try:
         loc = int(loc) or None
@@ -199,21 +149,21 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
 
       model = modelcache.get(alleles)
       if model is None:
-        model = modelcache[alleles] = build_model(alleles=alleles,max_alleles=2)
+        model = modelcache[alleles] = build_model(genotypes=[(a,a),(a,b),(b,b)],max_alleles=2)
 
       descr = build_descr(model,m)
 
       loci.append(lname)
       models.append(model)
-      file_genome.set_locus(lname,model,chr,loc)
+      file_genome.set_locus(lname,model,chrom,loc)
 
-      genos = GenotypeArray(descr, _decode_wtccc(model,a,b,threshold,fields[5:]))
+      genos = GenotypeArray(descr, _decode_fud(model,a,b,row[5:]))
 
       yield lname,genos
 
-  genos = GenomatrixStream(_load_wtccc(),'ldat',samples=samples,loci=loci,models=models,
-                                                genome=file_genome,phenome=phenome,
-                                                unique=unique,packed=True)
+  genos = GenomatrixStream(_load_fud(),'ldat',samples=samples,loci=loci,models=models,
+                                              genome=file_genome,phenome=phenome,
+                                              unique=unique,packed=True)
 
   if unique:
     genos = genos.unique_checked()
@@ -224,9 +174,9 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   return genos
 
 
-class WTCCCWriter(object):
+class FUDWriter(object):
   '''
-  Object to write WTCCC data
+  Object to write FUD data
 
   See http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html
 
@@ -237,15 +187,16 @@ class WTCCCWriter(object):
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci).as_ldat()
   >>> from cStringIO import StringIO
   >>> o = StringIO()
-  >>> with WTCCCWriter(o,'wtccc',genos.samples,genos.genome,genos.phenome) as w:
+  >>> with FUDWriter(o,'fud',genos.samples,genos.genome,genos.phenome) as w:
   ...   genos=iter(genos)
   ...   w.writerow(*genos.next())
   ...   w.writerow(*genos.next())
   ...   w.writerows(genos)
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  0 l1 0 A G 1 0 0 0 1 0 0 0 1
-  0 l2 0 C G 0 0 0 0 1 0 0 0 0
-  0 l3 0 C T 0 1 0 1 0 0 0 1 0
+  SNP Chromosome Position AlleleA AlleleB s1   s2   s3
+  l1                         A       G     0    1    2
+  l2                         C       G    -1    1   -1
+  l3                         C       T     1    0    1
   '''
   def __init__(self,filename,format,samples,genome,phenome,extra_args=None,**kwargs):
     '''
@@ -265,9 +216,12 @@ class WTCCCWriter(object):
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-    self.out       = autofile(filename,'wb')
+    self.out       = csv.writer(autofile(filename,'wb'),dialect='excel-tab')
     self.samples   = samples
     self.genome    = genome
+
+    self.out.writerow( HEADER_START+[s.strip() for s in samples] )
+
 
   def writerow(self, locus, genos):
     '''
@@ -286,15 +240,12 @@ class WTCCCWriter(object):
       raise ValueError('[ERROR] Internal error: Genotypes do not match header')
 
     loc = self.genome.get_locus(locus)
-    allele1,allele2,genovalues = _encode_wtccc(loc.model)
+    allele1,allele2,genovalues = _encode_fud(loc.model)
 
-    row = [ loc.chromosome or '0', locus, str(loc.location or '0'), allele1 or '?', allele2 or '?' ]
+    row  = [ locus, loc.chromosome or '', str(loc.location or ''), allele1 or '', allele2 or '' ]
+    row += (genovalues[g.index] for g in genos)
 
-    for g in genos:
-      row += genovalues[g.index]
-
-    out.write(' '.join(row))
-    out.write('\r\n')
+    out.writerow(row)
 
   def writerows(self, rows):
     '''
@@ -316,15 +267,12 @@ class WTCCCWriter(object):
         raise ValueError('[ERROR] Internal error: Genotypes do not match header')
 
       loc = genome.get_locus(locus)
-      allele1,allele2,genovalues = _encode_wtccc(loc.model)
+      allele1,allele2,genovalues = _encode_fud(loc.model)
 
-      row = [ loc.chromosome or '0', locus, str(loc.location or '0'), allele1 or '?', allele2 or '?' ]
+      row  = [ locus, loc.chromosome or '', str(loc.location or ''), allele1 or '', allele2 or '' ]
+      row += (genovalues[g.index] for g in genos)
 
-      for g in genos:
-        row += genovalues[g.index]
-
-      out.write(' '.join(row))
-      out.write('\r\n')
+      out.writerow(row)
 
   def close(self):
     '''
@@ -354,9 +302,9 @@ class WTCCCWriter(object):
     self.close()
 
 
-def save_wtccc(filename,genos,format,extra_args=None,**kwargs):
+def save_fud(filename,genos,format,extra_args=None,**kwargs):
   '''
-  Write genotype data to a WTCCC file
+  Write genotype data to a FUD file
 
   See http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html
 
@@ -372,11 +320,12 @@ def save_wtccc(filename,genos,format,extra_args=None,**kwargs):
   ...           ('s2', [('A','G'), ('C','G'), ('C','C')]),
   ...           ('s3', [('G','G'),(None,None),('C','T')]) ]
   >>> genos = GenomatrixStream.from_tuples(rows,'sdat',loci=loci)
-  >>> save_wtccc(o,genos,'wtccc')
+  >>> save_fud(o,genos,'fud')
   >>> print o.getvalue() # doctest: +NORMALIZE_WHITESPACE
-  0 l1 0 A G 1 0 0 0 1 0 0 0 1
-  0 l2 0 C G 0 0 0 0 1 0 0 0 0
-  0 l3 0 C T 0 1 0 1 0 0 0 1 0
+  SNP Chromosome Position AlleleA AlleleB s1   s2   s3
+  l1                         A       G     0    1    2
+  l2                         C       G    -1    1   -1
+  l3                         C       T     1    0    1
   '''
   if extra_args is None:
     args = kwargs
@@ -390,7 +339,7 @@ def save_wtccc(filename,genos,format,extra_args=None,**kwargs):
 
   genos = genos.as_ldat(mergefunc)
 
-  with WTCCCWriter(filename, format, genos.samples, genos.genome, genos.phenome, extra_args=args) as writer:
+  with FUDWriter(filename, format, genos.samples, genos.genome, genos.phenome, extra_args=args) as writer:
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
