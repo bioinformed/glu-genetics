@@ -9,7 +9,7 @@ import os
 
 from   itertools                import islice
 
-from   glu.lib.utils            import is_str,peekfirst,deprecated_by
+from   glu.lib.utils            import is_str,deprecated_by
 from   glu.lib.fileutils.auto   import guess_format, namefile
 from   glu.lib.fileutils.parser import parse_augmented_filename, tryint1, get_arg
 

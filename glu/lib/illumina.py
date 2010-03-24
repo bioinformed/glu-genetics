@@ -196,7 +196,6 @@ class IlluminaManifest(object):
       yield header
 
       snp_count  = self.snp_count
-      unpackB    = struct.Struct('<B').unpack
       unpack4B   = struct.Struct('<4B').unpack
       unpackL    = struct.Struct('<L').unpack
       unpackLL   = struct.Struct('<LL').unpack
