@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
 __gluindex__  = True
-__program__   = 'TagZilla surrogates'
 __authors__   = ['Kevin Jacobs (jacobs@bioinformed.com)']
-__abstract__  = 'Find LD surrogate for SNPs'
+__abstract__  = 'Find surrogates SNPs'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -20,17 +19,15 @@ from   glu.modules.ld.tagzilla import check_option01, epsilon, sfloat, \
 
 
 def option_parser():
-  usage = 'usage: %prog [options] genotypes...'
+  usage = 'usage: %prog [options] needles.lst haystack.lst genotypes...'
   parser = optparse.OptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
   geno_options(inputgroup,input=True,filter=True)
 
-  inputgroup.add_option('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
-                          help='File containing loci that are excluded from being a tag')
-  inputgroup.add_option('-s', '--subset', dest='subset', metavar='FILE', default='',
-                          help='File containing loci that define the subset to be analyzed of the loci that are read')
+  inputgroup.add_option('-e', '--exclude', dest='exclude', metavar='FILE', default='',
+                          help='File containing loci that are excluded from being a surrogate')
   inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
                           help='Ranges of genomic locations to analyze, specified as a comma separated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
@@ -85,15 +82,11 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if not args:
+  if len(args)<3:
     parser.print_help(sys.stderr)
     sys.exit(2)
 
-  subset  = set()
   exclude = set()
-
-  if options.subset:
-    subset = set(list_reader(options.subset))
 
   if options.exclude:
     exclude = set(list_reader(options.exclude))
@@ -104,31 +97,28 @@ def main():
     designscores = build_design_score(options.designscores)
     exclude.update(lname for lname,d in designscores.iteritems() if d <= epsilon)
 
-  if options.subset is not None:
-    subset.update(exclude)
-
-  direct   = subset - exclude
-  subex    = subset | exclude
-  indirect = subset & exclude
-  locusmap = {}
   seen     = set()
+  needle   = set(list_reader(args[0]))
+  haystack = set(list_reader(args[1]))-exclude
+  indirect = haystack-needle
 
-  # ldsubset=indirect
-  args = [(options,arg) for arg in args]
-  ldpairs = generate_ldpairs(args, locusmap, set(), None, indirect, options)
+  # ldsubset=needle
+  args = [ (options,arg) for arg in args[2:] ]
+  ldpairs = generate_ldpairs(args, {}, set(), None, needle, options)
 
   missing = '',0
   best_surrogate = {}
   for pairs in ldpairs:
-    seen.update(locusmap)
     for lname1,lname2,r2,dprime in pairs:
+      seen.add(lname1)
+      seen.add(lname2)
       if lname1==lname2:
         continue
-      elif lname1 in indirect and lname2 not in subex:
+      elif lname1 in needle and lname2 in indirect:
         best_locus,best_r2 = best_surrogate.get(lname1,missing)
         if r2 > best_r2:
           best_surrogate[lname1] = lname2,r2
-      elif lname2 in indirect and lname1 not in subex:
+      elif lname2 in needle and lname1 in indirect:
         best_locus,best_r2 = best_surrogate.get(lname2,missing)
         if r2 > best_r2:
           best_surrogate[lname2] = lname1,r2
@@ -138,18 +128,20 @@ def main():
 
   one    = sfloat(1)
   reason = 'DIRECT'
+  direct = needle&seen&haystack
   for lname in direct:
     outfile.writerow([lname,lname,one,reason])
 
   reason = 'INDIRECT'
   for lname,(surrogate,r2) in best_surrogate.iteritems():
-    outfile.writerow([lname,surrogate,sfloat(r2),reason])
+    if lname not in direct:
+      outfile.writerow([lname,surrogate,sfloat(r2),reason])
 
   reason_nos = 'NO SURROGATE'
   reason_nod = 'NO DATA'
 
-  for lname in subset:
-    if lname not in best_surrogate:
+  for lname in needle:
+    if lname not in direct and lname not in best_surrogate:
       if lname in seen:
         outfile.writerow([lname,'','',reason_nos])
       else:
