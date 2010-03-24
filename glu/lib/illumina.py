@@ -9,32 +9,50 @@ import os
 import csv
 import struct
 
-from   glu.lib.utils     import chunk
+from   glu.lib.utils     import chunk, namedtuple
 from   glu.lib.fileutils import autofile,parse_augmented_filename,guess_format,get_arg
 from   glu.lib.sections  import read_sections
+
 
 # Credit for a large proportion of the reverse-engineering in this module
 # goes to the R/BioConductor project, who in turn were helped by Keith
 # Baggerly.
 
-IDAT_FIELD_CODES = { 1000 : 'nSNPsRead',
-                      102 : 'IlluminaID',
-                      103 : 'SD',
-                      104 : 'Mean',
-                      107 : 'NBeads',
-                      200 : 'MidBlock',
-                      300 : 'RunInfo',
-                      400 : 'RedGreen',
-                      401 : 'Manifest',
-                      402 : 'Barcode',
-                      403 : 'Format',
-                      404 : 'Label',
-                      405 : 'OPA',
-                      406 : 'SampleID',
-                      407 : 'Descr',
-                      408 : 'Plate',
-                      409 : 'Well',
-                      510 : 'Unknown3' }
+
+ManifestRow = namedtuple('ManifestRow',
+                         'ilmnid name design_strand alleles assay_type_id norm_id '
+                         'addressA_id alleleA_probe_sequence addressB_id alleleB_probe_sequence '
+                         'genome_version chromosome mapinfo ploidy species '
+                         'source source_version source_strand source_sequence top_genomic_sequence customer_strand')
+
+assay_type_map = { 0 : 'Infinium II',
+                   1 : 'Infinium I red channel',
+                   2 : 'Infinium I green channel' }
+
+
+IDATData = namedtuple('IDATData', 'filename version snp_count illumina_ids sds means bead_counts '
+                                  'midblock red_green manifest barcode format label opa sampleid '
+                                  'descr plate well runinfo')
+
+
+IDAT_FIELD_CODES = { 1000 : 'snp_count',
+                      102 : 'illumina_ids',
+                      103 : 'sds',
+                      104 : 'means',
+                      107 : 'bead_counts',
+                      200 : 'midblock',
+                      300 : 'runinfo',
+                      400 : 'red_green',
+                      401 : 'manifest',
+                      402 : 'barcode',
+                      403 : 'format',
+                      404 : 'label',
+                      405 : 'opa',
+                      406 : 'sampleid',
+                      407 : 'descr',
+                      408 : 'plate',
+                      409 : 'well',
+                      510 : 'unknown' }
 
 
 def printable(s):
@@ -47,6 +65,10 @@ def myord(x):
     return x
   else:
     return '(%02d)' % ord(x)
+
+
+def int2bin(n, count=32):
+  return ''.join([str((n >> y) & 1) for y in range(count-1, -1, -1)])
 
 
 def readstr(afile):
@@ -121,7 +143,7 @@ class IlluminaManifest(object):
     self.snp_count   = int(_getattr(['Loci Count','SNP Count'],0)) or None
     self.snp_entries = None
     self.snp_names   = None
-    self.snp_types   = None
+    self.norm_ids    = None
 
     format = attrs['Assay Format']
 
@@ -137,7 +159,6 @@ class IlluminaManifest(object):
       raise ValueError('Unknown manifest format: %s' % format)
 
     self.manifest_data = contents
-
 
   def _load_bpm(self,filename):
     import numpy as np
@@ -163,20 +184,23 @@ class IlluminaManifest(object):
     self.snp_count,    = struct.unpack('<L', read(4))
     self.snp_entries   = np.fromfile(bpm, dtype='<u4', count=self.snp_count)
     self.snp_names     = [ readstr(bpm) for i in xrange(self.snp_count) ]
-    self.snp_types     = np.fromfile(bpm, dtype='u1', count=self.snp_count)
+    self.norm_ids      = np.fromfile(bpm, dtype='u1', count=self.snp_count)
 
     def _manifest_rows():
-      header = ['IlmnID','Name','IlmnStrand','SNP',
+      header = ['IlmnID','Name','IlmnStrand','SNP', 'AssayTypeID', 'NormID',
                 'AddressA_ID','AlleleA_ProbeSeq','AddressB_ID','AlleleB_ProbeSeq',
                 'GenomeBuild','Chr','MapInfo','Ploidy','Species',
                 'Source','SourceVersion','SourceStrand','SourceSeq',
-                'TopGenomicSeq']
+                'TopGenomicSeq', 'CustomerStrand']
 
       yield header
 
       snp_count  = self.snp_count
+      unpackB    = struct.Struct('<B').unpack
+      unpack4B   = struct.Struct('<4B').unpack
       unpackL    = struct.Struct('<L').unpack
       unpackLL   = struct.Struct('<LL').unpack
+      unpack4L   = struct.Struct('<4L').unpack
       unpack3BLB = struct.Struct('<3BLB').unpack
 
       for i in xrange(snp_count):
@@ -189,30 +213,37 @@ class IlluminaManifest(object):
         something4              = unpack3BLB(read(8))
         assert 1<=snpnum<=snp_count
         assert snpnum==snp_count-i
-        design_strand           = readstr(bpm)
-        alleles                 = readstr(bpm)
-        chromosome              = readstr(bpm)
-        ploidy                  = readstr(bpm)
-        species                 = readstr(bpm)
+        design_strand           = intern(readstr(bpm))
+        alleles                 = intern(readstr(bpm))
+        chromosome              = intern(readstr(bpm))
+        ploidy                  = intern(readstr(bpm))
+        species                 = intern(readstr(bpm))
         mapinfo                 = readstr(bpm)
         top_genomic_sequence    = readstr(bpm)
-        customer_strand         = readstr(bpm)
+        customer_strand         = intern(readstr(bpm))
         addressA_id,addressB_id = unpackLL(read(8))
         alleleA_probe_sequence  = readstr(bpm)
         alleleB_probe_sequence  = readstr(bpm)
-        genome_version          = readstr(bpm)
-        source                  = readstr(bpm)
-        source_version          = readstr(bpm)
-        source_strand           = readstr(bpm)
+        genome_version          = intern(readstr(bpm))
+        source                  = intern(readstr(bpm))
+        source_version          = intern(readstr(bpm))
+        source_strand           = intern(readstr(bpm))
         source_sequence         = readstr(bpm)
+        norm_id                 = self.norm_ids[snpnum-1]
 
         if record_version_maybe == 7:
-          endstuff = read(20)
+          something5,something6,something7,assay_type_id = unpack4B(read(4))
+          something8,something9,something10,something11  = unpack4L(read(16))
+        else:
+          assay_type_id = 0
 
-        yield [ilmnid,name,design_strand,alleles,
-               addressA_id,alleleA_probe_sequence,addressB_id,alleleB_probe_sequence,
-               genome_version,chromosome,mapinfo,ploidy,species,
-               source,source_version,source_strand,source_sequence,top_genomic_sequence]
+        self.norm_ids[snpnum-1] = norm_id = norm_id + 100*assay_type_id + 1
+
+        yield ManifestRow(ilmnid,name,design_strand,alleles,assay_type_id,norm_id,
+                          addressA_id,alleleA_probe_sequence,addressB_id,alleleB_probe_sequence,
+                          genome_version,chromosome,mapinfo,ploidy,species,
+                          source,source_version,source_strand,source_sequence,top_genomic_sequence,
+                          customer_strand)
 
         if 0:
           print 'SNP %d, SNPs left %d' % (i+1,snp_count-i-1)
@@ -220,11 +251,11 @@ class IlluminaManifest(object):
           print 'ilmnid:',ilmnid
           print 'name:',name
           print 'something1:',something1
-          print 'something2:',something1
-          print 'something3:',something1
+          print 'something2:',something2
+          print 'something3:',something3
           print 'snpnum:',snpnum
-          print 'something4:',something1
-          print 'snp_type:',self.snp_types[snpnum-1]
+          print 'something4:',something4
+          print 'snp_type:',self.norm_ids[snpnum-1]
           print 'snp_name:',self.snp_names[snpnum-1]
           print 'snp_entry:',self.snp_entries[snpnum-1]
           print 'design_strand:',design_strand
@@ -237,16 +268,23 @@ class IlluminaManifest(object):
           print 'customer_strand:',customer_strand
           print 'addressA_id:',addressA_id
           print 'addressB_id:',addressB_id
-          print 'AlleleA_ProbeSeq',alleleA_probe_sequence
-          print 'AlleleB_ProbeSeq',alleleB_probe_sequence
+          print 'alleleA_ProbeSeq:',alleleA_probe_sequence
+          print 'alleleB_ProbeSeq:',alleleB_probe_sequence
           print 'genome_version:',genome_version
           print 'source:',source
           print 'source_version:',source_version
           print 'source_strand:',source_strand
           print 'source_sequence:',source_sequence
+          print 'assay_type_id:',assay_type_id
 
           if record_version_maybe == 7:
-            print 'version7_endstuff',printable(endstuff)
+            print 'something5:',something5
+            print 'something6:',something6
+            print 'something7:',something7
+            print 'something8:',something8
+            print 'something9:',something9
+            print 'something10:',something10
+            print 'something11:',something11
 
           print
 
@@ -267,7 +305,7 @@ class IlluminaManifest(object):
       print 'snp_count:',self.snp_count
       print 'snp_entries:',self.snp_entries[:10],self.snp_entries[-10:]
       print 'snp_names:',self.snp_names[:10]+self.snp_names[-10:]
-      print 'snp_types:',self.snp_types[:10],self.snp_types[-10:]
+      print 'norm_ids:',self.norm_ids[:10],self.norm_ids[-10:]
 
     self.manifest_data = _manifest_rows()
 
@@ -318,80 +356,80 @@ def read_Illumina_IDAT(filename):
 
   snp_count = illumina_ids = sds = means = bead_counts = midblock \
             = red_green = manifest = barcode = format = label     \
-            = opa = sampleid = descr = plate = well = unknown3 = None
+            = opa = sampleid = descr = plate = well = unknown = None
   runinfo   = []
 
-  if 'nSNPsRead' in fields:
-    idat.seek(fields['nSNPsRead'])
+  if 'snp_count' in fields:
+    idat.seek(fields['snp_count'])
     snp_count, = struct.unpack('<L',idat.read(4))
 
-  if 'IlluminaID' in fields:
-    idat.seek(fields['IlluminaID'])
+  if 'illumina_ids' in fields:
+    idat.seek(fields['illumina_ids'])
     illumina_ids = np.fromfile(idat, dtype='<u4', count=snp_count)
 
-  if 'SD' in fields:
-    idat.seek(fields['SD'])
+  if 'sds' in fields:
+    idat.seek(fields['sds'])
     sds = np.fromfile(idat, dtype='<u2', count=snp_count)
 
-  if 'Mean' in fields:
-    idat.seek(fields['Mean'])
+  if 'means' in fields:
+    idat.seek(fields['means'])
     means = np.fromfile(idat, dtype='<u2', count=snp_count)
 
-  if 'NBeads' in fields:
-    idat.seek(fields['NBeads'])
+  if 'bead_counts' in fields:
+    idat.seek(fields['bead_counts'])
     bead_counts = np.fromfile(idat, dtype='b', count=snp_count)
 
-  if 'MidBlock' in fields:
-    idat.seek(fields['MidBlock'])
+  if 'midblock' in fields:
+    idat.seek(fields['midblock'])
     midblock_entry_count, = struct.unpack('<L', idat.read(4))
     midblock = np.fromfile(idat, dtype='u4', count=midblock_entry_count)
 
-  if 'RedGreen' in fields:
-    idat.seek(fields['RedGreen'])
+  if 'red_green' in fields:
+    idat.seek(fields['red_green'])
     red_green = struct.unpack('4B', idat.read(4))
 
-  if 'Manifest' in idat:
-    idat.seek(fields['Manifest'])
+  if 'manifest' in idat:
+    idat.seek(fields['manifest'])
     manifest = readstr(idat)
 
-  if 'Barcode' in fields:
-    idat.seek(fields['Barcode'])
+  if 'barcode' in fields:
+    idat.seek(fields['barcode'])
     barcode = readstr(idat)
 
-  if 'Format' in fields:
-    idat.seek(fields['Format'])
+  if 'format' in fields:
+    idat.seek(fields['format'])
     format = readstr(idat)
 
-  if 'Label' in fields:
-    idat.seek(fields['Label'])
+  if 'label' in fields:
+    idat.seek(fields['label'])
     label = readstr(idat)
 
-  if 'OPA' in fields:
-    idat.seek(fields['OPA'])
+  if 'opa' in fields:
+    idat.seek(fields['opa'])
     opa = readstr(idat)
 
-  if 'SampleID' in fields:
-    idat.seek(fields['SampleID'])
+  if 'sampleid' in fields:
+    idat.seek(fields['sampleid'])
     sampleid = readstr(idat)
 
-  if 'Descr' in fields:
-    idat.seek(fields['Descr'])
+  if 'descr' in fields:
+    idat.seek(fields['descr'])
     descr = readstr(idat)
 
-  if 'Plate' in fields:
-    idat.seek(fields['Plate'])
+  if 'plate' in fields:
+    idat.seek(fields['plate'])
     plate = readstr(idat)
 
-  if 'Well' in fields:
-    idat.seek(fields['Well'])
+  if 'well' in fields:
+    idat.seek(fields['well'])
     well = readstr(idat)
 
-  if 'Unknown3' in fields:
-    idat.seek(fields['Unknown3'])
-    unknown3 = readstr(idat)
+  if 'unknown' in fields:
+    idat.seek(fields['unknown'])
+    unknown = readstr(idat)
 
-  if 'RunInfo' in fields:
-    idat.seek(fields['RunInfo'])
+  if 'runinfo' in fields:
+    idat.seek(fields['runinfo'])
 
     runinfo_entry_count, = struct.unpack('<L', idat.read(4))
 
@@ -407,7 +445,7 @@ def read_Illumina_IDAT(filename):
   if 0:
     print 'filename:',filename
     print 'idat_version:',version
-    print 'offset:',unknown0
+    print 'unknown0:',unknown0
     print 'snp_count:',snp_count
     print 'Illumina IDs:',illumina_ids[:5]
     print 'SDs:',sds[:5]
@@ -424,7 +462,7 @@ def read_Illumina_IDAT(filename):
     print 'descr:',printable(descr)
     print 'plate:',plate
     print 'well:',well
-    print 'unknown3:',printable(unknown3)
+    print 'unknown:',printable(unknown)
 
     for i,(timestamp,entry_type,parameters,codeblock,code_version) in enumerate(runinfo):
       print 'RunInfo %d:' % (i+1)
@@ -436,11 +474,9 @@ def read_Illumina_IDAT(filename):
 
     print
 
-  return dict(filename=filename, version=version, offset=unknown0,snp_count=snp_count,
-              illumina_ids=illumina_ids,sds=sds,means=means,bead_counts=bead_counts,midblock=midblock,
-              red_green=red_green,manifest=manifest,barcode=barcode,format=format,label=label,
-              opa=opa,sampleid=sampleid,descr=descr,plate=plate,well=well,unknown3=unknown3,
-              runinfo=runinfo)
+  return IDATData(filename,version,snp_count,illumina_ids,sds,means,bead_counts,
+                  midblock,red_green,manifest,barcode,format,label,opa,sampleid,
+                  descr,plate,well,runinfo)
 
 
 def read_Illumina_LBD(filename,options):
@@ -536,21 +572,21 @@ def main():
     print 'rows:',len(list(manifest2))
 
   if 0:
-    IlluminaManifest('test/Human1M-Duov3_B.bpm')
-    IlluminaManifest('test/HumanHap300_(v1.0.0).bpm')
-    IlluminaManifest('test/HumanLinkage-12_E.bpm')
-    IlluminaManifest('test/HumanOmni1-Quad_v1-0_B_062509.bpm')
-    IlluminaManifest('test/HumanCNV370-Quadv3_C.bpm')
-    IlluminaManifest('test/CGEMS_P_F2_272225_A.bpm')
-    IlluminaManifest('test/Human610-Quadv1_B.bpm')
-    IlluminaManifest('test/Rare_Cancer_272049_A.bpm')
-    IlluminaManifest('test/240S_243991_Loci.bpm')
-    IlluminaManifest('test/Breast_Wide_Track_271628_A.bpm')
-    IlluminaManifest('test/CI1v410407_270414_A.bpm')
-    IlluminaManifest('test/NHL_B2B_271329_A.bpm')
-    IlluminaManifest('test/nsSNP_1x12_A_13371.bpm')
-    IlluminaManifest('test/Human660W-Quad_v1_A.bpm')
-    IlluminaManifest('test/HumanCNV370-Duo_v1-0_C.bpm')
+    list(IlluminaManifest('test/Human1M-Duov3_B.bpm'))
+    list(IlluminaManifest('test/HumanHap300_(v1.0.0).bpm'))
+    list(IlluminaManifest('test/HumanLinkage-12_E.bpm'))
+    list(IlluminaManifest('test/HumanOmni1-Quad_v1-0_B_062509.bpm'))
+    list(IlluminaManifest('test/HumanCNV370-Quadv3_C.bpm'))
+    list(IlluminaManifest('test/CGEMS_P_F2_272225_A.bpm'))
+    list(IlluminaManifest('test/Human610-Quadv1_B.bpm'))
+    list(IlluminaManifest('test/Rare_Cancer_272049_A.bpm'))
+    list(IlluminaManifest('test/240S_243991_Loci.bpm'))
+    list(IlluminaManifest('test/Breast_Wide_Track_271628_A.bpm'))
+    list(IlluminaManifest('test/CI1v410407_270414_A.bpm'))
+    list(IlluminaManifest('test/NHL_B2B_271329_A.bpm'))
+    list(IlluminaManifest('test/nsSNP_1x12_A_13371.bpm'))
+    list(IlluminaManifest('test/Human660W-Quad_v1_A.bpm'))
+    list(IlluminaManifest('test/HumanCNV370-Duo_v1-0_C.bpm'))
 
 
 if __name__=='__main__':
