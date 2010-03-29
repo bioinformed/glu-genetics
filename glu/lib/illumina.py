@@ -315,10 +315,6 @@ class IlluminaManifest(object):
 def read_Illumina_IDAT(filename):
   import numpy as np
 
-  s = os.stat(filename)
-
-  filesize = s.st_size
-
   idat = autofile(filename,'rb')
 
   sig = idat.read(4)
@@ -341,8 +337,12 @@ def read_Illumina_IDAT(filename):
       raise ValueError('Invalid duplicated field %s in IDAT file' % field_name)
     fields[field_name] = field_offset
 
-  if 0:
+  if 0: # DEBUG TOC
     from operator import itemgetter
+
+    s = os.stat(filename)
+    filesize = s.st_size
+
     sfields = sorted(fields.items(),key=itemgetter(1,0))
     for i,(field_name,field_offset) in enumerate(sfields):
       if i+1 < len(sfields):
@@ -441,7 +441,7 @@ def read_Illumina_IDAT(filename):
 
      runinfo.append( (timestamp,entry_type,parameters,codeblock,code_version) )
 
-  if 0:
+  if 0: # DEBUG internal decoding
     print 'filename:',filename
     print 'idat_version:',version
     print 'unknown0:',unknown0
@@ -534,6 +534,9 @@ def read_Illumina_LBD(filename,options):
 
 
 def main():
+  if 0:
+    read_Illumina_IDAT('test/4666416106_R01C01_Grn.idat')
+
   if 0:
     read_Illumina_IDAT('test/4583987055_R02C01_Grn.idat')
     read_Illumina_IDAT('test/4583987055_R02C01_Red.idat')
