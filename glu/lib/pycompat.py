@@ -40,7 +40,7 @@ else:
         >>> x, y = p                        # unpack like a regular tuple
         >>> x, y
         (11, 22)
-        >>> p.x + p.y                       # fields also accessable by name
+        >>> p.x + p.y                       # fields also accessible by name
         33
         >>> d = p._asdict()                 # convert to a dictionary
         >>> d['x']
@@ -272,7 +272,7 @@ else:
             '''
             # The regular dict.update() operation makes no sense here because the
             # replace behavior results in the some of original untouched counts
-            # being mixed-in with all of the other counts for a mismash that
+            # being mixed-in with all of the other counts for a mismatch that
             # doesn't have a straight-forward interpretation in most counting
             # contexts.  Instead, we implement straight-addition.  Both the inputs
             # and outputs are allowed to contain zero and negative counts.
