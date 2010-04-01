@@ -12,6 +12,7 @@ import sys
 
 from   itertools           import izip
 
+import numpy as np
 import scipy.stats
 
 from   numpy               import zeros,isfinite,hstack
@@ -158,6 +159,11 @@ def dump_model(filename,model):
   for pid,x in zip(model.pids,hstack( [model.y,model.X] ).tolist()):
     f.writerow( [pid]+x )
 
+  f.writerow([])
+  f.writerow(['']+model.vars)
+  for var,corr in zip(model.vars,np.corrcoef(model.X.T)):
+    f.writerow( [var]+['% .2f' % c for c in corr] )
+
 
 def main():
   parser = option_parser()
@@ -265,6 +271,7 @@ def main():
     # Design matrix debugging output
     if 0:
       dump_model('%s.csv' % lname, model)
+      sys.exit(1)
 
     # R model verification debugging code
     if 0:
