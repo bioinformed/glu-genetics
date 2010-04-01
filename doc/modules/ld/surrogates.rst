@@ -54,7 +54,7 @@ Options:
     -e FILE, --exclude=FILE
                         File containing loci that are excluded from being a
                         surrogate
-    -R RANGE,..., --range=RANGE,...
+    -R RANGE, --range=RANGE
                         Ranges of genomic locations to analyze, specified as a
                         comma separated list of start and end coordinates
                         "S-E".  If either S or E is not specified, then the
