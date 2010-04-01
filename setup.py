@@ -21,15 +21,17 @@ min_tables_version = '2.0'
 min_ply_version    = '2.5'
 min_nose_version   = '0.10.4'
 
+
 if sys.version_info < min_python_version:
   sys.stderr.write('Python 2.5 or newer to required to install and run GLU!\n')
   sys.exit(1)
 
-import distutils
-from   setuptools           import setup, find_packages, Extension
+
+from   setuptools           import find_packages, Extension
 from   numpy.distutils.core import setup as numpy_setup
-    
-import numpy
+
+import numpy as np
+
 
 def get_version():
   vfile = os.path.join(os.path.dirname(__file__), 'glu', 'VERSION')
@@ -63,10 +65,20 @@ def glmnet_config():
   from numpy.distutils.misc_util import Configuration
   config = Configuration('glm', 'glu.lib')
   return config.add_extension('_glmnet', sources=['glu/lib/glm/glmnet.pyf','glu/lib/glm/GLMnet.f'])
-                
+
+
+def evil_numpy_monkey_patch():
+  from   numpy.distutils.command import build_src
+  import Cython
+  import Cython.Compiler.Main
+  build_src.Pyrex = Cython
+  build_src.have_pyrex = True
+
 
 def main():
-  numpy_setup(name             = 'glu',
+  evil_numpy_monkey_patch()
+
+  numpy_setup(name       = 'glu',
         version          = get_version(),
         author           = 'Kevin Jacobs',
         author_email     = 'jacobske@mail.nih.gov',
@@ -95,10 +107,12 @@ def main():
                                                                                'glu/lib/genolib/bitarrayc.c',
                                                                                'glu/lib/genolib/_ibs.c',
                                                                                'glu/lib/genolib/_ld.c'],
-                                                                    include_dirs = [numpy.get_include()]),
+                                                                    include_dirs = [np.get_include()]),
                         Extension('glu.modules.struct._admix',      sources = ['glu/modules/struct/_admix.c'],
-                                                                    include_dirs = [numpy.get_include()]),
-                        Extension('glu.modules.ld.pqueue',    sources = ['glu/modules/ld/pqueue.c']),
+                                                                    include_dirs = [np.get_include()]),
+                        Extension('glu.modules.ld.pqueue',          sources = ['glu/modules/ld/pqueue.c']),
+                        Extension('glu.modules.seq.samhelpers',     sources = ['glu/modules/seq/samhelpers.pyx']),
+                        Extension('glu.modules.seq.intervaltree',   sources = ['glu/modules/seq/intervaltree.pyx']),
                         glmnet_config(),
                       ])
 
