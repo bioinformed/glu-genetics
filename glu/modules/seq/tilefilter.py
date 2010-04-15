@@ -29,7 +29,8 @@ def read_tiles(filename):
   track = bed.next()
 
   tiles = defaultdict(list)
-  for contig,start,end in bed:
+  for row in bed:
+    contig,start,end = row[:3]
     tiles[contig].append( (int(start),int(end)) )
 
   for contig in tiles:
