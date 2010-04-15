@@ -204,7 +204,7 @@ class IlluminaManifest(object):
 
       for i in xrange(snp_count):
         record_version_maybe,   = unpackL(read(4))
-        assert record_version_maybe in (4,7)
+        assert record_version_maybe in (4,7,8)
         ilmnid                  = readstr(bpm)
         name                    = readstr(bpm)
         something1,something2,  \
@@ -230,11 +230,14 @@ class IlluminaManifest(object):
         source_sequence         = readstr(bpm)
         norm_id                 = self.norm_ids[snpnum-1]
 
-        if record_version_maybe == 7:
+        if record_version_maybe in (7,8):
           something5,something6,something7,assay_type_id = unpack4B(read(4))
           something8,something9,something10,something11  = unpack4L(read(16))
         else:
           assay_type_id = 0
+
+        if record_version_maybe==8:
+          something_strand = intern(readstr(bpm))
 
         self.norm_ids[snpnum-1] = norm_id = norm_id + 100*assay_type_id + 1
 
@@ -276,7 +279,7 @@ class IlluminaManifest(object):
           print 'source_sequence:',source_sequence
           print 'assay_type_id:',assay_type_id
 
-          if record_version_maybe == 7:
+          if record_version_maybe in (7,8):
             print 'something5:',something5
             print 'something6:',something6
             print 'something7:',something7
@@ -284,6 +287,9 @@ class IlluminaManifest(object):
             print 'something9:',something9
             print 'something10:',something10
             print 'something11:',something11
+
+          if record_version_maybe==8:
+            print 'something_strand:',printable(something_strand)
 
           print
 
