@@ -10,6 +10,9 @@ __revision__  = '$Id$'
 
 import re
 import sys
+import random
+
+import xml.etree.cElementTree as etree
 
 from   operator          import getitem, itemgetter
 from   itertools         import izip, imap, groupby, repeat
@@ -19,6 +22,9 @@ import numpy as np
 
 from   glu.lib.fileutils import autofile,hyphen,table_writer,table_reader
 
+from   Bio               import SeqIO
+from   Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
+
 
 CIGAR_map = { ('-','-'):'P' }
 for a in 'NACGTacgt':
@@ -26,6 +32,7 @@ for a in 'NACGTacgt':
   CIGAR_map['-',a] = 'D'
   for b in 'NACGTacgt':
     CIGAR_map[a,b] = 'M'
+
 
 NDIFF_map = { ('-','-'): ('P',None) }
 for a in 'NACGTacgt':
@@ -106,9 +113,6 @@ class SFFIndex(object):
       self.add_sff(sfffile)
 
   def add_sff(self, sfffile):
-    from   Bio             import SeqIO
-    from   Bio.SeqIO.SffIO import _sff_read_roche_index_xml as sff_manifest
-    import xml.etree.cElementTree as etree
 
     print >> sys.stderr,'Loading SFF index for',sfffile
     sffindex   = self.sffindex
@@ -122,8 +126,10 @@ class SFFIndex(object):
       run_type         = run.find('run_type').text
       accession_prefix = run.find('accession_prefix').text
       analysis_name    = run.find('analysis_name').text
+
       if accession_prefix in sffindex:
         raise ValueError('Duplicate SFF accession prefix found.  Reads may be not be unique.')
+
       read_group = ('@RG','ID:%s' % accession_prefix, 'PL:454', 'SM:%s' % run_name)
       headers.append(read_group)
       sffindex[accession_prefix] = reads
@@ -227,17 +233,125 @@ def pair_align_records(records, sffindex):
     yield [qname, flag, rname, rstart, mapq, cigar, mrnm, mpos, isize, qq, qual]+opt
 
 
-def fixup_mapq(alignment):
-  for qname,qalign in groupby(alignment,itemgetter(0)):
-    qalign = list(qalign)
+def fixup_mapq(alignment, action):
+  reads = groupby(alignment,itemgetter(0))
 
-    if len(qalign)>1:
-      # Set MAPQ to 1 for multiply aligned reads
-      for row in qalign:
-        row[4] = 1
-        yield row
-    else:
-      yield qalign[0]
+  action = action.lower()
+
+  if action=='keep':
+    for name,aligns in reads:
+      aligns = list(aligns)
+
+      if len(aligns)>1:
+        # Set MAPQ to 1 for multiply aligned reads
+        for row in aligns:
+          row[4] = 1
+          yield row
+      else:
+        yield aligns[0]
+
+  elif action=='unalign':
+    for name,aligns in reads:
+      aligns = list(aligns)
+
+      if len(aligns)>1:
+        # Find longest read with fewest mismatches, set MAPQ to 1 and yield
+        aligns.sort(key=lambda a: (-len(a[9]),int(a[11].split(':')[-1])))
+
+        best = aligns[0]
+        best[1]  = 0x04
+        best[2]  = '*'
+        best[3]  = 0
+        best[4]  = '*'
+
+        if best[-1].startswith('RG:'):
+          best = best[:11]+best[-1]
+        else:
+          best = best[:11]
+
+        yield best
+
+      else:
+        yield aligns[0]
+
+  elif action=='drop':
+    for name,aligns in reads:
+      first = aligns.next()
+
+      try:
+        aligns.next()
+      except StopIteration:
+        yield first
+
+  elif action=='best':
+    for name,aligns in reads:
+      aligns = list(aligns)
+
+      if len(aligns)>1:
+        # Find longest read with fewest mismatches, set MAPQ to 1 and yield
+        aligns.sort(key=lambda a: (-len(a[9]),int(a[11].split(':')[-1])))
+        best = aligns[0]
+        best[4] = 1
+        yield best
+      else:
+        yield aligns[0]
+
+  elif action=='random':
+    for name,aligns in reads:
+      aligns = list(aligns)
+
+      if len(aligns)>1:
+        # Choose random alignment, set MAPQ to 1 and yield
+        rand = random.choose(aligns)
+        rand[4] = 1
+        yield rand
+      else:
+        yield aligns[0]
+
+  else:
+    raise ValueError('Invalid non-unique alignment action')
+
+
+def add_unaligned(alignment, sfffiles):
+  # Pass-through all reads and mark them as seen
+  aligned_reads = set()
+  for align in alignment:
+    aligned_reads.add(align[0])
+    yield align
+
+  flag   = 0x04
+  rname  = '*'
+  pos    = 0
+  mapq   = 0
+  cigar  = '*'
+  mrnm   = '*'
+  mpos   = 0
+  isize  = 0
+
+  aligned_count   = len(aligned_reads)
+  unaligned_count = 0
+
+  for filename in sfffiles:
+    for read in SeqIO.parse(open(filename,'rb'), 'sff-trim'):
+      qname = read.id
+
+      if qname in aligned_reads:
+        continue
+
+      aligned_reads.add(qname)
+
+      seq    = str(read.seq)
+      phred  = read.letter_annotations['phred_quality']
+      qual   = np.array(phred,dtype=np.uint8)
+      qual  += 33
+      qual   = qual.tostring()
+      rg     = 'RG:Z:%s' % qname[:9]
+
+      unaligned_count += 1
+
+      yield [qname, flag, rname, pos, mapq, cigar, mrnm, mpos, isize, seq, qual, rg]
+
+  print >> sys.stderr,'Processed %d aligned reads and %d unaligned reads.' % (aligned_count,unaligned_count)
 
 
 def load_contig_remap(filename):
@@ -273,6 +387,10 @@ def option_parser():
                     help='Reference genome contig list')
   parser.add_option('-m', '--remapcontig', dest='remapcontig', metavar='FILE',
                     help='Contig remapping')
+  parser.add_option('-n', '--nonunique', dest='nonunique', metavar='ACTION', default='drop',
+                    help='Action to perform for non-uniquely aligned reads: keep, unalign, drop, best, random.  Default=drop')
+  parser.add_option('-u', '--unaligned', dest='unaligned', metavar='ACTION', default='keep',
+                    help='Action to perform for unaligned reads: keep, drop.  Default=keep')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output SAM file')
   return parser
@@ -287,7 +405,8 @@ def main():
     sys.exit(2)
 
   alignfile = autofile(hyphen(args[0],sys.stdin))
-  sffindex  = SFFIndex(args[1:])
+  sfffiles  = args[1:]
+  sffindex  = SFFIndex(sfffiles)
 
   write_bam = options.output.endswith('.bam')
 
@@ -326,10 +445,14 @@ def main():
       out.writerow(row)
 
   print >> sys.stderr, 'Generating alignment from %s to %s' % (args[0],options.output)
-  alignment = fixup_mapq(pair_align_records(alignfile, sffindex))
+  alignment = pair_align_records(alignfile, sffindex)
+  alignment = fixup_mapq(alignment, options.nonunique)
 
   if options.remapcontig:
     alignment = remap_contigs(alignment, load_contig_remap(options.remapcontig))
+
+  if options.unaligned=='keep' and sfffiles:
+    alignment = add_unaligned(alignment, sfffiles)
 
   out.writerows(alignment)
 
