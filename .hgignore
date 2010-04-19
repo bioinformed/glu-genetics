@@ -1,0 +1,10 @@
+syntax: glob
+
+*.pyc
+*.so
+*~
+
+syntax: regexp
+
+^build/.*$
+^glu.egg-info/.*$
