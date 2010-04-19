@@ -24,17 +24,40 @@ from   glu.lib.fileutils import autofile
 GOOD,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
 
 
-def read_targets(filename):
-  bed = csv.reader(autofile(filename),dialect='excel-tab')
-  track = bed.next()
+def merge_targets(targets):
+  targets.sort()
 
+  current_start,current_end = None,None
+
+  for target_start,target_end in targets:
+    if current_start is None:
+      current_start,current_end = target_start,target_end
+    elif current_end<target_start:
+      yield current_start,current_end
+      current_start,current_end = target_start,target_end
+    else:
+      current_end = max(current_end,target_end)
+
+  if current_start is not None:
+    yield current_start,current_end
+
+
+def read_targets(filename):
   targets = defaultdict(list)
+
+  if not filename:
+    return targets
+
+  bed = csv.reader(autofile(filename),dialect='excel-tab')
+
   for row in bed:
+    if len(row)<3 or row[0].startswith('track '):
+      continue
     contig,start,end = row[:3]
     targets[contig].append( (int(start),int(end)) )
 
   for contig in targets:
-    targets[contig].sort()
+    targets[contig] = list(merge_targets(targets[contig]))
 
   return targets
 
@@ -90,7 +113,8 @@ def target_filter(allreads,references,targets,options):
       for target_start,target_end in ctargets:
         if target_start>read_end:
           break
-
+        if read_start>=target_end:
+          continue
         overlap_start,overlap_end = max(target_start,read_start),min(target_end,read_end)
         overlap_len += overlap_end-overlap_start
         #print '  Tile: (%d - %d) overlaps %d bases' % (target_start,target_end,overlap_end-overlap_start)
@@ -234,20 +258,4 @@ def main():
 
 
 if __name__=='__main__':
-  if 1:
-    main()
-  else:
-    try:
-      import cProfile as profile
-    except ImportError:
-      import profile
-    import pstats
-
-    prof = profile.Profile()
-    try:
-      prof.runcall(main)
-    finally:
-      stats = pstats.Stats(prof)
-      stats.strip_dirs()
-      stats.sort_stats('time', 'calls')
-      stats.print_stats(25)
+  main()
