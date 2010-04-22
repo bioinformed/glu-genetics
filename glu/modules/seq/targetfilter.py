@@ -51,7 +51,7 @@ def read_targets(filename):
   bed = csv.reader(autofile(filename),dialect='excel-tab')
 
   for row in bed:
-    if len(row)<3 or row[0].startswith('track '):
+    if len(row)<3 or row[0].startswith('track ') or row[0].startswith('#'):
       continue
     contig,start,end = row[:3]
     targets[contig].append( (int(start),int(end)) )
