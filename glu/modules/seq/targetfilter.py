@@ -27,19 +27,20 @@ GOOD,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
 def merge_targets(targets):
   targets.sort()
 
-  current_start,current_end = None,None
+  current_start,current_end,current_name = None,None,set()
 
-  for target_start,target_end in targets:
+  for target_start,target_end,target_name in targets:
     if current_start is None:
-      current_start,current_end = target_start,target_end
+      current_start,current_end,current_name = target_start,target_end,set([target_name])
     elif current_end<target_start:
-      yield current_start,current_end
-      current_start,current_end = target_start,target_end
+      yield current_start,current_end,','.join(sorted(current_name))
+      current_start,current_end,current_name = target_start,target_end,set([target_name])
     else:
+      current_name.add(target_name)
       current_end = max(current_end,target_end)
 
   if current_start is not None:
-    yield current_start,current_end
+    yield current_start,current_end,','.join(sorted(current_name))
 
 
 def read_targets(filename):
@@ -50,11 +51,21 @@ def read_targets(filename):
 
   bed = csv.reader(autofile(filename),dialect='excel-tab')
 
+  i = 1
   for row in bed:
-    if len(row)<3 or row[0].startswith('track ') or row[0].startswith('#'):
+    n = len(row)
+    if n<3 or row[0].startswith('track ') or row[0].startswith('#'):
       continue
+
     contig,start,end = row[:3]
-    targets[contig].append( (int(start),int(end)) )
+
+    if n>3:
+      name = row[3]
+    else:
+      name = 'target_%06d' % i
+      i += 1
+
+    targets[contig].append( (int(start),int(end),name) )
 
   for contig in targets:
     targets[contig] = list(merge_targets(targets[contig]))
@@ -102,24 +113,19 @@ def target_filter(allreads,references,targets,options):
         yield TOOSHORT,read
         continue
 
-      #print 'Read: %s:%s (%d - %d)' % (read.rname,read.qname,read_start,read_end)
-
       # Remove targets that end prior to the start of the current read
       while ctargets and ctargets[0][1]<read_start:
-        #print '  Tile: (%d - %d) dropped' % (ctargets[0][0],ctargets[0][1])
         ctargets.popleft()
 
       overlap_len = 0
-      for target_start,target_end in ctargets:
+      for target_start,target_end,target_name in ctargets:
         if target_start>read_end:
           break
         if read_start>=target_end:
           continue
         overlap_start,overlap_end = max(target_start,read_start),min(target_end,read_end)
         overlap_len += overlap_end-overlap_start
-        #print '  Tile: (%d - %d) overlaps %d bases' % (target_start,target_end,overlap_end-overlap_start)
 
-      #print '  %d bases overlap' % overlap_len
       if overlap_len<options.minoverlap:
         yield LOWOVERLAP,read
       else:
