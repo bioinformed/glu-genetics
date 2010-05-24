@@ -19,7 +19,7 @@ from   heapq       import heappush, heappop
 import numpy as np
 import pysam
 
-from   glu.lib.fileutils            import autofile, guess_format, table_writer
+from   glu.lib.fileutils            import autofile, guess_format, parse_augmented_name, table_writer
 from   glu.modules.seq.targetfilter import read_targets
 
 
@@ -197,10 +197,11 @@ def load_bed(filename,options):
 
 def load_regions(filename,options):
   format = guess_format(filename, ['bam','bed','sam'])
+  name   = parse_augmented_name(filename,{})
   if format in ('sam','bam'):
-    return load_bam(filename,options)
+    return load_bam(name,options)
   elif format=='bed':
-    return load_bed(filename,options)
+    return load_bed(name,options)
   else:
     raise ValueError('Unknown format for input %s' % filename)
 
