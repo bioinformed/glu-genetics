@@ -158,6 +158,41 @@ def ilen(seq):
   return sum(1 for x in seq)
 
 
+def consume(seq, n=None):
+  '''
+  consume(seq, n=None)
+
+  Advance the iterator n-steps ahead. If n is none, consume entirely.
+
+  Based on itertools recipes found in the Python documentation.  See:
+  http://docs.python.org/library/itertools.html
+
+  @param seq: input
+  @type  seq: sequence
+  @param   n: count of steps or None
+  @type    n: int or NoneType
+
+  >>> s = iter('abcdefg')
+  >>> consume(s,3)
+  >>> print ''.join(s)
+  defg
+
+  >>> s = iter('abcdefg')
+  >>> consume(s)
+  >>> print ''.join(s)
+  <BLANKLINE>
+  '''
+  from collections import deque
+
+  # The technique uses objects that consume iterators at C speed.
+  if n is None:
+    # feed the entire iterator into a zero-length deque
+    deque(seq, maxlen=0)
+  else:
+    # advance to the emtpy slice starting at position n
+    next(islice(seq, n, n), None)
+
+
 def pair_generator(items):
   '''
   Generator for distinct pairs of items
@@ -550,6 +585,37 @@ def chunk(iterable, size, pad=_chunk_nothing):
       block = tuple(chain(block, repeat(pad, size-len(block))))
 
     yield block
+
+
+
+def enum(typename, field_names):
+  '''
+  Create a new enumeration type
+
+  Based on Recipe 577024: "Yet another 'enum' for Python" from
+  http://code.activestate.com/recipes/577024-yet-another-enum-for-python/ by
+  Gabriel Genellina.
+
+  >>> STATE = enum('STATE', 'GET_QUIZ, GET_VERSE, TEACH')
+  >>> STATE.GET_QUIZ
+  0
+  >>> STATE.GET_VERSE
+  1
+  >>> STATE.TEACH
+  2
+  >>> STATE.GET_VERSE = 8
+  Traceback (most recent call last):
+    ...
+  AttributeError: 'STATE' object attribute 'GET_VERSE' is read-only
+  >>> del STATE.GET_VERSE
+  Traceback (most recent call last):
+    ...
+  AttributeError: 'STATE' object attribute 'GET_VERSE' is read-only
+  '''
+  if isinstance(field_names, str):
+      field_names = field_names.replace(',', ' ').split()
+  d = dict((reversed(nv) for nv in enumerate(field_names)), __slots__ = ())
+  return type(typename, (object,), d)()
 
 
 def _test():
