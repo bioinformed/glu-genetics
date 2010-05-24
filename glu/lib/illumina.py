@@ -23,7 +23,8 @@ ManifestRow = namedtuple('ManifestRow',
                          'ilmnid name design_strand alleles assay_type_id norm_id '
                          'addressA_id alleleA_probe_sequence addressB_id alleleB_probe_sequence '
                          'genome_version chromosome mapinfo ploidy species '
-                         'source source_version source_strand source_sequence top_genomic_sequence customer_strand')
+                         'source source_version source_strand source_sequence top_genomic_sequence '
+                         'customer_strand genomic_strand')
 
 assay_type_map = { 0 : 'Infinium II',
                    1 : 'Infinium I red channel',
@@ -71,29 +72,52 @@ def int2bin(n, count=32):
   return ''.join([str((n >> y) & 1) for y in range(count-1, -1, -1)])
 
 
-def readstr(afile):
-  '''
-  String data are encoded as a sequence of one or more length bytes followed
-  by the specified number of data bytes.
+try:
+  raise ImportError
+  from glu.lib._illumina import readstr
 
-  If the high-bit of the first length byte is set, then a second length byte
-  follows with the number of additional 128 character blocks.  This
-  accommodates strings up to length 16,384 (128**2) without ambiguity.  It is
-  unknown of this scheme scales to additional length bytes, since no strings
-  longer than 6,264 bytes have been observed in the wild.
-  '''
-  read = afile.read
-  n = ord(read(1))
+except ImportError:
+  def readstr(afile):
+    '''
+    String data are encoded as a sequence of one or more length bytes followed
+    by the specified number of data bytes.
 
-  if not n:
-    return ''
+    The lower 7 bits of each length byte encodes the bits that comprise the
+    length of the following byte string.  When the most significant bit it
+    set, then an additional length byte follows with 7 additional high bits to
+    be added to the current length.  The following string lenths are
+    accommodated by increasing sequences of length bytes:
 
-  if n&0x80:
-    m = ord(read(1))
-    if m:
-      n += (m-1)<<7
+    length  maximum
+    bytes   length
+    ------  --------
+      1       127 B
+      2        16 KB
+      3         2 MB
+      4       256 MB
+      5        32 GB
 
-  return read(n)
+    While this seems like a sensible progression, there is still some
+    uncertainty about this interpretation.  It is unknown of this scheme
+    scales beyond two length bytes, since no encoded strings longer than
+    6,264 have been observed in the wild.
+    '''
+    read = afile.read
+    n = m = ord(read(1))
+
+    if not n:
+      return ''
+
+    if m&0x80:
+      shift = 7
+      n     = m&0x7F
+
+      while m&0x80:
+        m      = ord(read(1))
+        n     += (m&0x7F)<<shift
+        shift += 7
+
+    return read(n)
 
 
 class IlluminaManifest(object):
@@ -191,7 +215,7 @@ class IlluminaManifest(object):
                 'AddressA_ID','AlleleA_ProbeSeq','AddressB_ID','AlleleB_ProbeSeq',
                 'GenomeBuild','Chr','MapInfo','Ploidy','Species',
                 'Source','SourceVersion','SourceStrand','SourceSeq',
-                'TopGenomicSeq', 'CustomerStrand']
+                'TopGenomicSeq', 'CustomerStrand', 'GenomicStrand']
 
       yield header
 
@@ -203,8 +227,11 @@ class IlluminaManifest(object):
       unpack3BLB = struct.Struct('<3BLB').unpack
 
       for i in xrange(snp_count):
-        record_version_maybe,   = unpackL(read(4))
-        assert record_version_maybe in (4,7,8)
+        record_version,         = unpackL(read(4))
+
+        if record_version not in (4,7,8):
+          raise ValueError('Unsupported Illumina BPM record version: %d' % record_version)
+
         ilmnid                  = readstr(bpm)
         name                    = readstr(bpm)
         something1,something2,  \
@@ -230,14 +257,16 @@ class IlluminaManifest(object):
         source_sequence         = readstr(bpm)
         norm_id                 = self.norm_ids[snpnum-1]
 
-        if record_version_maybe in (7,8):
+        if record_version in (7,8):
           something5,something6,something7,assay_type_id = unpack4B(read(4))
           something8,something9,something10,something11  = unpack4L(read(16))
         else:
           assay_type_id = 0
 
-        if record_version_maybe==8:
-          something_strand = intern(readstr(bpm))
+        if record_version==8:
+          genomic_strand = intern(readstr(bpm))
+        else:
+          genomic_strand = None
 
         self.norm_ids[snpnum-1] = norm_id = norm_id + 100*assay_type_id + 1
 
@@ -245,11 +274,11 @@ class IlluminaManifest(object):
                           addressA_id,alleleA_probe_sequence,addressB_id,alleleB_probe_sequence,
                           genome_version,chromosome,mapinfo,ploidy,species,
                           source,source_version,source_strand,source_sequence,top_genomic_sequence,
-                          customer_strand)
+                          customer_strand,genomic_strand)
 
         if 0:
           print 'SNP %d, SNPs left %d' % (i+1,snp_count-i-1)
-          print 'record_version_maybe:',record_version_maybe
+          print 'record_version:',record_version
           print 'ilmnid:',ilmnid
           print 'name:',name
           print 'something1:',something1
@@ -279,7 +308,7 @@ class IlluminaManifest(object):
           print 'source_sequence:',source_sequence
           print 'assay_type_id:',assay_type_id
 
-          if record_version_maybe in (7,8):
+          if record_version in (7,8):
             print 'something5:',something5
             print 'something6:',something6
             print 'something7:',something7
@@ -288,8 +317,8 @@ class IlluminaManifest(object):
             print 'something10:',something10
             print 'something11:',something11
 
-          if record_version_maybe==8:
-            print 'something_strand:',printable(something_strand)
+          if record_version==8:
+            print 'genomic_strand:',printable(genomic_strand)
 
           print
 

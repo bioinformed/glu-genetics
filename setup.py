@@ -102,7 +102,9 @@ def main():
         scripts          = ['bin/glu'],
         zip_safe         = False,
         test_suite       = 'nose.collector',
-        ext_modules = [ Extension('glu.lib.genolib.bitarrayc',      sources = ['glu/lib/genolib/bitarrayc.c']),
+        ext_modules = [
+                        Extension('glu.lib._illumina',              sources = ['glu/lib/_illumina.pyx']),
+                        Extension('glu.lib.genolib.bitarrayc',      sources = ['glu/lib/genolib/bitarrayc.c']),
                         Extension('glu.lib.genolib._genoarray',     sources = ['glu/lib/genolib/_genoarray.c',
                                                                                'glu/lib/genolib/bitarrayc.c',
                                                                                'glu/lib/genolib/_ibs.c',
