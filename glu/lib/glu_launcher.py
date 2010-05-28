@@ -158,6 +158,7 @@ def main():
   glu_options,args = parser.parse_args()
 
   if glu_options.path:
+    sys.stderr.write('GLU interpreter version: %s\n' % sys.version)
     sys.stderr.write('GLU import path: %s\n\n' % glu.__file__)
 
   if glu_options.help or not args:
