@@ -43,6 +43,9 @@ def _interval_pileup_region(contig_regions):
   window = []
 
   for read_start,read_end,name in contig_regions:
+    if read_start is None or read_end is None:
+      continue
+
     # Yield interval prior to current read_start
     while window and window[0][0]<read_start:
       end = window[0][0]
@@ -190,7 +193,7 @@ def load_bed(filename,options):
 
       yield contig,int(start),int(end),name
 
-  for contig_name,contig_regions in groupby(regions(bed), itemgetter(0)):
+  for contig_name,contig_regions in groupby(sorted(regions(bed)), itemgetter(0)):
     contig_regions = ( (start,end,name) for contig,start,end,name in contig_regions )
     yield contig_name,0,contig_regions
 
