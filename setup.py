@@ -23,7 +23,8 @@ min_nose_version   = '0.10.4'
 
 
 if sys.version_info < min_python_version:
-  sys.stderr.write('Python 2.5 or newer to required to install and run GLU!\n')
+  version_str = '.'.join( map(str,min_python_version) )
+  sys.stderr.write('Python %s or newer to required to install and run GLU!\n' % version_str)
   sys.exit(1)
 
 
