@@ -16,6 +16,7 @@ import xml.etree.cElementTree as etree
 
 from   operator          import getitem, itemgetter
 from   itertools         import izip, imap, groupby, repeat
+from   collections       import defaultdict
 from   subprocess        import Popen, PIPE
 
 import numpy as np
@@ -106,7 +107,7 @@ except ImportError:
 
 class SFFIndex(object):
   def __init__(self, sfffiles):
-    self.sffindex = {}
+    self.sffindex = defaultdict(list)
     self.headers  = []
 
     for sfffile in sfffiles:
@@ -127,21 +128,29 @@ class SFFIndex(object):
       accession_prefix = run.find('accession_prefix').text
       analysis_name    = run.find('analysis_name').text
 
-      if accession_prefix in sffindex:
-        raise ValueError('Duplicate SFF accession prefix found.  Reads may be not be unique.')
+      # Record the read group only the first time we see it
+      if accession_prefix not in sffindex:
+        read_group = ('@RG','ID:%s' % accession_prefix, 'PL:454', 'SM:%s' % run_name)
+        headers.append(read_group)
 
-      read_group = ('@RG','ID:%s' % accession_prefix, 'PL:454', 'SM:%s' % run_name)
-      headers.append(read_group)
-      sffindex[accession_prefix] = reads
+      # Add this SFF file as a source of reads for this accession prefix
+      # Most of the time this will be a unique mapping, but it is possible
+      # to split a run into multiple SFF files.  If one was to align based
+      # on those files, reads with the same accession will be present in the
+      # same input alignment and multiple SFF files.  Fortunately, this
+      # should not be typical.
+      sffindex[accession_prefix].append(reads)
 
   def get_quality(self, qname, query, qstart, qstop):
     prefix = qname[:9]
-    sff = self.sffindex.get(prefix)
 
-    if not sff:
+    for sff in self.sffindex.get(prefix,[]):
+      rec = sff.get(qname)
+      if rec:
+        break
+    else:
       return '*'
 
-    rec      = sff[qname]
     phred    = rec.letter_annotations['phred_quality']
     sffqual  = np.array(phred,dtype=np.uint8)
     sffqual += 33
