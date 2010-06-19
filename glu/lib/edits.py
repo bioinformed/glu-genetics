@@ -8,7 +8,6 @@ __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-import sys
 
 import numpy as np
 
@@ -117,7 +116,8 @@ def _edit_sequence(s1, s2, edits):
 
 def levenshtein_distance(s1, s2):
   '''
-  Calculate the Levenshtein distance between sequences.
+  Calculate a minimum number of edit operations to transform s1 into s2
+  based on the Levenshtein distance.
 
   This distance is the number of insertions, deletions, and substitutions
   needed to transform the first sequence into the second.
@@ -127,8 +127,13 @@ def levenshtein_distance(s1, s2):
   Transpositions are exchanges of *consecutive* characters; all other
   operations are self-explanatory.
 
-  This implementation is O(N*M) time and O(min(N,M)) space, for N and M the
-  lengths of the two sequences.
+  This implementation is based on a standard dynamic programming approach,
+  requiring O(N*M) time and O(min(N,M)) space, where N and M are the lengths
+  of the two sequences.  See the following for more information on these
+  concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
 
   >>> levenshtein_distance('ac', 'abc')
   1
@@ -143,44 +148,80 @@ def levenshtein_distance(s1, s2):
   >>> levenshtein_distance('abcd', ['b', 'a', 'c', 'd', 'e'])
   3
   '''
+  # Minimize storage by forcing s2 to the shorter sequence
   if len(s1) < len(s2):
     s1,s2 = s2,s1
 
-  if not s1:
-    return len(s2)
+  # Fast-path: If s2 is empty, return distance of len(s1)
+  if not s2:
+    return len(s1)
 
-  n        = len(s2)+1
-  current  = range(n)
-  previous = range(n)
+  # Otherwise, prepare storage for the edit costs
+  # Only store the current and previous cost rows, adding a single
+  # element to the beginning for the cost of inserting i characters
+  m        = len(s2)
 
+  # Start by assigning the cost of transforming an empty s1 into s2[0:m] by
+  # inserting 0..m elements
+  current  = range(m+1)
+
+  # Initialize previous costs to zero, since the values are not used and are
+  # going to be overwritten
+  previous = [0]*(m+1)
+
+  # For each location in s1
   for i,c1 in enumerate(s1):
+    # Swap current and previous cost row storage to recycle the old
+    # 'previous' as the new 'current'
     previous,current = current,previous
+
+    # Initialize the cost of inserting characters up to and including i
     current[0] = i+1
 
+    # Update minimum match, insertion, and deletion costs for each
+    # location in s2
     for j,c2 in enumerate(s2):
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
+
+      # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
+      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match        = previous[j]   + (c1 != c2)
+
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
       insert       = current[j]    + 1
+
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
       delete       = previous[j+1] + 1
+
+      # Take minimum cost operation
       current[j+1] = min(match, insert, delete)
 
+  # Return the minimum edit cost for both complete sequences.  i.e. the cost
+  # transforming s1[0:i+1]->s2[0:j+1], which is current[-1].
   return current[-1]
 
 
 def levenshtein_sequence(s1, s2):
   '''
-  Calculate a minimum sequence of edit operations based on the
-  Levenshtein distance between sequences.
+  Calculate a minimum number of edit operations to transform s1 into s2
+  based on the Levenshtein distance.
 
   This sequence is comprised of the minimum number insertions, deletions,
   and substitutions needed to transform the first sequence into the second.
 
   See: http://en.wikipedia.org/wiki/Levenshtein_distance
 
-  Transpositions are exchanges of *consecutive* characters; all other
-  operations are self-explanatory.
+  This function is related to the levenshtein_sequence such that
 
-  This implementation is O(N*M) time and O(M) space, for N and M the
-  lengths of the two sequences.
+    len(levenshtein_sequence(s1, s2)) == levenshtein_distance(s1,s2)
+
+  This implementation is based on a standard dynamic programming approach,
+  requiring O(N*M) time and space, where N and M are the lengths of the two
+  sequences.  See the following for more information on these concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
 
   >>> levenshtein_sequence('', '')
   []
@@ -201,28 +242,62 @@ def levenshtein_sequence(s1, s2):
   >>> levenshtein_sequence('abcd', ['b', 'a', 'c', 'd', 'e'])
   [('S', 0, 'a', 'b'), ('S', 1, 'b', 'a'), ('I', 4, 'e')]
   '''
+  # Fast-path: If s1 is empty, then construct a series of insertions to create s2
   if not s1:
     return [ ('I',j,c2) for j,c2 in enumerate(s2) ]
 
+  # Fast-path: If s2 is empty, then construct a series of deletions to remove all of s1
   if not s2:
     return [ ('D',0,c1) for c1 in s1 ]
 
-  n        = len(s2)+1
-  current  = range(n)
-  previous = range(n)
-  edits    = np.zeros((len(s1),len(s2)), dtype='S1')
+  # Otherwise, prepare storage for the edit costs and operations Only store
+  # the current and previous cost rows, adding an element to the beginning
+  # for the cost of inserting i characters
+  n        = len(s1)
+  m        = len(s2)
 
+  # Start by assigning the cost of transforming an empty s1 into s2[0:m] by
+  # inserting 0..m elements
+  current  = range(m+1)
+
+  # Initialize previous costs to zero, since the values are not used and are
+  # going to be overwritten
+  previous = [0]*(m+1)
+
+  # Allocate an empty character matrix to track the best edits at each step
+  # in order to reconstruct an optimal sequence at the end
+  edits    = np.zeros((n,m), dtype='S1')
+
+  # For each location in s1
   for i,c1 in enumerate(s1):
+    # Swap current and previous cost row storage to recycle the old
+    # 'previous' as the new 'current'
     previous,current = current,previous
+
+    # Initialize the cost of inserting characters up to and including i
     current[0] = i+1
 
     for j,c2 in enumerate(s2):
-      match        = previous[j]   + (c1 != c2)
-      insert       = current[j]    + 1
-      delete       = previous[j+1] + 1
-      mcost        = min(match, insert, delete)
-      current[j+1] = mcost
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
 
+      # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
+      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
+      match        = previous[j]   + (c1 != c2)
+
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
+      insert       = current[j]    + 1
+
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
+      delete       = previous[j+1] + 1
+
+      # Take minimum cost operation
+      current[j+1] = mcost = min(match, insert, delete)
+
+      # Record the operation chosen, with preference for (mis)matches over
+      # insertions over deletions.  This ambiguity for equal cost options
+      # implies that there may not be a unique optimum edit sequence, but
+      # one or more of sequences of equal length.
       if mcost==match:
         edits[i,j]='M'
       elif mcost==insert:
@@ -230,12 +305,14 @@ def levenshtein_sequence(s1, s2):
       else:
         edits[i,j]='D'
 
+  # Build and return a mimimal edit sequence using the saved operations
   return _edit_sequence(s1, s2, edits)
 
 
 def damerau_levenshtein_distance(s1, s2):
   '''
-  Calculate the Damerau-Levenshtein distance between sequences.
+  Calculate a minimum number of edit operations to transform s1 into s2
+  based on the Damerau-Levenshtein distance.
 
   This distance is the number of insertions, deletions, substitutions, and
   transpositions needed to transform the first sequence into the second.
@@ -245,8 +322,13 @@ def damerau_levenshtein_distance(s1, s2):
   Transpositions are exchanges of *consecutive* characters; all other
   operations are self-explanatory.
 
-  This implementation is O(N*M) time and O(min(N,M)) space, where N and M
-  are the lengths of the two sequences.
+  This implementation is based on a standard dynamic programming approach,
+  requiring O(N*M) time and O(min(N,M)) space, where N and M are the lengths
+  of the two sequences.  See the following for more information on these
+  concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
 
   >>> damerau_levenshtein_distance('ba', 'ab')
   1
@@ -261,39 +343,71 @@ def damerau_levenshtein_distance(s1, s2):
   >>> damerau_levenshtein_distance('abcd', ['b', 'a', 'c', 'd', 'e'])
   2
   '''
+  # Minimize storage by forcing s2 to the shorter sequence
   if len(s1) < len(s2):
     s1,s2 = s2,s1
 
+  # Fast-path: If s2 is empty, return distance of len(s1)
   if not s1:
     return len(s2)
 
-  n         = len(s2)+1
-  current   = range(n)
-  previous1 = range(n)
-  previous2 = range(n)
+  # Otherwise, prepare storage for the edit costs
+  # Only store the current and previous cost rows, adding a single
+  # element to the beginning for the cost of inserting i characters
+  m         = len(s2)
 
+  # Start by assigning the cost of transforming an empty s1 into s2[0:m] by
+  # inserting 0..m elements
+  current   = range(m+1)
+
+  # Initialize previous two cost rows to zero, since the values are not used
+  # and are going to be overwritten
+  previous1 = [0]*(m+1)
+  previous2 = [0]*(m+1)
+
+  # For each location in s1
   for i,c1 in enumerate(s1):
+    # Swap current and previous cost row storage to recycle the old
+    # 'previous2' as the new 'current'
     previous2,previous1,current = previous1,current,previous2
+
+    # Initialize the cost of inserting characters up to and including i
     current[0] = i+1
 
+    # Update minimum match, insertion, and deletion costs for each
+    # location in s2
     for j,c2 in enumerate(s2):
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
+
+      # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
+      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match  = previous1[j]   + (c1 != c2)
+
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
       insert = current[j]     + 1
+
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
       delete = previous1[j+1] + 1
-      trans  = sys.maxint
 
+      # Transpose: transform s1[0:i-1]->s2[0:j-1] + 1,
+      #            if s1[i]==s2[j-1] and s1[i-1]==s2[j]
+      trans  = match
       if i and j and c1==s2[j-1] and s1[i-1]==c2:
-        trans = min(current[j+1], previous2[j-1]+1)
+        trans = previous2[j-1]+1
 
+      # Take minimum cost operation
       current[j+1] = min(match, insert, delete, trans)
 
+  # Return the minimum edit cost for both complete sequences.  i.e. the cost
+  # transforming s1[0:i+1]->s2[0:j+1], which is current[-1].
   return current[-1]
 
 
 def damerau_levenshtein_sequence(s1, s2):
   '''
-  Calculate a minimum sequence of edit operations based on the
-  Damerau-Levenshtein distance between sequences.
+  Calculate a minimum sequence of edit operations to transform s1 into s2
+  based on the Damerau-Levenshtein distance.
 
   This sequence is comprised of the minimum number of insertions, deletions,
   substitutions, and transpositions needed to transform the first sequence
@@ -304,8 +418,16 @@ def damerau_levenshtein_sequence(s1, s2):
   Transpositions are exchanges of *consecutive* characters; all other
   operations are self-explanatory.
 
-  This implementation is O(N*M) time and O(min(N,M)) space, where N and M
-  are the lengths of the two sequences.
+  This function is related to the levenshtein_sequence such that
+
+    len(damerau_levenshtein_sequence(s1, s2)) == damerau_levenshtein_distance(s1,s2)
+
+  This implementation is based on a standard dynamic programming approach,
+  requiring O(N*M) time and space, where N and M are the lengths of the two
+  sequences.  See the following for more information on these concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
 
   >>> damerau_levenshtein_sequence('ba', 'ab')
   [('T', 0, 'ba', 'ab')]
@@ -320,34 +442,69 @@ def damerau_levenshtein_sequence(s1, s2):
   >>> damerau_levenshtein_sequence('abcd', ['b', 'a', 'c', 'd', 'e'])
   [('T', 0, 'ab', ['b', 'a']), ('I', 4, 'e')]
   '''
+  # Fast-path: If s1 is empty, then construct a series of insertions to create s2
   if not s1:
     return [ ('I',j,c2) for j,c2 in enumerate(s2) ]
 
+  # Fast-path: If s2 is empty, then construct a series of deletions to remove all of s1
   if not s2:
     return [ ('D',0,c1) for c1 in s1 ]
 
-  n         = len(s2)+1
-  current   = range(n)
-  previous1 = range(n)
-  previous2 = range(n)
-  edits     = np.zeros((len(s1),len(s2)), dtype='S1')
+  # Otherwise, prepare storage for the edit costs
+  # Only store the current and previous cost rows, adding a single
+  # element to the beginning for the cost of inserting i characters
+  n         = len(s1)
+  m         = len(s2)
 
+  # Start by assigning the cost of transforming an empty s1 into s2[0:m] by
+  # inserting 0..m elements
+  current   = range(m+1)
+
+  # Initialize previous two cost rows to zero, since the values are not used
+  # and are going to be overwritten
+  previous1 = [0]*(m+1)
+  previous2 = [0]*(m+1)
+
+  # Allocate an empty character matrix to track the best edits at each step
+  # in order to reconstruct an optimal sequence at the end
+  edits     = np.zeros((n,m), dtype='S1')
+
+  # For each location in s1
   for i,c1 in enumerate(s1):
+    # Swap current and previous cost row storage to recycle the old
+    # 'previous2' as the new 'current'
     previous2,previous1,current = previous1,current,previous2
+
+    # Initialize the cost of inserting characters up to and including i
     current[0] = i+1
 
     for j,c2 in enumerate(s2):
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
+
+      # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
+      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match        = previous1[j]   + (c1 != c2)
+
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
       insert       = current[j]     + 1
+
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
       delete       = previous1[j+1] + 1
-      trans        = sys.maxint
 
+      # Transpose: transform s1[0:i-1]->s2[0:j-1] + 1,
+      #            if s1[i]==s2[j-1] and s1[i-1]==s2[j]
+      trans        = match
       if i and j and c1==s2[j-1] and s1[i-1]==c2:
-        trans      = min(current[j+1], previous2[j-1]+1)
+        trans      = previous2[j-1]+1
 
-      mcost        = min(match, insert, delete, trans)
-      current[j+1] = mcost
+      # Take minimum cost operation
+      current[j+1] = mcost = min(match, insert, delete, trans)
 
+      # Record the operation chosen, with preference for (mis)matches over
+      # insertions over deletions over transpositions.  This ambiguity for
+      # equal cost options implies that there may not be a unique optimum
+      # edit sequence, but one or more of sequences of equal length.
       if mcost==match:
         edits[i,j]='M'
       elif mcost==insert:
@@ -357,6 +514,7 @@ def damerau_levenshtein_sequence(s1, s2):
       else:
         edits[i,j]='T'
 
+  # Build and return a mimimal edit sequence using the saved operations
   return _edit_sequence(s1, s2, edits)
 
 
@@ -367,4 +525,3 @@ def _test():
 
 if __name__ == '__main__':
   _test()
-
