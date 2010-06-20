@@ -24,6 +24,10 @@ def hamming_distance(s1, s2):
 
   See: http://en.wikipedia.org/wiki/Hamming_distance
 
+       Hamming, Richard W. (1950), "Error detecting and error correcting
+       codes", Bell System Technical Journal 26 (2): 147–160,
+       http://www.ece.rutgers.edu/~bushnell/dsdwebsite/hamming.pdf
+
   This implementation requires O(N) time and O(1) space, where N is the
   length of the input sequences.
 
@@ -51,6 +55,10 @@ def hamming_sequence(s1, s2):
   equal length.
 
   See: http://en.wikipedia.org/wiki/Hamming_distance
+
+       Hamming, Richard W. (1950), "Error detecting and error correcting
+       codes", Bell System Technical Journal 26 (2): 147–160,
+       http://www.ece.rutgers.edu/~bushnell/dsdwebsite/hamming.pdf
 
   This implementation requires O(N) time and space, where N is the length of
   the input sequences.
@@ -124,8 +132,11 @@ def levenshtein_distance(s1, s2):
 
   See: http://en.wikipedia.org/wiki/Levenshtein_distance
 
-  Transpositions are exchanges of *consecutive* characters; all other
-  operations are self-explanatory.
+       В.И. Левенштейн (1965). "Двоичные коды с исправлением выпадений, вставок и
+       замещений символов".  Доклады Академий Наук СCCP 163 (4): 845–8.  Appeared
+       in English as: Levenshtein VI (1966).  "Binary codes capable of correcting
+       deletions, insertions, and reversals".  Soviet Physics Doklady 10:
+       707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
 
   This implementation is based on a standard dynamic programming approach,
   requiring O(N*M) time and O(min(N,M)) space, where N and M are the lengths
@@ -134,6 +145,21 @@ def levenshtein_distance(s1, s2):
 
     http://en.wikipedia.org/wiki/Dynamic_programming
     http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+  cost[i,j] = |
+              |     | cost[i-1,j-1]      if c1==c2     (match)
+              | min | cost[i-1,j-1] + 1  if c1!=c2     (substitution)
+              |     | cost[i,  j-1] + 1                (insert c2)
+              |     | cost[i-1,j  ] + 1                (delete c1)
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j].  This implemention saves space by only storing the last two
+  cost rows at any given time (cost[i-1], and cost[i]).
 
   >>> levenshtein_distance('ac', 'abc')
   1
@@ -212,6 +238,12 @@ def levenshtein_sequence(s1, s2):
 
   See: http://en.wikipedia.org/wiki/Levenshtein_distance
 
+       В.И. Левенштейн (1965). "Двоичные коды с исправлением выпадений, вставок и
+       замещений символов".  Доклады Академий Наук СCCP 163 (4): 845–8.  Appeared
+       in English as: Levenshtein VI (1966).  "Binary codes capable of correcting
+       deletions, insertions, and reversals".  Soviet Physics Doklady 10:
+       707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
+
   This function is related to the levenshtein_sequence such that
 
     len(levenshtein_sequence(s1, s2)) == levenshtein_distance(s1,s2)
@@ -222,6 +254,23 @@ def levenshtein_sequence(s1, s2):
 
     http://en.wikipedia.org/wiki/Dynamic_programming
     http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+  cost[i,j] = |
+              |     | cost[i-1,j-1]      if c1==c2     (match)
+              | min | cost[i-1,j-1] + 1  if c1!=c2     (substitution)
+              |     | cost[i,  j-1] + 1                (insert c2)
+              |     | cost[i-1,j  ] + 1                (delete c1)
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j] and the edit sequence is obtained by keeping note of which
+  operation was selected at each step and backtracking from the end to the
+  beginning.  This implemention saves space by only storing the last two
+  cost rows at any given time (cost[i-1], and cost[i]).
 
   >>> levenshtein_sequence('', '')
   []
@@ -319,6 +368,16 @@ def damerau_levenshtein_distance(s1, s2):
 
   See: http://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance
 
+       В.И. Левенштейн (1965). "Двоичные коды с исправлением выпадений, вставок и
+       замещений символов".  Доклады Академий Наук СCCP 163 (4): 845–8.  Appeared
+       in English as: Levenshtein VI (1966).  "Binary codes capable of correcting
+       deletions, insertions, and reversals".  Soviet Physics Doklady 10:
+       707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
+
+       Damerau F (1964). "A technique for computer detection and correction
+       of spelling errors".  Communications of the ACM 7 (3):171-6.
+       http://www.cis.uni-muenchen.de/~heller/SuchMasch/apcadg/literatur/data/damerau_distance.pdf
+
   Transpositions are exchanges of *consecutive* characters; all other
   operations are self-explanatory.
 
@@ -329,6 +388,24 @@ def damerau_levenshtein_distance(s1, s2):
 
     http://en.wikipedia.org/wiki/Dynamic_programming
     http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+              |
+              |     | cost[i-1,j-1]      if c1==c2     (match)
+  cost[i,j] = |     | cost[i-1,j-1] + 1  if c1!=c2     (substitution)
+              |     | cost[i,  j-1] + 1                (insert c2)
+              | min | cost[i-1,j  ] + 1                (delete c1)
+              |     | cost[i-2,j-2] + 1  if i>1, j>1,  (transpose)
+              |     |                       s1[i-2]==c2,
+              |     |                       s2[j-2]==c1
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j].  This implemention saves space by only storing the last three
+  cost rows at any given time (cost[i-2], cost[i-1], and cost[i]).
 
   >>> damerau_levenshtein_distance('ba', 'ab')
   1
@@ -415,6 +492,16 @@ def damerau_levenshtein_sequence(s1, s2):
 
   See: http://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance
 
+       В.И. Левенштейн (1965). "Двоичные коды с исправлением выпадений, вставок и
+       замещений символов".  Доклады Академий Наук СCCP 163 (4): 845–8.  Appeared
+       in English as: Levenshtein VI (1966).  "Binary codes capable of correcting
+       deletions, insertions, and reversals".  Soviet Physics Doklady 10:
+       707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
+
+       Damerau F (1964). "A technique for computer detection and correction
+       of spelling errors".  Communications of the ACM 7 (3):171-6. 
+       http://www.cis.uni-muenchen.de/~heller/SuchMasch/apcadg/literatur/data/damerau_distance.pdf
+
   Transpositions are exchanges of *consecutive* characters; all other
   operations are self-explanatory.
 
@@ -428,6 +515,26 @@ def damerau_levenshtein_sequence(s1, s2):
 
     http://en.wikipedia.org/wiki/Dynamic_programming
     http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+              |
+              |     | cost[i-1,j-1]      if c1==c2     (match)
+  cost[i,j] = |     | cost[i-1,j-1] + 1  if c1!=c2     (substitution)
+              |     | cost[i,  j-1] + 1                (insert c2)
+              | min | cost[i-1,j  ] + 1                (delete c1)
+              |     | cost[i-2,j-2] + 1  if i>1, j>1,  (transpose)
+              |     |                       s1[i-2]==c2,
+              |     |                       s2[j-2]==c1
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j] and the edit sequence is obtained by keeping note of which
+  operation was selected at each step and backtracking from the end to the
+  beginning.  This implemention saves space by only storing the last three
+  cost rows at any given time (cost[i-2], cost[i-1], and cost[i]).
 
   >>> damerau_levenshtein_sequence('ba', 'ab')
   [('T', 0, 'ba', 'ab')]
