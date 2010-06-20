@@ -182,7 +182,19 @@ class IlluminaManifest(object):
     else:
       raise ValueError('Unknown manifest format: %s' % format)
 
-    self.manifest_data = contents
+    def _manifest_rows():
+      header = contents.next()
+      fields = len(header)
+
+      yield header
+
+      for row in contents:
+        n = fields-len(row)
+        if n>0:
+          row += ['']*n
+        yield row
+
+    self.manifest_data = _manifest_rows()
 
   def _load_bpm(self,filename):
     import numpy as np

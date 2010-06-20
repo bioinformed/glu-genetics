@@ -83,7 +83,6 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
                     assayid_idx,probea_idx,probeb_idx)
 
   for assay in manifest:
-    assay  += ['']*(max_idx-len(assay)+1)
     lname   = assay[name_idx]
     alleles = assay[alleles_idx]
     chr     = assay[chr_idx] or None
