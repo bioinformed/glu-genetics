@@ -9,7 +9,7 @@ __revision__  = '$Id$'
 
 
 __all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumerate','pick',
-           'peekfirst','groups','unique','izip_exact','deprecated','deprecated_by',
+           'peekfirst','groups','unique','izip_exact','LengthMismatch','deprecated','deprecated_by',
            'gcdisabled','chunk']
 
 import gc
@@ -189,7 +189,7 @@ def consume(seq, n=None):
     # feed the entire iterator into a zero-length deque
     deque(seq, maxlen=0)
   else:
-    # advance to the emtpy slice starting at position n
+    # advance to the empty slice starting at position n
     next(islice(seq, n, n), None)
 
 

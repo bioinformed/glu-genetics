@@ -81,7 +81,7 @@ def _interval_pileup_region(contig_regions):
 def interval_pileup(regions):
   '''
   Generator that produces a sequence of contig name, contig length, and a
-  seriies of intervals with coordinates [start, end) and a sequence of
+  series of intervals with coordinates [start, end) and a sequence of
   interval names for regions with a constant number of overlapping intervals
   based on an input sequence of (potentially) intervals and names provided
   as (start, end, name).

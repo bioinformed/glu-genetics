@@ -158,7 +158,7 @@ def levenshtein_distance(s1, s2):
               |     | cost[i-1,j  ] + 1                (delete c1)
 
   where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
-  cost[i,j].  This implemention saves space by only storing the last two
+  cost[i,j].  This implementation saves space by only storing the last two
   cost rows at any given time (cost[i-1], and cost[i]).
 
   >>> levenshtein_distance('ac', 'abc')
@@ -211,7 +211,7 @@ def levenshtein_distance(s1, s2):
       # following edit operations:
 
       # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
-      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
+      # Substitution: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match        = previous[j]   + (c1 != c2)
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
@@ -269,7 +269,7 @@ def levenshtein_sequence(s1, s2):
   where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
   cost[i,j] and the edit sequence is obtained by keeping note of which
   operation was selected at each step and backtracking from the end to the
-  beginning.  This implemention saves space by only storing the last two
+  beginning.  This implementation saves space by only storing the last two
   cost rows at any given time (cost[i-1], and cost[i]).
 
   >>> levenshtein_sequence('', '')
@@ -331,7 +331,7 @@ def levenshtein_sequence(s1, s2):
       # following edit operations:
 
       # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
-      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
+      # Substitution: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match        = previous[j]   + (c1 != c2)
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
@@ -404,7 +404,7 @@ def damerau_levenshtein_distance(s1, s2):
               |     |                       s2[j-2]==c1
 
   where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
-  cost[i,j].  This implemention saves space by only storing the last three
+  cost[i,j].  This implementation saves space by only storing the last three
   cost rows at any given time (cost[i-2], cost[i-1], and cost[i]).
 
   >>> damerau_levenshtein_distance('ba', 'ab')
@@ -458,7 +458,7 @@ def damerau_levenshtein_distance(s1, s2):
       # following edit operations:
 
       # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
-      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
+      # Substitution: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match  = previous1[j]   + (c1 != c2)
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
@@ -533,7 +533,7 @@ def damerau_levenshtein_sequence(s1, s2):
   where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
   cost[i,j] and the edit sequence is obtained by keeping note of which
   operation was selected at each step and backtracking from the end to the
-  beginning.  This implemention saves space by only storing the last three
+  beginning.  This implementation saves space by only storing the last three
   cost rows at any given time (cost[i-2], cost[i-1], and cost[i]).
 
   >>> damerau_levenshtein_sequence('ba', 'ab')
@@ -590,7 +590,7 @@ def damerau_levenshtein_sequence(s1, s2):
       # following edit operations:
 
       # Match:        transform s1[0:i]->s2[0:j] + 0, if s1[i]==s2[j]
-      # Substitition: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
+      # Substitution: transform s1[0:i]->s2[0:j] + 1, if s1[i]!=s2[j]
       match        = previous1[j]   + (c1 != c2)
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
