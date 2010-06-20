@@ -20,6 +20,7 @@ __genoformats__ = [
 
 from   operator                  import itemgetter
 from   itertools                 import groupby
+from   contextlib                import closing
 
 from   glu.lib.utils             import izip_exact,is_str,gcdisabled
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
@@ -642,13 +643,21 @@ def load_genotriples_binary(filename,format,genome=None,phenome=None,extra_args=
   phenome = load_phenos(gfile,samples,phenome,version,compat_version,ignorephenos)
 
   def _load():
-    for row in gfile.root.genotypes:
-      locusid = row[1]
-      yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
-    gfile.close()
+    with closing(gfile):
+      # Yield an initial dummy value to ensure that the generator starts,
+      # so that gfile is closed properly when it shuts down
+      yield
+
+      for row in gfile.root.genotypes:
+        locusid = row[1]
+        yield samples[row[0]],loci[locusid],models[locusid].genotypes[row[2]]
+
+  # Create the loader and fire it up by requesting the first dummy element
+  _loader = _load()
+  _loader.next()
 
   # FIXME: Order must be restored
-  genos = GenotripleStream(_load(),samples=set(samples),loci=set(loci),genome=file_genome,phenome=phenome)
+  genos = GenotripleStream(_loader,samples=set(samples),loci=set(loci),genome=file_genome,phenome=phenome)
 
   if genome:
     genos = genos.transformed(recode_models=genome)
@@ -1261,50 +1270,61 @@ def load_genomatrix_binary(filename,format,genome=None,phenome=None,extra_args=N
       models = list(file_models)
 
     def _load():
-      descr = GenotypeArrayDescriptor(models)
+      with closing(gfile):
+        # Yield an initial dummy value to ensure that the generator starts,
+        # so that gfile is closed properly when it shuts down
+        yield
 
-      chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
-      chunks    = int(len(rows)+chunksize-1)//chunksize
+        descr = GenotypeArrayDescriptor(models)
 
-      stop = 0
-      for i in xrange(chunks):
-        start,stop = stop,stop+chunksize
-        labels = rows[start:stop]
-        chunk  = gfile.root.genotypes[start:stop]
+        chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
+        chunks    = int(len(rows)+chunksize-1)//chunksize
 
-        for j,label in enumerate(labels):
-          g = GenotypeArray(descr)
-          g.data = chunk[j]
+        stop = 0
+        for i in xrange(chunks):
+          start,stop = stop,stop+chunksize
+          labels = rows[start:stop]
+          chunk  = gfile.root.genotypes[start:stop]
 
-          yield label,g
+          for j,label in enumerate(labels):
+            g = GenotypeArray(descr)
+            g.data = chunk[j]
 
-      gfile.close()
+            yield label,g
 
   elif format == 'lbat':
     models  = []
 
     def _load():
-      chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
-      chunks    = int(len(rows)+chunksize-1)//chunksize
+      with closing(gfile):
+        # Yield an initial dummy value to ensure that the generator starts,
+        # so that gfile is closed properly when it shuts down
+        yield
 
-      stop = 0
-      for i in xrange(chunks):
-        start,stop = stop,stop+chunksize
-        labels = rows[start:stop]
-        chunk  = gfile.root.genotypes[start:stop]
+        chunksize = max(2, int(scratch//gfile.root.genotypes.rowsize))
+        chunks    = int(len(rows)+chunksize-1)//chunksize
 
-        for j,label in enumerate(labels):
-          model = file_models.next()
-          descr = build_descr(model,len(samples))
-          g = GenotypeArray(descr)
-          g.data = chunk[j]
+        stop = 0
+        for i in xrange(chunks):
+          start,stop = stop,stop+chunksize
+          labels = rows[start:stop]
+          chunk  = gfile.root.genotypes[start:stop]
 
-          models.append(model)
-          yield label,g
+          for j,label in enumerate(labels):
+            model = file_models.next()
+            descr = build_descr(model,len(samples))
+            g = GenotypeArray(descr)
+            g.data = chunk[j]
 
-      gfile.close()
+            models.append(model)
+            yield label,g
 
-  genos = GenomatrixStream(_load(),gformat,samples=samples,loci=loci,models=models,genome=file_genome,
+  # Create the loader and fire it up by requesting the first dummy element
+  _loader = _load()
+  _loader.next()
+
+  # Build a stream from the primed data loader
+  genos = GenomatrixStream(_loader,gformat,samples=samples,loci=loci,models=models,genome=file_genome,
                                          phenome=phenome,unique=unique,packed=True)
 
   if genome:
