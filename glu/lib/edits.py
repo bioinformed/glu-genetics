@@ -14,6 +14,43 @@ import numpy as np
 from   glu.lib.utils     import izip_exact
 
 
+def _compress_edit_sequence(seq):
+  '''
+  Compress an edit sequence by merging adjacent character substitutions,
+  insertion and deletion operations into single multi-character operations.
+
+  >>> list(_compress_edit_sequence([('S',5,'A','G'),('S',6,'A','T'),('S',7,'A','G')]))
+  [('S', 5, 'AAA', 'GTG')]
+  >>> list(_compress_edit_sequence([('S',5,'A','G'),('S',7,'A','T'),('S',9,'A','G')]))
+  [('S', 5, 'A', 'G'), ('S', 7, 'A', 'T'), ('S', 9, 'A', 'G')]
+  >>> list(_compress_edit_sequence([('D',5,'A'),('D',5,'B'),('D',5,'C')]))
+  [('D', 5, 'ABC')]
+  >>> list(_compress_edit_sequence([('D',5,'A'),('D',6,'B'),('D',8,'C')]))
+  [('D', 5, 'A'), ('D', 6, 'B'), ('D', 8, 'C')]
+  >>> list(_compress_edit_sequence([('I',5,'A'),('I',6,'B'),('I',7,'C')]))
+  [('I', 5, 'ABC')]
+  >>> list(_compress_edit_sequence([('I',5,'A'),('I',7,'B'),('I',8,'C')]))
+  [('I', 5, 'A'), ('I', 7, 'BC')]
+  '''
+  last = None
+
+  for edit in seq:
+    if not last:
+      last = edit
+    elif edit[0]==last[0]=='D' and edit[1]==last[1]:
+      last = last[0],last[1],last[2]+edit[2]
+    elif edit[0]==last[0]=='S' and edit[1]==last[1]+len(last[2]):
+      last = last[0],last[1],last[2]+edit[2],last[3]+edit[3]
+    elif edit[0]==last[0]=='I' and edit[1]==last[1]+len(last[2]):
+      last = last[0],last[1],last[2]+edit[2]
+    else:
+      yield last
+      last = edit
+
+  if last:
+    yield last
+
+
 def hamming_distance(s1, s2):
   '''
   Calculate the Hamming distance between two sequences.
@@ -45,7 +82,7 @@ def hamming_distance(s1, s2):
   return sum(ch1 != ch2 for ch1, ch2 in izip_exact(s1, s2))
 
 
-def hamming_sequence(s1, s2):
+def hamming_sequence(s1, s2, compress=True):
   '''
   Calculate a minimum sequence of edit operations based on the
   Hamming distance between sequences.
@@ -53,6 +90,15 @@ def hamming_sequence(s1, s2):
   This distance is based on the number of substitutions needed to transform
   the first sequence into the second.  Both sequences are required to be of
   equal length.
+
+  The operations required to incrementally transform s1 into s2 are returned
+  as a sequence of operations, represented by tuples of the form:
+
+    Substitution:  ('S', position, old, new)
+
+  When compress=False, operations are always performed a single character or
+  element at a time.  When compress=True, adjacent operations are combined
+  into multi-character or multi-element operations, when possible.
 
   See: http://en.wikipedia.org/wiki/Hamming_distance
 
@@ -68,16 +114,21 @@ def hamming_sequence(s1, s2):
   >>> hamming_sequence('abb', 'abc')
   [('S', 2, 'b', 'c')]
   >>> hamming_sequence('abc', 'def')
+  [('S', 0, 'abc', 'def')]
+  >>> hamming_sequence('abc', 'def', compress=False)
   [('S', 0, 'a', 'd'), ('S', 1, 'b', 'e'), ('S', 2, 'c', 'f')]
   >>> hamming_sequence('a', 'ab')
   Traceback (most recent call last):
   ...
   LengthMismatch
   '''
-  return [ ('S',i,c1,c2) for i,(c1,c2) in enumerate(izip_exact(s1, s2)) if c1!=c2 ]
+  seq = [ ('S',i,c1,c2) for i,(c1,c2) in enumerate(izip_exact(s1, s2)) if c1!=c2 ]
+  if compress:
+    seq = list(_compress_edit_sequence(seq))
+  return seq
 
 
-def _edit_sequence(s1, s2, edits):
+def _edit_sequence(s1, s2, edits, offset=0):
   '''
   Compute the sequence of edits required to transform sequence s1 to s2
   using the operations encoded in the supplied matrix of edit operations.
@@ -94,32 +145,67 @@ def _edit_sequence(s1, s2, edits):
 
     if op=='M':
       if c1!=c2:
-        seq.append( ('S',j,c1,c2) )
+        seq.append( ('S',j+offset,c1,c2) )
       i -= 1
       j -= 1
     elif op=='I':
-      seq.append( ('I',j,c2) )
+      seq.append( ('I',j+offset,c2) )
       j -= 1
     elif op=='D':
-      seq.append( ('D',j,c1) )
+      seq.append( ('D',j+offset,c1) )
       i -= 1
     elif op=='T':
-      seq.append( ('T',j-1,s1[i-1:i+1],s2[j-1:j+1]) )
+      seq.append( ('T',j+offset-1,s1[i-1:i+1],s2[j-1:j+1]) )
       i -= 2
       j -= 2
     else:
       raise ValueError('Invalid edit operation')
 
   while j>=0:
-    seq.append( ('I',j,s2[j]) )
+    seq.append( ('I',j+offset,s2[j]) )
     j -= 1
 
   while i>=0:
-    seq.append( ('D',0,s1[i]) )
+    seq.append( ('D',offset,s1[i]) )
     i -= 1
 
   seq.reverse()
   return seq
+
+
+def reduce_match(s1,s2):
+  '''
+  Reduce matching problem size by removing any common prefix and suffix from
+  s1 and s2 and returning the prefix size to adjust the edit sequence
+
+  >>> reduce_match('xxx','yyy')
+  ('xxx', 'yyy', 0)
+  >>> reduce_match('abc','ac')
+  ('b', '', 1)
+  >>> reduce_match('abcdefg','abcxxx')
+  ('defg', 'xxx', 3)
+  >>> reduce_match('abcxxx','defxxx')
+  ('abc', 'def', 0)
+  >>> reduce_match('abc','abc')
+  ('', '', 3)
+  '''
+  i=j=0
+  n = min(len(s1),len(s2))
+
+  while i<n and s1[i]==s2[i]:
+    i+=1
+
+  s1 = s1[i:][::-1]
+  s2 = s2[i:][::-1]
+
+  n -= i
+  while j<n and s1[j]==s2[j]:
+    j+=1
+
+  s1 = s1[j:][::-1]
+  s2 = s2[j:][::-1]
+
+  return s1,s2,i
 
 
 def levenshtein_distance(s1, s2):
@@ -138,7 +224,7 @@ def levenshtein_distance(s1, s2):
        deletions, insertions, and reversals".  Soviet Physics Doklady 10:
        707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
 
-  This implementation is based on a standard dynamic programming approach,
+  This implementation is based on a standard dynamic programming algorithm,
   requiring O(N*M) time and O(min(N,M)) space, where N and M are the lengths
   of the two sequences.  See the following for more information on these
   concepts:
@@ -174,6 +260,9 @@ def levenshtein_distance(s1, s2):
   >>> levenshtein_distance('abcd', ['b', 'a', 'c', 'd', 'e'])
   3
   '''
+  # Reduce problem size by removing any common prefix or suffix
+  s1,s2,_ = reduce_match(s1,s2)
+
   # Minimize storage by forcing s2 to the shorter sequence
   if len(s1) < len(s2):
     s1,s2 = s2,s1
@@ -228,13 +317,25 @@ def levenshtein_distance(s1, s2):
   return current[-1]
 
 
-def levenshtein_sequence(s1, s2):
+def levenshtein_sequence(s1, s2, compress=True):
   '''
   Calculate a minimum number of edit operations to transform s1 into s2
   based on the Levenshtein distance.
 
   This sequence is comprised of the minimum number insertions, deletions,
   and substitutions needed to transform the first sequence into the second.
+
+  The operations required to incrementally transform s1 into s2 are returned
+  as a sequence of operations, represented by tuples of the form:
+
+    Substitution:  ('S', position, old, new)
+    Insertion:     ('I', position, new)
+    Deletion:      ('D', position, old)
+
+  When compress=False, substitution, insertion, and deletions operations are
+  always performed a single character or element at a time.  When
+  compress=True, adjacent operations are combined into multi-character or
+  multi-element operations, when possible.
 
   See: http://en.wikipedia.org/wiki/Levenshtein_distance
 
@@ -244,11 +345,12 @@ def levenshtein_sequence(s1, s2):
        deletions, insertions, and reversals".  Soviet Physics Doklady 10:
        707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
 
-  This function is related to the levenshtein_sequence such that
+  This function is related to levenshtein_sequence since the length of the
+  uncompressed edit sequence is equal to the minimum edit distance:
 
-    len(levenshtein_sequence(s1, s2)) == levenshtein_distance(s1,s2)
+    len(levenshtein_sequence(s1, s2, False)) == levenshtein_distance(s1,s2)
 
-  This implementation is based on a standard dynamic programming approach,
+  This implementation is based on a standard dynamic programming algorithm,
   requiring O(N*M) time and space, where N and M are the lengths of the two
   sequences.  See the following for more information on these concepts:
 
@@ -276,28 +378,44 @@ def levenshtein_sequence(s1, s2):
   []
   >>> levenshtein_sequence('abc', 'abc')
   []
-  >>> levenshtein_sequence('', 'abc')
+  >>> levenshtein_sequence('', 'abc', compress=False)
   [('I', 0, 'a'), ('I', 1, 'b'), ('I', 2, 'c')]
+  >>> levenshtein_sequence('', 'abc')
+  [('I', 0, 'abc')]
   >>> levenshtein_sequence('abc', '')
+  [('D', 0, 'abc')]
+  >>> levenshtein_sequence('abc', '', compress=False)
   [('D', 0, 'a'), ('D', 0, 'b'), ('D', 0, 'c')]
   >>> levenshtein_sequence('ba', 'ab')
+  [('S', 0, 'ba', 'ab')]
+  >>> levenshtein_sequence('ba', 'ab', compress=False)
   [('S', 0, 'b', 'a'), ('S', 1, 'a', 'b')]
   >>> levenshtein_sequence('eat', 'seat')
   [('I', 0, 's')]
   >>> levenshtein_sequence('abcdefghijk','cdefghijklm')
+  [('D', 0, 'ab'), ('I', 9, 'lm')]
+  >>> levenshtein_sequence('abcdefghijk','cdefghijklm', compress=False)
   [('D', 0, 'a'), ('D', 0, 'b'), ('I', 9, 'l'), ('I', 10, 'm')]
 
   It works with arbitrary sequences too:
   >>> levenshtein_sequence('abcd', ['b', 'a', 'c', 'd', 'e'])
-  [('S', 0, 'a', 'b'), ('S', 1, 'b', 'a'), ('I', 4, 'e')]
+  [('S', 0, 'ab', 'ba'), ('I', 4, 'e')]
   '''
+  # Reduce problem size by removing any common prefix or suffix, noting the
+  # prefix offset to adjust the edit sequence
+  s1,s2,offset = reduce_match(s1,s2)
+
+  # Fast-path: If both s1 and s2 are is empty, report a perfect match
+  if not s1 and not s2:
+    return []
+
   # Fast-path: If s1 is empty, then construct a series of insertions to create s2
   if not s1:
-    return [ ('I',j,c2) for j,c2 in enumerate(s2) ]
+    return [ ('I',offset,s2) ] if compress else [ ('I',j+offset,c2) for j,c2 in enumerate(s2) ]
 
   # Fast-path: If s2 is empty, then construct a series of deletions to remove all of s1
   if not s2:
-    return [ ('D',0,c1) for c1 in s1 ]
+    return [ ('D',offset,s1) ] if compress else [ ('D',offset,c1) for c1 in s1 ]
 
   # Otherwise, prepare storage for the edit costs and operations Only store
   # the current and previous cost rows, adding an element to the beginning
@@ -355,7 +473,13 @@ def levenshtein_sequence(s1, s2):
         edits[i,j]='D'
 
   # Build and return a mimimal edit sequence using the saved operations
-  return _edit_sequence(s1, s2, edits)
+  seq = _edit_sequence(s1, s2, edits, offset)
+
+  # Compress sequential substitution, deletion, and insertion operations
+  if compress:
+    seq = list(_compress_edit_sequence(seq))
+
+  return seq
 
 
 def damerau_levenshtein_distance(s1, s2):
@@ -365,6 +489,21 @@ def damerau_levenshtein_distance(s1, s2):
 
   This distance is the number of insertions, deletions, substitutions, and
   transpositions needed to transform the first sequence into the second.
+  Transpositions are exchanges of two *consecutive* characters and may not
+  overlap with other transpositions.
+
+  The operations required to incrementally transform s1 into s2 are returned
+  as a sequence of operations, represented by tuples of the form:
+
+    Substitution:  ('S', position, old, new)
+    Insertion:     ('I', position, new)
+    Deletion:      ('D', position, old)
+    Transposition: ('T', position, old, new)
+
+  When compress=False, substitution, insertion, and deletions operations are
+  always performed a single character or element at a time.  When
+  compress=True, adjacent operations are combined into multi-character or
+  multi-element operations, when possible.
 
   See: http://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance
 
@@ -378,10 +517,7 @@ def damerau_levenshtein_distance(s1, s2):
        of spelling errors".  Communications of the ACM 7 (3):171-6.
        http://www.cis.uni-muenchen.de/~heller/SuchMasch/apcadg/literatur/data/damerau_distance.pdf
 
-  Transpositions are exchanges of *consecutive* characters; all other
-  operations are self-explanatory.
-
-  This implementation is based on a standard dynamic programming approach,
+  This implementation is based on a standard dynamic programming algorithm,
   requiring O(N*M) time and O(min(N,M)) space, where N and M are the lengths
   of the two sequences.  See the following for more information on these
   concepts:
@@ -420,6 +556,9 @@ def damerau_levenshtein_distance(s1, s2):
   >>> damerau_levenshtein_distance('abcd', ['b', 'a', 'c', 'd', 'e'])
   2
   '''
+  # Reduce problem size by removing any common prefix or suffix
+  s1,s2,_ = reduce_match(s1,s2)
+
   # Minimize storage by forcing s2 to the shorter sequence
   if len(s1) < len(s2):
     s1,s2 = s2,s1
@@ -481,14 +620,15 @@ def damerau_levenshtein_distance(s1, s2):
   return current[-1]
 
 
-def damerau_levenshtein_sequence(s1, s2):
+def damerau_levenshtein_sequence(s1, s2, compress=True):
   '''
   Calculate a minimum sequence of edit operations to transform s1 into s2
   based on the Damerau-Levenshtein distance.
 
   This sequence is comprised of the minimum number of insertions, deletions,
   substitutions, and transpositions needed to transform the first sequence
-  into the second.
+  into the second.  Transpositions are exchanges of two *consecutive*
+  characters and may not overlap with other transpositions.
 
   See: http://en.wikipedia.org/wiki/Damerau%E2%80%93Levenshtein_distance
 
@@ -499,17 +639,16 @@ def damerau_levenshtein_sequence(s1, s2):
        707–10.  http://www.scribd.com/full/18654513?access_key=key-10o99fv9kcwswflz9uas
 
        Damerau F (1964). "A technique for computer detection and correction
-       of spelling errors".  Communications of the ACM 7 (3):171-6. 
+       of spelling errors".  Communications of the ACM 7 (3):171-6.
        http://www.cis.uni-muenchen.de/~heller/SuchMasch/apcadg/literatur/data/damerau_distance.pdf
 
-  Transpositions are exchanges of *consecutive* characters; all other
-  operations are self-explanatory.
+  This function is related to damerau_levenshtein_sequence since the length
+  of the uncompressed edit sequence is equal to the minimum edit distance:
 
-  This function is related to the levenshtein_sequence such that
+    len(damerau_levenshtein_sequence(s1, s2, False))
+                               == damerau_levenshtein_distance(s1,s2)
 
-    len(damerau_levenshtein_sequence(s1, s2)) == damerau_levenshtein_distance(s1,s2)
-
-  This implementation is based on a standard dynamic programming approach,
+  This implementation is based on a standard dynamic programming algorithm,
   requiring O(N*M) time and space, where N and M are the lengths of the two
   sequences.  See the following for more information on these concepts:
 
@@ -549,13 +688,21 @@ def damerau_levenshtein_sequence(s1, s2):
   >>> damerau_levenshtein_sequence('abcd', ['b', 'a', 'c', 'd', 'e'])
   [('T', 0, 'ab', ['b', 'a']), ('I', 4, 'e')]
   '''
+  # Reduce problem size by removing any common prefix or suffix, noting the
+  # prefix offset to adjust the edit sequence
+  s1,s2,offset = reduce_match(s1,s2)
+
+  # Fast-path: If both s1 and s2 are is empty, report a perfect match
+  if not s1 and not s2:
+    return []
+
   # Fast-path: If s1 is empty, then construct a series of insertions to create s2
   if not s1:
-    return [ ('I',j,c2) for j,c2 in enumerate(s2) ]
+    return [ ('I',offset,s2) ] if compress else [ ('I',j+offset,c2) for j,c2 in enumerate(s2) ]
 
   # Fast-path: If s2 is empty, then construct a series of deletions to remove all of s1
   if not s2:
-    return [ ('D',0,c1) for c1 in s1 ]
+    return [ ('D',offset,s1) ] if compress else [ ('D',offset,c1) for c1 in s1 ]
 
   # Otherwise, prepare storage for the edit costs
   # Only store the current and previous cost rows, adding a single
@@ -622,7 +769,13 @@ def damerau_levenshtein_sequence(s1, s2):
         edits[i,j]='T'
 
   # Build and return a mimimal edit sequence using the saved operations
-  return _edit_sequence(s1, s2, edits)
+  seq = _edit_sequence(s1, s2, edits, offset)
+
+  # Compress sequential substitution, deletion, and insertion operations
+  if compress:
+    seq = list(_compress_edit_sequence(seq))
+
+  return seq
 
 
 def _test():
