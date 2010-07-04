@@ -11,7 +11,10 @@ __revision__  = '$Id$'
 
 import numpy as np
 
-from   glu.lib.utils     import izip_exact
+from   glu.lib.utils     import izip_exact, namedtuple
+
+
+EditOp = namedtuple('EditOp', 'op pos old new')
 
 
 def _compress_edit_sequence(seq):
@@ -19,30 +22,31 @@ def _compress_edit_sequence(seq):
   Compress an edit sequence by merging adjacent character substitutions,
   insertion and deletion operations into single multi-character operations.
 
-  >>> list(_compress_edit_sequence([('S',5,'A','G'),('S',6,'A','T'),('S',7,'A','G')]))
-  [('S', 5, 'AAA', 'GTG')]
-  >>> list(_compress_edit_sequence([('S',5,'A','G'),('S',7,'A','T'),('S',9,'A','G')]))
-  [('S', 5, 'A', 'G'), ('S', 7, 'A', 'T'), ('S', 9, 'A', 'G')]
-  >>> list(_compress_edit_sequence([('D',5,'A'),('D',5,'B'),('D',5,'C')]))
-  [('D', 5, 'ABC')]
-  >>> list(_compress_edit_sequence([('D',5,'A'),('D',6,'B'),('D',8,'C')]))
-  [('D', 5, 'A'), ('D', 6, 'B'), ('D', 8, 'C')]
-  >>> list(_compress_edit_sequence([('I',5,'A'),('I',6,'B'),('I',7,'C')]))
-  [('I', 5, 'ABC')]
-  >>> list(_compress_edit_sequence([('I',5,'A'),('I',7,'B'),('I',8,'C')]))
-  [('I', 5, 'A'), ('I', 7, 'BC')]
+  >>> Op = EditOp
+  >>> list(_compress_edit_sequence([Op('S',5,'A','G'),Op('S',6,'A','T'),Op('S',7,'A','G')]))
+  [EditOp(op='S', pos=5, old='AAA', new='GTG')]
+  >>> list(_compress_edit_sequence([Op('S',5,'A','G'),Op('S',7,'A','T'),Op('S',9,'A','G')]))
+  [EditOp(op='S', pos=5, old='A', new='G'), EditOp(op='S', pos=7, old='A', new='T'), EditOp(op='S', pos=9, old='A', new='G')]
+  >>> list(_compress_edit_sequence([Op('D',5,'A',None),Op('D',5,'B',None),Op('D',5,'C',None)]))
+  [EditOp(op='D', pos=5, old='ABC', new=None)]
+  >>> list(_compress_edit_sequence([Op('D',5,'A',None),Op('D',6,'B',None),Op('D',8,'C',None)]))
+  [EditOp(op='D', pos=5, old='A', new=None), EditOp(op='D', pos=6, old='B', new=None), EditOp(op='D', pos=8, old='C', new=None)]
+  >>> list(_compress_edit_sequence([Op('I',5,None,'A'),Op('I',6,None,'B'),Op('I',7,None,'C')]))
+  [EditOp(op='I', pos=5, old=None, new='ABC')]
+  >>> list(_compress_edit_sequence([Op('I',5,None,'A'),Op('I',7,None,'B'),Op('I',8,None,'C')]))
+  [EditOp(op='I', pos=5, old=None, new='A'), EditOp(op='I', pos=7, old=None, new='BC')]
   '''
   last = None
 
   for edit in seq:
     if not last:
       last = edit
-    elif edit[0]==last[0]=='D' and edit[1]==last[1]:
-      last = last[0],last[1],last[2]+edit[2]
-    elif edit[0]==last[0]=='S' and edit[1]==last[1]+len(last[2]):
-      last = last[0],last[1],last[2]+edit[2],last[3]+edit[3]
-    elif edit[0]==last[0]=='I' and edit[1]==last[1]+len(last[2]):
-      last = last[0],last[1],last[2]+edit[2]
+    elif edit.op==last.op=='D' and edit.pos==last.pos:
+      last = EditOp(last.op,last.pos,last.old+edit.old,None)
+    elif edit.op==last.op=='S' and edit.pos==last.pos+len(last.old):
+      last = EditOp(last.op,last.pos,last.old+edit.old,last.new+edit.new)
+    elif edit.op==last.op=='I' and edit.pos==last.pos+len(last.new):
+      last = EditOp(last.op,last.pos,None,last.new+edit.new)
     else:
       yield last
       last = edit
@@ -94,7 +98,7 @@ def hamming_sequence(s1, s2, compress=True):
   The operations required to incrementally transform s1 into s2 are returned
   as a sequence of operations, represented by tuples of the form:
 
-    Substitution:  ('S', position, old, new)
+    Substitution:  EditOp(op='S', pos=position, old=old, new=new)
 
   When compress=False, operations are always performed a single character or
   element at a time.  When compress=True, adjacent operations are combined
@@ -112,17 +116,17 @@ def hamming_sequence(s1, s2, compress=True):
   >>> hamming_sequence('abc', 'abc')
   []
   >>> hamming_sequence('abb', 'abc')
-  [('S', 2, 'b', 'c')]
+  [EditOp(op='S', pos=2, old='b', new='c')]
   >>> hamming_sequence('abc', 'def')
-  [('S', 0, 'abc', 'def')]
+  [EditOp(op='S', pos=0, old='abc', new='def')]
   >>> hamming_sequence('abc', 'def', compress=False)
-  [('S', 0, 'a', 'd'), ('S', 1, 'b', 'e'), ('S', 2, 'c', 'f')]
+  [EditOp(op='S', pos=0, old='a', new='d'), EditOp(op='S', pos=1, old='b', new='e'), EditOp(op='S', pos=2, old='c', new='f')]
   >>> hamming_sequence('a', 'ab')
   Traceback (most recent call last):
   ...
   LengthMismatch
   '''
-  seq = [ ('S',i,c1,c2) for i,(c1,c2) in enumerate(izip_exact(s1, s2)) if c1!=c2 ]
+  seq = [ EditOp('S',i,c1,c2) for i,(c1,c2) in enumerate(izip_exact(s1, s2)) if c1!=c2 ]
   if compress:
     seq = list(_compress_edit_sequence(seq))
   return seq
@@ -145,28 +149,28 @@ def _edit_sequence(s1, s2, edits, offset=0):
 
     if op=='M':
       if c1!=c2:
-        seq.append( ('S',j+offset,c1,c2) )
+        seq.append( EditOp('S',offset+j,c1,c2) )
       i -= 1
       j -= 1
     elif op=='I':
-      seq.append( ('I',j+offset,c2) )
+      seq.append( EditOp('I',offset+j,None,c2) )
       j -= 1
     elif op=='D':
-      seq.append( ('D',j+offset,c1) )
+      seq.append( EditOp('D',offset+j,c1,None) )
       i -= 1
     elif op=='T':
-      seq.append( ('T',j+offset-1,s1[i-1:i+1],s2[j-1:j+1]) )
+      seq.append( EditOp('T',offset+j-1,s1[i-1:i+1],s2[j-1:j+1]) )
       i -= 2
       j -= 2
     else:
       raise ValueError('Invalid edit operation')
 
   while j>=0:
-    seq.append( ('I',j+offset,s2[j]) )
+    seq.append( EditOp('I',offset+j,None,s2[j]) )
     j -= 1
 
   while i>=0:
-    seq.append( ('D',offset,s1[i]) )
+    seq.append( EditOp('D',offset,s1[i],None) )
     i -= 1
 
   seq.reverse()
@@ -328,9 +332,9 @@ def levenshtein_sequence(s1, s2, compress=True):
   The operations required to incrementally transform s1 into s2 are returned
   as a sequence of operations, represented by tuples of the form:
 
-    Substitution:  ('S', position, old, new)
-    Insertion:     ('I', position, new)
-    Deletion:      ('D', position, old)
+    Substitution:  EditOp(op='S', pos=position, old=old,  new=new)
+    Insertion:     EditOp(op='I', pos=position, old=None, new=new)
+    Deletion:      EditOp(op='D', pos=position, old=old,  new=None)
 
   When compress=False, substitution, insertion, and deletions operations are
   always performed a single character or element at a time.  When
@@ -379,27 +383,27 @@ def levenshtein_sequence(s1, s2, compress=True):
   >>> levenshtein_sequence('abc', 'abc')
   []
   >>> levenshtein_sequence('', 'abc', compress=False)
-  [('I', 0, 'a'), ('I', 1, 'b'), ('I', 2, 'c')]
+  [EditOp(op='I', pos=0, old=None, new='a'), EditOp(op='I', pos=1, old=None, new='b'), EditOp(op='I', pos=2, old=None, new='c')]
   >>> levenshtein_sequence('', 'abc')
-  [('I', 0, 'abc')]
+  [EditOp(op='I', pos=0, old=None, new='abc')]
   >>> levenshtein_sequence('abc', '')
-  [('D', 0, 'abc')]
+  [EditOp(op='D', pos=0, old='abc', new=None)]
   >>> levenshtein_sequence('abc', '', compress=False)
-  [('D', 0, 'a'), ('D', 0, 'b'), ('D', 0, 'c')]
+  [EditOp(op='D', pos=0, old='a', new=None), EditOp(op='D', pos=0, old='b', new=None), EditOp(op='D', pos=0, old='c', new=None)]
   >>> levenshtein_sequence('ba', 'ab')
-  [('S', 0, 'ba', 'ab')]
+  [EditOp(op='S', pos=0, old='ba', new='ab')]
   >>> levenshtein_sequence('ba', 'ab', compress=False)
-  [('S', 0, 'b', 'a'), ('S', 1, 'a', 'b')]
+  [EditOp(op='S', pos=0, old='b', new='a'), EditOp(op='S', pos=1, old='a', new='b')]
   >>> levenshtein_sequence('eat', 'seat')
-  [('I', 0, 's')]
+  [EditOp(op='I', pos=0, old=None, new='s')]
   >>> levenshtein_sequence('abcdefghijk','cdefghijklm')
-  [('D', 0, 'ab'), ('I', 9, 'lm')]
+  [EditOp(op='D', pos=0, old='ab', new=None), EditOp(op='I', pos=9, old=None, new='lm')]
   >>> levenshtein_sequence('abcdefghijk','cdefghijklm', compress=False)
-  [('D', 0, 'a'), ('D', 0, 'b'), ('I', 9, 'l'), ('I', 10, 'm')]
+  [EditOp(op='D', pos=0, old='a', new=None), EditOp(op='D', pos=0, old='b', new=None), EditOp(op='I', pos=9, old=None, new='l'), EditOp(op='I', pos=10, old=None, new='m')]
 
   It works with arbitrary sequences too:
   >>> levenshtein_sequence('abcd', ['b', 'a', 'c', 'd', 'e'])
-  [('S', 0, 'ab', 'ba'), ('I', 4, 'e')]
+  [EditOp(op='S', pos=0, old='ab', new='ba'), EditOp(op='I', pos=4, old=None, new='e')]
   '''
   # Reduce problem size by removing any common prefix or suffix, noting the
   # prefix offset to adjust the edit sequence
@@ -411,11 +415,13 @@ def levenshtein_sequence(s1, s2, compress=True):
 
   # Fast-path: If s1 is empty, then construct a series of insertions to create s2
   if not s1:
-    return [ ('I',offset,s2) ] if compress else [ ('I',j+offset,c2) for j,c2 in enumerate(s2) ]
+    return [ EditOp('I',offset,  None,s2) ] if compress \
+      else [ EditOp('I',offset+j,None,c2) for j,c2 in enumerate(s2) ]
 
   # Fast-path: If s2 is empty, then construct a series of deletions to remove all of s1
   if not s2:
-    return [ ('D',offset,s1) ] if compress else [ ('D',offset,c1) for c1 in s1 ]
+    return [ EditOp('D',offset,s1,None) ] if compress \
+      else [ EditOp('D',offset,c1,None) for c1 in s1 ]
 
   # Otherwise, prepare storage for the edit costs and operations Only store
   # the current and previous cost rows, adding an element to the beginning
@@ -495,10 +501,10 @@ def damerau_levenshtein_distance(s1, s2):
   The operations required to incrementally transform s1 into s2 are returned
   as a sequence of operations, represented by tuples of the form:
 
-    Substitution:  ('S', position, old, new)
-    Insertion:     ('I', position, new)
-    Deletion:      ('D', position, old)
-    Transposition: ('T', position, old, new)
+    Substitution:  EditOp(op='S', pos=position, old=old,  new=new)
+    Insertion:     EditOp(op='I', pos=position, old=None, new=new)
+    Deletion:      EditOp(op='D', pos=position, old=old,  new=None)
+    Transposition: EditOp(op='T', pos=position, old=old,  new=new)
 
   When compress=False, substitution, insertion, and deletions operations are
   always performed a single character or element at a time.  When
@@ -676,17 +682,17 @@ def damerau_levenshtein_sequence(s1, s2, compress=True):
   cost rows at any given time (cost[i-2], cost[i-1], and cost[i]).
 
   >>> damerau_levenshtein_sequence('ba', 'ab')
-  [('T', 0, 'ba', 'ab')]
+  [EditOp(op='T', pos=0, old='ba', new='ab')]
   >>> damerau_levenshtein_sequence('ba', 'abc')
-  [('I', 0, 'a'), ('S', 2, 'a', 'c')]
+  [EditOp(op='I', pos=0, old=None, new='a'), EditOp(op='S', pos=2, old='a', new='c')]
   >>> damerau_levenshtein_sequence('fee', 'deed')
-  [('S', 0, 'f', 'd'), ('I', 3, 'd')]
+  [EditOp(op='S', pos=0, old='f', new='d'), EditOp(op='I', pos=3, old=None, new='d')]
   >>> damerau_levenshtein_sequence('eat', 'seat')
-  [('I', 0, 's')]
+  [EditOp(op='I', pos=0, old=None, new='s')]
 
   It works with arbitrary sequences too:
   >>> damerau_levenshtein_sequence('abcd', ['b', 'a', 'c', 'd', 'e'])
-  [('T', 0, 'ab', ['b', 'a']), ('I', 4, 'e')]
+  [EditOp(op='T', pos=0, old='ab', new=['b', 'a']), EditOp(op='I', pos=4, old=None, new='e')]
   '''
   # Reduce problem size by removing any common prefix or suffix, noting the
   # prefix offset to adjust the edit sequence
@@ -698,11 +704,13 @@ def damerau_levenshtein_sequence(s1, s2, compress=True):
 
   # Fast-path: If s1 is empty, then construct a series of insertions to create s2
   if not s1:
-    return [ ('I',offset,s2) ] if compress else [ ('I',j+offset,c2) for j,c2 in enumerate(s2) ]
+    return [ EditOp('I',offset,  None,s2) ] if compress \
+      else [ EditOp('I',offset+j,None,c2) for j,c2 in enumerate(s2) ]
 
   # Fast-path: If s2 is empty, then construct a series of deletions to remove all of s1
   if not s2:
-    return [ ('D',offset,s1) ] if compress else [ ('D',offset,c1) for c1 in s1 ]
+    return [ EditOp('D',offset,s1,None) ] if compress \
+      else [ EditOp('D',offset,c1,None) for c1 in s1 ]
 
   # Otherwise, prepare storage for the edit costs
   # Only store the current and previous cost rows, adding a single
