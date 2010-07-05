@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __abstract__  = 'test for deviations from Hardy-Weinberg proportions'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
@@ -57,7 +59,7 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
     return 1.
 
   # Compute the expected number of heterozygotes under HWP
-  hets = rare*common/(rare+common)
+  hets = rare*common//(rare+common)
 
   # Account for rounding error on the number of hets, if the
   # parity of rare and hets do not match
@@ -70,23 +72,23 @@ def hwp_exact_biallelic(hom1_count, het_count, hom2_count):
 
   # Initialize heterozygote probability vector, such that once filled in
   # P(hets|observed counts) = probs[hets/2]/sum(probs)
-  probs = [0]*(rare/2+1)
+  probs = [0]*(rare//2+1)
 
   # Set P(expected hets)=1, since the remaining probabilities will be
   # computed relative to it
-  probs[hets/2] = 1.0
+  probs[hets//2] = 1.0
 
   # Fill in relative probabilities for less than the expected hets
   for i,h in enumerate(xrange(hets,1,-2)):
-    probs[h/2-1] = probs[h/2]*h*(h-1) / (4*(hom_r+i+1)*(hom_c+i+1))
+    probs[h//2-1] = probs[h//2]*h*(h-1) / (4*(hom_r+i+1)*(hom_c+i+1))
 
   # Fill in relative probabilities for greater than the expected hets
   for i,h in enumerate(xrange(hets,rare-1,2)):
-    probs[h/2+1] = probs[h/2]*4*(hom_r-i)*(hom_c-i) / ((h+1)*(h+2))
+    probs[h//2+1] = probs[h//2]*4*(hom_r-i)*(hom_c-i) / ((h+1)*(h+2))
 
   # Compute the pvalue by summing the probabilities <= to that of the
   # observed number of heterozygotes and normalize by the total
-  p_obs = probs[het_count/2]
+  p_obs = probs[het_count//2]
   pvalue = sum(p for p in probs if p <= p_obs)/sum(probs)
 
   return pvalue
