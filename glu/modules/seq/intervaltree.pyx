@@ -62,11 +62,11 @@ cdef class IntervalNode:
   NOTE: Unless you really know what you are doing, you probably should us
         `IntervalTree` rather than using this directly.
   '''
-  cdef float        priority
-  cdef object       value
-  cdef public int   start, end
-  cdef int          minend, maxend, minstart
-  cdef IntervalNode cleft, cright, croot
+  cdef float         priority
+  cdef public object value
+  cdef public int    start, end
+  cdef int           minend, maxend, minstart
+  cdef IntervalNode  cleft, cright, croot
 
   property left:
     def __get__(self):
