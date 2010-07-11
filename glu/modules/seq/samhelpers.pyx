@@ -33,9 +33,8 @@ cdef inline void append_int(char **buffer, Py_ssize_t *size, Py_ssize_t *pos, Py
   pos[0] += sprintf(buffer[0]+pos[0], "%d", value)
 
 
-def make_cigar(query, ref, qstart, qstop, qlen):
+def make_cigar(query, ref):
   cdef char  symbol = 0, new_symbol = 0
-  cdef Py_ssize_t start=qstart, stop=qstop, ql=qlen
   cdef Py_ssize_t i, pos = 0, count = 0
 
   cdef char      *q = query
@@ -50,16 +49,6 @@ def make_cigar(query, ref, qstart, qstop, qlen):
   # More space can be added to accommodate very long results (not likely for good alignments)
   cdef Py_ssize_t size = imax(n,20)
   cdef char    *result = <char *>malloc(size*sizeof(char))
-
-  # Apply left hard-clipping
-  if start<stop and start!=1:
-    append_int(&result, &size, &pos, start-1, size*2)
-    result[pos] = 'H'
-    pos += 1
-  elif start>stop and start!=ql:
-    append_int(&result, &size, &pos, ql-start, size*2)
-    result[pos] = 'H'
-    pos += 1
 
   for i in range(n):
     if q[i]=='-' and r[i]=='-':
@@ -90,16 +79,6 @@ def make_cigar(query, ref, qstart, qstop, qlen):
     # (NULL termination of result will occur unconditionally next)
     append_int(&result, &size, &pos, count, size+10)
     result[pos] = symbol
-    pos += 1
-
-  # Apply right hard-clipping
-  if start<stop and stop!=ql:
-    append_int(&result, &size, &pos, ql-stop, size+10)
-    result[pos] = 'H'
-    pos += 1
-  elif start>stop and stop!=1:
-    append_int(&result, &size, &pos, stop-1, size+10)
-    result[pos] = 'H'
     pos += 1
 
   # NULL terminate result
