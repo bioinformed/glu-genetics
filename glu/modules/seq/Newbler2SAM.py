@@ -465,7 +465,7 @@ def option_parser():
   parser.add_option('--remapcontig', dest='remapcontig', metavar='FILE',
                     help='Contig remapping')
   parser.add_option('--trim', dest='trim', metavar='ACTION', default='flowkey,lowquality',
-                    help='Trim feature(s) of reads.  Comma separated list of: flowkey, adapter, quality, all.  Default=all')
+                    help='Trim feature(s) of reads.  Comma separated list of: flowkey, adapter, lowquality, all.  Default=all')
   parser.add_option('--maligned', dest='maligned', metavar='ACTION', default='keep-all',
                     help='Action to perform for multiply aligned reads: keep-primary, keep-all, unalign, drop.  Default=keep-all')
   parser.add_option('--mpick', dest='mpick', metavar='METHOD', default='best',
