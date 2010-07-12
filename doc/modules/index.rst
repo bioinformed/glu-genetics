@@ -39,4 +39,5 @@ and analysis.
   assoc/index
   struct/index
   ld/index
+  seq/index
   util/index

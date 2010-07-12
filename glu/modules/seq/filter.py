@@ -3,7 +3,7 @@
 from __future__ import division
 
 __gluindex__  = True
-__abstract__  = 'Filter SAM/BAM files by read length and target overlap'
+__abstract__  = 'Filter SAM/BAM files'
 __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
