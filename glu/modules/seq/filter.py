@@ -102,7 +102,7 @@ def target_filter(allreads,references,targets,options):
 
     for read in reads:
       read_start = read.pos
-      read_end   = read_start+read.rlen
+      read_end   = read.aend
 
       here = read_start,read_start
       assert last<=here, 'Out of order read (%s>%s)' % (last,here)
