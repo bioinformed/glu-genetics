@@ -157,6 +157,17 @@ class SimpleProgress(ProgressBarWidget):
         return '%d of %d' % (pbar.currval, pbar.maxval)
 
 
+class Completed(ProgressBarWidget):
+    "Returns what is already done"
+    def __init__(self, unit=None):
+        self.unit = unit
+    def update(self, pbar):
+        if self.unit:
+          return '%d %s' % (pbar.currval,self.unit)
+        else:
+          return '%d' % pbar.currval
+
+
 class Bar(ProgressBarWidgetHFill):
     'The bar of progress. It will stretch to fill the line.'
     def __init__(self, marker='#', left='|', right='|'):
@@ -233,10 +244,10 @@ class ProgressBar(object):
 
     def __init__(self, maxval=100, widgets=default_widgets, term_width=None,
                  fd=sys.stderr):
-        assert maxval > 0
-        self.maxval = maxval
-        self.widgets = widgets
-        self.fd = fd
+
+        self.maxval     = maxval
+        self.widgets    = widgets
+        self.fd         = fd
         self.signal_set = False
         if term_width is not None:
             self.term_width = term_width
@@ -252,7 +263,7 @@ class ProgressBar(object):
                 self.term_width = int(os.environ.get('COLUMNS', 80)) - 1
 
         self.num_intervals = max(100, self.term_width)
-        self.update_interval = self.maxval // self.num_intervals
+        self.update_interval = self.maxval // self.num_intervals if self.maxval else 1
         self.next_update = 0
 
         self.currval = 0
@@ -268,7 +279,7 @@ class ProgressBar(object):
 
     def percentage(self):
         'Returns the percentage of the progress.'
-        return self.currval * 100 // self.maxval
+        return self.currval * 100 // self.maxval if self.maxval else None
 
     def _format_widgets(self):
         r = []
@@ -295,7 +306,10 @@ class ProgressBar(object):
         return ''.join(self._format_widgets()).ljust(self.term_width)
 
     def _next_update(self):
-        return int((int(self.num_intervals * self.currval / self.maxval) + 1) * self.update_interval)
+        if self.maxval:
+          return int((int(self.num_intervals * self.currval / self.maxval) + 1) * self.update_interval)
+        else:
+          return self.currval
 
     def _need_update(self):
         '''Returns true when the progressbar should print an updated line.
@@ -319,7 +333,7 @@ class ProgressBar(object):
 
     def update(self, value, force=False, show=True):
         'Updates the progress bar to a new value.'
-        assert 0 <= value <= self.maxval
+        #assert 0 <= value <= self.maxval
         self.currval = value
         if not force and not self._need_update():
             return
@@ -348,7 +362,7 @@ class ProgressBar(object):
     def finish(self, show=True):
         '''Used to tell the progress is finished.'''
         self.finished = True
-        self.update(self.maxval,show=show)
+        self.update(self.maxval or self.currval,show=show,force=True)
         if show:
           self.fd.write('\n')
         if self.signal_set:
@@ -437,7 +451,10 @@ def progress_bar(output=None, widgets=None, length=None, label='Progress: ', bar
     if label:
       widgets += [label, ' ']
 
-    widgets += [Percentage(), ' ', Bar(marker=bar_marker), ' ', ETA()]
+    if length is not None:
+      widgets += [Percentage(), ' ', Bar(marker=bar_marker), ' ', ETA()]
+    else:
+      widgets += ['  ',Completed(unit=units)]
 
     if units:
       widgets += [' ',ProgressRate(unit=units)]
@@ -512,8 +529,15 @@ try:
   interval_timer = IntervalTimer(1)
 
 
-  def progress_loop(items, update_interval=None, **kwargs):
-    bar = progress_bar(**kwargs)
+  def progress_loop(items, update_interval=None, length=None, **kwargs):
+    if length is None:
+      try:
+        length = len(items)
+        update_interval = max(1,min(length//100,250))
+      except TypeError:
+        pass
+
+    bar = progress_bar(length=length,**kwargs)
 
     if bar is None:
       return items
@@ -538,6 +562,7 @@ try:
       finally:
         interval_timer.remove(jobid)
 
+      bar.update(i)
       bar.finish(show=is_foreground())
 
     return _progress()
@@ -545,8 +570,15 @@ try:
 except ImportError:
 
   # Fall back to a more portable dumb implementation
-  def progress_loop(items, update_interval=None, **kwargs):
-    bar = progress_bar(**kwargs)
+  def progress_loop(items, length=None, update_interval=None, **kwargs):
+    if length is None:
+      try:
+        length = len(items)
+        update_interval = max(1,min(length//100,250))
+      except TypeError:
+        pass
+
+    bar = progress_bar(length=length,**kwargs)
 
     if bar is None:
       return items
@@ -561,6 +593,7 @@ except ImportError:
 
         yield item
 
+      bar.update(i)
       bar.finish()
 
     return _progress()
