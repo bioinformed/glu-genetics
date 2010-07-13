@@ -19,8 +19,9 @@ from   heapq       import heappush, heappop
 import numpy as np
 import pysam
 
-from   glu.lib.fileutils            import autofile, guess_format, parse_augmented_name, table_writer
-from   glu.modules.seq.targetfilter import read_targets
+from   glu.lib.fileutils      import autofile, guess_format, parse_augmented_name, table_writer
+from   glu.modules.seq.filter import read_targets
+from   glu.lib.progressbar    import progress_loop
 
 
 def percent(a,b):
@@ -42,12 +43,12 @@ def _interval_pileup_region(contig_regions):
   pos    = 0
   window = []
 
-  for read_start,read_end,name in contig_regions:
-    if read_start is None or read_end is None:
+  for align_start,align_end,name in contig_regions:
+    if align_start is None or align_end is None:
       continue
 
-    # Yield interval prior to current read_start
-    while window and window[0][0]<read_start:
+    # Yield interval prior to current align_start
+    while window and window[0][0]<align_start:
       end = window[0][0]
 
       yield pos,end,window
@@ -57,13 +58,13 @@ def _interval_pileup_region(contig_regions):
 
       pos = end
 
-    # Yield gap between last region and and current read start
-    if pos!=read_start:
-      yield pos,read_start,window
-      pos = read_start
+    # Yield gap between last region and and current align start
+    if pos!=align_start:
+      yield pos,align_start,window
+      pos = align_start
 
     # Add current region to the window
-    heappush(window, (read_end,name) )
+    heappush(window, (align_end,name) )
 
   # Drain the window once all regions have been added
   while window:
@@ -166,14 +167,15 @@ def load_bam(filename,options):
   try:
     contig_names = inbam.references
     contig_lens  = inbam.lengths
-    reads        = inbam.fetch(region=options.region or None)
+    aligns       = inbam.fetch(region=options.region or None)
+    aligns       = progress_loop(aligns, label='Loading BAM file: ', units='alignments')
 
-    for contig_tid,contig_reads in groupby(reads, attrgetter('rname')):
-      contig_name  = contig_names[contig_tid]
-      contig_len   = contig_lens[contig_tid]
-      contig_reads = ( (read.pos,read.aend,read) for read in contig_reads )
+    for contig_tid,contig_aligns in groupby(aligns, attrgetter('rname')):
+      contig_name   = contig_names[contig_tid]
+      contig_len    = contig_lens[contig_tid]
+      contig_aligns = ( (align.pos,align.aend,align) for align in contig_aligns )
 
-      yield contig_name,contig_len,contig_reads
+      yield contig_name,contig_len,contig_aligns
 
   finally:
     inbam.close()
