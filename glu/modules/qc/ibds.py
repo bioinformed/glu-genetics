@@ -15,11 +15,12 @@ import numpy as np
 
 from   glu.lib.utils             import pair_generator
 from   glu.lib.fileutils         import table_writer
+from   glu.lib.progressbar       import progress_loop
 from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.transform import _intersect_options, _union_options
 from   glu.lib.genolib.genoarray import genoarray_ibs, genotype_count_matrix
 
-from   glu.modules.qc.dupcheck   import file_pairs, progress_bar
+from   glu.modules.qc.dupcheck   import file_pairs
 
 
 def allele_counts(models,geno_counts):
@@ -177,7 +178,7 @@ def main():
   e11 = float(ibs_given_ibd[1,1])
 
   if options.progress:
-    pairs = progress_bar(pairs, pair_count)
+    pairs = progress_loop(pairs, length=pair_count, units='pairs')
 
   for (sample1,genos1),(sample2,genos2) in pairs:
     ibs0,ibs1,ibs2 = genoarray_ibs(genos1,genos2)

@@ -16,6 +16,7 @@ from   itertools                 import chain
 from   glu.lib.utils             import pair_generator
 from   glu.lib.fileutils         import table_reader,table_writer
 from   glu.lib.union_find        import union_find
+from   glu.lib.progressbar       import progress_loop
 
 from   glu.lib.genolib.io        import load_genostream,geno_options
 from   glu.lib.genolib.genoarray import genoarray_concordance
@@ -130,17 +131,6 @@ def file_pairs(genos, pairfile):
   return pairs,len(pairs)
 
 
-def progress_bar(pairs, pair_count):
-  try:
-    from glu.lib.progressbar import progress_loop
-  except ImportError:
-    return pairs
-
-  update_interval = max(1,min(pair_count//100,250))
-
-  return progress_loop(pairs, length=pair_count, units='pairs', update_interval=update_interval)
-
-
 def main():
   parser = option_parser()
   options,args = parser.parse_args()
@@ -189,7 +179,7 @@ def main():
                 'EXPECTED_DUPLICATE','OBSERVED_DUPLICATE'])
 
   if options.progress:
-    pairs = progress_bar(pairs, pair_count)
+    pairs = progress_loop(pairs, length=pair_count, units='pairs')
 
   # N.B. It is not possible to output duplicates incrementally and enumerate
   # duplicate sets.  This is because sets can merge transitively as

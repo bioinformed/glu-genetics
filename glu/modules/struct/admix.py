@@ -16,6 +16,7 @@ import numpy as np
 from   itertools                 import izip
 
 from   glu.lib.fileutils         import table_writer
+from   glu.lib.progressbar       import progress_loop
 from   glu.lib.genolib           import load_genostream, geno_options
 from   glu.lib.genolib.genoarray import genotype_count_matrix, genotype_indices
 
@@ -368,17 +369,6 @@ def classify_ancestry(labels,x,threshold):
   return ipop
 
 
-def progress_bar(samples, sample_count):
-  try:
-    from glu.lib.progressbar import progress_loop
-  except ImportError:
-    return samples
-
-  update_interval = max(1,min(sample_count//100,250))
-
-  return progress_loop(samples, length=sample_count, units='samples', update_interval=update_interval)
-
-
 def compute_frequencies(freq_model,sample_count,models,geno_counts):
   # Set missing genotypes to zero
   geno_counts[:,0] = 0
@@ -529,7 +519,7 @@ def main():
   out.writerow(['SAMPLE']+labels+['IMPUTED_ANCESTRY'])
 
   if options.progress and test.samples:
-    test = progress_bar(test, len(test.samples))
+    test = progress_loop(test, length=len(test.samples), units='samples')
 
   for sample,genos in test:
     # Compute genotype frequencies
@@ -541,7 +531,8 @@ def main():
     # Estimate admixture
     x,l,it = estimate_admixture_sqp(f, x0)
 
-    ipop = classify_ancestry(labels, x, options.threshold)
+    ipop   = classify_ancestry(labels, x, options.threshold)
+
     out.writerow([sample]+['%.4f' % a for a in x] + [ipop])
 
 

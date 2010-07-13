@@ -19,9 +19,9 @@ from   heapq       import heappush, heappop
 import numpy as np
 import pysam
 
+from   glu.lib.progressbar    import progress_loop
 from   glu.lib.fileutils      import autofile, guess_format, parse_augmented_name, table_writer
 from   glu.modules.seq.filter import read_targets
-from   glu.lib.progressbar    import progress_loop
 
 
 def percent(a,b):
