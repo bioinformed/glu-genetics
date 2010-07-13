@@ -15,7 +15,7 @@ from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
 
 
-HEADER = ['CHROMOSOME','CYTOBAND','LOCATION','GENE NEIGHBORHOOD']
+HEADER = ['CHROMOSOME','CYTOBAND','START','END','GENE NEIGHBORHOOD','dbSNP ANNOTATION']
 
 
 def option_parser():
@@ -73,14 +73,15 @@ def annotate(con,header,rows,options):
     elif len(results) > 1:
       info = ['Multiple mappings','','']
     else:
-      lname,chromosome,location,strand = results[0]
-      near = query_gene_neighborhood(con,chromosome,location,up,dn)
-      cytoband = query_cytoband_by_location(con,chromosome,location)
+      name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight = results[0]
+      near = query_gene_neighborhood(con,chrom,start,end,up,dn)
+      cytoband = query_cytoband_by_location(con,chrom,start)
 
-      info = [chromosome,
+      info = [chrom,
               ','.join(c[0] for c in cytoband),
-              location,
-              ','.join(n[0] for n in near)]
+              start+1, end,
+              ','.join(n[0] for n in near),
+              func]
 
     yield row + info
 

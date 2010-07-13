@@ -6,20 +6,40 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-def query_genes_by_name(con,gene):
+from glu.lib.utils import namedtuple
+
+
+CANONICAL_TRANSCRIPT = 1
+CANONICAL_CHROMOSOME = 1<<1
+CANONICAL_ASSEMBLY   = 1<<2
+CANONICAL_ALL        = CANONICAL_TRANSCRIPT|CANONICAL_CHROMOSOME|CANONICAL_ASSEMBLY
+
+
+def query_genes_by_name(con, gene, canonical=None, mapped=None):
   sql = '''
-  SELECT   a.Alias,g.featureName,g.chromosome,g.chrStart,g.chrEnd,g.orientation,g.featureType
+  SELECT   a.Alias,g.symbol,g.chrom,MIN(g.txStart) as start,MAX(g.txEnd) as end,g.strand,"GENE"
   FROM     alias a, gene g
-  WHERE    g.geneID = a.geneID
-    AND    g.chrStart<>""
-    AND    g.chrEnd<>""
-    AND    a.Alias %s
-  ORDER BY g.chromosome,MIN(g.chrStart,g.chrEnd);
+  WHERE    %s
+  GROUP BY g.symbol
+  ORDER BY g.chrom,start,end,g.symbol,g.canonical DESC
   '''
+
+  conditions = ['g.name = a.name']
+
+  if canonical is not None:
+    conditions.append('g.canonical & %d' % canonical)
+
+  if mapped:
+    conditions += [ 'g.txStart<>""', 'g.txEnd<>""' ]
+  elif mapped is not None:
+    conditions += [ 'g.txStart=""', 'g.txEnd=""' ]
+
   if '%' in gene:
-    sql = sql % 'LIKE ?'
+    conditions.append('a.alias LIKE ?')
   else:
-    sql = sql % '= ?'
+    conditions.append('a.alias = ?')
+
+  sql = sql % '\n       AND '.join(conditions)
 
   cur = con.cursor()
   cur.execute(sql, (gene,))
@@ -35,49 +55,54 @@ def query_gene_by_name(con,gene):
   return genes[0]
 
 
-def query_gene_neighborhood(con,chromosome,location,up,dn):
+def query_gene_neighborhood(con,chrom,start,end,up,dn):
   sql = '''
-  SELECT   featureName,chromosome,orientation,chrStart,chrEnd
+  SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
   FROM     gene
-  WHERE    chromosome  = ?
-    AND  ((orientation = '+' AND ? BETWEEN (chrStart - ?) AND (chrEnd + ?))
-       OR (orientation = '-' AND ? BETWEEN (chrStart - ?) AND (chrEnd + ?)))
-  ORDER BY chromosome,chrStart;
+  WHERE    chrom  = ?
+    AND  ((strand = '+' AND txStart<? AND txEnd>?)
+       OR (strand = '-' AND txStart<? AND txEnd>?))
+  GROUP BY symbol
+  ORDER BY chrom,start,end,symbol,canonical DESC
   '''
   cur = con.cursor()
-  cur.execute(sql, (chromosome,location,up,dn,location,dn,up))
+  cur.execute(sql, (chrom,end+dn,start-up,end+up,start-dn))
   return cur.fetchall()
 
 
-def query_genes_by_location(con,chr,loc):
+def query_genes_by_location(con,chr,start,end):
   sql = '''
-  SELECT   featureName,featureName,chromosome,chrStart,chrEnd,orientation,featureType
+  SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
+  SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
   FROM     gene
-  WHERE    chromosome = ?
-    AND    ? BETWEEN chrStart AND chrEnd
-  ORDER BY chromosome,MIN(chrStart,chrEnd);
+  WHERE    chrom = ?
+    AND    txStart<? AND txEnd>?
+  GROUP BY symbol
+  ORDER BY chrom,start,end,symbol,canonical DESC
   '''
   cur = con.cursor()
   cur.execute(sql, (chr, loc))
   return cur.fetchall()
 
 
-def query_cytoband_by_location(con,chr,loc):
+def query_cytoband_by_location(con,chrom,loc):
   sql = '''
   SELECT   band,start,stop,color
   FROM     cytoband
-  WHERE    chromosome = ?
+  WHERE    chrom = ?
     AND    ? BETWEEN start AND stop
-  ORDER BY chromosome,MIN(start,stop);
+  ORDER BY chrom,MIN(start,stop);
   '''
+  if chrom.startswith('chr'):
+    chrom = chrom[3:]
   cur = con.cursor()
-  cur.execute(sql, (chr, loc))
+  cur.execute(sql, (chrom, loc))
   return cur.fetchall()
 
 
 def query_cytoband_by_name(con,name):
   sql1 = '''
-  SELECT   chromosome,start,stop,color
+  SELECT   chrom,start,stop,color
   FROM     cytoband
   WHERE    band = ?;
   '''
@@ -92,10 +117,10 @@ def query_cytoband_by_name(con,name):
     raise KeyError('Ambiguous cytoband "%s"' % name)
 
   sql2 = '''
-  SELECT   chromosome,MIN(start),MAX(stop),""
+  SELECT   chrom,MIN(start),MAX(stop),""
   FROM     cytoband
   WHERE    band LIKE (? || "%")
-  GROUP BY chromosome;
+  GROUP BY chrom;
   '''
 
   if not name or ('p' not in name and 'q' not in name):
@@ -119,9 +144,9 @@ def query_cytoband_by_name(con,name):
 
 def query_snps_by_name(con,name):
   sql = '''
-  SELECT   lname,chromosome,location,strand
+  SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
   FROM     snp
-  WHERE    lname %s
+  WHERE    name %s
   '''
   if '%' in name:
     sql = sql % 'LIKE ?'
@@ -144,12 +169,13 @@ def query_snp_by_name(con,name):
 
 def query_snps_by_location(con,chr,start,end):
   sql = '''
-  SELECT   lname,chromosome,location,strand
+  SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
   FROM     snp
-  WHERE    chromosome = ?
-    AND    location BETWEEN ? AND ?
-  ORDER BY location;
+  WHERE    chrom = ?
+    AND    start < ?
+    AND    end   > ?
+  ORDER BY start;
   '''
   cur = con.cursor()
-  cur.execute(sql,(chr,start,end))
+  cur.execute(sql,(chr,end,start))
   return cur.fetchall()

@@ -19,8 +19,9 @@ from   glu.modules.genedb.find_regions import resolve_features
 from   glu.modules.genedb.queries      import query_snps_by_location
 
 
-HEADER = ['LOCUS','CHROMOSOME','LOCATION','STRAND','DISTANCE','DISTANCE_RANK',
-          'REGION_START','REGION_END','FEATURE_NAME','FEATURE_STRAND','FEATURE_START','FEATURE_END','FEATURE_TYPE']
+HEADER = ['LOCUS','CHROMOSOME','START','END','STRAND','REF_ALLELE','OBSERVED_ALLELES','dbSNP_VCLASS','dbSNP_FUNC',
+          'DISTANCE','DISTANCE_RANK','REGION_START','REGION_END',
+          'FEATURE_NAME','FEATURE_STRAND','FEATURE_START','FEATURE_END','FEATURE_TYPE']
 
 
 def option_parser():
@@ -57,13 +58,14 @@ def feature_margin(start,end,strand,mup,mdown):
     raise ValueError('Unknown feature orientation')
 
 
-def process_results(results,start,end,strand,nup,ndown):
-  loci   = sorted(results,key=itemgetter(1,2,0))
-  locs   = [ loc[2] for loc in loci ]
+def annotate_results(results,start,end,strand,nup,ndown):
+  # Sort by chrom, start, end, name
   m1,m2  = (nup,ndown) if strand=='+' else (ndown,nup)
+  loci   = sorted(results,key=itemgetter(1,2,3,0))
+  starts = [ loc[2] for loc in loci ]
 
-  istart = bisect.bisect_left(locs,start)
-  iend   = bisect.bisect_right(locs,end)
+  istart = bisect.bisect_left(starts,  start)
+  iend   = bisect.bisect_right(starts, end)
 
   if m2 and len(loci)-iend>m2:
     loci = loci[:iend+m2]
@@ -75,14 +77,14 @@ def process_results(results,start,end,strand,nup,ndown):
 
   def _calc_rank_dist():
     for i,loc in enumerate(loci):
-      pos = loc[2]
+      var_start,var_end = loc[2:4]
 
       rank = distance = 0
-      if pos < start:
-        distance = pos-start
+      if var_end < start:
+        distance = var_end-start
         rank     = i-istart
-      elif pos > end:
-        distance = pos-end
+      elif var_start > end:
+        distance = var_start-end
         rank     = i-iend+1
 
       if strand == '-':
@@ -184,12 +186,14 @@ def main():
       chrStart,chrEnd = feature_margin(start,end,strand,int(mup or 0),int(mdown or 0))
 
       results = query_snps_by_location(con,chr,chrStart,chrEnd)
+      results = [ r[:-1] for r in results ]
       results = filter_results(results)
-      results = process_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
+      results = annotate_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
 
       for result in results:
-        result += [chrStart,chrEnd,name,strand,start,end,featuretype]
-        out.writerow(result)
+        row = [ result[0], result[1], result[2]+1, result[3], result[4], result[5], result[6], result[7], result[8],
+                chrStart, chrEnd, name, strand, start, end, featuretype ]
+        out.writerow(row)
 
 
 if __name__ == '__main__':
