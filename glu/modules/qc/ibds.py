@@ -88,7 +88,7 @@ def option_parser():
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('--frequencies', dest='frequencies', metavar='FILE', action='append',
+  parser.add_option('--frequencies', dest='frequencies', metavar='FILE',
                     help='Optional genotype file to estimate allele frequencies')
   parser.add_option('--includetest', dest='includetest', metavar='FILE', action='append',
                     help='List of samples to test')
@@ -115,17 +115,15 @@ def main():
     parser.print_help()
     sys.exit(2)
 
+  testfile = args[0]
+  freqfile = options.frequencies or testfile
+
   # Allow specification of a different genotype file with which to estimate allele frequencies
-  if options.frequencies == args[0]:
+  if testfile==freqfile:
     options.frequencies = None
 
-  if options.frequencies:
-    freqfile = options.frequencies
-  else:
-    freqfile = args[0]
-
   sys.stderr.write('Opening genotype data file...\n')
-  genos = load_genostream(freqfile,format=options.informat,genorepr=options.ingenorepr,
+  freqs = load_genostream(freqfile,format=options.informat,genorepr=options.ingenorepr,
                                    genome=options.loci,phenome=options.pedigree,
                                    transform=options, hyphen=sys.stdin)
 
@@ -133,28 +131,31 @@ def main():
 
   # Materialize only if genotypes for frequency estimation are also the test set
   if not options.frequencies:
-    genos = genos.as_sdat().materialize()
+    freqs = genos = freqs.as_sdat().materialize()
 
   sys.stderr.write('Computing genotype frequencies...\n')
-  loci,samples,geno_counts = genotype_count_matrix(genos)
+  loci,samples,geno_counts = genotype_count_matrix(freqs)
 
-  x,n = allele_counts(genos.models,geno_counts)
+  x,n = allele_counts(freqs.models,geno_counts)
   ibs_given_ibd = estimate_ibs_given_ibd(x,n)
 
   # Load distinct genotype set for tests if needed
   if options.frequencies:
     # Merge in test includes and excludes
-    options.includesamples.extend(options.includetest)
-    options.excludesamples.extend(options.excludetest)
+    options.includesamples = options.includesamples or []
+    options.excludesamples = options.excludesamples or []
 
-    genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                    genome=options.loci,phenome=options.pedigree,
-                                    transform=options, hyphen=sys.stdin).as_sdat().materialize()
+    options.includesamples.extend(options.includetest or [])
+    options.excludesamples.extend(options.excludetest or [])
+
+    genos = load_genostream(testfile,format=options.informat,genorepr=options.ingenorepr,
+                                     genome=options.loci,phenome=options.pedigree,
+                                     transform=options, hyphen=sys.stdin).as_sdat().materialize()
 
   # Apply test includes and excludes to the existing genotypes
   elif options.includetest or options.excludetest:
-    genos = genos.transformed(include_samples=_intersect_options(options.includetest),
-                              exclude_samples=    _union_options(options.excludetest)).materialize()
+    genos = genos.transformed(include_samples=_intersect_options(options.includetest or []),
+                              exclude_samples=    _union_options(options.excludetest or [])).materialize()
 
   if not len(genos):
     sys.stderr.write('No samples found.  Exiting...\n')
