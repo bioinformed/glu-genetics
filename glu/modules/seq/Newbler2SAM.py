@@ -182,6 +182,12 @@ def pair_align_records(records, trim, sffindex):
   mapq    = 60
   flag    = 0   # query is normalized by gsMapper to forward reference strand
 
+  trim_unaligned = 'unaligned' in trim
+
+  # trimming unaligned bases superceeds all other trimming options
+  if trim_unaligned:
+    trim = False
+
   for line in records:
     assert line.startswith('>')
 
@@ -232,7 +238,7 @@ def pair_align_records(records, trim, sffindex):
 
       # Add any requested hard trimming
       if trim:
-         seq,qual,hard_trim_left,hard_trim_right = hard_trim(read,seq,qual,trim)
+        seq,qual,hard_trim_left,hard_trim_right = hard_trim(read,seq,qual,trim)
       else:
         hard_trim_left = hard_trim_right = 0
 
@@ -248,8 +254,18 @@ def pair_align_records(records, trim, sffindex):
       seq    = str(seq)
       start  = seq.index(qseq)
 
+      # Hard trim everything but the aligned portion, if requested
+      if trim_unaligned:
+        end  = start+len(qseq)
+        hard_trim_left  += start
+        hard_trim_right += len(seq)-end
+        soft_trim_left,soft_trim_right = 0,0
+        seq  =  seq[start:end]
+        qual = qual[start:end]
+
       # Compute soft-trimming
-      soft_trim_left,soft_trim_right = start,len(seq)-len(qseq)-start
+      else:
+        soft_trim_left,soft_trim_right = start,len(seq)-len(qseq)-start
 
     # Add soft and hard trimming codes to the CIGAR
     cigar = cigar_add_trim(cigar, 'S', soft_trim_left, soft_trim_right)
@@ -442,7 +458,7 @@ def validate_trimming(options):
   options.trim = set(f.strip().lower() for f in options.trim.split(','))
   options.trim.discard('none')
 
-  all_trim     = set(['flowkey', 'adapter', 'lowquality'])
+  all_trim     = set(['unaligned', 'flowkey', 'adapter', 'lowquality'])
   allowed_trim = all_trim|set(['all'])
   extra_trim   = options.trim - allowed_trim
   if extra_trim:
@@ -464,8 +480,8 @@ def option_parser():
                     help='Reference genome contig list')
   parser.add_option('--remapcontig', dest='remapcontig', metavar='FILE',
                     help='Contig remapping')
-  parser.add_option('--trim', dest='trim', metavar='ACTION', default='flowkey,lowquality',
-                    help='Trim feature(s) of reads.  Comma separated list of: flowkey, adapter, lowquality, all.  Default=all')
+  parser.add_option('--trim', dest='trim', metavar='ACTION', default='all',
+                    help='Trim feature(s) of reads.  Comma separated list of: flowkey, adapter, lowquality, unaligned, all.  Default=all')
   parser.add_option('--maligned', dest='maligned', metavar='ACTION', default='keep-all',
                     help='Action to perform for multiply aligned reads: keep-primary, keep-all, unalign, drop.  Default=keep-all')
   parser.add_option('--mpick', dest='mpick', metavar='METHOD', default='best',
@@ -496,7 +512,7 @@ def main():
 
   if write_bam:
     if not options.reflist:
-      raise ValueError('Conversion to BAM format requires a reference genome contig list (-r/--reflist)')
+      raise ValueError('Conversion to BAM format requires a reference genome contig list (--reflist)')
 
     # Creating the following two-stage pipeline deadlocks due to problems with subprocess
     # -- use the shell method below instead
