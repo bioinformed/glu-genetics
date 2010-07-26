@@ -303,7 +303,7 @@ def output_intervals(target_intervals, options):
       values = list(row)
 
       target_name = values[-1]
-      if target_name not is None:
+      if target_name is not None:
         values[-1] = '<on target>'
       elif not target_name:
         values[-1] = ''
