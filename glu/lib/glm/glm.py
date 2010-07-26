@@ -232,12 +232,12 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
 
   a1,b1 = map(np.asarray,(a,b))
 
-  if len(a1.shape) != 2:
+  if a1.ndim != 2:
     raise ValueError('incompatible design matrix dimensions')
 
   m,n = a1.shape
 
-  if len(b1.shape)==2:
+  if b1.ndim == 2:
     nrhs = b1.shape[1]
   else:
     nrhs = 1
@@ -250,7 +250,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   # weights are well-conditioned.
   if weights is not None:
     # Weight vector
-    k = len(weights.shape)
+    k = weights.ndim
     if k==1 or (k==2 and 1 in weights.shape):
       weights = np.asarray(weights,dtype=float).reshape(-1)
 
@@ -264,7 +264,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
       b1 = (weights*b1.T).T
 
     # Generalized covariance
-    elif len(weights.shape) == 2:
+    elif weights.ndim == 2:
       if weights.shape[0] != weights.shape[1] != m:
         raise ValueError('incompatible weight matrix dimensions')
 
@@ -282,7 +282,7 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
   if n>m:
     # extend b matrix as it will be filled with a larger solution
     b2 = np.zeros((n,nrhs), dtype=gelss.dtype)
-    if len(b1.shape)==2:
+    if b1.ndim==2:
       b2[:m,:] = b1
     else:
       b2[:m,0] = b1
@@ -370,7 +370,7 @@ def sqrtm(x):
   True
   '''
   A = np.asanyarray(x)
-  if len(A.shape)!=2:
+  if A.ndim!=2:
     raise ValueError('Non-matrix input to matrix function')
 
   # Refactor into complex Schur form
@@ -917,7 +917,7 @@ def linreg(y, X, add_mean=False):
   y = np.asarray(y,dtype=float)
   X = np.asarray(X,dtype=float)
 
-  #if len(y.shape) == 1:
+  #if y.ndim == 1:
   #  y = y[:,np.newaxis]
 
   # Add type specific means, if requested
@@ -998,7 +998,7 @@ def logit(y, X, initial_beta=None, add_mean=False, max_iterations=50):
   y = np.asarray(y,dtype=int)
   X = np.asarray(X,dtype=float)
 
-  if len(y.shape)==1:
+  if y.ndim==1:
     y = y[:,np.newaxis]
 
   if y.shape[0] != X.shape[0]:
@@ -1127,7 +1127,7 @@ class GLogit(object):
     y = np.asarray(y,dtype=int)
     X = np.asarray(X,dtype=float)
 
-    if len(y.shape) == 1:
+    if y.ndim == 1:
       y = y[:,np.newaxis]
 
     assert y.shape[1] == 1
@@ -1640,7 +1640,7 @@ class Linear(object):
     y = np.asarray(y,dtype=float)
     X = np.asarray(X,dtype=float)
 
-    if len(y.shape) == 1:
+    if y.ndim == 1:
       y = y[:,np.newaxis]
 
     assert y.shape[1] == 1

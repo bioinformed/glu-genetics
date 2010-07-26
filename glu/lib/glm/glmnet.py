@@ -231,7 +231,7 @@ def glmnet(x,y,weights=None,family='gaussian',alpha=1.0,nlambda=None,lambda_min=
   if update not in ('covariance','naive'):
     raise ValueError('Unknown update: %s' % update)
 
-  if len(x.shape) != 2:
+  if x.ndim != 2:
     raise ValueError('expected x to be two-dimensional array')
 
   nobs,nvars = x.shape
@@ -252,19 +252,19 @@ def glmnet(x,y,weights=None,family='gaussian',alpha=1.0,nlambda=None,lambda_min=
     pmax = min((nvars+1)*1.2, nvars)
 
   if family == 'gaussian':
-    if len(y.shape) != 1:
+    if y.ndim != 1:
       raise ValueError('expected y to be one-dimensional array')
 
   else:
     ka = {'covariance':1, 'naive':2}[update]
 
-    if len(y.shape)==2 and y.shape[1]==1:
+    if y.ndim==2 and y.shape[1]==1:
       y = y[:,0]
 
-    if len(y.shape)==1:
+    if y.ndim==1:
       categories = sorted(set(y.flat))
       y = np.asarray(np.vstack([ y==cat for cat in sorted(categories) ]).T, dtype=float)
-    elif len(y.shape) != 2:
+    elif y.ndim != 2:
       raise ValueError('expected y to be two-dimensional array')
     else:
       categories = range(y.shape[1])
