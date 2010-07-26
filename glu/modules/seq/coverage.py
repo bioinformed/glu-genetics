@@ -175,7 +175,7 @@ def pileup_stats(target_intervals,options):
       if depth > max_track:
         depth = max_track
 
-      if target_name:
+      if target_name is not None:
         contig_coverage[1,depth] += size
         if targetout:
           target_coverage[contig_name,target_name][depth] += size
@@ -301,8 +301,13 @@ def output_intervals(target_intervals, options):
     name = [contig_name]
     for row in target_intervals:
       values = list(row)
-      if not values[-1]:
+
+      target_name = values[-1]
+      if target_name not is None:
+        values[-1] = '<on target>'
+      elif not target_name:
         values[-1] = ''
+
       out.writerow(name+values)
       yield row
 
