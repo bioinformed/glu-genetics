@@ -176,11 +176,11 @@ def pileup_stats(target_intervals,options):
         depth = max_track
 
       if target_name:
-        contig_coverage[0,depth] += size
+        contig_coverage[1,depth] += size
         if targetout:
           target_coverage[contig_name,target_name][depth] += size
       else:
-        contig_coverage[1,depth] += size
+        contig_coverage[0,depth] += size
 
     # Accumulate the current contig results
     all_coverage += contig_coverage
