@@ -32,7 +32,7 @@ def percent3(a,b):
   return [a,b,'%.2f' % percent(a,b)]
 
 
-def _interval_pileup_region(contig_regions):
+def _interval_pileup_contig(contig_regions):
   '''
   Generator that produces intervals with coordinates [start, end) and a
   sequence of interval names for regions with a constant number of
@@ -88,75 +88,102 @@ def interval_pileup(regions):
   as (start, end, name).
   '''
   for contig_name,contig_len,contig_regions in regions:
-    yield contig_name,contig_len,_interval_pileup_region(contig_regions)
+    yield contig_name,contig_len,_interval_pileup_contig(contig_regions)
 
 
-def pileup_stats(regions,targets,options):
+def _target_pileup_contig(contig_pileup,contig_len,targets):
+  ctargets = list(reversed(targets))
+
+  #print >> sys.stderr, '[INFO] Processing contig=%s targets=%d' % (contig_name,len(ctargets))
+
+  start = end = 0
+  for start,end,regions in contig_pileup:
+    depth = len(regions)
+
+    # Process all targets that overlap the current region
+    while ctargets and ctargets[-1][0]<end:
+      target_start,target_end,target_name = ctargets[-1]
+
+      if start<target_start:
+        yield start,target_start,depth,None
+        start = target_start
+
+      bound = min(target_end,end)
+
+      if start<bound:
+        yield start,bound,depth,target_name
+
+      start = bound
+
+      if target_end>end:
+        break
+
+      ctargets.pop()
+
+    # Process the remaining gap between the last target and the end of region
+    if start<end:
+      yield start,end,depth,None
+
+  # Account for all targets beyond the last region
+  for target_start,target_end,target_name in reversed(ctargets):
+    if end<target_start:
+      yield end,target_start,0,None
+
+    bound = max(target_start,end)
+    if bound<target_end:
+      yield bound,target_end,0,target_name
+
+    end = target_end
+
+  # Add the gap between the last region/target and the end of the contig
+  if contig_len is not None and end<contig_len:
+    yield end,contig_len,0,None
+
+
+def target_pileup(contig_intervals,targets):
   '''
   Compute coverage depth statistics that may overlap with a series of
   disjoint target regions.
   '''
-  maxcoverage     = options.maxcoverage[0]
+  # Process each contig and match it with targets
+  for contig_name,contig_len,contig_pileup in contig_intervals:
+    yield contig_name,_target_pileup_contig(contig_pileup,contig_len,targets[contig_name])
+
+
+def pileup_stats(target_intervals,options):
+  '''
+  Compute coverage depth statistics that may overlap with a series of
+  disjoint target regions.
+  '''
+  max_coverage    = options.maxcoverage[0]
   coverage_width  = options.maxcoverage[1]
-  max_track       = maxcoverage//coverage_width
+  max_track       = max_coverage//coverage_width
   targetout       = options.targetout
+  intervalout     = options.intervalout
   coverage        = {}
   all_coverage    = np.zeros( (2,max_track+1), dtype=int )
   target_coverage = defaultdict(lambda: np.zeros(max_track+1, dtype=int )) if targetout else None
 
   # Process each contig and match it with targets
-  for contig_name,contig_len,contig_pileup in regions:
-    ctargets = list(reversed(targets[contig_name]))
-
-    assert contig_name not in coverage
+  for contig_name,contig_intervals in target_intervals:
     contig_coverage = coverage[contig_name] = np.zeros( (2,max_track+1), dtype=int )
 
-    #print >> sys.stderr, '[INFO] Processing contig=%s targets=%d' % (contig_name,len(ctargets))
-
-    # Process each pile-up interval within the contig
-    start = end = 0
-    for start,end,regions in contig_pileup:
-      depth = len(regions)//coverage_width
+    for start,end,depth,target_name in contig_intervals:
+      size  = end-start
+      depth = depth//coverage_width
 
       if depth > max_track:
         depth = max_track
 
-      # Process all targets that overlap the current region
-      while ctargets and ctargets[-1][0]<end:
-        target_start,target_end,target_name = ctargets[-1]
-
-        if start<target_start:
-          contig_coverage[0,depth] += target_start-start
-          start = target_start
-
-        bound = min(target_end,end)
-        contig_coverage[1,depth] += bound-start
+      if target_name:
+        contig_coverage[0,depth] += size
         if targetout:
-          target_coverage[target_name][depth] += bound-start
-        start = bound
-
-        if target_end>end:
-          break
-
-        ctargets.pop()
-
-      # Process the remaining gap between the last target and the end of region
-      contig_coverage[0,depth] += end-start
-
-    # Account for all targets beyond the last region
-    for target_start,target_end,target_name in reversed(ctargets):
-      contig_coverage[0,0] += max(0,target_start-end)
-      contig_coverage[1,0] += target_end-max(end,target_start)
-      if targetout:
-        target_coverage[target_name][0] += target_end-max(end,target_start)
-
-      end = target_end
-
-    # Add the gap between the last region/target and the end of the contig
-    contig_coverage[0,0] += max(0,contig_len-end)
+          target_coverage[contig_name,target_name][depth] += size
+      else:
+        contig_coverage[1,depth] += size
 
     # Accumulate the current contig results
-    all_coverage         += contig_coverage
+    all_coverage += contig_coverage
 
   return all_coverage,target_coverage
 
@@ -211,6 +238,78 @@ def load_regions(filename,options):
     raise ValueError('Unknown format for input %s' % filename)
 
 
+def output_summary_coverage(all_coverage, options):
+  maxcoverage     = options.maxcoverage[0]
+  coverage_width  = options.maxcoverage[1]
+  max_track       = maxcoverage//coverage_width
+
+  out = table_writer(options.output,hyphen=sys.stdout)
+
+  out.writerow(['depth','on-target bases',  'target length',     'percent on-target',
+                        'off-target bases', 'off-target length', 'percent off-target',
+                        'bases',            'total length',      'percent'])
+
+  target_len = all_coverage.sum(axis=1)
+  genome_len = target_len.sum()
+
+  for i in xrange(max_track+1):
+    depth = i*coverage_width
+    if i==max_track:
+      depth = '>=%d' % depth
+    elif coverage_width!=1:
+      depth = '%d-%d' % (depth,depth+coverage_width-1)
+
+    out.writerow([depth] + percent3(all_coverage[1,i],target_len[1])
+                         + percent3(all_coverage[0,i],target_len[0])
+                         + percent3(all_coverage[:,i].sum(),genome_len) )
+
+
+def output_target_coverage(targets, target_coverage, options):
+  maxcoverage     = options.maxcoverage[0]
+  coverage_width  = options.maxcoverage[1]
+  max_track       = maxcoverage//coverage_width
+
+  target_dict = {}
+  for target_contig,ctargets in targets.iteritems():
+    for target_start,target_end,target_name in ctargets:
+      target_dict[target_contig,target_name] = target_start,target_end
+
+  out = table_writer(options.targetout)
+
+  header = ['target','contig','target_start','target_end']
+  if coverage_width==1:
+    header += range(0,max_track)
+  else:
+    header += [ '%d-%d' % (i*coverage_width,(i+1)*coverage_width-1) for i in range(0,max_track)]
+  header += [ '>=%d' % (max_track*coverage_width) ]
+
+  out.writerow(header)
+
+  for target_contig,target_name in sorted(target_coverage):
+    target_start,target_end = target_dict[target_contig,target_name]
+    coverage = target_coverage[target_contig,target_name].tolist()
+    info = [target_name,target_contig,target_start,target_end]
+    out.writerow(info+coverage)
+
+
+def output_intervals(target_intervals, options):
+
+  out = table_writer(options.intervalout)
+  out.writerow(['contig','start','end','depth','target'])
+
+  def _output_intervals_contig(target_intervals):
+    name = [contig_name]
+    for row in target_intervals:
+      values = list(row)
+      if not values[-1]:
+        values[-1] = ''
+      out.writerow(name+values)
+      yield row
+
+  for contig_name,target_intervals in target_intervals:
+    yield contig_name,_output_intervals_contig(target_intervals)
+
+
 def parse_maxcoverage(options):
   try:
     maxcov = map(int,options.maxcoverage.split(':'))
@@ -240,6 +339,8 @@ def option_parser():
                     help='Overall coverage statistics')
   parser.add_option('-O', '--targetout', dest='targetout', metavar='FILE',
                     help='Per-target coverage statistics')
+  parser.add_option('--intervalout', dest='intervalout', metavar='FILE',
+                    help='Output coverage by position interval')
 
   return parser
 
@@ -254,51 +355,22 @@ def main():
 
   parse_maxcoverage(options)
 
-  regions = load_regions(args[0],options)
-  targets = read_targets(options.targets)
-  pileup  = interval_pileup(regions)
+  regions   = load_regions(args[0],options)
+  targets   = read_targets(options.targets)
 
-  all_coverage,target_coverage = pileup_stats(pileup,targets,options)
+  contig_intervals = interval_pileup(regions)
+  target_intervals = target_pileup(contig_intervals, targets)
 
-  maxcoverage     = options.maxcoverage[0]
-  coverage_width  = options.maxcoverage[1]
-  max_track       = maxcoverage//coverage_width
+  if options.intervalout:
+    target_intervals = output_intervals(target_intervals, options)
+
+  all_coverage,target_coverage = pileup_stats(target_intervals, options)
 
   if options.output:
-    out = table_writer(options.output,hyphen=sys.stdout)
-
-    out.writerow(['depth','on-target bases',  'target length',     'percent on-target',
-                          'off-target bases', 'off-target length', 'percent off-target',
-                          'bases',            'total length',      'percent'])
-
-    target_len = all_coverage.sum(axis=1)
-    genome_len = target_len.sum()
-
-    for i in xrange(max_track+1):
-      depth = i*coverage_width
-      if i==max_track:
-        depth = '>=%d' % depth
-      elif coverage_width!=1:
-        depth = '%d-%d' % (depth,depth+coverage_width-1)
-
-      out.writerow([depth] + percent3(all_coverage[1,i],target_len[1])
-                           + percent3(all_coverage[0,i],target_len[0])
-                           + percent3(all_coverage[:,i].sum(),genome_len) )
+    output_summary_coverage(all_coverage, options)
 
   if options.targetout and target_coverage is not None:
-    out = table_writer(options.targetout)
-
-    header = ['target']
-    if coverage_width==1:
-      header += range(0,max_track)
-    else:
-      header += [ '%d-%d' % (i*coverage_width,(i+1)*coverage_width-1) for i in range(0,max_track)]
-    header += [ '>=%d' % (max_track*coverage_width) ]
-
-    out.writerow(header)
-
-    for target_name in sorted(target_coverage):
-      out.writerow([target_name]+target_coverage[target_name].tolist())
+    output_target_coverage(targets, target_coverage, options)
 
 
 if __name__=='__main__':
