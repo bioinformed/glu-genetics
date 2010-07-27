@@ -24,9 +24,9 @@ INPUT_EXTS = ['ace', 'clustal', 'fa', 'fasta', 'fastq', 'fq',
 
 
 OUTPUT_EXTS = ['clustal', 'fa', 'fasta', 'fastq', 'fq',
-              'fastq-sanger', 'fastq-solexa', 'fastq-illumina', 'genbank',
-              'gb', 'nexus', 'phd', 'phylip', 'stockholm',
-              'sff', 'qual' ]
+               'fastq-sanger', 'fastq-solexa', 'fastq-illumina', 'genbank',
+               'gb', 'nexus', 'phd', 'phylip', 'stockholm',
+               'sff', 'qual' ]
 
 
 FORMAT_REMAP = {'fa' : 'fasta',
