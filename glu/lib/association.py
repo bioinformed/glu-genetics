@@ -192,7 +192,7 @@ def table_trend(x):
   '''
   x = asanyarray(x, dtype=int)
 
-  if len(x.shape) != 2 or x.shape[0] != 2:
+  if x.ndim != 2 or x.shape[0] != 2:
     raise ValueError('tabletrend requires a 2xc table')
 
   n_i   = x.sum(axis=0)
