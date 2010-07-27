@@ -151,8 +151,10 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
     if is_str(hyphen):
       raise ValueError('a file object must be supplied for hyphen redirection')
     filename = hyphen
-  elif is_str(filename) and not os.path.isfile(filename):
-    raise IOError('No such file: %s' % filename)
+  elif is_str(filename):
+    filename = os.path.expanduser(filename)
+    if not os.path.isfile(filename):
+      raise IOError('No such file: %s' % filename)
 
   if format is None:
     format = guess_informat(filename)
