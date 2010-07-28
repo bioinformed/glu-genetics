@@ -22,9 +22,17 @@ from   subprocess        import Popen, PIPE
 import numpy as np
 
 from   glu.lib.fileutils import autofile,hyphen,table_writer,table_reader
+from   glu.lib.utils     import namedtuple
 
 from   Bio               import SeqIO
 from   Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
+
+
+PAIR_ALIGN_TAB_HEADER = ['QueryAccno', 'QueryStart', 'QueryEnd', 'QueryLength',
+                         'SubjAccno',  'SubjStart',  'SubjEnd',  'SubjLength',
+                         'NumIdent', 'AlignLength', 'QueryAlign', 'SubjAlign']
+
+AlignRecord = namedtuple('AlignRecord', ' '.join(PAIR_ALIGN_TAB_HEADER))
 
 
 CIGAR_map = { ('-','-'):'P' }
@@ -174,8 +182,56 @@ def cigar_add_trim(cigar, trim_char, left, right):
   return cigar
 
 
-def pair_align_records(records, trim, sffindex):
-  split   = re.compile('[\t ,.]+').split
+def read_pair_align(alignfile):
+  line   = alignfile.next()
+  fields = line.strip().split('\t')
+
+  # If in tab-delimited format
+  if fields == PAIR_ALIGN_TAB_HEADER:
+    for line in alignfile:
+      fields     = line.split('\t')
+      fields[1]  = int(fields[1])
+      fields[2]  = int(fields[2])
+      fields[3]  = int(fields[3])
+      fields[5]  = int(fields[5])
+      fields[6]  = int(fields[6])
+      fields[7]  = int(fields[7])
+      fields[8]  = int(fields[8])
+      fields[9]  = int(fields[9])
+      fields[11] = fields[11].strip()
+
+      yield AlignRecord._make(fields)
+
+  # human-readable format
+  elif line.startswith('>'):
+    split = re.compile('[\t ,.()/]+').split
+
+    def _record(line):
+      fields = split(line)
+      qname  = fields[0][1:]
+      qstart = int(fields[1])
+      qstop  = int(fields[2])
+      qlen   = int(fields[4])
+      rname  = fields[6]
+      rstart = int(fields[7])
+      rend   = int(fields[8])
+      rlen   = int(fields[10])
+      ident  = int(fields[11])
+      alen   = int(fields[12])
+      query  = split(alignfile.next())[2]
+      ref    = split(alignfile.next())[2]
+
+      return AlignRecord(qname,qstart,qstop,qlen,rname,rstart,rend,rlen,ident,alen,query,ref)
+
+    yield _record(line)
+    for line in alignfile:
+      yield _record(line)
+
+  else:
+    raise ValueError('Unknown pairwise alignment format')
+
+
+def pair_align_records(alignments, trim, sffindex):
   mrnm    = '*'
   mpos    = 0
   isize   = 0
@@ -188,21 +244,16 @@ def pair_align_records(records, trim, sffindex):
   if trim_unaligned:
     trim = False
 
-  for line in records:
-    assert line.startswith('>')
-
-    fields = split(line)
-    qname  = fields[0][1:]
-    qstart = int(fields[1])
-    qstop  = int(fields[2])
-    qlen   = int(fields[4])
-    rname  = fields[6]
-    rstart = fields[7]       # Keep as string
-    #rstop  = fields[8]      # Unused
-    #rlen  = int(fields[10]) # Unused
-    query  = split(records.next())[2]
+  for align in alignments:
+    qname  = align.QueryAccno
+    qstart = align.QueryStart
+    qstop  = align.QueryEnd
+    qlen   = align.QueryLength
+    rname  = align.SubjAccno
+    rstart = align.SubjAccno
+    query  = align.QueryAlign
     qseq   = query.replace('-','')
-    ref    = split(records.next())[2]
+    ref    = align.SubjAlign
 
     flag   = 0 if qstart<qstop else 0x10
     cigar  = make_cigar(query, ref)
@@ -546,7 +597,9 @@ def main():
 
   print >> sys.stderr, 'Generating alignment from %s to %s' % (args[0],options.output)
   reads_seen = set()
-  alignment  = pair_align_records(alignfile, options.trim, sffindex)
+
+  alignment  = read_pair_align(alignfile)
+  alignment  = pair_align_records(alignment, options.trim, sffindex)
   alignment  = handle_maligned(alignment,  options.maligned,  options.mpick, reads_seen)
   alignment  = handle_unaligned(alignment, options.unaligned, options.trim,  reads_seen, sfffiles)
 
@@ -561,20 +614,4 @@ def main():
 
 
 if __name__=='__main__':
-  if 1:
-    main()
-  else:
-    try:
-      import cProfile as profile
-    except ImportError:
-      import profile
-    import pstats
-
-    prof = profile.Profile()
-    try:
-      prof.runcall(main)
-    finally:
-      stats = pstats.Stats(prof)
-      stats.strip_dirs()
-      stats.sort_stats('time', 'calls')
-      stats.print_stats(25)
+  main()
