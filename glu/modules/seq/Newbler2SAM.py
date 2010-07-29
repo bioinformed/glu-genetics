@@ -21,8 +21,8 @@ from   subprocess        import Popen, PIPE
 
 import numpy as np
 
-from   glu.lib.fileutils import autofile,hyphen,table_writer,table_reader
 from   glu.lib.utils     import namedtuple
+from   glu.lib.fileutils import autofile,hyphen,table_writer,table_reader
 
 from   Bio               import SeqIO
 from   Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
@@ -97,7 +97,7 @@ def make_ndiff_py(query,ref):
 # Try to import the optimized Cython version
 # The Python version is pretty fast, but I wanted to play with Cython.
 try:
-  from samhelpers import make_cigar, make_ndiff
+  from glu.lib.seqlib.samhelpers import make_cigar, make_ndiff
 except ImportError:
   make_cigar = make_cigar_py
   make_ndiff = make_ndiff_py
@@ -598,10 +598,10 @@ def main():
   print >> sys.stderr, 'Generating alignment from %s to %s' % (args[0],options.output)
   reads_seen = set()
 
-  alignment  = read_pair_align(alignfile)
-  alignment  = pair_align_records(alignment, options.trim, sffindex)
-  alignment  = handle_maligned(alignment,  options.maligned,  options.mpick, reads_seen)
-  alignment  = handle_unaligned(alignment, options.unaligned, options.trim,  reads_seen, sfffiles)
+  alignment = read_pair_align(alignfile)
+  alignment = pair_align_records(alignment, options.trim, sffindex)
+  alignment = handle_maligned(alignment,  options.maligned,  options.mpick, reads_seen)
+  alignment = handle_unaligned(alignment, options.unaligned, options.trim,  reads_seen, sfffiles)
 
   if options.remapcontig:
     alignment = remap_contigs(alignment, load_contig_remap(options.remapcontig))

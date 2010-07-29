@@ -31,6 +31,8 @@ if sys.version_info < min_python_version:
 from   setuptools           import find_packages, Extension
 from   numpy.distutils.core import setup as numpy_setup
 
+
+
 import numpy as np
 
 
@@ -114,8 +116,8 @@ def main():
                         Extension('glu.modules.struct._admix',      sources = ['glu/modules/struct/_admix.c'],
                                                                     include_dirs = [np.get_include()]),
                         Extension('glu.modules.ld.pqueue',          sources = ['glu/modules/ld/pqueue.c']),
-                        Extension('glu.modules.seq.samhelpers',     sources = ['glu/modules/seq/samhelpers.pyx']),
-                        Extension('glu.modules.seq.intervaltree',   sources = ['glu/modules/seq/intervaltree.pyx']),
+                        Extension('glu.lib.seqlib.samhelpers',      sources = ['glu/lib/seqlib/samhelpers.pyx']),
+                        Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.pyx']),
                         glmnet_config(),
                       ])
 

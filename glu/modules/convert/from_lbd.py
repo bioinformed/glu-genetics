@@ -12,16 +12,16 @@ from   operator                  import getitem
 from   itertools                 import chain, imap, izip, repeat
 
 from   glu.lib.utils             import izip_exact, is_str
-from   glu.lib.fileutils         import autofile, table_reader, table_writer
-from   glu.lib.sequence          import norm_snp_seq, complement_base
+from   glu.lib.fileutils         import table_reader, table_writer
 from   glu.lib.illumina          import read_Illumina_LBD, IlluminaManifest
+
+from   glu.lib.seqlib.sequence   import norm_snp_seq, complement_base
 
 from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
 from   glu.lib.genolib.phenos    import Phenome, load_phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.io        import save_genostream, geno_options
 from   glu.lib.genolib.transform import GenoTransform
-
 from   glu.lib.genolib.genoarray import build_model, build_descr, GenotypeArray, GenotypeArrayDescriptor
 
 
@@ -78,9 +78,6 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
   topseq_idx  = find_index(header,['TopGenomicSeq'])
   probea_idx  = find_index(header,['AlleleA_ProbeSeq'],optional=True)
   probeb_idx  = find_index(header,['AlleleB_ProbeSeq'],optional=True)
-
-  max_idx     = max(topseq_idx,dstrand_idx,cstrand_idx,alleles_idx,name_idx,
-                    assayid_idx,probea_idx,probeb_idx)
 
   for assay in manifest:
     lname   = assay[name_idx]

@@ -21,11 +21,11 @@ from   Bio.Seq                      import Seq
 from   Bio.Data.CodonTable          import TranslationError
 
 from   glu.lib.utils                import gcdisabled
-from   glu.lib.fileutils            import table_reader, table_writer
-from   glu.lib.edits                import levenshtein_sequence, reduce_match
+from   glu.lib.fileutils            import table_writer
 from   glu.lib.progressbar          import progress_loop
 
-from   glu.modules.seq.intervaltree import IntervalTree
+from   glu.lib.seqlib.edits         import levenshtein_sequence, reduce_match
+from   glu.lib.seqlib.intervaltree  import IntervalTree
 
 
 #GENE_DB='out/genedb_hg18_snp130.db'
