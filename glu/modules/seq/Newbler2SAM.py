@@ -250,7 +250,7 @@ def pair_align_records(alignments, trim, sffindex):
     qstop  = align.QueryEnd
     qlen   = align.QueryLength
     rname  = align.SubjAccno
-    rstart = align.SubjAccno
+    rstart = align.SubjStart
     query  = align.QueryAlign
     qseq   = query.replace('-','')
     ref    = align.SubjAlign
