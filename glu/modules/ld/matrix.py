@@ -13,12 +13,12 @@ import optparse
 from   operator                import itemgetter
 from   itertools               import chain, izip
 
-from   glu.lib.fileutils       import table_reader,table_writer
+from   glu.lib.fileutils       import table_writer
 from   glu.lib.xtab            import xtab
 from   glu.lib.genolib         import geno_options
 
 
-from   glu.modules.ld.tagzilla import TagZillaOptionParser, check_option01, generate_ldpairs
+from   glu.modules.ld.tagzilla import check_option01, generate_ldpairs
 
 
 def option_parser():
@@ -77,12 +77,6 @@ def option_parser():
   return parser
 
 
-def chain_from_iter(it):
-  for items in it:
-    for item in items:
-      yield item
-
-
 def merge(i,j,x):
   return x[0] if x else ''
 
@@ -107,7 +101,7 @@ def main():
   args = [(options,arg) for arg in args]
   locusmap = {}
   ldpairs  = generate_ldpairs(args, locusmap, set(), None, None, options)
-  ldpairs  = chain_from_iter(ldpairs)
+  ldpairs  = chain.from_iterable(ldpairs)
 
   columns,rows,data = xtab(ldpairs,itemgetter(1),itemgetter(0),itemgetter(col),merge)
   out.writerow(['']+columns)
