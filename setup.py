@@ -116,7 +116,7 @@ def main():
                         Extension('glu.modules.struct._admix',      sources = ['glu/modules/struct/_admix.c'],
                                                                     include_dirs = [np.get_include()]),
                         Extension('glu.modules.ld.pqueue',          sources = ['glu/modules/ld/pqueue.c']),
-                        Extension('glu.lib.seqlib.samhelpers',      sources = ['glu/lib/seqlib/samhelpers.pyx']),
+                        Extension('glu.lib.seqlib._cigar',          sources = ['glu/lib/seqlib/_cigar.pyx']),
                         Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.pyx']),
                         glmnet_config(),
                       ])

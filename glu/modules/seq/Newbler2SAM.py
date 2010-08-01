@@ -12,20 +12,15 @@ import re
 import sys
 import random
 
-import xml.etree.cElementTree as etree
+from   operator                import itemgetter
+from   itertools               import groupby
+from   subprocess              import Popen, PIPE
 
-from   operator          import getitem, itemgetter
-from   itertools         import izip, imap, groupby, repeat
-from   collections       import defaultdict
-from   subprocess        import Popen, PIPE
+from   glu.lib.utils           import namedtuple
+from   glu.lib.fileutils       import autofile,hyphen,table_writer,table_reader
 
-import numpy as np
-
-from   glu.lib.utils     import namedtuple
-from   glu.lib.fileutils import autofile,hyphen,table_writer,table_reader
-
-from   Bio               import SeqIO
-from   Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
+from   glu.lib.seqlib.sffutils import SFFIndex, get_qual, hard_trim
+from   glu.lib.seqlib.cigar    import make_cigar, make_ndiff, cigar_add_trim
 
 
 PAIR_ALIGN_TAB_HEADER = ['QueryAccno', 'QueryStart', 'QueryEnd', 'QueryLength',
@@ -33,153 +28,6 @@ PAIR_ALIGN_TAB_HEADER = ['QueryAccno', 'QueryStart', 'QueryEnd', 'QueryLength',
                          'NumIdent', 'AlignLength', 'QueryAlign', 'SubjAlign']
 
 AlignRecord = namedtuple('AlignRecord', ' '.join(PAIR_ALIGN_TAB_HEADER))
-
-
-CIGAR_map = { ('-','-'):'P' }
-for a in 'NACGTacgt':
-  CIGAR_map[a,'-'] = 'I'
-  CIGAR_map['-',a] = 'D'
-  for b in 'NACGTacgt':
-    CIGAR_map[a,b] = 'M'
-
-
-NDIFF_map = { ('-','-'): ('P',None) }
-for a in 'NACGTacgt':
-  NDIFF_map[a,'-'] = ('I',a)
-  NDIFF_map['-',a] = ('D',a)
-  # N,N is considered a mismatch(?)
-  for b in 'NACGTacgt':
-    NDIFF_map[a,b] = ('=' if a==b and a!='N' else 'X',b)
-
-
-def make_cigar_py(query,ref):
-  assert len(query)==len(ref)
-  igar  = imap(getitem, repeat(CIGAR_map), izip(query,ref))
-  cigar = ''.join('%d%s' % (len(list(run)),code) for code,run in groupby(igar))
-  return cigar
-
-
-def make_ndiff_py(query,ref):
-  assert len(query)==len(ref)
-
-  nd   = groupby(imap(getitem, repeat(NDIFF_map), izip(query,ref)),itemgetter(0))
-  nm   = 0
-  md   = ''
-  eq   = 0
-
-  for code,items in nd:
-    if code=='P':
-      continue
-    elif code=='=':
-      eq += len(list(items))
-    elif code=='I':
-      nm += len(list(items))
-    else:
-      md += '%d' % eq
-      eq = 0
-
-      bases = ''.join(b for c,b in items)
-      nm   += len(bases)
-
-      if code=='D':
-        md   += '^'
-      else:
-        # For some silly reason mismatch bases must be 0 separated
-        bases = '0'.join(bases)
-
-      md += bases
-
-  md += '%d' % eq
-
-  return nm,md
-
-
-# Try to import the optimized Cython version
-# The Python version is pretty fast, but I wanted to play with Cython.
-try:
-  from glu.lib.seqlib.samhelpers import make_cigar, make_ndiff
-except ImportError:
-  make_cigar = make_cigar_py
-  make_ndiff = make_ndiff_py
-
-
-class SFFIndex(object):
-  def __init__(self, sfffiles):
-    self.sffindex = defaultdict(list)
-    self.headers  = []
-
-    for sfffile in sfffiles:
-      self.add_sff(sfffile)
-
-  def add_sff(self, sfffile):
-    print >> sys.stderr,'Loading SFF index for',sfffile
-    sffindex   = self.sffindex
-    headers    = self.headers
-    manifest   = sff_manifest(open(sfffile,'rb'))
-    reads      = SeqIO.index(sfffile, 'sff')
-
-    for run in etree.fromstring(manifest).findall('run'):
-      run_name         = run.find('run_name').text
-      run_path         = run.find('path').text
-      run_type         = run.find('run_type').text
-      accession_prefix = run.find('accession_prefix').text
-      analysis_name    = run.find('analysis_name').text
-
-      # Record the read group only the first time we see it
-      if accession_prefix not in sffindex:
-        read_group = ('@RG','ID:%s' % accession_prefix, 'PL:454', 'SM:%s' % run_name)
-        headers.append(read_group)
-
-      # Add this SFF file as a source of reads for this accession prefix
-      # Most of the time this will be a unique mapping, but it is possible
-      # to split a run into multiple SFF files.  If one was to align based
-      # on those files, reads with the same accession will be present in the
-      # same input alignment and multiple SFF files.  Fortunately, this
-      # should not be typical.
-      sffindex[accession_prefix].append(reads)
-
-  def get_read(self, qname):
-    prefix = qname[:9]
-
-    for sff in self.sffindex.get(prefix,[]):
-      rec = sff.get(qname)
-      if rec:
-        return rec
-    return None
-
-
-def get_qual(read):
-  phred = read.letter_annotations['phred_quality']
-  qual  = np.array(phred,dtype=np.uint8)
-  qual += 33
-  return qual.tostring()
-
-
-def hard_trim(read,seq,qual,trim):
-  seqlen = len(seq)
-  hard_trim_left = hard_trim_right = 0
-
-  if 'flowkey' in trim:
-    hard_trim_left = 4
-  if 'adapter' in trim:
-    hard_trim_left = max(hard_trim_left,read.annotations['clip_qual_left'])
-  if 'lowquality' in trim:
-    hard_trim_right = seqlen-read.annotations['clip_qual_right']
-
-  seq  =  seq[hard_trim_left:seqlen-hard_trim_right]
-  qual = qual[hard_trim_left:seqlen-hard_trim_right]
-
-  return seq,qual,hard_trim_left,hard_trim_right
-
-
-def cigar_add_trim(cigar, trim_char, left, right):
-  if left and right:
-    cigar = '%d%s%s%d%s' % (left,trim_char,cigar,right,trim_char)
-  elif left:
-    cigar = '%s%s%s' % (left,trim_char,cigar)
-  elif right:
-    cigar = '%s%d%s' % (cigar,right,trim_char)
-  return cigar
 
 
 def read_pair_align(alignfile):

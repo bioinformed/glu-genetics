@@ -15,7 +15,7 @@ from   glu.lib.utils             import izip_exact, is_str
 from   glu.lib.fileutils         import table_reader, table_writer
 from   glu.lib.illumina          import read_Illumina_LBD, IlluminaManifest
 
-from   glu.lib.seqlib.sequence   import norm_snp_seq, complement_base
+from   glu.lib.seqlib.strand     import norm_snp_seq, complement_base
 
 from   glu.lib.genolib.locus     import Genome, Nothing, load_genome
 from   glu.lib.genolib.phenos    import Phenome, load_phenome

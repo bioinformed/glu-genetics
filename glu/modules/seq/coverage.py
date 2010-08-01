@@ -21,7 +21,8 @@ import pysam
 
 from   glu.lib.progressbar    import progress_loop
 from   glu.lib.fileutils      import autofile, guess_format, parse_augmented_name, table_writer
-from   glu.modules.seq.filter import read_targets
+
+from   glu.lib.seqlib.bed     import read_features
 
 
 def percent(a,b):
@@ -361,7 +362,7 @@ def main():
   parse_maxcoverage(options)
 
   regions   = load_regions(args[0],options)
-  targets   = read_targets(options.targets)
+  targets   = read_features(options.targets)
 
   contig_intervals = interval_pileup(regions)
   target_intervals = target_pileup(contig_intervals, targets)
