@@ -18,59 +18,12 @@ from   itertools   import groupby
 
 import pysam
 
-from   glu.lib.fileutils import autofile
+from   glu.lib.fileutils  import autofile
+
+from   glu.lib.seqlib.bed import read_features
 
 
 GOOD,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
-
-
-def merge_targets(targets):
-  targets.sort()
-
-  current_start,current_end,current_name = None,None,set()
-
-  for target_start,target_end,target_name in targets:
-    if current_start is None:
-      current_start,current_end,current_name = target_start,target_end,set([target_name])
-    elif current_end<target_start:
-      yield current_start,current_end,','.join(sorted(current_name))
-      current_start,current_end,current_name = target_start,target_end,set([target_name])
-    else:
-      current_name.add(target_name)
-      current_end = max(current_end,target_end)
-
-  if current_start is not None:
-    yield current_start,current_end,','.join(sorted(current_name))
-
-
-def read_targets(filename):
-  targets = defaultdict(list)
-
-  if not filename:
-    return targets
-
-  bed = csv.reader(autofile(filename),dialect='excel-tab')
-
-  i = 1
-  for row in bed:
-    n = len(row)
-    if n<3 or row[0].startswith('track ') or row[0].startswith('#'):
-      continue
-
-    contig,start,end = row[:3]
-
-    if n>3:
-      name = row[3]
-    else:
-      name = 'target_%06d' % i
-      i += 1
-
-    targets[contig].append( (int(start),int(end),name) )
-
-  for contig in targets:
-    targets[contig] = list(merge_targets(targets[contig]))
-
-  return targets
 
 
 def depth_filter(reads,options):
@@ -217,7 +170,7 @@ def main():
   reads  = inbam.fetch(until_eof=True)
 
   if options.targets:
-    targets = read_targets(options.targets)
+    targets = read_features(options.targets)
     reads = target_filter(reads,inbam.references,targets,options)
   else:
     reads = depth_filter(reads,options)
