@@ -138,6 +138,10 @@ def main():
       r2 = sfloat(r2)
     outfile.writerow([lname,tag,r2])
 
+  for lname in locusmap:
+    if lname not in loci:
+      outfile.writerow([lname,'',sfloat(0)])
+
 
 if __name__ == '__main__':
   main()
