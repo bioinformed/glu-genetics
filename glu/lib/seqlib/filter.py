@@ -8,6 +8,8 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
+__all__ = ['filter_alignments','alignment_filter_options']
+
 #             NAME            POSITIVE      NEGATIVE
 FLAGS = { 'paired_end'      : (0x001,       0x000),
           'single_end'      : (0x000,       0x001),
@@ -33,7 +35,28 @@ FLAGS = { 'paired_end'      : (0x001,       0x000),
 
 
 SUPPORTED_OPTIONS = set(FLAGS)
-ALL_OPTIONS       = set(['read_group','sample','library','center','qname','has_seq','has_qual','query_len','seq_len')|SUPPORTED_OPTIONS
+ALL_OPTIONS       = SUPPORTED_OPTIONS|set(['read_group','sample','library','center',
+                                           'qname','has_seq','has_qual','query_len','seq_len'])
+
+
+def normalize_options(opts):
+  opts = opts or []
+
+  if isinstance(opts,basestring):
+    opts = [opts]
+
+  opts = (o.strip().lower() for opt in opts for o in opt.split(','))
+  return set(o for o in opts if o)
+
+
+# Internal helper generator function for filter_alignments
+def _filter_alignments(alignments,positive_flags,negative_flags):
+  for alignment in alignments:
+    flags     = alignment.flag
+    pos_match = (flags&positive_flags)==positive_flags
+    neg_match = (flags&negative_flags)==0
+    if pos_match and neg_match:
+      yield alignment
 
 
 def filter_alignments(alignments, include, exclude):
@@ -45,7 +68,7 @@ def filter_alignments(alignments, include, exclude):
   ...   def __repr__(self): return hex(self.flag)
 
   >>> aligns = [ A(0x000|0x004), A(0x001|0x200) ]
-  >>> print list(filter_alignments(aligns, ['single_end'],[]))
+  >>> print list(filter_alignments(aligns, 'single_end',None))
   [0x4]
   >>> print list(filter_alignments(aligns, [],['single_end']))
   [0x201]
@@ -62,8 +85,8 @@ def filter_alignments(alignments, include, exclude):
   >>> print list(filter_alignments(aligns, [],['unmapped']))
   [0x201]
   '''
-  include         = set(i.lower() for i in include)
-  exclude         = set(e.lower() for e in exclude)
+  include = normalize_options(include)
+  exclude = normalize_options(exclude)
 
   unknown_options = (include|exclude)-ALL_OPTIONS
 
@@ -90,12 +113,21 @@ def filter_alignments(alignments, include, exclude):
     positive_flags |= pos
     negative_flags |= neg
 
-  for alignment in alignments:
-    flags     = alignment.flag
-    pos_match = (flags&positive_flags)==positive_flags
-    neg_match = (flags&negative_flags)==0
-    if pos_match and neg_match:
-      yield alignment
+  if not positive_flags and not negative_flags:
+    return alignments
+
+  return _filter_alignments(alignments,positive_flags,negative_flags)
+
+
+def alignment_filter_options(group):
+  opts = ', '.join(sorted(SUPPORTED_OPTIONS))
+
+  group.add_option('--includealign', dest='includealign', action='append', metavar='OPTS',
+                   help='Include alignments that meet the specified comma separated criteria. '
+                        'These include: ' + opts)
+  group.add_option('--excludealign', dest='excludealign', action='append', metavar='OPTS',
+                   help='Exclude alignments that meet the specified comma separated criteria. '
+                        ' See --includealign for supported criteria.')
 
 
 def _test():

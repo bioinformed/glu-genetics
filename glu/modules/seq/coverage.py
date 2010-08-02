@@ -23,6 +23,7 @@ from   glu.lib.progressbar    import progress_loop
 from   glu.lib.fileutils      import autofile, guess_format, parse_augmented_name, table_writer
 
 from   glu.lib.seqlib.bed     import read_features
+from   glu.lib.seqlib.filter  import alignment_filter_options, filter_alignments
 
 
 def percent(a,b):
@@ -197,6 +198,7 @@ def load_bam(filename,options):
     contig_lens  = inbam.lengths
     aligns       = inbam.fetch(region=options.region or None)
     aligns       = progress_loop(aligns, label='Loading BAM file: ', units='alignments')
+    aligns       = filter_alignments(aligns, options.includealign, options.excludealign)
 
     for contig_tid,contig_aligns in groupby(aligns, attrgetter('rname')):
       contig_name   = contig_names[contig_tid]
@@ -333,6 +335,8 @@ def option_parser():
 
   usage = 'usage: %prog [options] in.bam'
   parser = optparse.OptionParser(usage=usage)
+
+  alignment_filter_options(parser)
 
   parser.add_option('--targets', dest='targets', metavar='BED',
                     help='Single track BED file containing all targetd intervals')

@@ -12,32 +12,34 @@ __revision__  = '$Id$'
 import sys
 import csv
 
-from   collections import deque,defaultdict
-from   operator    import attrgetter
-from   itertools   import groupby
+from   collections           import deque, defaultdict
+from   operator              import attrgetter
+from   itertools             import groupby
 
 import pysam
 
-from   glu.lib.fileutils  import autofile
+from   glu.lib.utils         import consume
+from   glu.lib.fileutils     import autofile
 
-from   glu.lib.seqlib.bed import read_features
+from   glu.lib.seqlib.bed    import read_features
+from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 
 
 GOOD,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
 
 
-def depth_filter(reads,options):
-  for read in reads:
-    if read.rlen<options.minreadlen:
-      yield TOOSHORT,read
+def depth_filter(aligns,options):
+  for align in aligns:
+    if align.rlen<options.minreadlen:
+      yield TOOSHORT,align
     else:
-      yield GOOD,read
+      yield GOOD,align
 
 
-def target_filter(allreads,references,targets,options):
+def target_filter(allaligns,references,targets,options):
   contigs = set()
 
-  for contig,reads in groupby(allreads, attrgetter('rname')):
+  for contig,aligns in groupby(allaligns, attrgetter('rname')):
     rname = references[contig] if contig>= 0 else 'unaligned'
 
     ctargets = deque(targets[rname])
@@ -47,83 +49,82 @@ def target_filter(allreads,references,targets,options):
     contigs.add(rname)
 
     if rname=='unaligned':
-      for read in reads:
-        yield UNALIGNED,read
+      for align in aligns:
+        yield UNALIGNED,align
       continue
 
     last = -1,-1
 
-    for read in reads:
-      read_start = read.pos
-      read_end   = read.aend
+    for align in aligns:
+      align_start = align.pos
+      align_end   = align.aend
 
-      here = read_start,read_start
-      assert last<=here, 'Out of order read (%s>%s)' % (last,here)
+      here = align_start,align_start
+      assert last<=here, 'Out of order align (%s>%s)' % (last,here)
       last = here
 
-      # Fast-path: fail short reads
-      if read.rlen<options.minreadlen:
-        yield TOOSHORT,read
+      # Fast-path: fail short aligns
+      if align.rlen<options.minreadlen:
+        yield TOOSHORT,align
         continue
 
-      # Remove targets that end prior to the start of the current read
-      while ctargets and ctargets[0][1]<read_start:
+      # Remove targets that end prior to the start of the current align
+      while ctargets and ctargets[0][1]<align_start:
         ctargets.popleft()
 
       overlap_len = 0
       for target_start,target_end,target_name in ctargets:
-        if target_start>read_end:
+        if target_start>align_end:
           break
-        if read_start>=target_end:
+        if align_start>=target_end:
           continue
-        overlap_start,overlap_end = max(target_start,read_start),min(target_end,read_end)
+        overlap_start,overlap_end = max(target_start,align_start),min(target_end,align_end)
         overlap_len += overlap_end-overlap_start
 
       if overlap_len<options.minoverlap:
-        yield LOWOVERLAP,read
+        yield LOWOVERLAP,align
       else:
-        yield GOOD,read
+        yield GOOD,align
 
 
 class FilterStats(object):
   def __init__(self):
     self.stats = [0]*4
 
-  def __call__(self, reads):
+  def __call__(self, aligns):
     stats = self.stats
-    for status,read in reads:
+    for status,align in aligns:
       stats[status] += 1
-      yield status,read
+      yield status,align
 
   def __getitem__(self, i):
     return self.stats[i]
 
 
-def action_color(reads):
-  for status,read in reads:
-    read.is_reverse = status==GOOD
-    yield read
+def action_color(aligns):
+  for status,align in aligns:
+    align.is_reverse = status==GOOD
+    yield align
 
 
-def action_filter(reads):
-  for status,read in reads:
+def action_filter(aligns):
+  for status,align in aligns:
     if status==GOOD:
-      yield read
+      yield align
 
 
-def sink_file(filename,template,reads):
+def sink_file(filename,template,aligns):
   outbam = pysam.Samfile(filename, 'wb', template=template)
 
   try:
-    for read in reads:
-      outbam.write(read)
+    for align in aligns:
+      outbam.write(align)
   finally:
     outbam.close()
 
 
-def sink_null(reads):
-  for read in reads:
-    pass
+def sink_null(aligns):
+  consume(aligns)
 
 
 def percent(a,b):
@@ -136,16 +137,18 @@ def option_parser():
   usage = 'usage: %prog [options] in.bam'
   parser = optparse.OptionParser(usage=usage)
 
+  alignment_filter_options(parser)
+
   parser.add_option('--minreadlen', dest='minreadlen', metavar='N', type='int', default=85,
                     help='Minimum read length filter (default=85)')
 
   parser.add_option('--targets', dest='targets', metavar='BED',
                     help='Single track BED file containing all targeted intervals')
   parser.add_option('--minoverlap', dest='minoverlap', metavar='N', type='int', default=20,
-                    help='Minimum read overlap with any target (default=20)')
+                    help='Minimum alignment overlap with any target (default=20)')
 
   parser.add_option('--action', dest='action', metavar='X', default='filter',
-                    help='Action to perform on failing reads (filter or color, default=filter)')
+                    help='Action to perform on failing aligns (filter or color, default=filter)')
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output BAM file')
@@ -167,29 +170,30 @@ def main():
     raise ValueError('Invalid filter action selected')
 
   inbam  = pysam.Samfile(args[0], 'rb')
-  reads  = inbam.fetch(until_eof=True)
+  aligns = inbam.fetch(until_eof=True)
+  aligns = filter_alignments(aligns, options.includealign, options.excludealign)
 
   if options.targets:
     targets = read_features(options.targets)
-    reads = target_filter(reads,inbam.references,targets,options)
+    aligns  = target_filter(aligns,inbam.references,targets,options)
   else:
-    reads = depth_filter(reads,options)
+    aligns  = depth_filter(aligns,options)
 
-  stats = FilterStats()
-  reads = stats(reads)
+  stats  = FilterStats()
+  aligns = stats(aligns)
 
   if options.action=='filter':
-    reads = action_filter(reads)
+    aligns = action_filter(aligns)
   else:
-    reads = action_color(reads)
+    aligns = action_color(aligns)
 
   complete = False
 
   try:
     if options.output:
-      sink_file(options.output, inbam, reads)
+      sink_file(options.output, inbam, aligns)
     else:
-      sink_null(reads)
+      sink_null(aligns)
 
     complete = True
 
@@ -202,9 +206,9 @@ def main():
   total = sum(stats)
 
   if complete:
-    print 'Read summary:'
+    print 'Alignment summary:'
   else:
-    print 'Partial read summary (execution interrupted):'
+    print 'Partial alignment summary (execution interrupted):'
 
   print '         Good: %10d (%5.2f%%)' % (stats[GOOD],      percent(stats[GOOD],      total))
   print '    Unaligned: %10d (%5.2f%%)' % (stats[UNALIGNED], percent(stats[UNALIGNED], total))
