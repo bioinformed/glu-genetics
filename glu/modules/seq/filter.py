@@ -114,7 +114,8 @@ def action_filter(aligns):
 
 
 def sink_file(filename,template,aligns):
-  outbam = pysam.Samfile(filename, 'wb', template=template)
+  flags  = 'wb' if filename.endswith('.bam') else 'wh'
+  outbam = pysam.Samfile(filename, flags, template=template)
 
   try:
     for align in aligns:
