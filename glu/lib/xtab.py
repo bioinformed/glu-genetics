@@ -7,7 +7,7 @@ __revision__  = '$Id$'
 
 
 from   operator  import itemgetter
-from   itertools import groupby
+from   itertools import groupby, chain
 
 
 def _rowstream(data, rowkeyfunc, colkeyfunc, valuefunc):
@@ -18,7 +18,52 @@ def _rowstream(data, rowkeyfunc, colkeyfunc, valuefunc):
     yield rowkey,colkey,value
 
 
-def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None):
+def _infer_columns(data):
+  '''
+  Infer columns from a data stream by looking ahead in the stream to detect
+  the first row key change.  Once found, the column keys and look-ahead
+  buffer chained together with the remaining data generator are chained
+  together and returned.
+
+  This method of detecting columns can accommodate repeated column keys, but
+  not missing column keys.  The first set of data records must have at least
+  one instance of each column key.
+  '''
+  seen       = set()
+  columns    = []
+  look_ahead = []
+
+  # Obtain the first row
+  row = next(data,None)
+
+  if row is None:
+    return columns,data
+
+  # Record the details
+  look_ahead.append(row)
+  rowkey = row[0]
+  colkey = row[1]
+  seen.add(colkey)
+  columns.append(colkey)
+
+  # Process the remaining rows for the first rowkey
+  for row in data:
+    look_ahead.append(row)
+
+    if row[0]!=rowkey:
+      break
+
+    # Record first instance of each column key
+    colkey = row[1]
+    if colkey not in seen:
+      seen.add(colkey)
+      columns.append(colkey)
+
+  # Return columns and entire data sequence
+  return columns,chain(look_ahead,data)
+
+
+def rowsby(data, columns=None, rowkeyfunc=None, colkeyfunc=None, valuefunc=None, aggregatefunc=None):
   '''
   Build genomatrix from genotriples when the necessary columns are given.
   Genotypes from the same row and column are grouped together.  Empty list
@@ -42,12 +87,19 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
   @return             : genomatrix
   @rtype              : genomatrix generator
 
-
   >>> columns = ['l1','l2']
   >>> data = [('s1','l1', ('G', 'G')),('s1','l2', ('A', 'A')),
   ...         ('s2','l1', ('G', 'T')),('s2','l2', ('T', 'T')),
   ...         ('s3','l1', ('G', 'G')),('s3','l2', ('A', 'A'))]
   >>> cols, rows = rowsby(data, columns, itemgetter(0), itemgetter(1), itemgetter(2))
+  >>> print cols
+  ['l1', 'l2']
+  >>> for row in rows:
+  ...   print row
+  ('s1', [[('G', 'G')], [('A', 'A')]])
+  ('s2', [[('G', 'T')], [('T', 'T')]])
+  ('s3', [[('G', 'G')], [('A', 'A')]])
+  >>> cols, rows = rowsby(data)
   >>> print cols
   ['l1', 'l2']
   >>> for row in rows:
@@ -67,13 +119,17 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
   ('l2', [['AA', 'AA'], []])
   ('l3', [['BB', 'BB', 'AB'], []])
   '''
-  get0 = itemgetter(0)
-
-  columns = list(columns)
+  rowkeyfunc = rowkeyfunc or itemgetter(0)
+  colkeyfunc = colkeyfunc or itemgetter(1)
+  valuefunc  = valuefunc  or itemgetter(2)
 
   data = _rowstream(data, rowkeyfunc, colkeyfunc, valuefunc)
 
+  if columns is None:
+    columns,data = _infer_columns(data)
+
   # Build column key index
+  columns = list(columns)
   colkeys = dict( (colkey,j) for j,colkey in enumerate(columns))
 
   if len(colkeys) != len(columns):
@@ -81,8 +137,9 @@ def rowsby(data, columns, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None)
 
   def _rowsby():
     # Build and yield result rows
+    get0 = itemgetter(0)
     for rowkey,rowdata in groupby(data, get0):
-      row = [ [] for i in range(len(colkeys)) ]
+      row = [ [] for i in xrange(len(colkeys)) ]
 
       for rowkey,colkey,value in rowdata:
         j = colkeys[colkey]
