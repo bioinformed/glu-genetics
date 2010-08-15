@@ -19,13 +19,12 @@ from   itertools             import groupby
 import pysam
 
 from   glu.lib.utils         import consume
-from   glu.lib.fileutils     import autofile
 
 from   glu.lib.seqlib.bed    import read_features
 from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 
 
-GOOD,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
+PASS,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
 
 
 def depth_filter(aligns,options):
@@ -33,7 +32,7 @@ def depth_filter(aligns,options):
     if align.rlen<options.minreadlen:
       yield TOOSHORT,align
     else:
-      yield GOOD,align
+      yield PASS,align
 
 
 def target_filter(allaligns,references,targets,options):
@@ -84,7 +83,7 @@ def target_filter(allaligns,references,targets,options):
       if overlap_len<options.minoverlap:
         yield LOWOVERLAP,align
       else:
-        yield GOOD,align
+        yield PASS,align
 
 
 class FilterStats(object):
@@ -101,15 +100,15 @@ class FilterStats(object):
     return self.stats[i]
 
 
-def action_color(aligns):
+def action_fail(aligns):
   for status,align in aligns:
-    align.is_reverse = status==GOOD
+    align.is_qcfail = status!=PASS
     yield align
 
 
-def action_filter(aligns):
+def action_drop(aligns):
   for status,align in aligns:
-    if status==GOOD:
+    if status==PASS:
       yield align
 
 
@@ -148,8 +147,8 @@ def option_parser():
   parser.add_option('--minoverlap', dest='minoverlap', metavar='N', type='int', default=20,
                     help='Minimum alignment overlap with any target (default=20)')
 
-  parser.add_option('--action', dest='action', metavar='X', default='filter',
-                    help='Action to perform on failing aligns (filter or color, default=filter)')
+  parser.add_option('--action', dest='action', metavar='X', default='fail',
+                    help='Action to perform on failing alignments (drop or fail, default=fail)')
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output BAM file')
@@ -167,10 +166,11 @@ def main():
 
   options.action = options.action.lower()
 
-  if options.action not in ('filter','color'):
+  if options.action not in ('drop','fail'):
     raise ValueError('Invalid filter action selected')
 
-  inbam  = pysam.Samfile(args[0], 'rb')
+  flags  = 'rb' if args[0].endswith('.bam') else 'r'
+  inbam  = pysam.Samfile(args[0], flags)
   aligns = inbam.fetch(until_eof=True)
   aligns = filter_alignments(aligns, options.includealign, options.excludealign)
 
@@ -183,10 +183,10 @@ def main():
   stats  = FilterStats()
   aligns = stats(aligns)
 
-  if options.action=='filter':
-    aligns = action_filter(aligns)
+  if options.action=='drop':
+    aligns = action_drop(aligns)
   else:
-    aligns = action_color(aligns)
+    aligns = action_fail(aligns)
 
   complete = False
 
@@ -211,7 +211,7 @@ def main():
   else:
     print 'Partial alignment summary (execution interrupted):'
 
-  print '         Good: %10d (%5.2f%%)' % (stats[GOOD],      percent(stats[GOOD],      total))
+  print '         Pass: %10d (%5.2f%%)' % (stats[PASS],      percent(stats[PASS],      total))
   print '    Unaligned: %10d (%5.2f%%)' % (stats[UNALIGNED], percent(stats[UNALIGNED], total))
   print '    Too short: %10d (%5.2f%%)' % (stats[TOOSHORT],  percent(stats[TOOSHORT],  total))
   print '  Low overlap: %10d (%5.2f%%)' % (stats[LOWOVERLAP],percent(stats[LOWOVERLAP],total))
