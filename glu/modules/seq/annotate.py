@@ -174,7 +174,7 @@ def get_snps_interval(con, chrom, ref_start, ref_end):
     yield make(row)
 
 
-class VariantSifter(object):
+class VariantAnnotator(object):
   def __init__(self):
     self.reference   = Fastafile(REF_GENOME)
     #self.transcripts = transcripts = {}
@@ -405,7 +405,7 @@ class VariantSifter(object):
       assert len(ref_aa)
 
       result[-1] += ':aa=%d' % (aa_position+1)
-      result += ['SYNONYMOUS',mut_type,ref_nuc,var_nuc,ref_aa,ref_aa]
+      result += ['SYNONYMOUS',mut_type,ref_nuc,var_nuc,str(ref_aa),str(ref_aa)]
       return result
 
     ref_stop = ref_aa.find('*')
@@ -441,7 +441,7 @@ class VariantSifter(object):
 
     mut_type = ','.join(sorted(mut_type))
     result[-1] += ':aa=%d' % (aa_position+1)
-    result += ['NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,ref_aa,var_aa]
+    result += ['NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,str(ref_aa),str(var_aa)]
     return result
 
 
@@ -467,7 +467,7 @@ class VariantSifter(object):
 
 
 def main():
-  vs = VariantSifter()
+  vs = VariantAnnotator()
 
   if 0:
     print vs.classify('chr1',1110293,1110294,'A')
