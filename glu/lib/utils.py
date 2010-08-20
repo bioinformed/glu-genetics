@@ -14,6 +14,7 @@ __all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumera
 
 import gc
 
+from   collections      import deque
 from   itertools        import izip, count, chain, islice, repeat
 
 import glu.lib.pycompat
@@ -587,7 +588,6 @@ def chunk(iterable, size, pad=_chunk_nothing):
     yield block
 
 
-
 def enum(typename, field_names):
   '''
   Create a new enumeration type
@@ -616,6 +616,58 @@ def enum(typename, field_names):
       field_names = field_names.replace(',', ' ').split()
   d = dict((reversed(nv) for nv in enumerate(field_names)), __slots__ = ())
   return type(typename, (object,), d)()
+
+
+class iter_queue(deque):
+
+  '''Iterator object that is also a queue that allows one to look-ahead in
+  the stream using the peek() method.  Calling peek() when the iterator is
+  exhaused results in a ValueError exception.
+
+  Values returned by peek are accessible from the other using a
+  deque-interface, from which the iterator inherits.  Each call to peek()
+  looks ahead one value and that value is available as the right-most
+  element in the deque.  There is no look-behind, as all buffered values
+  returned from the iterator are removed after they are "seen" via the
+  iterator protocol.  Thus the len(it) returns the number of items in the
+  look-ahead and next(it) reduces the size of the look-ahead by one, if any
+  are present.
+
+  >>> iq = iter_queue(xrange(10))
+  >>> iq.peek()
+  0
+  >>> iq.peek()
+  1
+  >>> iq[1]
+  1
+  >>> next(iq)
+  0
+  >>> iq[0]
+  1
+  >>> iq.peek()
+  2
+  >>> next(iq)
+  1
+  >>> list(iq)
+  [2, 3, 4, 5, 6, 7, 8, 9]
+  '''
+  def __init__(self, iterable):
+    self.iterable = iter(iterable)
+
+  def __iter__(self):
+    return self
+
+  def next(self):
+    try:
+      return self.popleft()
+    except IndexError:
+      return next(self.iterable)
+
+  def peek(self):
+    '''Return next value but do not advance this iterator'''
+    value = next(self.iterable, ValueError)
+    self.append(value)
+    return value
 
 
 def _test():
