@@ -2582,10 +2582,9 @@ def merge_genomatrixstream_list(genos, mergefunc):
 def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
   '''
   Build genomatrix from genotriples using either the xtab or the rowsby
-  function.  The rowsby function would be chosen over xtab if and only if:
-
-    1. the necessary columns are given, and
-    2. triples have been ordered appropriately (specified by the order argument).
+  function.  The rowsby function would be chosen over xtab if triples have
+  been ordered appropriately (specified by the order argument).  Columns can
+  be specified or inferred from the data stream.
 
   @param   triples: sequence of genotriples(str,str,genotype representation)
   @type    triples: sequence
@@ -2698,7 +2697,7 @@ def build_genomatrixstream_from_genotriples(triples, format, mergefunc):
     order = False
 
   # SLOWPATH: full xtab because of unknown columns or unordered rows
-  if columns is None or not order:
+  if not order:
     columns,rows,data = xtab(triples, rowkeyfunc, colkeyfunc, valuefunc, aggfunc)
     genos  = tuple(izip(rows,data))
     rows   = tuple(rows)
