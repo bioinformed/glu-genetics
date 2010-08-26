@@ -436,13 +436,13 @@ def _make_expr_env(code,header,env=None):
     if counts[h] == 1:
       indices[h] = i
 
-      spaces = ' ' in h
-      digit  = h[0] in '0123456789'
+      illegal = ' ' in h or '-' in h
+      digit   = h[0] in '0123456789'
 
       # Try to fix up h
-      if spaces or digit:
-        if spaces:
-          h = h.replace(' ','_')
+      if illegal or digit:
+        if illegal:
+          h = h.replace(' ','_').replace('-','_')
         if digit:
           h = '_' + h
 
