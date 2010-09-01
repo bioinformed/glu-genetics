@@ -7,12 +7,10 @@ __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id: $'
 
-cimport cython
 
-from stdio         cimport sprintf
-from stdlib        cimport malloc, realloc, free
-from python_string cimport PyString_Size
-from python_exc    cimport PyErr_NoMemory
+from libc.stdio    cimport sprintf
+from libc.stdlib   cimport malloc, realloc, free
+from cpython       cimport PyString_Size, PyErr_NoMemory
 
 
 cdef inline size_t imax(int a, int b):
