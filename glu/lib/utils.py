@@ -644,10 +644,14 @@ class iter_queue(deque):
   0
   >>> iq[0]
   1
+  >>> iq.peek(0)
+  1
   >>> iq.peek()
   2
   >>> next(iq)
   1
+  >>> iq.peek(4)
+  6
   >>> list(iq)
   [2, 3, 4, 5, 6, 7, 8, 9]
   '''
@@ -663,10 +667,22 @@ class iter_queue(deque):
     except IndexError:
       return next(self.iterable)
 
-  def peek(self):
-    '''Return next value but do not advance this iterator'''
-    value = next(self.iterable, ValueError)
-    self.append(value)
+  def peek(self, i=None):
+    '''Return next or i'th value but do not advance this iterator'''
+    if i is not None:
+      # Index is already buffered
+      if i<len(self):
+        value = self[i]
+
+      # We must peek further
+      else:
+        for _ in xrange(len(self),i+1):
+          value = next(self.iterable)
+          self.append(value)
+    else:
+      value = next(self.iterable)
+      self.append(value)
+
     return value
 
 
