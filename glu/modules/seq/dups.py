@@ -24,7 +24,11 @@ from   glu.lib.progressbar          import progress_loop
 from   glu.modules.seq.filter       import sink_file
 
 
-def adjust_read_start(align):
+def read_start_generic(align):
+  return align.aend if align.is_reverse else align.pos
+
+
+def read_start_454(align):
   seq = align.query
 
   if not align.is_reverse:
@@ -46,7 +50,16 @@ def adjust_read_start(align):
     return align_end
 
 
-def read_groups(aligns):
+def read_groups(aligns,platform):
+  platform = platform.lower()
+
+  if platform=='454':
+    get_read_start = read_start_454
+  elif platform in ('','neutral'):
+    get_read_start = read_start_generic
+  else:
+    raise ValueError('Unknown platform specified: %s' % platform)
+
   for contig,contig_aligns in groupby(aligns,attrgetter('rname')):
     if contig==-1:
       continue
@@ -55,7 +68,7 @@ def read_groups(aligns):
     rev = []
 
     for align in contig_aligns:
-      read_start = adjust_read_start(align)
+      read_start = get_read_start(align)
       if not align.is_reverse:
         fwd.append( (read_start,align) )
       else:
@@ -123,6 +136,8 @@ def option_parser():
   usage = 'usage: %prog [options] in.bam'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('--platform', dest='platform', metavar='NAME', default='neutral',
+                    help='Sequencing platform: neutral, 454 (default=neutral).')
   parser.add_option('--action', dest='action', metavar='ACTION', default='keep',
                     help='Action to perform for duplicate reads: keep, drop.  Default=keep')
   parser.add_option('--pick', dest='pick', metavar='METHOD', default='best',
@@ -146,7 +161,7 @@ def main():
   inbam    = pysam.Samfile(bamfile,'rb')
   aligns   = inbam.fetch()
   aligns   = progress_loop(aligns, label='Loading BAM file: ', units='alignments')
-  groups   = read_groups(aligns)
+  groups   = read_groups(aligns,options.platform)
 
   seen   = set()
   group_count = 0
@@ -171,13 +186,14 @@ def main():
   dup_count   = sum(len(g) for g in groups) - len(groups)
   total_count = len(seen)
 
-  print
-  print 'Statistics for %s:'   % bamfile
-  print '  Total  Mbps: %0.2f' % (total_len/1000000)
-  print '  Total Reads: %8d'   % total_count
-  print '    Dup Reads: %8d'   % dup_count
-  print '  %% Dup Reads: %0.2f' % (dup_count/total_count*100)
-  print
+  if options.output!='-':
+    print
+    print 'Statistics for %s:'   % bamfile
+    print '  Total  Mbps: %0.2f' % (total_len/1000000)
+    print '  Total Reads: %8d'   % total_count
+    print '    Dup Reads: %8d'   % dup_count
+    print '  %% Dup Reads: %0.2f' % (dup_count/total_count*100)
+    print
 
   if options.output:
     duplicates = pick_duplicates(groups, options.pick)
