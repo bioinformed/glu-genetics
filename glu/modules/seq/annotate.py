@@ -33,10 +33,10 @@ GENE_DB='/usr/local/share/genedb/genedb_hg18_snp130.db'
 REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg18.fa'
 
 
-Gene = namedtuple('Gene', 'name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
+Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
                           'cdsStart cdsEnd exonCount exonStarts exonEnds')
 
-SNP  = namedtuple('SNP',  'name chrom start end strand refAllele alleles vclass func weight')
+SNP  = namedtuple('SNP',  'id name chrom start end strand refAllele alleles vclass func weight')
 
 
 GeneFeature = namedtuple('GeneFeature', 'chrom start end cds_index exon_num type')
@@ -175,27 +175,16 @@ def get_snps_interval(con, chrom, ref_start, ref_end):
 
 
 class VariantAnnotator(object):
-  def __init__(self):
-    self.reference   = Fastafile(REF_GENOME)
-    #self.transcripts = transcripts = {}
+  def __init__(self, gene_db, reference_fasta):
+    self.reference   = Fastafile(reference_fasta)
     self.feature_map = feature_map = defaultdict(IntervalTree)
-    self.con = sqlite3.connect(GENE_DB)
+    self.con = sqlite3.connect(gene_db)
 
     trans = get_transcripts(self.con)
     trans = progress_loop(trans, label='Loading transcripts: ', units='transcripts')
 
     for gene in trans:
-      #transcripts[gene.name] = gene
       feature_map[gene.chrom].insert(gene.txStart,gene.txEnd,gene)
-
-    if 0:
-      with gcdisabled():
-        self.snp_map = snp_map = defaultdict(IntervalTree)
-        snps = get_snps(self.con)
-        snps = progress_loop(snps, label='Loading SNPs: ', units='SNPs')
-
-        for snp in snps:
-          snp_map[snp.chrom].insert(snp.start,snp.end,snp)
 
     sys.stderr.write('Loading complete.\n')
 
@@ -316,6 +305,8 @@ class VariantAnnotator(object):
     result = [gene.chrom,ref_start,ref_end,'CDS',gene.symbol,'%s:exon%d' % (accession,cds.exon_num)]
     exon_start = ref_start - cds.start
     exon_end   = ref_end   - cds.start
+
+    # FIXME: Report ref and var nuc relative to gene strand
 
     var_nuc = var_nuc.upper()
 
@@ -467,9 +458,9 @@ class VariantAnnotator(object):
 
 
 def main():
-  vs = VariantAnnotator()
+  vs = VariantAnnotator(GENE_DB, REF_GENOME)
 
-  if 0:
+  if 1:
     print vs.classify('chr1',1110293,1110294,'A')
     print vs.classify('chr1',960530,960532,'')
     print vs.classify('chr1',968624,968625,'A')
@@ -488,6 +479,8 @@ def main():
     print vs.classify('chr8', 31616810,31616820,'')
     print vs.classify('chr8', 31615810,31615820,'')
     print vs.classify('chr8', 32743315,32743317,'')
+
+    return
 
   if 0:
     sys.stderr.write('Loading SNPs...\n')
