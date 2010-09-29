@@ -12,7 +12,10 @@ import sys
 
 from   itertools         import chain
 
+from   Bio.Seq           import Seq
 from   Bio               import SeqIO
+from   Bio.SeqRecord     import SeqRecord
+from   Bio.Alphabet      import single_letter_alphabet
 
 from   glu.lib.fileutils import autofile, hyphen, guess_format, parse_augmented_filename
 
@@ -20,7 +23,7 @@ from   glu.lib.fileutils import autofile, hyphen, guess_format, parse_augmented_
 INPUT_EXTS = ['ace', 'clustal', 'fa', 'fasta', 'fastq', 'fq',
               'fastq-sanger', 'fastq-solexa', 'fastq-illumina', 'genbank',
               'gb', 'ig', 'nexus', 'phd', 'phylip', 'pir', 'stockholm',
-              'sff', 'sff-trim', 'swiss', 'qual' ]
+              'sff', 'sff-trim', 'swiss', 'qual', 'qseq' ]
 
 
 OUTPUT_EXTS = ['clustal', 'fa', 'fasta', 'fastq', 'fq',
@@ -80,6 +83,43 @@ def read_sequence(filename, informat):
     raise ValueError('Input format must be specified for filename %s' % filename)
 
   return SeqIO.parse(autofile(filename,'rb'), informat)
+
+
+
+SOLEXA_SCORE_OFFSET = 64
+
+def QseqIterator(handle, alphabet = single_letter_alphabet):
+  """Parse Illumina QSEQ files
+  """
+  import csv
+
+  q_mapping = {}
+  for letter in range(0, 255):
+      q_mapping[chr(letter)] = letter-SOLEXA_SCORE_OFFSET
+
+  reader = csv.reader(handle,dialect='excel-tab')
+  for row in reader:
+
+      id = name = '%s_%s:%s:%s:%s:%s/%s' % tuple(row[:7])
+
+      seq = row[8].replace('.','N')
+
+      record = SeqRecord(Seq(seq, alphabet),
+                         id=id, name=name, description='')
+
+      qualities = [q_mapping[letter] for letter in row[9]]
+      if qualities and (min(qualities) < 0 or max(qualities) > 62):
+          raise ValueError("Invalid character in quality string")
+
+      #Dirty trick to speed up this line:
+      #record.letter_annotations["phred_quality"] = qualities
+      dict.__setitem__(record._per_letter_annotations,
+                       "phred_quality", qualities)
+      yield record
+
+
+import Bio.SeqIO
+SeqIO._FormatToIterator['qseq'] = QseqIterator
 
 
 def option_parser():
