@@ -42,9 +42,10 @@ def format_elapsed_time(t):
 
     if e:
       if symbol == 's':
-        elapsed.append('%.2f%s' % (e,symbol))
+        format = '%05.2f%s' if t else '%.2f%s'
       else:
-        elapsed.append('%d%s' % (e,symbol))
+        format = '%d%s'
+      elapsed.append(format % (e,symbol))
 
     if not t:
       break
