@@ -52,10 +52,10 @@ def find_index(header,headings,optional=False):
     raise ValueError('Cannot find heading index')
 
 
-def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=None):
+def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   '''
   Parse an Illumina manifest to obtain mappings from A/B probes to alleles
-  relative to a specific genomic strand
+  relative to a specified genomic strand.
   '''
   if errorhandler is None:
     def errorhandler(msg):
@@ -117,15 +117,14 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
 
     # Handle CNV probes, which can simply be skipped
     if (a,b) == NA:
-      genome.merge_locus(lname, chromosome=chr, location=loc)
+      yield lname,chr,loc,None,None
       continue
 
     # Handle indels, which are strand neutral
     elif cstrand in 'pm' and dstrand in 'pm':
       a = indelmap[a]
       b = indelmap[b]
-      genome.merge_locus(lname, chromosome=chr, location=loc)
-      abmap[lname] = (a,b)
+      yield lname,chr,loc,None,(a,b)
       continue
 
     # Otherwise, we have a SNP with A and B alleles on the design strand
@@ -135,7 +134,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
         errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
                          % (a,b,probea[-1],probeb[-1],lname))
-        genome.merge_locus(lname, chromosome=chr, location=loc)
+        yield lname,chr,loc,None,None
         continue
 
     try:
@@ -143,7 +142,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       tstrand       = tstrand.lower()
       if tstrand != 'top':
         errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % lname)
-        genome.merge_locus(lname, chromosome=chr, location=loc)
+        yield lname,chr,loc,None,None
         continue
 
     except ValueError:
@@ -155,7 +154,7 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
     # a,b and aa,bb should both be normalized to tstrand and must be equal
     if (a,b) != (aa,bb):
       errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,lname))
-      genome.merge_locus(lname, chromosome=chr, location=loc)
+      yield lname,chr,loc,None,None
       continue
 
     if gstrand != 'U':
@@ -183,8 +182,20 @@ def parse_manifest(manifest,genome,abmap,targetstrand='customer',errorhandler=No
       a,b = complement_base(a),complement_base(b)
       strand = {Nothing:Nothing,'+':'-','-':'+'}[strand]
 
+    yield lname,chr,loc,strand,(a,b)
+
+
+def create_abmap(manifest,genome):
+  '''
+  Create mapping from A/B probes to final alleles from the oriented manifest
+  entries and updating the genome metadata for each locus.
+  '''
+  abmap = {}
+  for lname,chr,loc,alleles in manifest:
     genome.merge_locus(lname, chromosome=chr, location=loc, strand=strand)
-    abmap[lname] = (a,b)
+    if alleles:
+      abmap[lname] = alleles
+  return abmap
 
 
 def filter_gc(samples, gcthreshold):
@@ -362,7 +373,8 @@ def main():
   if options.manifest:
     sys.stderr.write('Processing Illumina manifest file...')
     manifest = IlluminaManifest(options.manifest)
-    parse_manifest(manifest,genome,abmap,targetstrand=options.targetstrand,errorhandler=errorhandler)
+    manifest = orient_manifest(manifest,targetstrand=options.targetstrand,errorhandler=errorhandler)
+    abmap    = create_abmap(manifest,genome)
     sys.stderr.write('done.\n')
 
   if options.abmap:
