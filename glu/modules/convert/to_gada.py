@@ -36,10 +36,12 @@ def split_fullname(filename):
   # Combine dirname and up to the first '.' of filename as prefix
   prefix = os.path.join(dirname,parts[0])
 
+  sep = '_' if parts[0] else ''
+
   # Suffix the remainder of filename after the first '.'
   suffix = '' if len(parts) == 1 else parts[1]
 
-  return prefix,suffix
+  return prefix,sep,suffix
 
 
 def option_parser():
@@ -111,7 +113,7 @@ def main():
     sys.stderr.write('ERROR: An output filename template must be specified')
     sys.exit(2)
 
-  prefix,suffix = split_fullname(options.output)
+  prefix,sep,suffix = split_fullname(options.output)
 
   transform = GenoTransform.from_object(options)
 
@@ -152,7 +154,7 @@ def main():
     if rename is not None:
       sample = rename.get(sample,sample)
 
-    out = table_writer('%s_%s.%s' % (prefix,sample,suffix), hyphen=sys.stdout)
+    out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix), hyphen=sys.stdout)
     out.writerow( ('Name','Chr','Position','Log.R.Ratio','B.Allele.Freq','GType') )
 
     sample_data = izip(recode,lrr[i]/10000.,baf[i]/10000.,genos[i])
