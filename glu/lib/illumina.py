@@ -9,9 +9,13 @@ import os
 import csv
 import struct
 
-from   glu.lib.utils     import chunk, namedtuple
-from   glu.lib.fileutils import autofile,parse_augmented_filename,guess_format,get_arg
-from   glu.lib.sections  import read_sections
+from   glu.lib.utils         import chunk, namedtuple
+from   glu.lib.fileutils     import autofile,parse_augmented_filename,guess_format,get_arg
+from   glu.lib.sections      import read_sections
+
+from   glu.lib.genolib.locus import Nothing
+
+from   glu.lib.seqlib.strand import norm_snp_seq, complement_base
 
 
 # Credit for a large proportion of the reverse-engineering in this module
@@ -357,6 +361,172 @@ class IlluminaManifest(object):
 
   def __iter__(self):
     return self.manifest_data
+
+
+def find_index(header,headings,optional=False):
+  for h in headings:
+    try:
+      return header.index(h)
+    except ValueError:
+      pass
+
+  if not optional:
+    raise ValueError('Cannot find heading index')
+
+
+def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
+  '''
+  Parse an Illumina manifest to obtain mappings from A/B probes to alleles
+  relative to a specified genomic strand.
+  '''
+  if errorhandler is None:
+    def errorhandler(msg):
+      raise ValueError(msg)
+
+  indelmap     = {'D':'-','I':'+'}
+  strandmap    = {Nothing:Nothing,'+':'-','-':'+'}
+  NA           = ('N','A')
+  cnv          = ('-','+')
+  targetstrand = targetstrand.lower()
+
+  assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
+
+  manifest    = iter(manifest)
+  header      = manifest.next()
+  assayid_idx = find_index(header,['IlmnID','Ilmn ID'])
+  name_idx    = find_index(header,['Name'])
+  alleles_idx = find_index(header,['SNP'])
+  chr_idx     = find_index(header,['Chr'])
+  loc_idx     = find_index(header,['MapInfo'])
+  cstrand_idx = find_index(header,['CustomerStrand','SourceStrand'])
+  dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
+  topseq_idx  = find_index(header,['TopGenomicSeq'])
+  probea_idx  = find_index(header,['AlleleA_ProbeSeq'],optional=True)
+  probeb_idx  = find_index(header,['AlleleB_ProbeSeq'],optional=True)
+
+  for assay in manifest:
+    lname   = assay[name_idx]
+    alleles = assay[alleles_idx]
+    chr     = assay[chr_idx] or None
+    loc     = assay[loc_idx]
+    cstrand = assay[cstrand_idx].lower()
+    dstrand = assay[dstrand_idx].lower()
+    topseq  = assay[topseq_idx]
+    gstrand = assay[assayid_idx].split('_')[-2]
+
+    if chr.startswith('chr'):
+      chr = chr[3:]
+    if chr=='Mt':
+      chr='M'
+
+    if cstrand not in ('top','bot','p','m'):
+      errorhandler('Invalid customer strand %s for %s' % (cstrand,lname))
+      continue
+
+    if dstrand not in ('top','bot','p','m'):
+      errorhandler('Invalid design strand %s for %s' % (dstrand,lname))
+      continue
+
+    if gstrand not in 'FRU':
+      errorhandler('Unknown gstrand %s for %s' % (gstrand,lname))
+      continue
+
+    if len(alleles) != 5 or (alleles[0],alleles[2],alleles[4]) != ('[','/',']'):
+      errorhandler('Invalid SNP alleles %s for %s' % (alleles,lname))
+      continue
+
+    a,b = alleles[1],alleles[3]
+
+    if loc:
+      loc = int(loc)
+
+    # Handle CNV probes, which can simply be skipped
+    if (a,b) == NA:
+      yield lname,chr,loc,Nothing,cnv
+      continue
+
+    # Handle indels, which are strand neutral
+    elif cstrand in 'pm' and dstrand in 'pm':
+      a = indelmap[a]
+      b = indelmap[b]
+      yield lname,chr,loc,None,(a,b)
+      continue
+
+    # Otherwise, we have a SNP with A and B alleles on the design strand
+    elif None not in (probea_idx,probeb_idx):
+      probea = assay[probea_idx]
+      probeb = assay[probeb_idx]
+      if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
+        errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
+                         % (a,b,probea[-1],probeb[-1],lname))
+        yield lname,chr,loc,Nothing,None
+        continue
+
+    try:
+      tstrand,aa,bb = norm_snp_seq(topseq)
+      tstrand       = tstrand.lower()
+      if tstrand != 'top':
+        errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % lname)
+        yield lname,chr,loc,Nothing,None
+        continue
+
+    except ValueError:
+      tstrand,aa,bb = dstrand,a,b
+
+    if dstrand!=tstrand:
+      a,b = complement_base(a),complement_base(b)
+
+    # a,b and aa,bb should both be normalized to tstrand and must be equal
+    if (a,b) != (aa,bb):
+      errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,lname))
+      yield lname,chr,loc,Nothing,None
+      continue
+
+    if gstrand != 'U':
+      # Get the strand orientation of the design sequence
+      # Alleles are forward strand if the tstrand matches the design strand
+      # and the design is on the forward strand or the converse of both
+      # conditions is true.
+      forward = (tstrand != dstrand) ^ (gstrand == 'F')
+      strand  = '+' if forward else '-'
+    else:
+      if targetstrand in ('forward','reverse') and gstrand == 'U':
+        raise ValueError("Unknown strand for assay '%s'" % lname)
+      strand = Nothing
+
+    flip =    ((targetstrand == 'customer'     and tstrand != cstrand)
+           or  (targetstrand == 'anticustomer' and tstrand == cstrand)
+           or  (targetstrand == 'design'       and tstrand != dstrand)
+           or  (targetstrand == 'antidesign'   and tstrand == dstrand)
+           or  (targetstrand == 'top'          and tstrand != 'top'  )
+           or  (targetstrand == 'bottom'       and tstrand != 'bot'  )
+           or  (targetstrand == 'forward'      and not forward       )
+           or  (targetstrand == 'reverse'      and     forward       ))
+
+    if flip:
+      a,b = complement_base(a),complement_base(b)
+      strand = strandmap[strand]
+
+    yield lname,chr,loc,strand,(a,b)
+
+
+def create_abmap(manifest,genome):
+  '''
+  Create mapping from A/B probes to final alleles from the oriented manifest
+  entries and updating the genome metadata for each locus.
+  '''
+  abmap = {}
+  for lname,chr,loc,strand,alleles in manifest:
+    genome.merge_locus(lname, chromosome=chr, location=loc, strand=strand)
+    if alleles:
+      abmap[lname] = alleles
+  return abmap
+
+
+def create_Illumina_abmap(filename,genome,targetstrand='customer',errorhandler=None):
+  manifest = IlluminaManifest(filename)
+  manifest = orient_manifest(manifest,targetstrand=targetstrand,errorhandler=errorhandler)
+  return create_abmap(manifest,genome)
 
 
 def read_Illumina_IDAT(filename):
