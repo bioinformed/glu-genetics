@@ -139,13 +139,12 @@ def option_parser():
 
   alignment_filter_options(parser)
 
-  parser.add_option('--minreadlen', dest='minreadlen', metavar='N', type='int', default=85,
-                    help='Minimum read length filter (default=85)')
-
+  parser.add_option('--minreadlen', dest='minreadlen', metavar='N', type='int', default=0,
+                    help='Minimum read length filter')
   parser.add_option('--targets', dest='targets', metavar='BED',
                     help='Single track BED file containing all targeted intervals')
-  parser.add_option('--minoverlap', dest='minoverlap', metavar='N', type='int', default=20,
-                    help='Minimum alignment overlap with any target (default=20)')
+  parser.add_option('--minoverlap', dest='minoverlap', metavar='N', type='int', default=1,
+                    help='Minimum alignment overlap with any target (default=1)')
 
   parser.add_option('--action', dest='action', metavar='X', default='fail',
                     help='Action to perform on failing alignments (drop or fail, default=fail)')
