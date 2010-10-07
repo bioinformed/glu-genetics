@@ -669,19 +669,23 @@ class iter_queue(deque):
 
   def peek(self, i=None):
     '''Return next or i'th value but do not advance this iterator'''
-    if i is not None:
-      # Index is already buffered
-      if i<len(self):
-        value = self[i]
+    try:
+      if i is not None:
+        # Index is already buffered
+        if i<len(self):
+          value = self[i]
 
-      # We must peek further
+        # We must peek further
+        else:
+          for _ in xrange(i+1-len(self)):
+            value = next(self.iterable)
+            self.append(value)
       else:
-        for _ in xrange(len(self),i+1):
-          value = next(self.iterable)
-          self.append(value)
-    else:
-      value = next(self.iterable)
-      self.append(value)
+        value = next(self.iterable)
+        self.append(value)
+
+    except StopIteration:
+      raise ValueError('No more values')
 
     return value
 
