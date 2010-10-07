@@ -63,6 +63,9 @@ def option_parser():
 
   bingroup = optparse.OptionGroup(parser, 'LD threshold options')
 
+  bingroup.add_option('--indirect', dest='indirect', action='store_true',
+                          help='Allow only indirect surrogates')
+
   bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
                           action='callback', callback=check_option01,
                           help='Minimum d-prime threshold to output (default=0)')
@@ -102,9 +105,14 @@ def main():
   haystack = set(list_reader(args[1]))-exclude
   indirect = haystack-needle
 
+  if options.indirect:
+    haystack = indirect
+
+  include  = needle|haystack
+
   # ldsubset=needle
   args = [ (options,arg) for arg in args[2:] ]
-  ldpairs = generate_ldpairs(args, {}, set(), None, needle, options)
+  ldpairs = generate_ldpairs(args, {}, include, None, needle, options)
 
   missing = '',0
   best_surrogate = {}
