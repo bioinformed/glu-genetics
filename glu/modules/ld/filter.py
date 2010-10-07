@@ -84,6 +84,7 @@ def main():
   takenset    = set()
   skippedld   = 0
   skippedt    = 0
+  missingdata = 0
   genos       = dict(genos)
 
   for i,row in enumerate(rows):
@@ -92,6 +93,12 @@ def main():
     if locus in takenset:
       skippedt += 1
       out.writerow(row+[i+1,'','SKIP','ALREADY_TAKEN',''])
+      continue
+
+    if locus not in genos:
+      takenset.add(locus)
+      missingdata += 1
+      out.writerow(row+[i+1,'','TAKE','SNP NOT IN REFERENCE DATA',''])
       continue
 
     geno  = genos[locus]
@@ -128,9 +135,11 @@ def main():
       out.writerow(row+[i+1,'','SKIP','Above LD threshold',
                                'First: %s r2=%.2f, Others: %d' % (firstloc,firstr2,(len(snpld)-1))])
 
-  print >> sys.stderr, 'Skip Taken:',skippedt
-  print >> sys.stderr, 'Skip LD:   ',skippedld
-  print >> sys.stderr, 'Taken:     ',len(taken)
+  print >> sys.stderr, 'Skip Taken    :',skippedt
+  print >> sys.stderr, 'Skip LD       :',skippedld
+  print >> sys.stderr, 'Taken         :',len(takenset)
+  print >> sys.stderr, '  Has ref data:',len(taken)
+  print >> sys.stderr, '  No ref data :',missingdata
 
 
 if __name__ == '__main__':
