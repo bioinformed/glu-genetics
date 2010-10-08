@@ -154,6 +154,10 @@ def main():
     if rename is not None:
       sample = rename.get(sample,sample)
 
+    if not sample:
+      sys.stderr.write('Invalid null sample name... skipping.\n')
+      continue
+
     out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix), hyphen=sys.stdout)
     out.writerow( ('Name','Chr','Position','Log.R.Ratio','B.Allele.Freq','GType') )
 

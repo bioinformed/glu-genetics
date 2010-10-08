@@ -159,43 +159,52 @@ def main():
   exclude      = transform.samples.exclude
   rename       = transform.samples.rename
 
-  s = 0
+  # Resize storage to accommodate num_samples
+  def resize(num_samples):
+    d = (num_samples,num_snps)
+    samples.resize( (num_samples,) )
+    geno.resize(d)
+    x.resize(d)
+    gc.resize(d)
+    y.resize(d)
+    x_raw.resize(d)
+    y_raw.resize(d)
+    baf.resize(d)
+    lrr.resize(d)
+
+  # Save currently buffered samples
+  def save_chunk(start):
+    n    = len(id_chunk)
+    stop = start + n
+
+    if num_samples is None:
+      resize(stop)
+
+    samples[start:stop] = id_chunk[:n]
+    gc[start:stop]      = gc_chunk[:n]
+    geno[start:stop]    = geno_chunk[:n]
+    x[start:stop]       = x_chunk[:n]
+    y[start:stop]       = y_chunk[:n]
+    x_raw[start:stop]   = x_raw_chunk[:n]
+    y_raw[start:stop]   = y_raw_chunk[:n]
+    baf[start:stop]     = baf_chunk[:n]
+    lrr[start:stop]     = lrr_chunk[:n]
+
+  saved = 0
   for sample_id,data in indata:
-    j = len(id_chunk)
+    j = len(id_chunk) % sample_chunk
 
-    if j==sample_chunk:
-      i = s+sample_chunk
-
+    if id_chunk and j==0
       print 'Saving chunk',
       t = time.time()
-      if num_samples is None:
-        d = (i,num_snps)
-        samples.resize( (i,) )
-        geno.resize(d)
-        x.resize(d)
-        gc.resize(d)
-        y.resize(d)
-        x_raw.resize(d)
-        y_raw.resize(d)
-        baf.resize(d)
-        lrr.resize(d)
 
-      samples[s:i] = id_chunk
-      geno[s:i]    = geno_chunk
-      gc[s:i]      = gc_chunk
-      x[s:i]       = x_chunk
-      y[s:i]       = y_chunk
-      x_raw[s:i]   = x_raw_chunk
-      y_raw[s:i]   = y_raw_chunk
-      baf[s:i]     = baf_chunk
-      lrr[s:i]     = lrr_chunk
-
+      save_chunk(saved)
+      saved   += sample_chunk
       id_chunk = []
-      s = i
 
       print ': %.2fs' % (time.time()-t)
 
-    print 'Processing sample %d: %s' % (s+j+1,sample_id),
+    print 'Processing sample %d: %s' % (saved+j+1,sample_id),
     t = time.time()
 
     if include is not None and sample_id not in include:
@@ -215,7 +224,7 @@ def main():
     assert len(data)==num_snps
 
     snp_names = map(itemgetter(snp_idx),data)
-    if not s and not id_chunk:
+    if not saved and not id_chunk:
       snps[:] = snps1 = snp_names
     else:
       assert snps1==snp_names
@@ -231,8 +240,6 @@ def main():
     y_chunk[j]     = np.fromiter(imap(itemgetter(y_idx),    data), count=num_snps, dtype=np.float32)*1000
     x_raw_chunk[j] = np.fromiter(imap(itemgetter(x_raw_idx),data), count=num_snps, dtype=np.int16  )
     y_raw_chunk[j] = np.fromiter(imap(itemgetter(y_raw_idx),data), count=num_snps, dtype=np.int16  )
-    #baf_chunk[j]   = np.fromiter(imap(itemgetter(baf_idx),  data), count=num_snps, dtype=np.float32)*10000
-    #lrr_chunk[j]   = np.fromiter(imap(itemgetter(lrr_idx),  data), count=num_snps, dtype=np.float32)*10000
     baf_chunk[j]   = np.fromiter( (d[baf_idx] or '0' for d in data),  count=num_snps, dtype=np.float32)*10000
     lrr_chunk[j]   = np.fromiter( (d[lrr_idx] or '0' for d in data),  count=num_snps, dtype=np.float32)*10000
     print ', recode=%.2fs' % (time.time()-t1)
@@ -240,32 +247,14 @@ def main():
   if id_chunk:
     print 'Saving final chunk',
     t  = time.time()
-    n  = len(id_chunk)
-    i  = s+n
 
-    if num_samples is None:
-      d = (i,num_snps)
-      samples.resize( (i,) )
-      geno.resize(d)
-      gc.resize(d)
-      x.resize(d)
-      y.resize(d)
-      x_raw.resize(d)
-      y_raw.resize(d)
-      baf.resize(d)
-      lrr.resize(d)
-
-    samples[s:i]    = id_chunk[:n]
-    gc[s:i]         = gc_chunk[:n]
-    geno[s:i]       = geno_chunk[:n]
-    x[s:i]          = x_chunk[:n]
-    y[s:i]          = y_chunk[:n]
-    x_raw[s:i]      = x_raw_chunk[:n]
-    y_raw[s:i]      = y_raw_chunk[:n]
-    baf[s:i]        = baf_chunk[:n]
-    lrr[s:i]        = lrr_chunk[:n]
+    save_chunk(saved)
+    saved += len(id_chunk)
 
     print ': %.2fs' % (time.time()-t)
+
+  # Ensure no extra space has been allocated
+  resize(saved)
 
   out.close()
   infile.close()
