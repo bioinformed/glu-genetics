@@ -9,10 +9,11 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
+import os
 import sys
 import csv
 
-from   itertools                 import imap, islice, groupby, chain, izip
+from   itertools                 import imap, groupby, chain, izip
 from   operator                  import itemgetter
 
 import h5py
@@ -88,9 +89,6 @@ def read_gfr(filename):
   def data():
     sample_idx,snp_idx,gc_idx,a1_idx,a2_idx,x_idx,y_idx,x_raw_idx,y_raw_idx,baf_idx,lrr_idx = indices
 
-    alleles  = 'ACGTBID-'
-    geno_map = dict( ((a1,a2), (a1+a2).replace('-',' ').replace('I','+').replace('D','-')) for a1 in alleles for a2 in alleles )
-
     samples_seen = set()
     for sample_id,data in groupby(indata,itemgetter(sample_idx)):
       data = list(data)
@@ -158,6 +156,15 @@ def create_gdat(filename, num_snps, num_samples=None):
   gdat.create_dataset('LRR',       mdims, np.int16,
                                    maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
   return gdat
+
+
+def fix_allele(a):
+  if a=='+':
+    return 'I'
+  elif a=='-':
+    return 'D'
+  else:
+    return a
 
 
 def gdat_writer(gdat, gfr_data, genome, abmap, transform):
@@ -257,7 +264,8 @@ def gdat_writer(gdat, gfr_data, genome, abmap, transform):
 
         gmap = mapcache.get(ab)
         if gmap is None:
-          a,b = ab
+          a = fix_allele(ab[0])
+          b = fix_allele(ab[1])
           gmap = mapcache[ab] = { (a,a):'AA', (a,b):'AB', (b,a):'AB', (b,b):'BB', ('-','-'):'  ' }
         genomap.append(gmap)
 
@@ -330,6 +338,15 @@ def main():
 
   #gfr_data  = progress_bar(gfr_data,num_samples)
   gdat_writer(gdat, gfr_data, genome, abmap, transform)
+
+  attrs = gdat.attrs
+  attrs['GLU_FORMAT']   = 'gdat'
+  attrs['GLU_VERSION']  = 1
+  attrs['ManifestPath'] = args[0]
+  attrs['SourceFile']   = args[1]
+  attrs['ManifestName'] = manifest or os.path.basename(args[0])
+  attrs['SNPCount']     = len(gdat['SNPs'])
+  attrs['SampleCount']  = len(gdat['Genotype'])
 
   gdat.close()
 
