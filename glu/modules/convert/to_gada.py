@@ -16,11 +16,8 @@ from   itertools                 import izip
 
 import h5py
 
-from   glu.lib.illumina          import create_Illumina_abmap
-
 from   glu.lib.fileutils         import table_writer
 
-from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.transform import GenoTransform
 
 
@@ -58,43 +55,7 @@ def option_parser():
                     help='Rename samples from a file containing rows of original name, tab, new name')
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output genotype file name')
-  parser.add_option('-M', '--manifest', dest='manifest', metavar='FILE',
-                    help='Illumina manifest file (BPM or CSV)')
-  parser.add_option('-w', '--warnings', action='store_true', dest='warnings',
-                    help='Emit warnings and A/B calls for SNPs with invalid manifest data')
   return parser
-
-
-def create_recode(loci,genome,abmap):
-  empty      = {'DD':'AA', 'ID':'AB', 'DI':'AB', 'II':'BB','  ':'NC'}
-  geno_cache = {}
-  recode     = []
-  locusmap   = genome.loci
-
-  for lname in loci:
-    loc     = locusmap[lname]
-    alleles = abmap.get(lname)
-
-    genomap = geno_cache.get(alleles)
-    if not genomap:
-      if alleles:
-        a,b = alleles
-        aa  = a+a
-        ab  = a+b
-        ba  = b+a
-        bb  = b+b
-        genomap = { aa:'AA', ab:'AB', ba:'AB', bb:'BB', '  ':'NC' }
-        if alleles==('-','+') or alleles==('+','-'):
-          genomap.update(empty)
-
-      else:
-        genomap = empty
-
-      geno_cache[alleles] = genomap
-
-    recode.append( (loc.name,loc.chromosome,loc.location,genomap) )
-
-  return recode
 
 
 def main():
@@ -105,10 +66,6 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
-  if not options.manifest:
-    sys.stderr.write('ERROR: An Illumina manifest file must be specified')
-    sys.exit(2)
-
   if not options.output:
     sys.stderr.write('ERROR: An output filename template must be specified')
     sys.exit(2)
@@ -117,34 +74,21 @@ def main():
 
   transform = GenoTransform.from_object(options)
 
-  genome = Genome()
+  gdat    = h5py.File(args[0],'r')
 
-  errorhandler = None
-  if options.warnings:
-    def errorhandler(msg):
-      sys.stderr.write('WARNING: %s\n' % msg)
+  snps    = gdat['SNPs'][:]
+  samples = gdat['Samples'][:]
+  genos   = gdat['Genotype']
+  lrr     = gdat['LRR']
+  baf     = gdat['BAF']
 
-  sys.stderr.write('Processing Illumina manifest file...')
-  abmap = create_Illumina_abmap(options.manifest,genome,targetstrand='forward',
-                                                        errorhandler=errorhandler)
-  sys.stderr.write('done.\n')
-
-  indata = h5py.File(args[0])
-
-  snps    = indata['SNPs'][:]
-  samples = indata['Samples'][:]
-  genos   = indata['Genotype']
-  lrr     = indata['LRR']
-  baf     = indata['BAF']
-
-  recode  = create_recode(snps,genome,abmap)
   include = transform.samples.include
   exclude = transform.samples.exclude
   rename  = transform.samples.rename
 
-  for i in xrange(len(samples)):
-    sample = samples[i]
+  genomap = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 
+  for i,sample in enumerate(samples):
     if include is not None and sample not in include:
       continue
 
@@ -158,11 +102,11 @@ def main():
       sys.stderr.write('Invalid null sample name... skipping.\n')
       continue
 
-    out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix), hyphen=sys.stdout)
+    out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix))
     out.writerow( ('Name','Chr','Position','Log.R.Ratio','B.Allele.Freq','GType') )
 
-    sample_data = izip(recode,lrr[i]/10000.,baf[i]/10000.,genos[i])
-    for (lname,chrom,location,genomap),l,b,geno in sample_data:
+    sample_data = izip(snps,lrr[i]/10000.,baf[i]/10000.,genos[i])
+    for (lname,chrom,location,alleles_forward),l,b,geno in sample_data:
       out.writerow( (lname,chrom,location,l,b,genomap[geno]) )
 
 
