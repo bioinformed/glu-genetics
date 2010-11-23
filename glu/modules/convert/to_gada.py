@@ -15,10 +15,19 @@ import sys
 from   itertools                 import izip
 
 import h5py
+import numpy as np
 
 from   glu.lib.fileutils         import table_writer
 
 from   glu.lib.genolib.transform import GenoTransform
+
+
+def decode(data, scale, nanval):
+  nans       = data==nanval
+  data       = data.astype(float)
+  data[nans] = np.nan
+  data      /= scale
+  return data
 
 
 def split_fullname(filename):
@@ -74,19 +83,25 @@ def main():
 
   transform = GenoTransform.from_object(options)
 
-  gdat    = h5py.File(args[0],'r')
+  gdat      = h5py.File(args[0],'r')
 
-  snps    = gdat['SNPs'][:]
-  samples = gdat['Samples'][:]
-  genos   = gdat['Genotype']
-  lrr     = gdat['LRR']
-  baf     = gdat['BAF']
+  snps      = gdat['SNPs'][:]
+  samples   = gdat['Samples'][:]
+  genos     = gdat['Genotype']
+  lrr       = gdat['LRR']
+  baf       = gdat['BAF']
 
-  include = transform.samples.include
-  exclude = transform.samples.exclude
-  rename  = transform.samples.rename
+  lrr_scale = lrr.attrs['SCALE']
+  lrr_nan   = lrr.attrs['NAN']
 
-  genomap = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
+  baf_scale = baf.attrs['SCALE']
+  baf_nan   = baf.attrs['NAN']
+
+  include   = transform.samples.include
+  exclude   = transform.samples.exclude
+  rename    = transform.samples.rename
+
+  genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 
   for i,sample in enumerate(samples):
     if include is not None and sample not in include:
@@ -105,7 +120,10 @@ def main():
     out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix))
     out.writerow( ('Name','Chr','Position','Log.R.Ratio','B.Allele.Freq','GType') )
 
-    sample_data = izip(snps,lrr[i]/10000.,baf[i]/10000.,genos[i])
+    sample_lrr = decode(lrr[i], lrr_scale, lrr_nan)
+    sample_baf = decode(baf[i], baf_scale, baf_nan)
+
+    sample_data = izip(snps,sample_lrr,sample_baf,genos[i])
     for (lname,chrom,location,alleles_forward),l,b,geno in sample_data:
       out.writerow( (lname,chrom,location,l,b,genomap[geno]) )
 

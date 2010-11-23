@@ -26,6 +26,34 @@ from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.transform import GenoTransform
 
 
+GENO_TYPE  = 'S2'
+RAW_TYPE   = np.int16
+
+GC_TYPE    = np.int16
+GC_SCALE   = 10000
+GC_NAN     = np.iinfo(GC_TYPE).min
+GC_MIN     = np.iinfo(GC_TYPE).min+1
+GC_MAX     = np.iinfo(GC_TYPE).max
+
+NORM_TYPE  = np.int16
+NORM_SCALE =  1000
+NORM_NAN   = np.iinfo(NORM_TYPE).min
+NORM_MIN   = np.iinfo(NORM_TYPE).min+1
+NORM_MAX   = np.iinfo(NORM_TYPE).max
+
+BAF_TYPE   = np.int16
+BAF_SCALE  =  10000
+BAF_NAN    = np.iinfo(BAF_TYPE).min
+BAF_MIN    = np.iinfo(BAF_TYPE).min+1
+BAF_MAX    = np.iinfo(BAF_TYPE).max
+
+LRR_TYPE   = np.int32
+LRR_SCALE  = 100000
+LRR_NAN    = np.iinfo(LRR_TYPE).min
+LRR_MIN    = np.iinfo(LRR_TYPE).min+1
+LRR_MAX    = np.iinfo(LRR_TYPE).max
+
+
 def progress_bar(samples, sample_count):
   try:
     from glu.lib.progressbar import progress_loop
@@ -106,13 +134,28 @@ def read_gfr(filename):
       samples_seen.add(sample_id)
 
       geno  = imap(itemgetter(a1_idx,a2_idx),data)
-      gc    = np.fromiter(imap(itemgetter(gc_idx),   data),    count=num_snps, dtype=np.float32)*10000
-      x     = np.fromiter(imap(itemgetter(x_idx),    data),    count=num_snps, dtype=np.float32)*1000
-      y     = np.fromiter(imap(itemgetter(y_idx),    data),    count=num_snps, dtype=np.float32)*1000
-      x_raw = np.fromiter(imap(itemgetter(x_raw_idx),data),    count=num_snps, dtype=np.int16  )
-      y_raw = np.fromiter(imap(itemgetter(y_raw_idx),data),    count=num_snps, dtype=np.int16  )
-      baf   = np.fromiter( (d[baf_idx] or '0' for d in data),  count=num_snps, dtype=np.float32)*10000
-      lrr   = np.fromiter( (d[lrr_idx] or '0' for d in data),  count=num_snps, dtype=np.float32)*10000
+      gc    = np.fromiter(imap(itemgetter(gc_idx),   data),    count=num_snps, dtype=np.float)*GC_SCALE
+      x     = np.fromiter(imap(itemgetter(x_idx),    data),    count=num_snps, dtype=np.float)*NORM_SCALE
+      y     = np.fromiter(imap(itemgetter(y_idx),    data),    count=num_snps, dtype=np.float)*NORM_SCALE
+      x_raw = np.fromiter(imap(itemgetter(x_raw_idx),data),    count=num_snps, dtype=RAW_TYPE)
+      y_raw = np.fromiter(imap(itemgetter(y_raw_idx),data),    count=num_snps, dtype=RAW_TYPE)
+      baf   = np.fromiter( (d[baf_idx] or '0' for d in data),  count=num_snps, dtype=np.float)*BAF_SCALE
+      lrr   = np.fromiter( (d[lrr_idx] or '0' for d in data),  count=num_snps, dtype=np.float)*LRR_SCALE
+
+      np.clip(gc, GC_MIN, GC_MAX, out=gc)
+      gc[~np.isfinite(gc)] = GC_NAN
+
+      np.clip(x, NORM_MIN, NORM_MAX, out=x)
+      x[~np.isfinite(x)] = NORM_NAN
+
+      np.clip(y, NORM_MIN, NORM_MAX, out=y)
+      y[~np.isfinite(y)] = NORM_NAN
+
+      np.clip(baf, BAF_MIN, BAF_MAX, out=baf)
+      baf[~np.isfinite(baf)] = BAF_NAN
+
+      np.clip(lrr, LRR_MIN, LRR_MAX, out=lrr)
+      lrr[~np.isfinite(lrr)] = LRR_NAN
 
       yield sample_id,snps,geno,gc,x,y,x_raw,y_raw,baf,lrr
 
@@ -137,24 +180,51 @@ def create_gdat(filename, num_snps, num_samples=None):
   vstr         = h5py.special_dtype(vlen=str)
   snptype      = [ ('name',vstr),('chromosome',vstr),('location',np.uint32), ('alleles_forward','S2') ]
 
-  gdat.create_dataset('SNPs',      (num_snps,), snptype,                 **comp)
-  gdat.create_dataset('Samples',   (n,),        vstr, maxshape=(None,),  **comp)
-  gdat.create_dataset('Genotype',  mdims, 'S2',
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('GC',        mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('X',         mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('Y',         mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('X_raw',     mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('Y_raw',     mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('BAF',       mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
-  gdat.create_dataset('LRR',       mdims, np.int16,
-                                   maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  snps    = gdat.create_dataset('SNPs',      (num_snps,), snptype,                 **comp)
+  samples = gdat.create_dataset('Samples',   (n,),        vstr, maxshape=(None,),  **comp)
+  genos   = gdat.create_dataset('Genotype',  mdims, GENO_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+
+  gc      = gdat.create_dataset('GC',        mdims, GC_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  gc.attrs['SCALE'] = GC_SCALE
+  gc.attrs['NAN']   = GC_NAN
+  gc.attrs['MIN']   = GC_MIN
+  gc.attrs['MAX']   = GC_MAX
+
+  x       = gdat.create_dataset('X',         mdims, NORM_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  x.attrs['SCALE'] = NORM_SCALE
+  x.attrs['NAN']   = NORM_NAN
+  x.attrs['MIN']   = NORM_MIN
+  x.attrs['MAX']   = NORM_MAX
+
+  y       = gdat.create_dataset('Y',         mdims, NORM_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  y.attrs['SCALE'] = NORM_SCALE
+  y.attrs['NAN']   = NORM_NAN
+  y.attrs['MIN']   = NORM_MIN
+  y.attrs['MAX']   = NORM_MAX
+
+  x_raw   = gdat.create_dataset('X_raw',     mdims, RAW_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  y_raw   = gdat.create_dataset('Y_raw',     mdims, RAW_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+
+  baf     = gdat.create_dataset('BAF',       mdims, BAF_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  baf.attrs['SCALE'] = BAF_SCALE
+  baf.attrs['NAN']   = BAF_NAN
+  baf.attrs['MIN']   = BAF_MIN
+  baf.attrs['MAX']   = BAF_MAX
+
+  lrr     = gdat.create_dataset('LRR',       mdims, LRR_TYPE,
+                                maxshape=defshape,chunks=defchunks,shuffle=shuffle,**comp)
+  lrr.attrs['SCALE'] = LRR_SCALE
+  lrr.attrs['NAN']   = LRR_NAN
+  lrr.attrs['MIN']   = LRR_MIN
+  lrr.attrs['MAX']   = LRR_MAX
+
   return gdat
 
 
@@ -184,14 +254,14 @@ def gdat_writer(gdat, gfr_data, genome, abmap, transform):
   num_snps      = len(gdat['SNPs'])
 
   id_chunk      = []
-  geno_chunk    = np.empty( (sample_chunk,num_snps), dtype='S2')
-  gc_chunk      = np.empty( (sample_chunk,num_snps), dtype=np.int16)
-  x_chunk       = np.empty( (sample_chunk,num_snps), dtype=np.int16)
-  y_chunk       = np.empty( (sample_chunk,num_snps), dtype=np.int16)
-  x_raw_chunk   = np.empty( (sample_chunk,num_snps), dtype=np.int16)
-  y_raw_chunk   = np.empty( (sample_chunk,num_snps), dtype=np.int16)
-  baf_chunk     = np.empty( (sample_chunk,num_snps), dtype=np.int16)
-  lrr_chunk     = np.empty( (sample_chunk,num_snps), dtype=np.int16)
+  geno_chunk    = np.empty( (sample_chunk,num_snps), dtype=GENO_TYPE)
+  gc_chunk      = np.empty( (sample_chunk,num_snps), dtype=GC_TYPE)
+  x_chunk       = np.empty( (sample_chunk,num_snps), dtype=NORM_TYPE)
+  y_chunk       = np.empty( (sample_chunk,num_snps), dtype=NORM_TYPE)
+  x_raw_chunk   = np.empty( (sample_chunk,num_snps), dtype=RAW_TYPE)
+  y_raw_chunk   = np.empty( (sample_chunk,num_snps), dtype=RAW_TYPE)
+  baf_chunk     = np.empty( (sample_chunk,num_snps), dtype=BAF_TYPE)
+  lrr_chunk     = np.empty( (sample_chunk,num_snps), dtype=LRR_TYPE)
 
   include       = transform.samples.include
   exclude       = transform.samples.exclude
