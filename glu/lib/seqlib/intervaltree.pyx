@@ -330,6 +330,8 @@ cdef class IntervalTree:
     '''
     Return a sorted list of all intervals overlapping [start,end).
     '''
+    if self.root is None:
+      return []
     return self.root.intersect(start, end)
 
   def before(self, position, num_intervals=0, max_dist=0):
@@ -337,6 +339,8 @@ cdef class IntervalTree:
     Find `num_intervals` intervals that lie before `position` and are no
     further than `max_dist` positions aways
     '''
+    if self.root is None:
+      return []
     return self.root.before(position, num_intervals, max_dist)
 
   def after(self, position, num_intervals=0, max_dist=0):
@@ -344,4 +348,6 @@ cdef class IntervalTree:
     Find `num_intervals` intervals that lie after `position` and are no
     further than `max_dist` positions aways
     '''
+    if self.root is None:
+      return []
     return self.root.after(position, num_intervals, max_dist)
