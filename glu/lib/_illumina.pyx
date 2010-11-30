@@ -23,10 +23,9 @@ def readstr(afile):
     4       256 MB
     5        32 GB
 
-  While this seems like a sensible progression, there is still some
-  uncertainty about this interpretation.  It is unknown of this scheme
-  scales beyond two length bytes, since no encoded strings longer than 6,264
-  have been observed in the wild.
+  While this seems like a sensible progression, there is some uncertainty
+  about this interpretation, since the longest of string observed in the
+  wild has been of length 6,264 with two length bytes.
   '''
   cdef char *s
   cdef int n, m

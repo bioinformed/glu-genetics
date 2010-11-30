@@ -6,6 +6,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 import os
+import sys
 import csv
 import struct
 
@@ -77,10 +78,11 @@ def int2bin(n, count=32):
 
 
 try:
-  raise ImportError
   from glu.lib._illumina import readstr
 
 except ImportError:
+  sys.stderr.write('WARNING: Using slow binary string reader.\n')
+
   def readstr(afile):
     '''
     String data are encoded as a sequence of one or more length bytes followed
@@ -101,10 +103,9 @@ except ImportError:
       4       256 MB
       5        32 GB
 
-    While this seems like a sensible progression, there is still some
-    uncertainty about this interpretation.  It is unknown of this scheme
-    scales beyond two length bytes, since no encoded strings longer than
-    6,264 have been observed in the wild.
+    While this seems like a sensible progression, there is some uncertainty
+    about this interpretation, since the longest of string observed in the
+    wild has been of length 6,264 with two length bytes.
     '''
     read = afile.read
     n = m = ord(read(1))
@@ -236,11 +237,13 @@ class IlluminaManifest(object):
       yield header
 
       snp_count  = self.snp_count
+      norm_ids   = self.norm_ids
       unpack4B   = struct.Struct('<4B').unpack
       unpackL    = struct.Struct('<L').unpack
       unpackLL   = struct.Struct('<LL').unpack
       unpack4L   = struct.Struct('<4L').unpack
       unpack3BLB = struct.Struct('<3BLB').unpack
+      unpack4B4L = struct.Struct('<4B4L').unpack
 
       for i in xrange(snp_count):
         record_version,         = unpackL(read(4))
@@ -271,20 +274,17 @@ class IlluminaManifest(object):
         source_version          = intern(readstr(bpm))
         source_strand           = intern(readstr(bpm))
         source_sequence         = readstr(bpm)
-        norm_id                 = self.norm_ids[snpnum-1]
+        norm_id                 = norm_ids[snpnum-1]
 
         if record_version in (7,8):
-          something5,something6,something7,assay_type_id = unpack4B(read(4))
-          something8,something9,something10,something11  = unpack4L(read(16))
+          something5,something6,something7,assay_type_id, \
+          something8,something9,something10,something11     = unpack4B4L(read(20))
         else:
           assay_type_id = 0
 
-        if record_version==8:
-          genomic_strand = intern(readstr(bpm))
-        else:
-          genomic_strand = None
+        genomic_strand = intern(readstr(bpm)) if record_version==8 else None
 
-        self.norm_ids[snpnum-1] = norm_id = norm_id + 100*assay_type_id + 1
+        norm_ids[snpnum-1] = norm_id = norm_id + 100*assay_type_id + 1
 
         yield ManifestRow(ilmnid,name,design_strand,alleles,assay_type_id,norm_id,
                           addressA_id,alleleA_probe_sequence,addressB_id,alleleB_probe_sequence,
@@ -302,7 +302,7 @@ class IlluminaManifest(object):
           print 'something3:',something3
           print 'snpnum:',snpnum
           print 'something4:',something4
-          print 'snp_type:',self.norm_ids[snpnum-1]
+          print 'norm_id:',self.norm_ids[snpnum-1]
           print 'snp_name:',self.snp_names[snpnum-1]
           print 'snp_entry:',self.snp_entries[snpnum-1]
           print 'design_strand:',design_strand
@@ -388,6 +388,8 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   NA           = ('N','A')
   cnv          = ('-','+')
   targetstrand = targetstrand.lower()
+  validstrand  = set(('top','bot','p','plus','m','minus'))
+  plusminus    = set(('p','plus','m','minus'))
 
   assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
 
@@ -419,20 +421,24 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     if chr=='Mt':
       chr='M'
 
-    if cstrand not in ('top','bot','p','m'):
+    if cstrand not in validstrand:
       errorhandler('Invalid customer strand %s for %s' % (cstrand,lname))
+      yield lname,chr,loc,Nothing,None
       continue
 
-    if dstrand not in ('top','bot','p','m'):
+    if dstrand not in validstrand:
       errorhandler('Invalid design strand %s for %s' % (dstrand,lname))
+      yield lname,chr,loc,Nothing,None
       continue
 
     if gstrand not in 'FRU':
       errorhandler('Unknown gstrand %s for %s' % (gstrand,lname))
+      yield lname,chr,loc,Nothing,None
       continue
 
     if len(alleles) != 5 or (alleles[0],alleles[2],alleles[4]) != ('[','/',']'):
       errorhandler('Invalid SNP alleles %s for %s' % (alleles,lname))
+      yield lname,chr,loc,Nothing,None
       continue
 
     a,b = alleles[1],alleles[3]
@@ -440,19 +446,19 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     if loc:
       loc = int(loc)
 
-    # Handle CNV probes, which can simply be skipped
+    # CNV probes can simply be skipped
     if (a,b) == NA:
       yield lname,chr,loc,Nothing,cnv
       continue
 
-    # Handle indels, which are strand neutral
-    elif cstrand in 'pm' and dstrand in 'pm':
+    # Indels are strand neutral
+    elif cstrand in plusminus or dstrand in plusminus:
       a = indelmap[a]
       b = indelmap[b]
       yield lname,chr,loc,None,(a,b)
       continue
 
-    # Otherwise, we have a SNP with A and B alleles on the design strand
+    # SNP with A and B alleles on the design strand
     elif None not in (probea_idx,probeb_idx):
       probea = assay[probea_idx]
       probeb = assay[probeb_idx]
@@ -527,6 +533,33 @@ def create_Illumina_abmap(filename,genome,targetstrand='customer',errorhandler=N
   manifest = IlluminaManifest(filename)
   manifest = orient_manifest(manifest,targetstrand=targetstrand,errorhandler=errorhandler)
   return create_abmap(manifest,genome)
+
+
+def manifest_snps(filename):
+  '''
+  Parse an Illumina manifest to obtain SNPs and locations.
+  '''
+  manifest    = IlluminaManifest(filename)
+  manifest    = iter(manifest)
+  header      = manifest.next()
+  name_idx    = find_index(header,['Name'])
+  chr_idx     = find_index(header,['Chr'])
+  loc_idx     = find_index(header,['MapInfo'])
+
+  for assay in manifest:
+    lname   = assay[name_idx]
+    chr     = assay[chr_idx] or None
+    loc     = assay[loc_idx]
+
+    if chr.startswith('chr'):
+      chr = chr[3:]
+    if chr=='Mt':
+      chr='M'
+
+    if loc:
+      loc = int(loc)
+
+    yield lname,chr,loc
 
 
 def read_Illumina_IDAT(filename):
