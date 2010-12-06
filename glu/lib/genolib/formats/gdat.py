@@ -2,10 +2,9 @@
 
 from __future__ import with_statement
 
-__abstract__  = 'Genotype storage formats based on a Bit-packed binary representation'
-__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__abstract__  = 'GDAT file format read support'
+__copyright__ = 'Copyright (c) 2010. BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
-__revision__  = '$Id: binary.py 894 2009-05-11 18:09:57Z bioinformed $'
 
 __all__ = ['load_gdat']
 
@@ -14,13 +13,13 @@ __genoformats__ = [
   ('load_gdat',                      None,                    None,             'sdat',   None,  'gdat') ]
 
 
-from   itertools                 import izip, count
+from   itertools                 import izip
 from   contextlib                import closing
 
 import h5py
 
 from   glu.lib.utils             import is_str
-from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,compressed_filename,\
+from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,tryfloat,compressed_filename,\
                                         namefile
 from   glu.lib.genolib.locus     import Genome,Locus
 from   glu.lib.genolib.phenos    import Phenome
@@ -99,7 +98,8 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
 
   filename     = parse_augmented_filename(filename,args)
 
-  ignoreloci   = trybool(get_arg(args,['ignoreloci']))
+  ignoreloci   =  trybool(get_arg(args,['ignoreloci']))
+  gcthreshold  = tryfloat(get_arg(args,['gc','gcthreshold']))
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -137,18 +137,38 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
   phenome = Phenome()
   samples = gdat['Samples'][:].tolist()
 
-  def _load():
-    with closing(gdat):
-      # Yield an initial dummy value to ensure that the generator starts,
-      # so that gdat is closed properly when it shuts down
-      yield
+  if not gcthreshold or gcthreshold<=0:
+    def _load():
+      with closing(gdat):
+        # Yield an initial dummy value to ensure that the generator starts,
+        # so that gdat is closed properly when it shuts down
+        yield
 
-      descr = GenotypeArrayDescriptor(models)
+        descr = GenotypeArrayDescriptor(models)
 
-      for i,name,genos in izip(count(),samples,gdat['Genotype']):
-        # FIXME: Can be recoded directly to binary as __:00,AA:01,AB:10,BB:11
-        genos = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
-        yield name,GenotypeArray(descr,genos)
+        for name,genos in izip(samples,gdat['Genotype']):
+          # FIXME: Can be recoded directly to binary as __:00,AA:01,AB:10,BB:11
+          genos = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
+          yield name,GenotypeArray(descr,genos)
+  else:
+    def _load():
+      gc_scale = gdat['GC'].attrs['SCALE']
+      gc_nan   = gdat['GC'].attrs['NAN']
+
+      with closing(gdat):
+        # Yield an initial dummy value to ensure that the generator starts,
+        # so that gdat is closed properly when it shuts down
+        yield
+
+        descr = GenotypeArrayDescriptor(models)
+
+        for name,genos,gc in izip(samples,gdat['Genotype'],gdat['GC']):
+          mask        = gc==gc_nan
+          mask       |= gc<=(gcthreshold*gc_scale)
+          genos[mask] = '  '
+          # FIXME: Can be recoded directly to binary as __:00,AA:01,AB:10,BB:11
+          genos       = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
+          yield name,GenotypeArray(descr,genos)
 
   # Create the loader and fire it up by requesting the first dummy element
   _loader = _load()
