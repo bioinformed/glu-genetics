@@ -16,15 +16,61 @@ __genoformats__ = [
 from   itertools                 import izip
 from   contextlib                import closing
 
+import numpy as np
 import h5py
 
 from   glu.lib.utils             import is_str
-from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,tryfloat,compressed_filename,\
-                                        namefile
+from   glu.lib.fileutils         import parse_augmented_filename,get_arg,trybool,tryfloat, \
+                                        compressed_filename,namefile,table_writer
 from   glu.lib.genolib.locus     import Genome,Locus
 from   glu.lib.genolib.phenos    import Phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model
+
+
+class GCSummary(object):
+  def __init__(self, data, loci):
+    self.loci = loci
+    self.data = data
+
+  def __iter__(self):
+    self.locusstats  = []
+    self.samplestats = samplestats = []
+
+    locusstats1 = np.zeros(len(self.loci))
+    locusstats2 = np.zeros(len(self.loci))
+    locuscounts = np.zeros(len(self.loci),dtype=int)
+
+    for sampleid,genos,gcscores in self.data:
+      gc = np.array(gcscores,dtype=float)
+
+      mask = np.isfinite(gc)
+      gc[~mask] = 0
+
+      # Track first two uncentered moments
+      locusstats1 += gc
+      locusstats2 += gc**2
+
+      # Track the number of finite values (in Python, False=0, True=1)
+      locuscounts += mask
+
+      gc = gc[mask]
+      samplestats.append( (sampleid, gc.mean(), gc.std()) )
+
+      yield sampleid,genos,gcscores
+
+    if not samplestats:
+      return
+
+    mu  = locusstats1/locuscounts
+
+    # Compute std.dev from sqrt(E(X**2) - E(X)**2), with compensation for
+    # the inherent numerical problems with the approach
+    var = locusstats2/locuscounts - mu**2
+    var[var < 0] = 0
+    std = var**0.5
+
+    self.locusstats = [ (locus,mui,stdi) for locus,mui,stdi in izip(self.loci,mu,std) ]
 
 
 def load_models(gdat,ignoreloci=False):
@@ -99,7 +145,9 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
   filename     = parse_augmented_filename(filename,args)
 
   ignoreloci   =  trybool(get_arg(args,['ignoreloci']))
-  gcthreshold  = tryfloat(get_arg(args,['gc','gcthreshold']))
+  gcthreshold  = tryfloat(get_arg(args,['gc','gcthreshold'])) or 0
+  samplestats  =          get_arg(args,['samplestats'])
+  locusstats   =          get_arg(args,['locusstats'])
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -110,8 +158,7 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
   if compressed_filename(filename):
     raise ValueError('Binary genotype files must not have a compressed extension')
 
-  gdat = h5py.File(filename,'r')
-
+  gdat         = h5py.File(filename,'r')
   attrs        = gdat.attrs
   format_found = attrs.get('GLU_FORMAT')
   gdat_version = attrs.get('GLU_VERSION')
@@ -131,13 +178,12 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
   if sample_count!=len(gdat['Genotype']):
     raise ValueError('Inconsistant gdat sample metadata. gdat file may be corrupted.')
 
-
   loci,file_genome,models,genomaps = load_models(gdat,ignoreloci)
 
   phenome = Phenome()
   samples = gdat['Samples'][:].tolist()
 
-  if not gcthreshold or gcthreshold<=0:
+  if gcthreshold<=0 and not samplestats and not locusstats:
     def _load():
       with closing(gdat):
         # Yield an initial dummy value to ensure that the generator starts,
@@ -152,23 +198,53 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
           yield name,GenotypeArray(descr,genos)
   else:
     def _load():
-      gc_scale = gdat['GC'].attrs['SCALE']
-      gc_nan   = gdat['GC'].attrs['NAN']
+
+      def genogc_iter():
+        gc_scale = gdat['GC'].attrs['SCALE']
+        gc_nan   = gdat['GC'].attrs['NAN']
+
+        for name,genos,gc in izip(samples,gdat['Genotype'],gdat['GC']):
+          mask     = gc==gc_nan
+          gc       = gc.astype(float)
+          gc      /= gc_scale
+          gc[mask] = np.nan
+
+          yield name,genos,gc
 
       with closing(gdat):
         # Yield an initial dummy value to ensure that the generator starts,
         # so that gdat is closed properly when it shuts down
         yield
 
-        descr = GenotypeArrayDescriptor(models)
+        descr  = GenotypeArrayDescriptor(models)
 
-        for name,genos,gc in izip(samples,gdat['Genotype'],gdat['GC']):
-          mask        = gc==gc_nan
-          mask       |= gc<=(gcthreshold*gc_scale)
-          genos[mask] = '  '
+        genogc = genogc_iter()
+
+        if samplestats or locusstats:
+          summary = genogc = GCSummary(genogc, loci)
+
+        for name,genos,gc in genogc:
+          if gcthreshold>0:
+            mask        = gc<=gcthreshold
+            mask       |= ~np.isfinite(gc)
+            genos[mask] = '  '
+
           # FIXME: Can be recoded directly to binary as __:00,AA:01,AB:10,BB:11
-          genos       = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
+          genos = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
+
           yield name,GenotypeArray(descr,genos)
+
+      if samplestats:
+        out = table_writer(samplestats)
+        out.writerow(['SAMPLE','GC_MEAN','GC_STDDEV'])
+        out.writerows( [ (s,'%.4f' % gc, '%.4f' % dev)
+                          for s,gc,dev in summary.samplestats ] )
+
+      if locusstats:
+        out = table_writer(locusstats)
+        out.writerow(['LOCUS','GC_MEAN','GC_STDDEV'])
+        out.writerows( [ (l,'%.4f' % gc, '%.4f' % dev)
+                          for l,gc,dev in summary.locusstats ] )
 
   # Create the loader and fire it up by requesting the first dummy element
   _loader = _load()
