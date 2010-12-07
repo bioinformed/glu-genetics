@@ -113,6 +113,8 @@ def main():
                                                                                'glu/lib/genolib/_ibs.c',
                                                                                'glu/lib/genolib/_ld.c'],
                                                                     include_dirs = [np.get_include()]),
+                        Extension('glu.lib.genolib.helpers',        sources = ['glu/lib/genolib/helpers.pyx'],
+                                                                    include_dirs = [np.get_include()]),
                         Extension('glu.modules.struct._admix',      sources = ['glu/modules/struct/_admix.c'],
                                                                     include_dirs = [np.get_include()]),
                         Extension('glu.modules.ld.pqueue',          sources = ['glu/modules/ld/pqueue.c']),

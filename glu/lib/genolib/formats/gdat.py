@@ -26,6 +26,7 @@ from   glu.lib.genolib.locus     import Genome,Locus
 from   glu.lib.genolib.phenos    import Phenome
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.genoarray import GenotypeArrayDescriptor,GenotypeArray,build_model
+from   glu.lib.genolib.helpers   import encode_ab_to_snps
 
 
 class GCSummary(object):
@@ -85,22 +86,19 @@ def load_models(gdat,ignoreloci=False):
   genome   = Genome()
   loci     = []
   models   = []
-  genomaps = []
 
   for row in gdat['SNPs'][:].tolist():
     name,chromosome,location,alleles_forward = row[:4]
 
     if alleles_forward in model_cache:
-      model,genomap = model_cache[alleles_forward]
+      model   = model_cache[alleles_forward]
     else:
       model   = build_model(alleles=tuple(alleles_forward),max_alleles=2)
       genos   = model.genotypes
-      genomap = {'  ':genos[0],'AA':genos[1],'AB':genos[2],'BA':genos[2],'BB':genos[3]}
-      model_cache[alleles_forward] = model,genomap
+      model_cache[alleles_forward] = model
 
     loci.append(name)
     models.append(model)
-    genomaps.append(genomap)
 
     if ignoreloci:
       genome.loci[name] = Locus(name, model)
@@ -109,7 +107,7 @@ def load_models(gdat,ignoreloci=False):
         location = None
       genome.loci[name] = Locus(name, model, chromosome, location, '+')
 
-  return loci,genome,models,genomaps
+  return loci,genome,models
 
 
 #######################################################################################
@@ -178,7 +176,7 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
   if sample_count!=len(gdat['Genotype']):
     raise ValueError('Inconsistant gdat sample metadata. gdat file may be corrupted.')
 
-  loci,file_genome,models,genomaps = load_models(gdat,ignoreloci)
+  loci,file_genome,models = load_models(gdat,ignoreloci)
 
   phenome = Phenome()
   samples = gdat['Samples'][:].tolist()
@@ -193,9 +191,11 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
         descr = GenotypeArrayDescriptor(models)
 
         for name,genos in izip(samples,gdat['Genotype']):
-          # FIXME: Can be recoded directly to binary as __:00,AA:01,AB:10,BB:11
-          genos = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
-          yield name,GenotypeArray(descr,genos)
+          # Recode directly to binary as __:00,AA:01,AB:10,BB:11
+          g = GenotypeArray(descr)
+          g.data = encode_ab_to_snps(genos)
+
+          yield name,g
   else:
     def _load():
 
@@ -229,10 +229,11 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
             mask       |= ~np.isfinite(gc)
             genos[mask] = '  '
 
-          # FIXME: Can be recoded directly to binary as __:00,AA:01,AB:10,BB:11
-          genos = [ genomap[g] for g,genomap in izip(genos,genomaps) ]
+          # Recode directly to binary as __:00,AA:01,AB:10,BB:11
+          g = GenotypeArray(descr)
+          g.data = encode_ab_to_snps(genos)
 
-          yield name,GenotypeArray(descr,genos)
+          yield name,g
 
       if samplestats:
         out = table_writer(samplestats)
