@@ -806,12 +806,6 @@ def variable_summary(out, x, categorical_limit=5, verbose=1):
 def print_results(out,locus_model,linear_model,verbose=1):
   import scipy.stats
 
-  b     = linear_model.beta.reshape(-1)
-  stde  = linear_model.W.diagonal()**.5
-  z     = b/stde
-  oddsr = exp(b)
-  p     = 2*scipy.stats.distributions.norm.cdf(-abs(z))
-
   vars = locus_model.vars or linear_model.vars or \
          [ 'Covariate_%02d' % i for i in xrange(linear_model.X.shape[1]) ]
 
@@ -830,6 +824,17 @@ def print_results(out,locus_model,linear_model,verbose=1):
     out.write('  %-12s: ' % name)
     variable_summary(out, x, verbose=verbose)
   out.write('\n')
+
+  if linear_model.beta is None:
+    out.write('Model fit failed\n\n')
+    return
+
+  b     = linear_model.beta.reshape(-1)
+  stde  = linear_model.W.diagonal()**.5
+  z     = b/stde
+  oddsr = exp(b)
+  p     = 2*scipy.stats.distributions.norm.cdf(-abs(z))
+
   out.write('Log likelihood = %f\n' % linear_model.L)
   out.write('\n')
 

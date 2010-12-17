@@ -197,14 +197,16 @@ def main():
 
   # Obtain estimates of covariate effects under the null
   null = GLogit(null_model.y,null_model.X,vars=null_model.vars)
-  null.fit()
+
+  try:
+    null.fit()
+  finally:
+    if options.details:
+      details.write('NULL MODEL:\n\n')
+      print_results(details,null_model,null)
 
   if 0:
     dump_model('null.csv',null_model)
-
-  if options.details:
-    details.write('NULL MODEL:\n\n')
-    print_results(details,null_model,null)
 
   if not genos:
     return
