@@ -3,10 +3,9 @@
 from __future__ import division
 
 __gluindex__  = True
-__abstract__  = 'Convert an Illumina Locus by DNA report file into a GLU genotype file'
-__copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__abstract__  = 'Convert a GDAT file into series of GADA input files'
+__copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
-__revision__  = '$Id$'
 
 
 import os
@@ -28,6 +27,43 @@ def decode(data, scale, nanval):
   data[nans] = np.nan
   data      /= scale
   return data
+
+
+def cnv_data(gdat,transform):
+  include   = transform.samples.include
+  exclude   = transform.samples.exclude
+  rename    = transform.samples.rename
+
+  snps      = gdat['SNPs'][:]
+  samples   = gdat['Samples'][:]
+  genos     = gdat['Genotype']
+  lrr       = gdat['LRR']
+  baf       = gdat['BAF']
+
+  lrr_scale = lrr.attrs['SCALE']
+  lrr_nan   = lrr.attrs['NAN']
+
+  baf_scale = baf.attrs['SCALE']
+  baf_nan   = baf.attrs['NAN']
+
+  for i,sample in enumerate(samples):
+    if include is not None and sample not in include:
+      continue
+
+    if exclude is not None and sample in exclude:
+      continue
+
+    if rename is not None:
+      sample = rename.get(sample,sample)
+
+    if not sample:
+      sys.stderr.write('Invalid null sample name... skipping.\n')
+      continue
+
+    sample_lrr = decode(lrr[i], lrr_scale, lrr_nan)
+    sample_baf = decode(baf[i], baf_scale, baf_nan)
+
+    yield sample,snps,genos[i],sample_lrr,sample_baf
 
 
 def split_fullname(filename):
@@ -84,46 +120,14 @@ def main():
   transform = GenoTransform.from_object(options)
 
   gdat      = h5py.File(args[0],'r')
-
-  snps      = gdat['SNPs'][:]
-  samples   = gdat['Samples'][:]
-  genos     = gdat['Genotype']
-  lrr       = gdat['LRR']
-  baf       = gdat['BAF']
-
-  lrr_scale = lrr.attrs['SCALE']
-  lrr_nan   = lrr.attrs['NAN']
-
-  baf_scale = baf.attrs['SCALE']
-  baf_nan   = baf.attrs['NAN']
-
-  include   = transform.samples.include
-  exclude   = transform.samples.exclude
-  rename    = transform.samples.rename
-
+  data      = cnv_data(gdat,transform)
   genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 
-  for i,sample in enumerate(samples):
-    if include is not None and sample not in include:
-      continue
-
-    if exclude is not None and sample in exclude:
-      continue
-
-    if rename is not None:
-      sample = rename.get(sample,sample)
-
-    if not sample:
-      sys.stderr.write('Invalid null sample name... skipping.\n')
-      continue
-
+  for sample,snps,geno,lrr,baf in data:
     out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix))
     out.writerow( ('Name','Chr','Position','Log.R.Ratio','B.Allele.Freq','GType') )
 
-    sample_lrr = decode(lrr[i], lrr_scale, lrr_nan)
-    sample_baf = decode(baf[i], baf_scale, baf_nan)
-
-    sample_data = izip(snps,sample_lrr,sample_baf,genos[i])
+    sample_data = izip(snps,lrr,baf,geno)
     for (lname,chrom,location,alleles_forward),l,b,geno in sample_data:
       out.writerow( (lname,chrom,location,l,b,genomap[geno]) )
 
