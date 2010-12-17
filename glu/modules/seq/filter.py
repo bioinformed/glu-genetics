@@ -19,6 +19,7 @@ from   itertools             import groupby
 import pysam
 
 from   glu.lib.utils         import consume
+from   glu.lib.fileutils     import autofile, hyphen
 
 from   glu.lib.seqlib.bed    import read_features
 from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
@@ -27,9 +28,11 @@ from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 PASS,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
 
 
-def depth_filter(aligns,options):
+def simple_filter(aligns,options):
   for align in aligns:
-    if align.rlen<options.minreadlen:
+    if align.rname<0:
+      yield UNALIGNED,align
+    elif align.rlen<options.minreadlen:
       yield TOOSHORT,align
     else:
       yield PASS,align
@@ -88,16 +91,17 @@ def target_filter(allaligns,references,targets,options):
 
 class FilterStats(object):
   def __init__(self):
-    self.stats = [0]*4
+    self.reads = [0]*4
+    self.bases = [0]*4
 
   def __call__(self, aligns):
-    stats = self.stats
+    reads = self.reads
+    bases = self.bases
     for status,align in aligns:
-      stats[status] += 1
-      yield status,align
+      reads[status] += 1
+      bases[status] += align.rlen
 
-  def __getitem__(self, i):
-    return self.stats[i]
+      yield status,align
 
 
 def action_fail(aligns):
@@ -151,6 +155,8 @@ def option_parser():
 
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output BAM file')
+  parser.add_option('-O', '--sumout', dest='sumout', metavar='FILE', default='-',
+                    help='Summary output file')
 
   return parser
 
@@ -177,7 +183,7 @@ def main():
     targets = read_features(options.targets)
     aligns  = target_filter(aligns,inbam.references,targets,options)
   else:
-    aligns  = depth_filter(aligns,options)
+    aligns  = simple_filter(aligns,options)
 
   stats  = FilterStats()
   aligns = stats(aligns)
@@ -203,18 +209,27 @@ def main():
   finally:
     inbam.close()
 
-  total = sum(stats)
+  bases = stats.bases
+  reads = stats.reads
+
+  total_reads = sum(reads)
+  total_bases = sum(bases)
+
+  sumout = autofile(hyphen(options.sumout, sys.stdout),'w')
 
   if complete:
-    print 'Alignment summary:'
+    sumout.write('Alignment summary:\n')
   else:
-    print 'Partial alignment summary (execution interrupted):'
+    sumout.write('Partial alignment summary (execution interrupted):\n')
 
-  print '         Pass: %10d (%5.2f%%)' % (stats[PASS],      percent(stats[PASS],      total))
-  print '    Unaligned: %10d (%5.2f%%)' % (stats[UNALIGNED], percent(stats[UNALIGNED], total))
-  print '    Too short: %10d (%5.2f%%)' % (stats[TOOSHORT],  percent(stats[TOOSHORT],  total))
-  print '  Low overlap: %10d (%5.2f%%)' % (stats[LOWOVERLAP],percent(stats[LOWOVERLAP],total))
-  print
+
+  def stat_line(status):
+    return '%10d (%6.2f%%) %15d (%6.2f%%)' % (reads[status], percent(reads[status], total_reads),
+                                              bases[status], percent(bases[status], total_bases))
+
+  sumout.write('           STATUS       READS        %            BASES        %\n')
+  for status,name in enumerate(['Pass','Unaligned','Too short','Low overlap']):
+    sumout.write('  %15s: %s\n' % (name, stat_line(status)))
 
   if not complete:
     raise KeyboardInterrupt
