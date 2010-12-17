@@ -92,7 +92,7 @@ def filter_alignments(alignments, include, exclude):
 
   if unknown_options:
     unknown_options = ', '.join(sorted(unknown_options))
-    raise ValueError('Alignment filter does not recogize the following options: %s' % unknown_options)
+    raise ValueError('Alignment filter does not recognize the following options: %s' % unknown_options)
 
   unsupported_options = (include|exclude)-SUPPORTED_OPTIONS
 

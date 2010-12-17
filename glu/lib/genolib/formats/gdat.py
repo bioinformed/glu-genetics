@@ -171,10 +171,10 @@ def load_gdat(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
     raise ValueError('Unknown gdat file version: %s' % gdat_version)
 
   if snp_count!=len(gdat['SNPs']):
-    raise ValueError('Inconsistant gdat SNP metadata. gdat file may be corrupted.')
+    raise ValueError('Inconsistent gdat SNP metadata. gdat file may be corrupted.')
 
   if sample_count!=len(gdat['Genotype']):
-    raise ValueError('Inconsistant gdat sample metadata. gdat file may be corrupted.')
+    raise ValueError('Inconsistent gdat sample metadata. gdat file may be corrupted.')
 
   loci,file_genome,models = load_models(gdat,ignoreloci)
 

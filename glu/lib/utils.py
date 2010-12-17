@@ -622,7 +622,7 @@ class iter_queue(deque):
 
   '''Iterator object that is also a queue that allows one to look-ahead in
   the stream using the peek() method.  Calling peek() when the iterator is
-  exhaused results in a ValueError exception.
+  exhausted results in a ValueError exception.
 
   Values returned by peek are accessible from the other using a
   deque-interface, from which the iterator inherits.  Each call to peek()

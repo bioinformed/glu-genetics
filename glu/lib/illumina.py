@@ -91,7 +91,7 @@ except ImportError:
     The lower 7 bits of each length byte encodes the bits that comprise the
     length of the following byte string.  When the most significant bit it
     set, then an additional length byte follows with 7 additional high bits to
-    be added to the current length.  The following string lenths are
+    be added to the current length.  The following string lengths are
     accommodated by increasing sequences of length bytes:
 
     length  maximum

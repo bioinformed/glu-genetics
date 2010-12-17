@@ -478,7 +478,7 @@ def levenshtein_sequence(s1, s2, compress=True):
       else:
         edits[i,j]='D'
 
-  # Build and return a mimimal edit sequence using the saved operations
+  # Build and return a minimal edit sequence using the saved operations
   seq = _edit_sequence(s1, s2, edits, offset)
 
   # Compress sequential substitution, deletion, and insertion operations
@@ -776,7 +776,7 @@ def damerau_levenshtein_sequence(s1, s2, compress=True):
       else:
         edits[i,j]='T'
 
-  # Build and return a mimimal edit sequence using the saved operations
+  # Build and return a minimal edit sequence using the saved operations
   seq = _edit_sequence(s1, s2, edits, offset)
 
   # Compress sequential substitution, deletion, and insertion operations
