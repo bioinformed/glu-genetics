@@ -110,7 +110,7 @@ def main():
   elif distance and 'hamming'.startswith(distance):
     distance_metric = hamming_sequence
   else:
-    raise ValueError('Unknown distaance metric: %s' % options.distance)
+    raise ValueError('Unknown distance metric: %s' % options.distance)
 
   location = options.location.lower()
   if location not in ('454','illumina'):
