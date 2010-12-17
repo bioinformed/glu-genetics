@@ -14,7 +14,8 @@ use_setuptools()
 
 
 # minimum versions required
-min_python_version = (2,5)
+min_python_version = (2,6)
+min_cython_version = '1.4'
 min_numpy_version  = '1.0.2'
 min_scipy_version  = '0.5.2'
 min_tables_version = '2.0'
@@ -29,11 +30,8 @@ if sys.version_info < min_python_version:
 
 
 from   setuptools           import find_packages, Extension
-from   numpy.distutils.core import setup as numpy_setup
-
-
-
 import numpy as np
+from   numpy.distutils.core import setup as numpy_setup
 
 
 def get_version():
@@ -70,17 +68,35 @@ def glmnet_config():
   return config.add_extension('_glmnet', sources=['glu/lib/glm/glmnet.pyf','glu/lib/glm/GLMnet.f'])
 
 
-def evil_numpy_monkey_patch():
-  from   numpy.distutils.command import build_src
-  import Cython
-  import Cython.Compiler.Main
-  build_src.Pyrex = Cython
-  build_src.have_pyrex = True
+def cython_modules():
+  try:
+    raise ImportError
+    from Cython.Build import cythonize
+
+    ext = [
+            Extension('glu.lib._illumina',              sources = ['glu/lib/_illumina.pyx']),
+            Extension('glu.lib.genolib.helpers',        sources = ['glu/lib/genolib/helpers.pyx'],
+                                                   include_dirs = [np.get_include()]),
+            Extension('glu.lib.seqlib._cigar',          sources = ['glu/lib/seqlib/_cigar.pyx']),
+            Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.pyx']),
+          ]
+
+    ext = cythonize(ext)
+
+  # Fall back to using pre-generated C files
+  except ImportError:
+    ext = [
+            Extension('glu.lib._illumina',              sources = ['glu/lib/_illumina.c']),
+            Extension('glu.lib.genolib.helpers',        sources = ['glu/lib/genolib/helpers.c'],
+                                                   include_dirs = [np.get_include()]),
+            Extension('glu.lib.seqlib._cigar',          sources = ['glu/lib/seqlib/_cigar.c']),
+            Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.c']),
+          ]
+
+  return ext
 
 
 def main():
-  evil_numpy_monkey_patch()
-
   numpy_setup(name       = 'glu',
         version          = get_version(),
         author           = 'Kevin Jacobs',
@@ -106,22 +122,17 @@ def main():
         zip_safe         = False,
         test_suite       = 'nose.collector',
         ext_modules = [
-                        Extension('glu.lib._illumina',              sources = ['glu/lib/_illumina.pyx']),
                         Extension('glu.lib.genolib.bitarrayc',      sources = ['glu/lib/genolib/bitarrayc.c']),
                         Extension('glu.lib.genolib._genoarray',     sources = ['glu/lib/genolib/_genoarray.c',
                                                                                'glu/lib/genolib/bitarrayc.c',
                                                                                'glu/lib/genolib/_ibs.c',
                                                                                'glu/lib/genolib/_ld.c'],
-                                                                    include_dirs = [np.get_include()]),
-                        Extension('glu.lib.genolib.helpers',        sources = ['glu/lib/genolib/helpers.pyx'],
-                                                                    include_dirs = [np.get_include()]),
+                                                               include_dirs = [np.get_include()]),
                         Extension('glu.modules.struct._admix',      sources = ['glu/modules/struct/_admix.c'],
-                                                                    include_dirs = [np.get_include()]),
+                                                               include_dirs = [np.get_include()]),
                         Extension('glu.modules.ld.pqueue',          sources = ['glu/modules/ld/pqueue.c']),
-                        Extension('glu.lib.seqlib._cigar',          sources = ['glu/lib/seqlib/_cigar.pyx']),
-                        Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.pyx']),
                         glmnet_config(),
-                      ])
+                      ] + cython_modules() )
 
 
 if __name__ == '__main__':
