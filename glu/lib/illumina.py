@@ -383,7 +383,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     def errorhandler(msg):
       raise ValueError(msg)
 
-  indelmap     = {'D':'-','I':'+'}
+  indelmap     = {'D':'-','I':'+','A':'A','C':'C','G':'G','T':'T'}
   strandmap    = {Nothing:Nothing,'+':'-','-':'+'}
   NA           = ('N','A')
   cnv          = ('-','+')
@@ -748,6 +748,9 @@ def read_Illumina_LBD(filename,options):
   def sample_generator(sopts):
     import numpy as np
 
+    include = sopts.include
+    exclude = sopts.exclude
+
     for genos,scores in chunk(data,2):
       assert genos[:6] == scores[:6]
       assert  genos[6] == 'calls'
@@ -755,10 +758,10 @@ def read_Illumina_LBD(filename,options):
 
       sampleid = genos[0]
 
-      if sopts.include is not None and sampleid not in sopts.include:
+      if include is not None and sampleid not in include:
         continue
 
-      if sopts.exclude is not None and sampleid     in sopts.exclude:
+      if exclude is not None and sampleid     in exclude:
         continue
 
       genos = np.array(genos[8:],dtype='S1')
