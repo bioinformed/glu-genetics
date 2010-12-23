@@ -14,7 +14,7 @@ from   glu.lib.utils         import chunk, namedtuple
 from   glu.lib.fileutils     import autofile,parse_augmented_filename,guess_format,get_arg
 from   glu.lib.sections      import read_sections
 
-from   glu.lib.genolib.locus import Nothing
+from   glu.lib.genolib.locus import STRAND_UNKNOWN
 
 from   glu.lib.seqlib.strand import norm_snp_seq, complement_base
 
@@ -384,7 +384,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       raise ValueError(msg)
 
   indelmap     = {'D':'-','I':'+','A':'A','C':'C','G':'G','T':'T'}
-  strandmap    = {Nothing:Nothing,'+':'-','-':'+'}
+  strandmap    = {STRAND_UNKNOWN:STRAND_UNKNOWN,'+':'-','-':'+'}
   NA           = ('N','A')
   cnv          = ('-','+')
   targetstrand = targetstrand.lower()
@@ -423,22 +423,22 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
 
     if cstrand not in validstrand:
       errorhandler('Invalid customer strand %s for %s' % (cstrand,lname))
-      yield lname,chr,loc,Nothing,None
+      yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
     if dstrand not in validstrand:
       errorhandler('Invalid design strand %s for %s' % (dstrand,lname))
-      yield lname,chr,loc,Nothing,None
+      yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
     if gstrand not in 'FRU':
       errorhandler('Unknown gstrand %s for %s' % (gstrand,lname))
-      yield lname,chr,loc,Nothing,None
+      yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
     if len(alleles) != 5 or (alleles[0],alleles[2],alleles[4]) != ('[','/',']'):
       errorhandler('Invalid SNP alleles %s for %s' % (alleles,lname))
-      yield lname,chr,loc,Nothing,None
+      yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
     a,b = alleles[1],alleles[3]
@@ -448,7 +448,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
 
     # CNV probes can simply be skipped
     if (a,b) == NA:
-      yield lname,chr,loc,Nothing,cnv
+      yield lname,chr,loc,STRAND_UNKNOWN,cnv
       continue
 
     # Indels are strand neutral
@@ -465,7 +465,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
         errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
                          % (a,b,probea[-1],probeb[-1],lname))
-        yield lname,chr,loc,Nothing,None
+        yield lname,chr,loc,STRAND_UNKNOWN,None
         continue
 
     try:
@@ -473,7 +473,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       tstrand       = tstrand.lower()
       if tstrand != 'top':
         errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % lname)
-        yield lname,chr,loc,Nothing,None
+        yield lname,chr,loc,STRAND_UNKNOWN,None
         continue
 
     except ValueError:
@@ -485,7 +485,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     # a,b and aa,bb should both be normalized to tstrand and must be equal
     if (a,b) != (aa,bb):
       errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,lname))
-      yield lname,chr,loc,Nothing,None
+      yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
     if gstrand != 'U':
@@ -498,7 +498,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     else:
       if targetstrand in ('forward','reverse') and gstrand == 'U':
         raise ValueError("Unknown strand for assay '%s'" % lname)
-      strand = Nothing
+      strand = STRAND_UNKNOWN
 
     flip =    ((targetstrand == 'customer'     and tstrand != cstrand)
            or  (targetstrand == 'anticustomer' and tstrand == cstrand)

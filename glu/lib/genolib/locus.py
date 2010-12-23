@@ -138,7 +138,7 @@ class Genome(object):
         else:
           raise ValueError(msg)
 
-    if strand is not STRAND_UNKNOWN:
+    if strand not in (STRAND_UNKNOWN,Nothing):
       if locus.strand is STRAND_UNKNOWN:
         locus.strand = strand
       elif locus.strand != strand:
