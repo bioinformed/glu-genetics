@@ -729,22 +729,6 @@ def read_Illumina_IDAT(filename):
 
 
 def read_Illumina_LBD(filename,options):
-  def parse_gentrain():
-    row = data.next()
-    assert row[1] == 'Gentrain Scores'
-    assert row[2] == ''
-    return map(float,row[3:])
-
-  def parse_loci():
-    row = data.next()
-    assert row[1] == 'locusNames'
-    assert row[2] == ''
-    return row[3:]
-
-  def skiprows(n):
-    for i in xrange(n):
-      data.next()
-
   def sample_generator(sopts):
     import numpy as np
 
@@ -752,9 +736,8 @@ def read_Illumina_LBD(filename,options):
     exclude = sopts.exclude
 
     for genos,scores in chunk(data,2):
-      assert genos[:6] == scores[:6]
-      assert  genos[6] == 'calls'
-      assert scores[6] == 'Score_Call'
+      if genos[:6]!=scores[:6] or genos[6]!='calls' or scores[6]!='Score_Call':
+        raise ValueError('Invalid Locus-by-DNA report found %s' % namefile(filename))
 
       sampleid = genos[0]
 
@@ -774,11 +757,32 @@ def read_Illumina_LBD(filename,options):
 
   data = csv.reader(autofile(filename), dialect='csv')
 
-  skiprows(11)
-  gentrain = parse_gentrain()
-  skiprows(3)
-  loci    = parse_loci()
-  skiprows(5)
+  row = next(data)
+
+  if row != ['OPA','LinkedGentrainFilePath']:
+    raise ValueError('Invalid Locus-by-DNA report found %s' % namefile(filename))
+
+  LBD_HEADER1 = ['oligoPoolId','recordType', 'data']
+  LBD_HEADER2 = ['oligoPoolId','GTS LocusId','data']
+
+  for row in data:
+    if row == LBD_HEADER2:
+      raise ValueError('Invalid Locus-by-DNA report found %s' % namefile(filename))
+    elif row == LBD_HEADER1:
+      break
+
+  for row in data:
+    if row == LBD_HEADER2:
+      break
+    elif row and row[1] == 'Gentrain Scores':
+      gentrain = map(float,row[3:])
+    elif row and row[1] == 'locusNames':
+      loci = row[3:]
+
+  for row in data:
+    if row and row[0] == ['instituteLabel']:
+      break
+
   samples = sample_generator(options.samples)
 
   assert len(gentrain) == len(loci)
