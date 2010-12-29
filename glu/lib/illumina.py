@@ -780,7 +780,7 @@ def read_Illumina_LBD(filename,options):
       loci = row[3:]
 
   for row in data:
-    if row and row[0] == ['instituteLabel']:
+    if row[:1] == ['instituteLabel']:
       break
 
   samples = sample_generator(options.samples)
