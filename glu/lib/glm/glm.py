@@ -1214,7 +1214,7 @@ class GLogit(object):
       w_min = abs(min(e.min() for row in w for e in row))
 
       if w_min < EPS:
-        raise LinAlgError('glogit estimator failed due to extreme ill-conditioning')
+        raise LinAlgError('glogit estimator failed due to extreme ill-conditioning (w_min=%e)' % w_min)
 
       # Compute upper Cholesky factor and inverse weights
       ww = block_cholesky(w,lower=False)
