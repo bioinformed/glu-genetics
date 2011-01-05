@@ -12,13 +12,13 @@ import glob
 import time
 import sqlite3
 
-from   itertools         import chain, islice, imap
-from   collections       import defaultdict, namedtuple
+from   itertools            import chain, islice, imap
+from   collections          import defaultdict, namedtuple
 
-from   glu.lib.utils     import gcdisabled
-from   glu.lib.fileutils import autofile, table_reader, map_reader, list_reader, tryint
-
-from   glu.lib.illumina  import IlluminaManifest
+from   glu.lib.utils        import gcdisabled
+from   glu.lib.fileutils    import autofile, table_reader, map_reader, list_reader, tryint
+from   glu.lib.glu_launcher import format_elapsed_time
+from   glu.lib.illumina     import IlluminaManifest
 
 
 DBSNP     = ['data/snp130.txt.gz', 'data/snp129.txt.gz', 'data/snp128.txt.gz', 'data/snp126.txt.gz']
@@ -46,9 +46,12 @@ def sqlite_magic(con):
   con.execute('PRAGMA default_cache_size=200000;')
 
 
-def batch_write(con,sql,values,chunk=50000):
+def batch_write(con,sql,values,chunk=100000):
   cur = con.cursor()
   sqlite_magic(con)
+  total_rows = 0
+  very_start = time.time()
+
   while 1:
     start = time.time()
     rows = list(islice(values,chunk))
@@ -61,7 +64,15 @@ def batch_write(con,sql,values,chunk=50000):
     con.commit()
     t2 = time.time()
 
-    print 'batch exectute time: %.1f sec, commit time: %.1f sec, rows/s: %.1f' % (t1-start,t2-t2, len(rows)/(t2-start))
+    total_rows   += len(rows)
+    total_time    = format_elapsed_time(t2-very_start)
+    total_rate    = total_rows/(t2-very_start)
+    execute_time  = format_elapsed_time(t1-start)
+    commit_time   = format_elapsed_time(t2-t1)
+    batch_rate    = len(rows)/(t2-start)
+
+    print '[total] time: %s rows/s %.1f; [batch] exectute: %s, commit: %s, rows/s: %.1f' % \
+              (total_time,total_rate,execute_time,commit_time,batch_rate)
 
 
 def get_goldenpath_aliases(con,filename,seen):
@@ -181,7 +192,8 @@ def load_genes(con,genes):
     pass
 
   sql = '''
-  create table GENE (name          TEXT,
+  CREATE TABLE GENE (id            INTEGER PRIMARY KEY,
+                     name          TEXT,
                      symbol        TEXT,
                      geneID        INTEGER,
                      mRNA          TEXT,
@@ -198,13 +210,16 @@ def load_genes(con,genes):
                      exonEnds      TEXT);'''
 
   cur.execute(sql)
-  sql = 'INSERT INTO GENE VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);'
+  sql = 'INSERT INTO GENE VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);'
   batch_write(con,sql,genes)
+
+  sql = 'CREATE UNIQUE INDEX idx_gene_id ON GENE (id)';
+  cur.execute(sql)
 
   sql = 'CREATE INDEX idx_gene_name ON GENE (name)';
   cur.execute(sql)
 
-  sql = 'CREATE INDEX idx_gene_id ON GENE (geneid)';
+  sql = 'CREATE INDEX idx_gene_geneid ON GENE (geneid)';
   cur.execute(sql)
 
   sql = 'CREATE INDEX idx_gene_symbol ON GENE (symbol)';
@@ -216,6 +231,24 @@ def load_genes(con,genes):
   sql = 'SELECT COUNT(*) FROM GENE;'
   cur.execute(sql)
   print 'GENES:',cur.fetchall()[0][0]
+
+  con.commit()
+
+  try:
+    cur.execute('DROP TABLE gene_index;')
+  except:
+    pass
+
+  print 'Creating GENE rtree index:'
+  sql = '''CREATE VIRTUAL TABLE gene_index USING rtree_i32(id,txStart,txEnd);'''
+  cur.execute(sql)
+
+  sql = '''
+  INSERT INTO gene_index(id,txStart,txEnd)
+  SELECT id,txStart,txEnd
+  FROM   gene;
+  '''
+  cur.execute(sql)
 
   con.commit()
 
@@ -296,7 +329,8 @@ def load_snps(con, snps):
   con.commit()
 
   cur.execute('''
-    CREATE TABLE SNP (name       TEXT,
+    CREATE TABLE snp (id         INTEGER PRIMARY KEY,
+                      name       TEXT,
                       chrom      TEXT,
                       start      INTEGER,
                       end        INTEGER,
@@ -307,18 +341,40 @@ def load_snps(con, snps):
                       func       TEXT,
                       weight     INTEGER);''')
 
-  sql = 'INSERT INTO SNP VALUES (?,?,?,?,?,?,?,?,?,?);'
+  sql = 'INSERT INTO snp VALUES (NULL,?,?,?,?,?,?,?,?,?,?);'
   batch_write(con,sql,snps)
 
-  sql = 'CREATE INDEX idx_snp_name ON SNP (name);'
-  cur.execute(sql)
-
-  sql = 'CREATE INDEX idx_snp_loc ON SNP (chrom,start,end);'
-  cur.execute(sql)
-
-  sql = 'SELECT COUNT(*) FROM SNP;'
+  sql = 'SELECT COUNT(*) FROM snp;'
   cur.execute(sql)
   print 'SNPS:',cur.fetchall()[0][0]
+
+  con.commit()
+
+  sql = 'CREATE INDEX idx_snp_name ON snp (name);'
+  print sql
+  cur.execute(sql)
+
+  sql = 'CREATE INDEX idx_snp_loc ON snp (chrom,start,end);'
+  print sql
+  cur.execute(sql)
+
+  con.commit()
+
+  try:
+    cur.execute('DROP TABLE snp_index;')
+  except:
+    pass
+
+  print 'Creating SNP rtree index:'
+  sql = '''CREATE VIRTUAL TABLE snp_index USING rtree_i32(id,start,end);'''
+  cur.execute(sql)
+
+  sql = '''
+  INSERT INTO snp_index(id,start,end)
+  SELECT id,start,end
+  FROM   snp;
+  '''
+  cur.execute(sql)
 
   con.commit()
 
@@ -339,9 +395,14 @@ def get_goldenpath_dbsnp(filename):
     strand    = row.strand
     refAllele = row.refUCSC.replace('-','')
     alleles   = row.observed.replace('-','')
-    vclass    = row.vclass
-    func      = row.func if row.func!='unknown' else ''
-    weight    = row.weight
+    vclass    = intern(row.vclass)
+    func      = intern(row.func if row.func!='unknown' else '')
+    weight    = intern(row.weight)
+
+    if len(refAllele)<20:
+      refAllele = intern(refAllele)
+    if len(alleles)<20:
+      alleles = intern(alleles)
 
     yield name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
 
@@ -468,20 +529,20 @@ def load_cytobands(con,bands):
   con.commit()
 
 
-def main():
-  con = sqlite3.connect('out/genedb_hg18_snp130.db')
+def build_hg18():
+  con = sqlite3.connect('out/genedb_hg18_snp130_rtree.db')
 
   sqlite_magic(con)
 
-  if 0:
+  if 1:
     genes = get_goldenpath_genes('hg18')
     load_genes(con,genes)
 
-  if 0:
+  if 1:
     bands = get_cytobands('hg18/cytoBand.txt.gz')
     load_cytobands(con,bands)
 
-  if 0:
+  if 1:
     seen = set()
     aliases = [ get_goldenpath_aliases(con,'hg18/kgAlias.txt.gz',seen),
                     get_entrez_aliases(con,'entrez/gene_info.gz',seen) ]
@@ -502,5 +563,39 @@ def main():
       load_snps(con,snps)
 
 
+def build_hg19():
+  con = sqlite3.connect('out/genedb_hg19_snp131_rtree.db')
+
+  sqlite_magic(con)
+
+  if 1:
+    genes = get_goldenpath_genes('hg19')
+    load_genes(con,genes)
+
+  if 1:
+    bands = get_cytobands('hg19/cytoBand.txt.gz')
+    load_cytobands(con,bands)
+
+  if 1:
+    seen = set()
+    aliases = [ get_goldenpath_aliases(con,'hg19/kgAlias.txt.gz',seen),
+                    get_entrez_aliases(con,'entrez/gene_info.gz',seen) ]
+    aliases = chain.from_iterable(aliases)
+    aliases = squash_dups2(aliases)
+    load_gene_aliases(con,aliases)
+
+  if 1:
+    streams   = []
+    streams  += [ get_goldenpath_dbsnp('hg19/snp131.txt.gz') ]
+    #streams  += [ get_goldenpath_arrays(a) for a in glob.glob('hg19/snpArray*.txt.gz') ]
+    #streams += [ extract_illumina_snps(IlluminaManifest(m))
+    #               for m in MANIFESTS ]
+
+    with gcdisabled():
+      snps = chain.from_iterable(streams)
+      snps = squash_dups4(snps)
+      load_snps(con,snps)
+
+
 if __name__ == '__main__':
-  main()
+   main2()
