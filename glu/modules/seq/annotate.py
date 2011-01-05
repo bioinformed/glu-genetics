@@ -8,9 +8,8 @@ __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
+import time
 import sys
-
-import sqlite3
 
 from   operator                     import itemgetter
 from   itertools                    import imap,count,izip,groupby
@@ -27,10 +26,12 @@ from   glu.lib.progressbar          import progress_loop
 from   glu.lib.seqlib.edits         import levenshtein_sequence, reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
+from   glu.modules.genedb           import open_genedb
+
 
 #GENE_DB='out/genedb_hg18_snp130.db'
-GENE_DB='/usr/local/share/genedb/genedb_hg18_snp130.db'
-REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg18.fa'
+#GENE_DB='/usr/local/share/genedb/genedb_hg18_snp130.db'
+#REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg18.fa'
 
 
 Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
@@ -161,10 +162,20 @@ def get_snps(con):
 def get_snps_interval(con, chrom, ref_start, ref_end):
   cur = con.cursor()
   #cur.execute('SELECT * FROM SNP WHERE chrom=? AND start<=? AND end>=?;', (chrom, ref_end, ref_start))
-  cur.execute('SELECT * FROM SNP WHERE chrom=? AND start=? AND end=?;', (chrom, ref_start, ref_end))
+  #cur.execute('SELECT * FROM SNP WHERE chrom=? AND start=? AND end=?;', (chrom, ref_start, ref_end))
+
+  t = time.time()
+  cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (ref_start,ref_end))
+  ids = cur.fetchall()
+
+  if not ids:
+    return
+
+  ids = ','.join([ str(i[0]) for i in ids ])
+
+  cur.execute('SELECT * from snp WHERE id IN (%s) AND chrom="%s"' % (ids,chrom))
 
   make  = SNP._make
-
   for row in cur:
     # name chrom start end strand refAllele alleles vclass func weight
     row    = list(row)
@@ -174,22 +185,36 @@ def get_snps_interval(con, chrom, ref_start, ref_end):
     yield make(row)
 
 
+def group_evidence(orig):
+  key_func = itemgetter(0,1,2,3,4,6,7,8,9,10,11)
+  orig.sort(key=key_func)
+  new = []
+  for key,values in groupby(orig, key_func):
+    values = list(values)
+    if len(values)>1:
+      transcripts = ','.join(sorted(set(v[5] for v in values)))
+      values[0][5] = transcripts
+    new.append(values[0])
+
+  return new
+
+
 class VariantAnnotator(object):
   def __init__(self, gene_db, reference_fasta):
-    self.reference   = Fastafile(reference_fasta)
-    self.feature_map = feature_map = defaultdict(IntervalTree)
-    self.con = sqlite3.connect(gene_db)
+    self.reference = Fastafile(reference_fasta)
+    self.con       = open_genedb(gene_db)
 
     trans = get_transcripts(self.con)
     trans = progress_loop(trans, label='Loading transcripts: ', units='transcripts')
 
+    self.feature_map = feature_map = defaultdict(IntervalTree)
     for gene in trans:
       feature_map[gene.chrom].insert(gene.txStart,gene.txEnd,gene)
 
     sys.stderr.write('Loading complete.\n')
 
 
-  def classify(self, chrom, ref_start, ref_end, variant):
+  def classify(self, chrom, ref_start, ref_end, variant, nsonly=False):
     #print chrom,ref_start,ref_end,variant
 
     variant = variant.replace('-','')
@@ -200,6 +225,10 @@ class VariantAnnotator(object):
     evidence = []
     for feature in self.feature_map[chrom].find(ref_start, ref_end):
       evidence.extend( self.classify_feature(feature.value, ref_start, ref_end, ref_nuc, var_nuc) )
+
+    ns = any('NON-SYNONYMOUS' in e[6] for e in evidence)
+    if nsonly and not ns:
+      return []
 
     # If not in a gene, check to see if there are any genes nearby
     if not evidence:
@@ -224,20 +253,8 @@ class VariantAnnotator(object):
     if not evidence:
       evidence.append( [chrom,ref_start,ref_end,'intergenic','','','','',ref_nuc,var_nuc,'',''] )
 
-    key_func = itemgetter(0,1,2,3,4,6,7,8,9,10,11)
-    evidence.sort(key=key_func)
-    new_evidence = []
-    for key,values in groupby(evidence, key_func):
-      values = list(values)
-      if len(values)>1:
-        transcripts = ','.join(sorted(set(v[5] for v in values)))
-        values[0][5] = transcripts
-      new_evidence.append(values[0])
-
-    evidence = new_evidence
-
-    dbsnp = self.get_dbsnp(chrom, ref_start, ref_end, ref_nuc, var_nuc)
-
+    evidence = group_evidence(evidence)
+    dbsnp    = self.get_dbsnp(chrom, ref_start, ref_end, ref_nuc, var_nuc)
     evidence = [ e+dbsnp for e in evidence ]
 
     return evidence
@@ -311,7 +328,7 @@ class VariantAnnotator(object):
     var_nuc = var_nuc.upper()
 
     #print gene.chrom,ref_start,ref_end,ref_nuc,var_nuc
-    assert len(ref_nuc)==(ref_end-ref_start)
+    #assert len(ref_nuc)==(ref_end-ref_start)
 
     if ref_nuc==var_nuc:
       result += ['SYNONYMOUS','FALSE POSITIVE',ref_nuc,var_nuc,'','']
@@ -342,14 +359,14 @@ class VariantAnnotator(object):
     for chrom,start,end,cds_index,exon_num,label in gene_parts:
       if label=='CDS':
         seq = Seq(self.reference.fetch(chrom,start,end))
-        assert len(seq)==(end-start)
+        #assert len(seq)==(end-start)
         ref_cds_seq.append(seq)
         if cds_index<cds.cds_index:
           ref_var_start += len(seq)
         elif cds_index==cds.cds_index:
           ref_var_start += exon_start
 
-    assert ref_nuc==str(ref_cds_seq[cds.cds_index][exon_start:exon_end]).upper()
+    #assert ref_nuc==str(ref_cds_seq[cds.cds_index][exon_start:exon_end]).upper()
 
     if 0:
       print '  CDS  : %d-%d' % (cds.start,cds.end)
@@ -442,12 +459,17 @@ class VariantAnnotator(object):
     var_comp = str(Seq(var_nuc).complement())
     var      = set([var_nuc,var_comp])
 
-    exact   = set()
-    inexact = set()
+    exact    = set()
+    inexact  = set()
 
     for snp in snps:
-      match = (snp.start==ref_start and snp.end==ref_end and snp.refAllele==ref_nuc \
-              and var&snp.alleles)
+      #ref_alleles = set(str(snp.refAllele).split('/'))
+      #var_alleles = set(str(snp.alleles).split('/'))
+      #match = (snp.start==ref_start and snp.end==ref_end and ref_nuc in snp.refAllele \
+      #        and var&alleles)
+      match = False
+      #print snp.name,snp.start,ref_start,snp.end,ref_end,snp.refAllele,ref_nuc,var,alleles,var&alleles,match
+      #print snp.name,snp.start==ref_start,snp.end==ref_end,snp.refAllele,ref_nuc,
 
       if match:
         exact.add(snp.name)
@@ -457,8 +479,34 @@ class VariantAnnotator(object):
     return [ ','.join(sorted(exact)), ','.join(sorted(inexact)) ]
 
 
+def option_parser():
+  import optparse
+
+  usage = 'usage: %prog [options] infile.bam'
+  parser = optparse.OptionParser(usage=usage)
+
+  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+                      help='Genedb genome annotation database name or file')
+  parser.add_option('-r', '--reference',   dest='reference', metavar='NAME',
+                      help='Reference genome sequence (FASTA + FAI files)')
+  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+                    help='Output variant file')
+  return parser
+
+
 def main():
-  vs = VariantAnnotator(GENE_DB, REF_GENOME)
+  parser = option_parser()
+  options,args = parser.parse_args()
+
+  if len(args)!=1:
+    parser.print_help(sys.stderr)
+    sys.exit(2)
+
+  if not options.reference:
+    sys.stderr.write('ERROR: Reference genome sequence required')
+    sys.exit(2)
+
+  vs = VariantAnnotator(options.genedb, options.reference)
 
   if 1:
     print vs.classify('chr1',1110293,1110294,'A')

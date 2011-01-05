@@ -3,16 +3,17 @@ from __future__ import division
 import os
 import sys
 
-from   collections       import defaultdict
-from   itertools         import groupby
-from   operator          import itemgetter
+from   collections              import defaultdict
+from   itertools                import groupby
+from   operator                 import itemgetter
 
 import numpy as np
 import pysam
 
-from   glu.lib.utils     import Counter, namedtuple, iter_queue, unique
-from   glu.lib.fileutils import table_reader, table_writer
+from   glu.lib.utils            import Counter, namedtuple, iter_queue, unique
+from   glu.lib.fileutils        import table_reader, table_writer
 
+from   glu.modules.genedb       import open_genedb
 from   glu.modules.seq.annotate import VariantAnnotator
 
 
@@ -20,34 +21,78 @@ Variant = namedtuple('Variant', 'chrom start end depth ref a1 d1 a2 d2 ratio pAA
 
 
 #REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg18.fa'
-REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg19.fa'
-GENE_DB='/home/jacobske/projects/genedb/out/genedb_hg19_snp131_rtree.db'
+#REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg19.fa'
+#GENE_DB='/home/jacobske/projects/genedb/out/genedb_hg19_snp131_rtree.db'
 
 
-def geno_prob(start,end,loc,ref=None,prior=0.05,min_variant=None,collapse=True):
+def clean_allele(a):
+  return a.replace('<','').replace('>','').replace('-','')
+
+
+def geno_prob(start,end,loc,ref=None,prior=0.05,min_variant=None,collapse=True,alleles=None):
   names,bases,quals = zip(*loc)
 
-  bases = np.array(bases, dtype=object)
-  quals = np.array(quals, dtype=float)
-
-  alleles = Counter(bases).most_common(2)
-
-  if not alleles:
-    return start,end,ref,'',0,'',0,0,0,0,0
-
-  if ref:
+  if not collapse:
+    bases = [ clean_allele(b) for b in bases ]
+  elif ref:
     ref = ref[0]+'<' + '>'.join(ref[1:])
   else:
     ref = '<'
 
-  a1,c1 = alleles[0]
+  #print '  counts =',Counter(bases)
 
-  if len(alleles)==2:
-    a2,c2 = alleles[1]
-  elif a1==ref:
-    a2,c2 = 'N<',0
+  if alleles:
+    if len(alleles)>2:
+      raise ValueError
+
+    alleles = list(alleles)
+
+    if len(alleles)==1 and ref not in alleles:
+      alleles.append(ref)
+
+    if len(alleles)!=2:
+      raise ValueError
+
+    valid_bases = [ b for b in bases if b in alleles ]
   else:
-    a2,c2 = ref,0
+    valid_bases = bases
+    alleles = ref or 'N','N'
+
+  bases = np.array(bases, dtype=object)
+  quals = np.array(quals, dtype=float)
+
+  common_alleles = Counter(valid_bases).most_common(2)
+
+  a1 = a2 = 'N'
+  c1 = c2 = 0
+
+  if not common_alleles and alleles:
+    a1,a2 = alleles
+  else:
+    a1,c1 = common_alleles[0]
+
+    if len(common_alleles)==2:
+      a2,c2 = common_alleles[1]
+    elif a1==alleles[0]:
+      a2,c2 = alleles[1],0
+    else:
+      a2,c2 = alleles[0],0
+
+  c = c1+c2
+
+  if not c:
+    return start,end,ref,a1,c1,a2,c2,0,0.,0.,0.
+
+  if not c2 and a1==ref:
+    return start,end,ref,a1,c1,a2,c2,0,1.,0.,0.
+
+  ca1  = clean_allele(a1)  or '-'
+  ca2  = clean_allele(a2)  or '-'
+  cref = clean_allele(ref) or '-'
+
+  if ca2==cref or (ca1!=cref and (len(ca1),ca1)>(len(ca2),ca2)):
+    a1,a2 = a2,a1
+    c1,c2 = c2,c1
 
   m1 = bases==a1
   m2 = bases==a2
@@ -74,17 +119,9 @@ def geno_prob(start,end,loc,ref=None,prior=0.05,min_variant=None,collapse=True):
 
     #print '  after collapse:',start,end,ref,a1,a2
 
-    a1  =  a1.replace('<','').replace('>','') or '-'
-    a2  =  a2.replace('<','').replace('>','') or '-'
-    ref = ref.replace('<','').replace('>','') or '-'
-
-  if a2==ref:
-    a1,a2 = a2,a1
-    c1,c2 = c2,c1
-    m1,m2 = m2,m1
-  elif a1!=ref and c1==c2 and (len(a1),a1)>(len(a2),a2):
-    a1,c1 = a2,c2
-    m1,m2 = m2,m1
+  a1  = clean_allele(a1)  or '-'
+  a2  = clean_allele(a2)  or '-'
+  ref = clean_allele(ref) or '-'
 
   ratio = c2/(c1+c2)*100.
 
@@ -134,8 +171,18 @@ def parse_locations(filename):
         chrom,start,end,depth,ref_nuc,a1,c1,a2,c2 = row[:9]
         start = int(start)
         end   = int(end)
-        c1    = int(c1)
-        c2    = int(c2)
+        yield chrom,start,end,a1,a2
+      except ValueError:
+        pass
+
+
+def parse_locations(filename):
+  for row in table_reader(filename,want_header=False):
+    if len(row)>=5:
+      try:
+        chrom,start,end,a1,a2 = row[:5]
+        start = int(start)-1
+        end   = int(end)
         yield chrom,start,end,a1,a2
       except ValueError:
         pass
@@ -199,15 +246,17 @@ def strip_one(pileup):
     if bases:
       seen.add(bases)
 
-  if not seen:
-    return []
+  #if not seen:
+  #  return []
 
   return stripped
 
 
-def extend_variant(pos, loc, ref_seq, pileup, exclude_start=False):
+def extend_variant(pos, loc, ref_seq, pileup, exclude_start=False, fixed_end=None):
   start = pos
   end   = pos
+
+  #print '  extending from pos=%d to %d' % (pos, fixed_end)
 
   if not exclude_start:
     end += 1
@@ -227,12 +276,18 @@ def extend_variant(pos, loc, ref_seq, pileup, exclude_start=False):
   loc = new_loc
 
   # Do not extend if only reference bases are present
-  if len(prefix)==1 and next(iter(prefix))==ref_seq[pos]:
+  if fixed_end is None and len(prefix)==1 and next(iter(prefix))==ref_seq[pos]:
     return loc,end
 
   groups = prefix.values()
 
   while 1:
+    #print '  Extend loop'
+
+    if fixed_end is not None and end>=fixed_end:
+      #print '  exiting due to fixed end (%d>%d)' % (end,fixed_end)
+      break
+
     try:
       next_chrom,next_pos,next_depth,next_loc = pileup.peek(0)
       #print '  peeking at pile up data at',next_pos
@@ -242,22 +297,24 @@ def extend_variant(pos, loc, ref_seq, pileup, exclude_start=False):
       break
 
     if next_pos!=pos+1:
-      #print '  missing extention point at',next_pos
+      #print '  missing extension point at',next_pos
       break
 
     next_loc = dict( (l[0],l) for l in next_loc )
-    nucs = []
-    for group in groups:
-      n = set( next_loc[name][1] for name in group if name in next_loc )
-      if len(n) != 1:
-        #print '  variant and non-variant groups changed at',next_pos
-        break
-      nucs.append(next(iter(n)))
 
-    ref = ref_seq[next_pos]
-    if all(n==ref for n in nucs):
-      #print '  all reads are reference at',next_pos
-      break
+    if fixed_end is None:
+      nucs = []
+      for group in groups:
+        n = set( next_loc[name][1] for name in group if name in next_loc )
+        if len(n) != 1:
+          #print '  variant and non-variant groups changed at',next_pos
+          break
+        nucs.append(next(iter(n)))
+
+      ref = ref_seq[next_pos]
+      if all(n==ref for n in nucs):
+        #print '  all reads are reference at',next_pos
+        break
 
     new_loc = []
     for name,bases,qual in loc:
@@ -337,7 +394,7 @@ def call_variants_all(inbam, reference):
     loc,end = extend_variant(start, loc, ref_seq, pileup)
 
     ref_nuc = ref_seq[start:end]
-    geno    = geno_prob(start,end,loc,ref_nuc,min_variant=2)
+    geno    = geno_prob(start,end,loc,ref_nuc,min_variant=2,collapse=True)
 
     start,end,ref,a1,d1,a2,d2,ratio,pAA,pAB,pBB = geno
 
@@ -390,35 +447,62 @@ def call_variants_locations(inbam, reference, locations):
 
     chrom,pos,depth,loc = next(pileup)
 
-    exclude = False
-    if pos==start-1:
-      loc  = strip_one(loc)
-      pos += 1
+    if pos>start:
+      continue
 
-      if not loc:
-        #print '  no variant insertions at start-1'
+    exclude = False
+
+    # Not an indel
+    if pos==start-1:
+      if len(a1.replace('-','')) == len(a2.replace('-','')) == end-start:
         try:
           chrom,pos,depth,loc = next(pileup)
         except StopIteration:
           depth,loc = 0,[]
           #print 'Nothing found after start-1'
-
       else:
-        exclude = True
-        #print '  using variant insertions at start-1'
+        # Have to collect adjacent bases
+        loc    = strip_one(loc)
+        start += 1
+        pos   += 1
 
-    loc,end = extend_variant(pos, loc, ref_seq, pileup, exclude_start=exclude)
+        if not loc:
+          #print '  no variant insertions at start-1'
+          try:
+            chrom,pos,depth,loc = next(pileup)
+          except StopIteration:
+            depth,loc = 0,[]
+            #print 'Nothing found after start-1'
+
+        else:
+          exclude = True
+          #print '  using variant insertions at start-1'
+
+    if 0: # start>=end:
+      print '  stripping one more position...?'
+      loc     = strip_one(loc)
+      end    -= 1
+      var_end = end
+    else:
+      loc,var_end = extend_variant(pos, loc, ref_seq, pileup, exclude_start=exclude, fixed_end=end)
+
     #print '   extended end to %d: %s' % (end,loc)
 
-    #if stripped:
-    #  end -= 1
+    if var_end!=end:
+      #print '  inconsistent end location (%d!=%d)' % (var_end,end)
+      continue
 
     ref_nuc = ref_seq[pos:end]
-    geno    = geno_prob(pos,end,loc,ref_nuc)
+    geno    = geno_prob(pos,end,loc,ref_nuc,collapse=False,alleles=(a1,a2))
 
+    #print loc
+    #print
     #print geno
 
     start,end,ref,a1,d1,a2,d2,ratio,pAA,pAB,pBB = geno
+
+    if end<start:
+      end = start
 
     ref_nuc = ref_seq[start:end]
     yield Variant(chrom,start,end,depth,ref,a1,d1,a2,d2,ratio,pAA,pAB,pBB)
@@ -429,17 +513,18 @@ def annotate_variants(variants, gene_db, reference):
 
   for v in variants:
     evidence = []
-    if v.ref!=v.a2 and (v.ref!=v.a1 or v.pAA<0.95):
-      evidence.extend(va.classify(v.chrom, v.start, v.end, v.a2))
-    if v.ref!=v.a1 and (v.ref!=v.a2 or v.pBB<0.95):
-      evidence.extend(va.classify(v.chrom, v.start, v.end, v.a1))
+    if v.ref!=v.a2: #  and (v.ref!=v.a1 or v.pAA<0.95):
+      evidence.extend(va.classify(v.chrom, v.start, v.end, v.a2, False))
+    if v.ref!=v.a1 or (v.ref==v.a1==v.a2): #  and (v.ref!=v.a2 or v.pBB<0.95):
+      evidence.extend(va.classify(v.chrom, v.start, v.end, v.a1, False))
 
     #if 'NON-SYNONYMOUS' not in [ e[6] for e in evidence ]:
     #  continue
-
-    #evidence = [ e for e in evidence if e[6]=='NON-SYNONYMOUS' ]
+    #evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[6] ]
     #if not evidence:
-    #  evidence = [[]]
+    #  continue
+    if not evidence:
+      evidence = [[]]
 
     for e in evidence:
       yield v+tuple(e[3:])
@@ -451,6 +536,10 @@ def option_parser():
   usage = 'usage: %prog [options] infile.bam'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+                      help='Genedb genome annotation database name or file')
+  parser.add_option('-r', '--reference',   dest='reference', metavar='NAME',
+                      help='Reference genome sequence (FASTA + FAI files)')
   parser.add_option('--locations', dest='locations', metavar='FILE',
                     help='Locations at which to call variants')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -466,7 +555,11 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
-  reference = pysam.Fastafile(REF_GENOME)
+  if not options.reference:
+    sys.stderr.write('ERROR: Reference genome sequence required')
+    sys.exit(2)
+
+  reference = pysam.Fastafile(options.reference)
 
   flags = 'rb' if args[0].endswith('.bam') else 'r'
   inbam = pysam.Samfile(args[0], flags)
@@ -486,7 +579,7 @@ def main():
   if 1:
     header.extend(['INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
                    'REF_NUC','VAR_NUC','REF_AA','VAR_AA', 'dbSNP_exact','dbSNP_inexact'])
-    variants = annotate_variants(variants, GENE_DB, REF_GENOME)
+    variants = annotate_variants(variants, options.genedb, options.reference)
 
   out.writerow(header)
   out.writerows(variants)
