@@ -12,7 +12,7 @@ import sys
 import sqlite3
 
 
-DEFAULT_GENEDB = ['genedb_hg18_snp130.db']
+DEFAULT_GENEDB = ['genedb_hg18_snp130_rtree.db']
 
 DEFAULT_PATHS  = [os.path.join(os.path.dirname(__file__),'data'),
                   '/usr/local/share/genedb',
