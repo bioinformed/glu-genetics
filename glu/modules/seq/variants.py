@@ -181,7 +181,7 @@ def parse_locations(filename):
     if len(row)>=5:
       try:
         chrom,start,end,a1,a2 = row[:5]
-        start = int(start)-1
+        start = int(start)
         end   = int(end)
         yield chrom,start,end,a1,a2
       except ValueError:
@@ -536,10 +536,12 @@ def option_parser():
   usage = 'usage: %prog [options] infile.bam'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-a', '--annotate', dest='annotate', action='store_true',
+                    help='Annotate called variants')
   parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
-                      help='Genedb genome annotation database name or file')
+                    help='Genedb genome annotation database name or file')
   parser.add_option('-r', '--reference',   dest='reference', metavar='NAME',
-                      help='Reference genome sequence (FASTA + FAI files)')
+                    help='Reference genome sequence (FASTA + FAI files)')
   parser.add_option('--locations', dest='locations', metavar='FILE',
                     help='Locations at which to call variants')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
@@ -576,7 +578,7 @@ def main():
   else:
     variants = call_variants_all(inbam, reference)
 
-  if 1:
+  if options.annotate:
     header.extend(['INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
                    'REF_NUC','VAR_NUC','REF_AA','VAR_AA', 'dbSNP_exact','dbSNP_inexact'])
     variants = annotate_variants(variants, options.genedb, options.reference)

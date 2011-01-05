@@ -26,12 +26,10 @@ from   glu.lib.progressbar          import progress_loop
 from   glu.lib.seqlib.edits         import levenshtein_sequence, reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
+from   glu.lib.fileutils            import table_reader, table_writer
+
 from   glu.modules.genedb           import open_genedb
 
-
-#GENE_DB='out/genedb_hg18_snp130.db'
-#GENE_DB='/usr/local/share/genedb/genedb_hg18_snp130.db'
-#REF_GENOME='/CGF/DCEGProjects/Exome/Pilot/build4/reference/hg18.fa'
 
 
 Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
@@ -503,12 +501,12 @@ def main():
     sys.exit(2)
 
   if not options.reference:
-    sys.stderr.write('ERROR: Reference genome sequence required')
+    sys.stderr.write('ERROR: Reference genome sequence required\n')
     sys.exit(2)
 
   vs = VariantAnnotator(options.genedb, options.reference)
 
-  if 1:
+  if 0:
     print vs.classify('chr1',1110293,1110294,'A')
     print vs.classify('chr1',960530,960532,'')
     print vs.classify('chr1',968624,968625,'A')
@@ -548,7 +546,7 @@ def main():
         for row in evidence:
           out.writerow([snp.name,func]+row)
 
-  if 1:
+  if 0:
     from merge_diffs import load_diffs, VARIANT_HEADER
     filename = sys.argv[1]
     variants = load_diffs(filename)
@@ -582,6 +580,24 @@ def main():
     #print >> sys.stderr,'Newbler_NS,GLU_NS,count'
     #for key in sorted(stats):
     #  print >> sys.stderr,key,stats[key]
+
+  if 1:
+    filename = args[0]
+    variants = table_reader(filename)
+    header   = next(variants)
+    extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
+                'REF_NUC_NEW','VAR_NUC_NEW','REF_AA_NEW','VAR_AA_NEW', 'dbSNP_exact','dbSNP_inexact']
+    out      = table_writer(sys.stdout)
+    out.writerow(header + extra[3:])
+
+    stats = defaultdict(int)
+
+    for v in variants:
+      evidence = list(vs.classify(v[0], int(v[1]), int(v[2]), v[4]))
+      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[6] ] or [[]]
+
+      for e in evidence:
+        out.writerow(v+e[3:])
 
 
 if __name__=='__main__':
