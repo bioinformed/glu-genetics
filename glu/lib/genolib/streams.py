@@ -27,7 +27,7 @@ from   glu.lib.genolib.encode    import pack_genomatrixstream, recode_genomatrix
                                         encode_genomatrixstream_from_strings,                \
                                         recode_genotriples, encode_genotriples_from_tuples,  \
                                         encode_genotriples_from_strings,                     \
-                                        merge_locus, update_model
+                                        merge_locus2, update_model
 
 # Debugging flag
 DEBUG=False
@@ -3103,7 +3103,9 @@ def _genome_rename_loci(old_genome, old_name, new_genome, new_name, warn):
 
   new_locus = new_genome.loci[new_name]
 
-  return merge_locus(new_locus,old_model)
+  recode,new_locus.model = merge_locus2(new_locus.model,old_model)
+
+  return recode
 
 
 def _genome_rename(old_genome, locusmap, warn=False):

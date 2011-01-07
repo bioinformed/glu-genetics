@@ -41,8 +41,8 @@ def _encoding_error(locus,item,model,warn=False):
   Handle genotype encoding error by either producing an informative exception
   or a warning message.
   '''
-  if is_str(item):
-    item = 'allele %s' % item
+  if is_str(item) or len(item)==1:
+    item = 'allele %s' % (''.join(item))
   else:
     item = 'genotype %s' % (','.join(item))
 
@@ -67,9 +67,22 @@ def merge_locus(loc,new_model):
   else:
     # Recoding needed
     loc.model = build_model(alleles=new_model.alleles[1:],base=loc.model)
+
     return True
 
   return False
+
+
+def merge_locus2(old_model,new_model):
+  if old_model is None:
+    return False,new_model
+  elif new_model is None or new_model.replaceable_by(old_model):
+    return False,old_model
+  elif new_model is old_model or old_model.replaceable_by(new_model):
+    return False,new_model
+
+  # Recoding needed
+  return True,build_model(alleles=new_model.alleles[1:],base=old_model)
 
 
 def update_model(old_model, new_model):
@@ -293,8 +306,6 @@ def recode_genomatrixstream(genos, genome, warn=False):
     def _recode_genomatrixstream():
       n = len(genos.samples)
 
-      packed = genos.packed
-
       for (lname,row),old_model in izip(genos,genos.models):
         old_locus = genos.genome.loci[lname]
 
@@ -306,16 +317,22 @@ def recode_genomatrixstream(genos, genome, warn=False):
           loc = genome.loci[lname]
 
         try:
-          merge_locus(loc, old_model)
+          recode,loc.model = merge_locus2(loc.model, old_model)
         except GenotypeRepresentationError:
-          _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),old_model,warn)
+          # FIXME: The third argument may be incorrect elsewhere too
+          _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),loc.model,warn)
+          row = [loc.model.genotypes[0]]*len(row)
+          packed = False
 
         model = loc.model
 
         # If recoding or packing is required
-        if old_model is not model or not packed:
+        if recode or not genos.packed:
           descr = build_descr(model,n)
-          row = GenotypeArray(descr,row)
+          row   = GenotypeArray(descr,row)
+
+        # N.B. Does not aggressively recode model to loc.model unless
+        # encoding changed or stream is not packed
 
         models.append(model)
         yield lname,row
@@ -338,9 +355,9 @@ def recode_genomatrixstream(genos, genome, warn=False):
         loc = genome.get_locus(lname)
 
         try:
-          merge_locus(loc, old_model)
+          recode,loc.model = merge_locus2(loc.model, old_model)
         except GenotypeRepresentationError:
-          _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),old_model,warn)
+          _encoding_error(lname,set(old_model.alleles)-set(loc.model.alleles),loc.model,warn)
 
       models.append(loc.model)
 
@@ -356,7 +373,7 @@ def recode_genomatrixstream(genos, genome, warn=False):
             old_model = loc.model
 
             try:
-              merge_locus(loc, model)
+              recode,loc.model = merge_locus2(loc.model, model)
             except GenotypeRepresentationError:
               _encoding_error(genos.loci[i],set(old_model.alleles)-set(model.alleles),model,warn)
 
@@ -755,7 +772,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
                 try:
                   loc.model = build_model(alleles=geno,base=loc.model)
                 except GenotypeRepresentationError:
-                  _encoding_error(columns[i],set(geno)-set(model.alleles),loc.model,warn)
+                  _encoding_error(columns[i],set(geno)-set(loc.model.alleles),loc.model,warn)
 
               model = loc.model
               if models[i] is not model:
@@ -969,7 +986,7 @@ def encode_genotriples_from_strings(triples,genorepr,genome,warn=False):
         try:
           loc.model = model = build_model(alleles=geno,base=loc.model)
         except GenotypeRepresentationError:
-          _encoding_error(lname,geno,model,warn)
+          _encoding_error(lname,geno,loc.model,warn)
 
         updates.append( (lname,model) )
 
