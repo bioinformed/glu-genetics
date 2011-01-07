@@ -173,10 +173,8 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   elif is_str(phenome):
     phenome = load_phenome(phenome,extra_args=args)
 
-  kwargs = dict(genome=genome,phenome=phenome)
-
   loader = get_genostream_loader(format)
-  genos  = loader(filename, format, extra_args=args, **kwargs)
+  genos  = loader(filename, format, extra_args=args, genome=genome, phenome=phenome)
 
   # Apply any requested transformations
   # FIXME: The length checking code is there because transformed may not be

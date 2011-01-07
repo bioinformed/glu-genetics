@@ -85,15 +85,19 @@ def load_wtccc_samples(filename):
 
   for line_num,line in enumerate(sfile):
     fields = line.split()
-    if len(fields) < 3:
-      raise ValueError('Invalid WTCCC sample data on line %d of %s' % (line_num+1,namefile(filename)))
 
-    sample = '%s:%s' % (fields[0],fields[1])
+    if fields[0:1] and fields[1:2]:
+      sample = '%s:%s' % (fields[0],fields[1])
+    else:
+      sample = fields[0] or (len(fields)>1 and fields[1])
+
+    if not sample:
+      raise ValueError('Invalid WTCCC sample data on line %d of %s' % (line_num+1,namefile(filename)))
 
     yield sample
 
 
-def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_wtccc(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
   '''
   See http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html
 
@@ -120,7 +124,7 @@ def load_wtccc(filename,genome=None,phenome=None,extra_args=None,**kwargs):
   ... '0 l2 0 C G 0 0 0 0 1 0 0 0 0\\n'
   ... '0 l3 0 C T 0 1 0 1 0 0 0 1 0\\n')
   >>> samples = StringIO('ID_1 ID_2 missing\\n0 0 0 0 0 0\\nf1 s1 0\\nf1 s2 0\\nf1 s3 0\\n')
-  >>> genos = load_wtccc(data,samples=samples)
+  >>> genos = load_wtccc(data,'wtccc',samples=samples)
   >>> genos.format
   'ldat'
   >>> genos.columns
