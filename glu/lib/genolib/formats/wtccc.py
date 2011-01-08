@@ -16,7 +16,7 @@ __genoformats__ = [
 
 from   itertools                 import izip, imap
 
-from   glu.lib.fileutils         import autofile,parse_augmented_filename,get_arg,guess_related_file,trybool,namefile
+from   glu.lib.fileutils         import autofile,parse_augmented_filename,get_arg,guess_related_file,related_file,trybool,namefile
 
 from   glu.lib.genolib.streams   import GenomatrixStream
 from   glu.lib.genolib.phenos    import Phenome
@@ -266,12 +266,19 @@ class WTCCCWriter(object):
 
     filename = parse_augmented_filename(filename,args)
 
+    samplefile  = get_arg(args, ['samplefile','samples','sample'])
+
+    # Careful: samplefile=<blank> is intended to suppress output
+    if samplefile is None:
+      samplefile = related_file(filename,'sample')
+
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
 
-    self.out       = autofile(filename,'wb')
-    self.samples   = samples
-    self.genome    = genome
+    self.out        = autofile(filename,'wb')
+    self.samples    = samples
+    self.genome     = genome
+    self.samplefile = samplefile
 
   def writerow(self, locus, genos):
     '''
@@ -344,6 +351,13 @@ class WTCCCWriter(object):
     #        testing
     #self.out.close()
     self.out = None
+
+    if self.samplefile:
+      out = autofile(self.samplefile,'wb')
+      out.write('ID_1 ID_2 missing\r\n')
+      out.write('0 0 0\r\n')
+      for sample in self.samples:
+        out.write('%s %s 0\r\n' % (sample,sample))
 
   def __enter__(self):
     '''
