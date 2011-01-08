@@ -213,7 +213,7 @@ def guess_format(filename, formats, args=None):
 
   parts = os.path.basename(filename).split('.')
 
-  if parts and parts[-1] in COMPRESSED_SUFFIXES:
+  if len(parts)>1 and parts[-1] in COMPRESSED_SUFFIXES:
     parts.pop()
 
   if parts and parts[-1] in formats:
@@ -241,12 +241,20 @@ def related_file(filename,extension):
   if not is_str(filename):
     return None
 
-  prefix = os.path.splitext(filename)[0]
+  parts = os.path.basename(filename).split('.')
 
-  if not prefix:
+  if len(parts)>1 and parts[-1] in COMPRESSED_SUFFIXES:
+    parts.pop()
+
+  if not parts:
     raise ValueError('invalid filename')
 
-  return '%s.%s' % (prefix,extension)
+  if len(parts)>1:
+    parts.pop()
+
+  parts.append(extension)
+
+  return '.'.join(parts)
 
 
 def guess_related_file(filename,extensions):
