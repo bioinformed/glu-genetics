@@ -29,7 +29,7 @@ def find_glu_modules():
 
   for (i,name,ispkg) in pkgutil.walk_packages(path,prefix=prefix):
     try:
-      module = __import__(name,fromlist=['main'])
+      module = __import__(name,fromlist=[''])
     except:
       continue
 
@@ -81,11 +81,15 @@ def find_glu_modules():
 def main():
   modules = find_glu_modules()
 
-  # FIXME: Figure out what to do when width is too large
-  width   = max(len(m[1]) for m in modules)+4
-
   out = StringIO()
   out.write('Welcome to GLU: The Genotype Library and Utilities\n')
+
+  if not modules:
+    out.write('\nNo modules found!\n')
+    return
+
+  # FIXME: Figure out what to do when width is too large
+  width   = max(len(m[1]) for m in modules)+4
 
   inheading = None
   for heading,name,module in modules:

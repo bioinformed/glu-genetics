@@ -86,10 +86,16 @@ def load_wtccc_samples(filename):
   for line_num,line in enumerate(sfile):
     fields = line.split()
 
-    if fields[0:1] and fields[1:2]:
+    sample = ''
+
+    if not fields:
+      pass
+    elif len(fields)==1:
+      sample = fields[0]
+    elif fields[0] and fields[1]:
       sample = '%s:%s' % (fields[0],fields[1])
     else:
-      sample = fields[0] or (len(fields)>1 and fields[1])
+      sample = fields[0] or fields[1]
 
     if not sample:
       raise ValueError('Invalid WTCCC sample data on line %d of %s' % (line_num+1,namefile(filename)))
@@ -190,8 +196,7 @@ def load_wtccc(filename,format,genome=None,phenome=None,extra_args=None,**kwargs
         chrom = 'M'
       elif chrom not in ('X','Y','XY','M'):
         try:
-          chrom = int(chrom)
-          if chrom < 1 or chrom > 22:
+          if not (1<=int(chrom)<=22):
             chrom = None
         except ValueError:
           chrom = None
@@ -209,7 +214,7 @@ def load_wtccc(filename,format,genome=None,phenome=None,extra_args=None,**kwargs
 
       loci.append(lname)
       models.append(model)
-      file_genome.set_locus(lname,model,chr,loc)
+      file_genome.set_locus(lname,model,chrom,loc)
 
       genos = GenotypeArray(descr, _decode_wtccc(model,a,b,threshold,fields[5:]))
 
