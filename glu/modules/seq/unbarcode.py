@@ -10,22 +10,20 @@ __revision__  = '$Id$'
 
 import sys
 
-from   collections          import namedtuple, defaultdict
+from   collections             import namedtuple, defaultdict
 
 import numpy as np
 
-from   Bio                  import SeqIO
+from   glu.lib.utils           import pair_generator
+from   glu.lib.fileutils       import autofile, hyphen, table_reader
+from   glu.lib.seqlib.edits    import levenshtein_sequence, hamming_sequence
 
-from   glu.lib.utils        import pair_generator
-from   glu.lib.fileutils    import autofile, hyphen, table_reader
-from   glu.lib.seqlib.edits import levenshtein_sequence, hamming_sequence
-
-from   glu.modules.seq.convert import read_sequence
+from   glu.modules.seq.convert import read_sequence, write_sequence, guess_informat_list
 
 
 def read_barcodes(filename):
   barcodes      = table_reader(filename)
-  header    = next(barcodes)
+  header        = next(barcodes)
   barcode_tuple = namedtuple('barcode_tuple', 'id seq')
   barcodes      = map(barcode_tuple._make, ( (id,seq.upper()) for id,seq in barcodes if id and seq) )
   return barcodes
@@ -60,21 +58,20 @@ def barcode_len(barcodes):
   return max(barcode_lens)
 
 
-def compute_barcode_distances(barcodes,distance_metric):
+def compute_barcode_distances(out,barcodes,distance_metric):
   blen         = barcode_len(barcodes)
   barcodestats = defaultdict(lambda: [0]*(blen+1))
 
   for b1,b2 in pair_generator(barcodes):
-      d = len(distance_metric(b1.seq,b2.seq,compress=False))
-      barcodestats[b1.id][d] += 1
-      barcodestats[b2.id][d] += 1
+    d = len(distance_metric(b1.seq,b2.seq,compress=False))
+    barcodestats[b1.id][d] += 1
+    barcodestats[b2.id][d] += 1
 
   for barcode in barcodes:
     stat = barcodestats[barcode.id]
     nz,  = np.nonzero(stat)
     nz   = nz[0] if len(nz) else ' '
-    print barcode.id,barcode.seq,nz,stat
-
+    out.write('%s %s %s %s\n' % (barcode.id,barcode.seq,nz,stat))
 
 
 def option_parser():
@@ -83,6 +80,16 @@ def option_parser():
   usage = 'usage: %prog [options] [barcode file] [input files..]'
   parser = optparse.OptionParser(usage=usage)
 
+  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT', default='sff',
+                    help='Input sequence format (default=sff).  Formats include: '
+                         'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
+                         'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
+                         'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
+  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT', default='fasta',
+                    help='Output sequence format (default=fasta).  As above, except ace, ig, '
+                         'pir, sff-trim, swiss.')
+  parser.add_option('--destdir', dest='destdir', default='.',
+                    help='Destination directory for output files.  Write to input file directory by default.')
   parser.add_option('--distance', dest='distance', metavar='TYPE', default='levenshtein',
                     help='Distance metric for barcodes: levenshtein (default) or hamming')
   parser.add_option('--location', dest='location', metavar='LOC', default='454',
@@ -104,6 +111,9 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
+  if options.informat is None:
+    options.informat = guess_informat_list(args[1:])
+
   distance = options.distance.lower()
   if distance and 'levenshtein'.startswith(distance):
     distance_metric = levenshtein_sequence
@@ -119,7 +129,9 @@ def main():
   barcodes     = read_barcodes(args[0])
   blen         = barcode_len(barcodes)
 
-  compute_barcode_distances(barcodes,distance_metric)
+  out = autofile(hyphen(options.output,sys.stdout),'wb')
+
+  compute_barcode_distances(out,barcodes,distance_metric)
 
   bad      = 0
   match    = [0]*(blen+1)
@@ -131,11 +143,10 @@ def main():
   barcodestats = defaultdict(lambda: [0]*(blen+1))
   substats = defaultdict(int)
   posstats = defaultdict(int)
+  decoded  = defaultdict(list)
 
-  out = autofile(hyphen(options.output,sys.stdout),'wb')
   for filename in args[1:]:
     for barcode,seq in read_sequence_and_barcode(filename, location, blen):
-
       if len(barcode)!=blen:
         bad += 1
         continue
@@ -149,11 +160,9 @@ def main():
         min_count                   = sum(1 for d,m,ops in distances if d==min_dist)
         next_dist,next_barcode,next_ops = distances[1]
 
-        if (options.maxerror and min_dist>=options.maxerror) or min_count>1 \
+        if (options.maxerror is not None and min_dist>options.maxerror) or min_count>1 \
           or min_dist+options.mindist>next_dist:
           min_barcode,min_ops='',[]
-
-        #print min_barcode,'%d<%d' % (min_dist,options.maxerror)
 
         cache[barcode] = min_dist,min_count,min_barcode,min_ops
         misses += 1
@@ -162,7 +171,12 @@ def main():
         min_dist,min_count,min_barcode,min_ops = cache[barcode]
         hits += 1
 
+      #print min_barcode,'distance %d<=%d maxerror' % (min_dist,options.maxerror)
+
       if min_barcode:
+        if options.outformat:
+          decoded[min_barcode.id].append(seq)
+
         match[min_dist] += 1
         barcodestats[min_barcode.id][min_dist] += 1
         if min_dist==1:
@@ -175,26 +189,33 @@ def main():
 
       #print seq.id,barcode,min_dist,min_count,min_barcode
 
+  for mid,sequences in decoded.iteritems():
+    filename = '%s/%s.%s' % (options.destdir,mid,options.outformat)
+    write_sequence(sequences, filename, options.outformat)
+    sequences[:] = []
+
+  decoded.clear()
+
   if not hits+misses:
     return
 
   hit_rate = hits/(hits+misses)*100 if hits+misses else 0
-  print '      BAD BARCODES:',bad
-  print '   MATCH DISTANCES:',match
-  print 'MISMATCH DISTANCES:',mismatch
-  print '    CACHE HIT RATE: %.3f%%' % hit_rate
+  out.write('      BAD BARCODES: %d\n' % bad)
+  out.write('   MATCH DISTANCES: %s\n' % match)
+  out.write('MISMATCH DISTANCES: %s\n' % mismatch)
+  out.write('    CACHE HIT RATE: %.3f%%\n\n' % hit_rate)
 
   #for pos in sorted(posstats):
   #  print pos,posstats[pos]
 
   for i in xrange(1,blen+1):
-    print i,[ sum(substats[i,b1,b2] for b2 in 'ACGTN') for b1 in 'ACGTN' ]
+    out.write('%d %s\n' % (i,' '.join('%d' % sum(substats[i,b1,b2] for b2 in 'ACGTN') for b1 in 'ACGTN')))
 
   #for sub in sorted(substats):
   #  print sub,substats[sub]
 
   for barcode in barcodes:
-    print barcode.id,barcode.seq,barcodestats[barcode.id]
+    out.write('%s %s %s\n' % (barcode.id,barcode.seq,barcodestats[barcode.id]))
 
 
 if __name__=='__main__':
