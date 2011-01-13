@@ -13,6 +13,7 @@ from   Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
 class SFFIndex(object):
   def __init__(self, sfffiles):
     self.sffindex = defaultdict(list)
+    self.sfffiles = []
     self.headers  = []
 
     for sfffile in sfffiles:
@@ -25,7 +26,14 @@ class SFFIndex(object):
     manifest   = sff_manifest(open(sfffile,'rb'))
     reads      = SeqIO.index(sfffile, 'sff')
 
-    for run in etree.fromstring(manifest).findall('run'):
+    self.sfffiles.append(reads)
+
+    try:
+      runs     = etree.fromstring(manifest).findall('run')
+    except SyntaxError:
+      return
+
+    for run in runs:
       run_name         = run.find('run_name').text
       run_path         = run.find('path').text
       run_type         = run.find('run_type').text
@@ -48,7 +56,7 @@ class SFFIndex(object):
   def get_read(self, qname):
     prefix = qname[:9]
 
-    for sff in self.sffindex.get(prefix,[]):
+    for sff in self.sffindex.get(prefix,self.sfffiles):
       rec = sff.get(qname)
       if rec:
         return rec
