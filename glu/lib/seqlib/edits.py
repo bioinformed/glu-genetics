@@ -803,7 +803,7 @@ def damerau_levenshtein_sequence(s1, s2, compress=True):
   return seq
 
 
-def _roll_cigar(i, j, edits, offset=0):
+def _roll_cigar(i, j, edits):
   '''
   Compute the sequence of edits required to transform sequence s1 to s2
   using the operations encoded in the supplied matrix of edit operations.
@@ -881,12 +881,12 @@ def cigar_alignment(s1,s2,cigar,hide_match=True):
       a2.extend(s2[j:j+n])
       j += n
 
-    elif op in 'D':
+    elif op=='D':
       a1.extend(s1[i:i+n])
       a2.extend('-'*n)
       i += n
 
-    elif op in 'S':
+    elif op=='S':
       a1.extend(s1[i:i+n])
       a2.extend(' '*n)
       i += n
@@ -899,7 +899,6 @@ def cigar_alignment(s1,s2,cigar,hide_match=True):
 
 def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   '''
-
   Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
@@ -1045,6 +1044,153 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   return score,cigar
 
 
+def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_score=-2, gap_extend_score=-1):
+  '''
+  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  alignment.  An alignment score and sequence of alignment operations are returned.
+
+  The operations to align s1 to s2 are returned as a sequence, represented
+  by extended CIGAR (Compact Idiosyncratic Gapped Alignment Report)
+  operations of the form:
+
+    Match:         CigarOp(op='=', count=n)
+    Mismatch:      CigarOp(op='X', count=n)
+    Insertion:     CigarOp(op='I', count=n)
+    Deletion:      CigarOp(op='D', count=n)
+
+  Match operations are inclusive of matching and mismatch characters
+
+  See: http://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
+
+       Smith, Temple F.; and Waterman, Michael S. (1981). "Identification
+       of Common Molecular Subsequences". Journal of Molecular Biology 147: 195–197.
+       http://gel.ym.edu.tw/~chc/AB_papers/03.pdf
+
+
+  This implementation is based on a standard dynamic programming algorithm,
+  requiring O(N*M) time and space, where N and M are the lengths of the two
+  sequences.  See the following for more information on these concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+  cost[i,j] = |
+              |     | 0
+              |     | cost[i-1,j-1] + m   if c1==c2     (match: perfect)
+              | min | cost[i-1,j-1] + mm  if c1!=c2     (match: substitution)
+              |     | cost[i,  j-1] + g                (insert c2)
+              |     | cost[i-1,j  ] + g                (delete c1)
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j] and the edit sequence is obtained by keeping note of which
+  operation was selected at each step and backtracking from the end to the
+  beginning.  This implementation saves space by only storing the last two
+  cost rows at any given time (cost[i-1], and cost[i]).
+
+  >>> s1,s2='b','abc'
+  >>> score,cigar = smith_waterman_gotoh(s1,s2)
+  >>> score
+  1
+  >>> cigar_to_string(cigar)
+  '1N1=1N'
+  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  ' b '
+  'a.c'
+
+  >>> s1,s2='abc','b'
+  >>> score,cigar = smith_waterman_gotoh(s1,s2)
+  >>> score
+  1
+  >>> cigar_to_string(cigar)
+  '1S1=1S'
+  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'abc'
+  ' . '
+
+  >>> s1,s2='abbcbbd','acd'
+  >>> score,cigar = smith_waterman_gotoh(s1,s2,match_score=4)
+  >>> score
+  6
+  >>> cigar_to_string(cigar)
+  '1=2D1=2D1='
+  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'abbcbbd'
+  '.--.--.'
+
+  >>> s1,s2='abbcbbd','acd'
+  >>> score,cigar = smith_waterman_gotoh(s1,s2,match_score=3,gap_extend_score=0)
+  >>> score
+  5
+  >>> cigar_to_string(cigar)
+  '1=2D1=2D1='
+  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'abbcbbd'
+  '.--.--.'
+  '''
+
+  # Fall back to the standard Smith Waterman when the overhead of the Gotoh
+  # scoring is not needed
+  if gap_open_score==gap_extend_score:
+    return smith_waterman(s1, s2, match_score=match_score, mismatch_score=mismatch_score,
+                                  gap_score=gap_open_score)
+
+  # Prepare storage for the edit costs and operations
+  # Allocate an empty character matrix to track the best edits at each step
+  # in order to reconstruct an optimal sequence at the end
+  n     = len(s1)
+  m     = len(s2)
+  cost  = np.zeros((n+1,m+1), dtype=int)
+  gap1  = np.zeros((n+1,m+1), dtype=int)
+  gap2  = np.zeros((n+1,m+1), dtype=int)
+  edits = np.zeros((n,  m  ), dtype='S1')
+
+  for i,c1 in enumerate(s1):
+    for j,c2 in enumerate(s2):
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
+
+      # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
+      match  = cost[i,j]   + (match_score if c1==c2 else mismatch_score)
+
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
+      insert = gap1[i+1,j+1] = max(gap1[i+1,j] + gap_extend_score,
+                                   cost[i+1,j] + gap_open_score)
+
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
+      delete = gap2[i+1,j+1] = max(gap2[i,j+1] + gap_extend_score,
+                                   cost[i,j+1] + gap_open_score)
+
+      # Take best costing operation
+      cost[i+1,j+1] = mcost = max(0, match, insert, delete)
+
+      # Record the operation chosen, with preference for (mis)matches over
+      # insertions over deletions.  This ambiguity for equal cost options
+      # implies that there may not be a unique optimum edit sequence, but
+      # one or more sequences of equal length.
+      if mcost==match:
+        edits[i,j]='=' if c1==c2 else 'X'
+      elif mcost==insert:
+        edits[i,j]='I'
+      else:
+        edits[i,j]='D'
+
+  # Build and return a minimal edit sequence using the saved operations
+  i,j   = np.unravel_index(np.argmax(cost), cost.shape)
+  score = cost[i,j]
+  cigar = _roll_cigar(i-1,j-1,edits)
+
+  return score,cigar
+
+
 try:
   from glu.lib.seqlib._edits import *
 except ImportError:
@@ -1054,6 +1200,11 @@ except ImportError:
 def _test():
   import doctest
   doctest.testmod()
+  try:
+    import glu.lib.seqlib._edits as _edits
+    doctest.testmod(_edits)
+  except ImportError:
+    pass
 
 
 if __name__ == '__main__':
