@@ -814,16 +814,11 @@ def _roll_cigar(i, j, edits):
 
   igar = []
 
-  while n-1>i:
-    igar.append('S')
-    n -= 1
-
-  while m-1>j:
-    igar.append('N')
-    m -= 1
-
   while i>=0 and j>=0:
     op = edits[i,j]
+
+    if not op:
+      break
 
     igar.append(op)
     if op in 'M=X':
@@ -839,15 +834,12 @@ def _roll_cigar(i, j, edits):
     else:
       raise ValueError('Invalid edit operation')
 
-  while j>=0:
-    igar.append('N')
-    j -= 1
+  i += 1
+  j += 1
 
-  while i>=0:
-    igar.append('S')
-    i -= 1
+  cigar = [ CigarOp(code,len(list(run))) for code,run in groupby(reversed(igar)) ]
 
-  return [ CigarOp(code,len(list(run))) for code,run in groupby(reversed(igar)) ]
+  return i,j,cigar
 
 
 def cigar_to_string(cigar):
@@ -946,59 +938,94 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   cost rows at any given time (cost[i-1], and cost[i]).
 
   >>> s1,s2='b','abc'
-  >>> score,cigar = smith_waterman(s1,s2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2)
+  >>> p1
+  slice(0, 1, None)
+  >>> p2
+  slice(1, 2, None)
   >>> score
   1
   >>> cigar_to_string(cigar)
-  '1N1=1N'
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
-  ' b '
-  'a.c'
+  'b'
+  '.'
 
   >>> s1,s2='abc','b'
-  >>> score,cigar = smith_waterman(s1,s2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2)
+  >>> p1
+  slice(1, 2, None)
+  >>> p2
+  slice(0, 1, None)
   >>> score
   1
   >>> cigar_to_string(cigar)
-  '1S1=1S'
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
-  'abc'
-  ' . '
+  'b'
+  '.'
 
   >>> s1,s2='abcbd','acd'
-  >>> score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1
+  slice(0, 5, None)
+  >>> p2
+  slice(0, 3, None)
   >>> score
   4
   >>> cigar_to_string(cigar)
   '1=1D1=1D1='
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
   'abcbd'
   '.-.-.'
 
   >>> s2,s1='abcbd','acd'
-  >>> score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1
+  slice(0, 3, None)
+  >>> p2
+  slice(0, 5, None)
   >>> score
   4
   >>> cigar_to_string(cigar)
   '1=1I1=1I1='
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
   'a-c-d'
   '.b.b.'
 
   >>> s1,s2='abcbd','beb'
-  >>> score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1
+  slice(1, 4, None)
+  >>> p2
+  slice(0, 3, None)
   >>> score
   3
   >>> cigar_to_string(cigar)
-  '1S1=1X1=1S'
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  '1=1X1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
-  'abcbd'
-  ' .e. '
+  'bcb'
+  '.e.'
+
+  >>> s1,s2='abcdefghijklmnop','pqrstuvqw'
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1
+  slice(15, 16, None)
+  >>> p2
+  slice(0, 1, None)
+  >>> score
+  2
+  >>> cigar_to_string(cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'p'
+  '.'
   '''
   # Prepare storage for the edit costs and operations
   # Allocate an empty character matrix to track the best edits at each step
@@ -1029,7 +1056,9 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
       # insertions over deletions.  This ambiguity for equal cost options
       # implies that there may not be a unique optimum edit sequence, but
       # one or more sequences of equal length.
-      if mcost==match:
+      if mcost==0:
+        pass
+      elif mcost==match:
         edits[i,j]='=' if c1==c2 else 'X'
       elif mcost==insert:
         edits[i,j]='I'
@@ -1037,11 +1066,11 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
         edits[i,j]='D'
 
   # Build and return a minimal edit sequence using the saved operations
-  i,j   = np.unravel_index(np.argmax(cost), cost.shape)
-  score = cost[i,j]
-  cigar = _roll_cigar(i-1,j-1,edits)
+  end_i,end_j = np.unravel_index(np.argmax(cost), cost.shape)
+  score       = cost[end_i,end_j]
+  start_i,start_j,cigar = _roll_cigar(end_i-1,end_j-1,edits)
 
-  return score,cigar
+  return slice(start_i,end_i),slice(start_j,end_j),score,cigar
 
 
 def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_score=-2, gap_extend_score=-1):
@@ -1093,45 +1122,57 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   cost rows at any given time (cost[i-1], and cost[i]).
 
   >>> s1,s2='b','abc'
-  >>> score,cigar = smith_waterman_gotoh(s1,s2)
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2)
   >>> score
   1
   >>> cigar_to_string(cigar)
-  '1N1=1N'
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
-  ' b '
-  'a.c'
+  'b'
+  '.'
 
   >>> s1,s2='abc','b'
-  >>> score,cigar = smith_waterman_gotoh(s1,s2)
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2)
+  >>> p1
+  slice(1, 2, None)
+  >>> p2
+  slice(0, 1, None)
   >>> score
   1
   >>> cigar_to_string(cigar)
-  '1S1=1S'
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
-  'abc'
-  ' . '
+  'b'
+  '.'
 
   >>> s1,s2='abbcbbd','acd'
-  >>> score,cigar = smith_waterman_gotoh(s1,s2,match_score=4)
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,match_score=4)
+  >>> p1
+  slice(0, 7, None)
+  >>> p2
+  slice(0, 3, None)
   >>> score
   6
   >>> cigar_to_string(cigar)
   '1=2D1=2D1='
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
   'abbcbbd'
   '.--.--.'
 
   >>> s1,s2='abbcbbd','acd'
-  >>> score,cigar = smith_waterman_gotoh(s1,s2,match_score=3,gap_extend_score=0)
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,match_score=3,gap_extend_score=0)
+  >>> p1
+  slice(0, 7, None)
+  >>> p2
+  slice(0, 3, None)
   >>> score
   5
   >>> cigar_to_string(cigar)
   '1=2D1=2D1='
-  >>> a1,a2 = cigar_alignment(s1,s2,cigar)
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
   'abbcbbd'
   '.--.--.'
@@ -1176,7 +1217,9 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
       # insertions over deletions.  This ambiguity for equal cost options
       # implies that there may not be a unique optimum edit sequence, but
       # one or more sequences of equal length.
-      if mcost==match:
+      if mcost==0:
+        pass
+      elif mcost==match:
         edits[i,j]='=' if c1==c2 else 'X'
       elif mcost==insert:
         edits[i,j]='I'
@@ -1184,11 +1227,11 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
         edits[i,j]='D'
 
   # Build and return a minimal edit sequence using the saved operations
-  i,j   = np.unravel_index(np.argmax(cost), cost.shape)
-  score = cost[i,j]
-  cigar = _roll_cigar(i-1,j-1,edits)
+  end_i,end_j = np.unravel_index(np.argmax(cost), cost.shape)
+  score       = cost[end_i,end_j]
+  start_i,start_j,cigar = _roll_cigar(end_i-1,end_j-1,edits)
 
-  return score,cigar
+  return slice(start_i,end_i),slice(start_j,end_j),score,cigar
 
 
 try:
