@@ -6,19 +6,24 @@ __abstract__  = 'Various edit distance algorithms'
 __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
+# C imports
 cimport cython
 cimport numpy as np
 
-import numpy as np
+from    libc.stdio          cimport sprintf
+from    libc.stdlib         cimport malloc, realloc, calloc, free
+from    cpython             cimport PyString_Size, PyErr_NoMemory
 
-from libc.stdio    cimport sprintf
-from libc.stdlib   cimport malloc, realloc, calloc, free
-from cpython       cimport PyString_Size, PyErr_NoMemory
+# Python imports
+import  numpy as np
 
-from   glu.lib.utils        import namedtuple
-from   glu.lib.seqlib.edits import cigar_to_string, cigar_alignment
+from    glu.lib.utils        import namedtuple
+from    glu.lib.seqlib.edits import cigar_to_string, cigar_alignment
 
+
+# Alignment operation data structures
 EditOp  = namedtuple('EditOp',  'op pos old new')
+
 CigarOp = namedtuple('CigarOp', 'op count')
 
 
@@ -350,8 +355,8 @@ def damerau_levenshtein_distance(s1, s2):
 
   cdef Py_ssize_t n = PyString_Size(s1)
   cdef Py_ssize_t m = PyString_Size(s2)
-
-  cdef Py_ssize_t  i,j,cost,match,insert,delete,trans
+  cdef char *ss1    = s1
+  cdef char *ss2    = s2
 
   # Otherwise, prepare storage for the edit costs
   # Only store the current and previous cost rows, adding a single
@@ -360,6 +365,9 @@ def damerau_levenshtein_distance(s1, s2):
   cdef Py_ssize_t *current   = <Py_ssize_t *>malloc( (m+1)*sizeof(Py_ssize_t))
   cdef Py_ssize_t *previous1 = <Py_ssize_t *>malloc( (m+1)*sizeof(Py_ssize_t))
   cdef Py_ssize_t *previous2 = <Py_ssize_t *>malloc( (m+1)*sizeof(Py_ssize_t))
+
+  cdef Py_ssize_t  i,j,cost,match,insert,delete,trans
+  cdef char c1,c2
 
   # Start by assigning the cost of transforming an empty s1 into s2[0:m] by
   # inserting 0..m elements
@@ -370,10 +378,6 @@ def damerau_levenshtein_distance(s1, s2):
     current[i]   = i
     previous1[i] = 0
     previous2[i] = 0
-
-  cdef char *ss1 = s1
-  cdef char *ss2 = s2
-  cdef char c1,c2
 
   # For each location in s1
   for i in range(n):
@@ -645,24 +649,30 @@ def smith_waterman(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_score=-
   # Allocate an empty character matrix to track the best edits at each step
   # in order to reconstruct an optimal sequence at the end
 
-  cdef Py_ssize_t n = PyString_Size(s1)
-  cdef Py_ssize_t m = PyString_Size(s2)
-  cdef Py_ssize_t i,j,start_i,end_i,start_j,end_j,max_cost,mcost,match,insert,delete
-  cdef char *edits = <char*>malloc(n*m*sizeof(char))
-  cdef int  *cost  = <int*>malloc((n+1)*(m+1)*sizeof(int))
-  cdef char *ss1   = s1
-  cdef char *ss2   = s2
+  cdef Py_ssize_t n    = PyString_Size(s1)
+  cdef Py_ssize_t m    = PyString_Size(s2)
+  cdef char *ss1       = s1
+  cdef char *ss2       = s2
+
+  cdef char *edits     = <char*>malloc(n*m*sizeof(char))
+
+  cdef int  *curr_cost =  <int*>malloc((m+1)*sizeof(int))
+  cdef int  *prev_cost =  <int*>malloc((m+1)*sizeof(int))
+
+  cdef Py_ssize_t i,j,start_i,end_i,start_j,end_j,score,mcost,match,insert,delete
   cdef char c1,c2,op
 
-  end_i = end_j = max_cost = 0
+  end_i = end_j = score = 0
 
   for j in range(m+1):
-    cost[j] = 0
+    curr_cost[j] = 0
 
   for i in range(n):
     c1 = ss1[i]
 
-    cost[(m+1)*(i+1)] = 0
+    curr_cost,prev_cost = prev_cost,curr_cost
+
+    curr_cost[0] = 0
 
     for j in range(m):
       c2 = ss2[j]
@@ -671,7 +681,7 @@ def smith_waterman(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_score=-
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = cost[(m+1)*i+j]
+      match  = prev_cost[j]
 
       if c1==c2:
         match += match_score
@@ -679,18 +689,18 @@ def smith_waterman(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_score=-
         match += mismatch_score
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = cost[(m+1)*(i+1)+j] + gap_score
+      insert = curr_cost[j] + gap_score
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = cost[(m+1)*i+j+1] + gap_score
+      delete = prev_cost[j+1] + gap_score
 
       # Take best costing operation
-      cost[(m+1)*(i+1)+j+1] = mcost = max4(0, match, insert, delete)
+      curr_cost[j+1] = mcost = max4(0, match, insert, delete)
 
-      if mcost>max_cost:
-         max_cost = mcost
-         end_i    = i
-         end_j    = j
+      if mcost>score:
+         score = mcost
+         end_i = i
+         end_j = j
 
       # Record the operation chosen, with preference for (mis)matches over
       # insertions over deletions.  This ambiguity for equal cost options
@@ -710,11 +720,12 @@ def smith_waterman(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_score=-
       edits[m*i+j]=op
 
   # Build and return a minimal edit sequence using the saved operations
-  score = cost[(m+1)*(end_i+1)+end_j+1]
   start_i,start_j,cigar = _roll_cigar(n,m,end_i,end_j,edits)
 
+  free(prev_cost)
+  free(curr_cost)
+
   free(edits)
-  free(cost)
 
   return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar
 
@@ -832,26 +843,36 @@ def smith_waterman_gotoh(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_s
 
   cdef Py_ssize_t n = PyString_Size(s1)
   cdef Py_ssize_t m = PyString_Size(s2)
-  cdef Py_ssize_t i,j,start_i,end_i,start_j,end_j,max_cost,mcost,match,insert,delete
-  cdef char *edits = <char*>calloc(n*m, sizeof(char))
-  cdef int  *cost  = <int*>calloc((n+1)*(m+1), sizeof(int))
-  cdef int  *gap1  = <int*>calloc((n+1)*(m+1), sizeof(int))
-  cdef int  *gap2  = <int*>calloc((n+1)*(m+1), sizeof(int))
-  cdef char *ss1   = s1
-  cdef char *ss2   = s2
+  cdef char *ss1    = s1
+  cdef char *ss2    = s2
+
+  cdef char *edits      = <char*>malloc(n*m*sizeof(char))
+
+  cdef int  *curr_cost  =  <int*>malloc((m+1)*sizeof(int))
+  cdef int  *prev_cost  =  <int*>malloc((m+1)*sizeof(int))
+  cdef int  *curr_gap1  =  <int*>malloc((m+1)*sizeof(int))
+  cdef int  *prev_gap1  =  <int*>malloc((m+1)*sizeof(int))
+  cdef int  *curr_gap2  =  <int*>malloc((m+1)*sizeof(int))
+  cdef int  *prev_gap2  =  <int*>malloc((m+1)*sizeof(int))
+
+  cdef Py_ssize_t i,j,start_i,end_i,start_j,end_j,score,mcost,match,insert,delete
   cdef char c1,c2,op
 
-  end_i = end_j = max_cost = 0
+  end_i = end_j = score = 0
 
   for j in range(m+1):
-    cost[j] = gap1[j] = gap2[j] = 0
+    curr_cost[j] = curr_gap1[j] = curr_gap2[j] = 0
 
   for i in range(n):
     c1 = ss1[i]
 
-    cost[(m+1)*(i+1)] = 0
-    gap1[(m+1)*(i+1)] = 0
-    gap2[(m+1)*(i+1)] = 0
+    curr_cost,prev_cost = prev_cost,curr_cost
+    curr_gap1,prev_gap1 = prev_gap1,curr_gap1
+    curr_gap2,prev_gap2 = prev_gap2,curr_gap2
+
+    curr_cost[0] = 0
+    curr_gap1[0] = 0
+    curr_gap2[0] = 0
 
     for j in range(m):
       c2 = ss2[j]
@@ -860,7 +881,7 @@ def smith_waterman_gotoh(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_s
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = cost[(m+1)*i+j]
+      match  = prev_cost[j]
 
       if c1==c2:
         match += match_score
@@ -868,24 +889,24 @@ def smith_waterman_gotoh(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_s
         match += mismatch_score
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = gap1[(m+1)*(i+1)+j+1] = max2(gap1[(m+1)*(i+1)+j] + gap_extend_score,
-                                            cost[(m+1)*(i+1)+j] + gap_open_score)
+      insert = curr_gap1[j+1] = max2(curr_gap1[j] + gap_extend_score,
+                                     curr_cost[j] + gap_open_score)
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = gap2[(m+1)*(i+1)+j+1] = max2(gap2[(m+1)*i+j+1] + gap_extend_score,
-                                            cost[(m+1)*i+j+1] + gap_open_score)
+      delete = curr_gap2[j+1] = max2(prev_gap2[j+1] + gap_extend_score,
+                                     prev_cost[j+1] + gap_open_score)
 
       # Take best costing operation
-      cost[(m+1)*(i+1)+j+1] = mcost = max4(0, match, insert, delete)
+      curr_cost[j+1] = mcost = max4(0, match, insert, delete)
 
       # Record the operation chosen, with preference for (mis)matches over
       # insertions over deletions.  This ambiguity for equal cost options
       # implies that there may not be a unique optimum edit sequence, but
       # one or more sequences of equal length.
-      if mcost>max_cost:
-         max_cost = mcost
-         end_i    = i
-         end_j    = j
+      if mcost>score:
+         score = mcost
+         end_i = i
+         end_j = j
 
       # Record the operation chosen, with preference for (mis)matches over
       # insertions over deletions.  This ambiguity for equal cost options
@@ -905,12 +926,15 @@ def smith_waterman_gotoh(s1, s2, Py_ssize_t match_score=1, Py_ssize_t mismatch_s
       edits[m*i+j]=op
 
   # Build and return a minimal edit sequence using the saved operations
-  score = cost[(m+1)*(end_i+1)+end_j+1]
   start_i,start_j,cigar = _roll_cigar(n,m,end_i,end_j,edits)
 
+  free(prev_gap2)
+  free(curr_gap2)
+  free(prev_gap1)
+  free(curr_gap1)
+  free(prev_cost)
+  free(curr_cost)
+
   free(edits)
-  free(cost)
-  free(gap2)
-  free(gap1)
 
   return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar

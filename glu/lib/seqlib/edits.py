@@ -1030,27 +1030,44 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   # Prepare storage for the edit costs and operations
   # Allocate an empty character matrix to track the best edits at each step
   # in order to reconstruct an optimal sequence at the end
-  n     = len(s1)
-  m     = len(s2)
-  cost  = np.zeros((n+1,m+1), dtype=int)
-  edits = np.zeros((n,  m  ), dtype='S1')
+  n         = len(s1)
+  m         = len(s2)
+
+  curr_cost = [0]*(m+1)
+  prev_cost = [0]*(m+1)
+
+  edits     = np.zeros((n,m), dtype='S1')
+
+  end_i     = 0
+  end_j     = 0
+  score     = 0
 
   for i,c1 in enumerate(s1):
+
+    curr_cost,prev_cost = prev_cost,curr_cost
+
+    curr_cost[0] = 0
+
     for j,c2 in enumerate(s2):
       # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = cost[i,j]   + (match_score if c1==c2 else mismatch_score)
+      match  = prev_cost[j] + (match_score if c1==c2 else mismatch_score)
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = cost[i+1,j] + gap_score
+      insert = curr_cost[j] + gap_score
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = cost[i,j+1] + gap_score
+      delete = prev_cost[j+1] + gap_score
 
       # Take best costing operation
-      cost[i+1,j+1] = mcost = max(0, match, insert, delete)
+      curr_cost[j+1] = mcost = max(0, match, insert, delete)
+
+      if mcost>score:
+        end_i = i
+        end_j = j
+        score = mcost
 
       # Record the operation chosen, with preference for (mis)matches over
       # insertions over deletions.  This ambiguity for equal cost options
@@ -1066,11 +1083,9 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
         edits[i,j]='D'
 
   # Build and return a minimal edit sequence using the saved operations
-  end_i,end_j = np.unravel_index(np.argmax(cost), cost.shape)
-  score       = cost[end_i,end_j]
-  start_i,start_j,cigar = _roll_cigar(end_i-1,end_j-1,edits)
+  start_i,start_j,cigar = _roll_cigar(end_i,end_j,edits)
 
-  return slice(start_i,end_i),slice(start_j,end_j),score,cigar
+  return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar
 
 
 def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_score=-2, gap_extend_score=-1):
@@ -1187,31 +1202,52 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   # Prepare storage for the edit costs and operations
   # Allocate an empty character matrix to track the best edits at each step
   # in order to reconstruct an optimal sequence at the end
-  n     = len(s1)
-  m     = len(s2)
-  cost  = np.zeros((n+1,m+1), dtype=int)
-  gap1  = np.zeros((n+1,m+1), dtype=int)
-  gap2  = np.zeros((n+1,m+1), dtype=int)
-  edits = np.zeros((n,  m  ), dtype='S1')
+  n         = len(s1)
+  m         = len(s2)
+
+  curr_cost = [0]*(m+1)
+  prev_cost = [0]*(m+1)
+  curr_gap1 = [0]*(m+1)
+  prev_gap1 = [0]*(m+1)
+  curr_gap2 = [0]*(m+1)
+  prev_gap2 = [0]*(m+1)
+
+  edits     = np.zeros((n,m), dtype='S1')
+
+  end_i     = 0
+  end_j     = 0
+  score     = 0
 
   for i,c1 in enumerate(s1):
+
+    curr_cost,prev_cost = prev_cost,curr_cost
+    curr_gap1,prev_gap1 = prev_gap1,curr_gap1
+    curr_gap2,prev_gap2 = prev_gap2,curr_gap2
+
+    curr_cost[0] = curr_gap1[0] = curr_gap1[0] = 0
+
     for j,c2 in enumerate(s2):
       # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = cost[i,j]   + (match_score if c1==c2 else mismatch_score)
+      match  = prev_cost[j] + (match_score if c1==c2 else mismatch_score)
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = gap1[i+1,j+1] = max(gap1[i+1,j] + gap_extend_score,
-                                   cost[i+1,j] + gap_open_score)
+      insert = curr_gap1[j+1] = max(curr_gap1[j] + gap_extend_score,
+                                    curr_cost[j] + gap_open_score)
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = gap2[i+1,j+1] = max(gap2[i,j+1] + gap_extend_score,
-                                   cost[i,j+1] + gap_open_score)
+      delete = curr_gap2[j+1] = max(prev_gap2[j+1] + gap_extend_score,
+                                    prev_cost[j+1] + gap_open_score)
 
       # Take best costing operation
-      cost[i+1,j+1] = mcost = max(0, match, insert, delete)
+      curr_cost[j+1] = mcost = max(0, match, insert, delete)
+
+      if mcost>score:
+        end_i = i
+        end_j = j
+        score = mcost
 
       # Record the operation chosen, with preference for (mis)matches over
       # insertions over deletions.  This ambiguity for equal cost options
@@ -1227,11 +1263,9 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
         edits[i,j]='D'
 
   # Build and return a minimal edit sequence using the saved operations
-  end_i,end_j = np.unravel_index(np.argmax(cost), cost.shape)
-  score       = cost[end_i,end_j]
-  start_i,start_j,cigar = _roll_cigar(end_i-1,end_j-1,edits)
+  start_i,start_j,cigar = _roll_cigar(end_i,end_j,edits)
 
-  return slice(start_i,end_i),slice(start_j,end_j),score,cigar
+  return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar
 
 
 try:
