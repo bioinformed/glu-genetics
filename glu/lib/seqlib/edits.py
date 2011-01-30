@@ -803,7 +803,7 @@ def damerau_levenshtein_sequence(s1, s2, compress=True):
   return seq
 
 
-def _roll_cigar(i, j, edits):
+def _roll_cigar(i, j, edits, anchor_left):
   '''
   Compute the sequence of edits required to transform sequence s1 to s2
   using the operations encoded in the supplied matrix of edit operations.
@@ -834,12 +834,18 @@ def _roll_cigar(i, j, edits):
     else:
       raise ValueError('Invalid edit operation')
 
-  i += 1
-  j += 1
+  if anchor_left:
+    if j>=0:
+      igar.extend('I'*(j+1))
+      j = -1
+
+    if i>=0:
+      igar.extend('D'*(i+1))
+      i = -1
 
   cigar = [ CigarOp(code,len(list(run))) for code,run in groupby(reversed(igar)) ]
 
-  return i,j,cigar
+  return i+1,j+1,cigar
 
 
 def cigar_to_string(cigar):
@@ -889,7 +895,8 @@ def cigar_alignment(s1,s2,cigar,hide_match=True):
   return ''.join(a1),''.join(a2)
 
 
-def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
+def smith_waterman(s1, s2, match_score=10, mismatch_score=-9, gap_score=-12,
+                           anchor_left=False,anchor_right=False,local_align=None):
   '''
   Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
   alignment.  An alignment score and sequence of alignment operations are returned.
@@ -944,7 +951,7 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   >>> p2
   slice(1, 2, None)
   >>> score
-  1
+  10
   >>> cigar_to_string(cigar)
   '1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -959,7 +966,7 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   >>> p2
   slice(0, 1, None)
   >>> score
-  1
+  10
   >>> cigar_to_string(cigar)
   '1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -968,13 +975,13 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   '.'
 
   >>> s1,s2='abcbd','acd'
-  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=20)
   >>> p1
   slice(0, 5, None)
   >>> p2
   slice(0, 3, None)
   >>> score
-  4
+  36
   >>> cigar_to_string(cigar)
   '1=1D1=1D1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -983,13 +990,13 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   '.-.-.'
 
   >>> s2,s1='abcbd','acd'
-  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=20)
   >>> p1
   slice(0, 3, None)
   >>> p2
   slice(0, 5, None)
   >>> score
-  4
+  36
   >>> cigar_to_string(cigar)
   '1=1I1=1I1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -998,13 +1005,13 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   '.b.b.'
 
   >>> s1,s2='abcbd','beb'
-  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2)
   >>> p1
   slice(1, 4, None)
   >>> p2
   slice(0, 3, None)
   >>> score
-  3
+  11
   >>> cigar_to_string(cigar)
   '1=1X1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -1013,13 +1020,13 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   '.e.'
 
   >>> s1,s2='abcdefghijklmnop','pqrstuvqw'
-  >>> p1,p2,score,cigar = smith_waterman(s1,s2,match_score=2)
+  >>> p1,p2,score,cigar = smith_waterman(s1,s2)
   >>> p1
   slice(15, 16, None)
   >>> p2
   slice(0, 1, None)
   >>> score
-  2
+  10
   >>> cigar_to_string(cigar)
   '1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -1027,13 +1034,28 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
   'p'
   '.'
   '''
+  if local_align is not None and not local_align:
+    anchor_left = anchor_right = True
+  elif anchor_left or anchor_right:
+    local_align = False
+
   # Prepare storage for the edit costs and operations
   # Allocate an empty character matrix to track the best edits at each step
   # in order to reconstruct an optimal sequence at the end
   n         = len(s1)
   m         = len(s2)
 
-  curr_cost = [0]*(m+1)
+  # Transform scalar scores into position-specific scores
+  if isinstance(match_score,int):
+    match_score = [match_score]*n
+
+  if isinstance(mismatch_score,int):
+    mismatch_score = [mismatch_score]*n
+
+  if isinstance(gap_score,int):
+    gap_score = [gap_score]*n
+
+  curr_cost = range(m+1) if anchor_left else [0]*(m+1)
   prev_cost = [0]*(m+1)
 
   edits     = np.zeros((n,m), dtype='S1')
@@ -1046,23 +1068,28 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
 
     curr_cost,prev_cost = prev_cost,curr_cost
 
-    curr_cost[0] = 0
+    curr_cost[0] = i+1 if anchor_left else 0
 
     for j,c2 in enumerate(s2):
       # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = prev_cost[j] + (match_score if c1==c2 else mismatch_score)
+      match  = prev_cost[j] + (match_score[i] if c1==c2 else mismatch_score[i])
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = curr_cost[j] + gap_score
+      insert = curr_cost[j] + gap_score[i]
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = prev_cost[j+1] + gap_score
+      delete = prev_cost[j+1] + gap_score[i]
 
       # Take best costing operation
-      curr_cost[j+1] = mcost = max(0, match, insert, delete)
+      mcost = max(match, insert, delete)
+
+      if not anchor_left:
+        mcost = max(0, mcost)
+
+      curr_cost[j+1] = mcost
 
       if mcost>score:
         end_i = i
@@ -1073,7 +1100,7 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
       # insertions over deletions.  This ambiguity for equal cost options
       # implies that there may not be a unique optimum edit sequence, but
       # one or more sequences of equal length.
-      if mcost==0:
+      if not anchor_left and mcost==0:
         pass
       elif mcost==match:
         edits[i,j]='=' if c1==c2 else 'X'
@@ -1083,12 +1110,20 @@ def smith_waterman(s1, s2, match_score=1, mismatch_score=-1, gap_score=-1):
         edits[i,j]='D'
 
   # Build and return a minimal edit sequence using the saved operations
-  start_i,start_j,cigar = _roll_cigar(end_i,end_j,edits)
+  if anchor_right:
+    end_i = n-1
+    end_j = m-1
+    score = mcost
+
+  start_i,start_j,cigar = _roll_cigar(end_i,end_j,edits, anchor_left)
 
   return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar
 
 
-def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_score=-2, gap_extend_score=-1):
+def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
+                                 gap_open_score=-15, gap_extend_score=-6,
+                                 s2_homopolymer_penalty=None,
+                                 anchor_left=False,anchor_right=False,local_align=None):
   '''
   Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
   alignment.  An alignment score and sequence of alignment operations are returned.
@@ -1139,7 +1174,7 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   >>> s1,s2='b','abc'
   >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2)
   >>> score
-  1
+  10
   >>> cigar_to_string(cigar)
   '1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -1154,7 +1189,7 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   >>> p2
   slice(0, 1, None)
   >>> score
-  1
+  10
   >>> cigar_to_string(cigar)
   '1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -1163,13 +1198,13 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   '.'
 
   >>> s1,s2='abbcbbd','acd'
-  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,match_score=4)
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,match_score=30)
   >>> p1
   slice(0, 7, None)
   >>> p2
   slice(0, 3, None)
   >>> score
-  6
+  48
   >>> cigar_to_string(cigar)
   '1=2D1=2D1='
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
@@ -1177,27 +1212,30 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   'abbcbbd'
   '.--.--.'
 
-  >>> s1,s2='abbcbbd','acd'
-  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,match_score=3,gap_extend_score=0)
+  >>> s1,s2='cc','accct'
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,match_score=1,mismatch_score=-1,gap_open_score=-4,gap_extend_score=-1,local_align=False)
   >>> p1
-  slice(0, 7, None)
+  slice(0, 2, None)
   >>> p2
-  slice(0, 3, None)
+  slice(0, 5, None)
   >>> score
-  5
+  -6
   >>> cigar_to_string(cigar)
-  '1=2D1=2D1='
+  '3I1=1X'
   >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
-  'abbcbbd'
-  '.--.--.'
+  '---cc'
+  'acc.t'
   '''
-
   # Fall back to the standard Smith Waterman when the overhead of the Gotoh
   # scoring is not needed
   if gap_open_score==gap_extend_score:
     return smith_waterman(s1, s2, match_score=match_score, mismatch_score=mismatch_score,
-                                  gap_score=gap_open_score)
+                                  gap_score=gap_open_score, anchor_left=anchor_left,
+                                  anchor_right=anchor_right, local_align=local_align)
+
+  if local_align is not None and not local_align:
+    anchor_left = anchor_right = True
 
   # Prepare storage for the edit costs and operations
   # Allocate an empty character matrix to track the best edits at each step
@@ -1205,12 +1243,31 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
   n         = len(s1)
   m         = len(s2)
 
+  # Transform scalar scores into position-specific scores
+  if isinstance(match_score,int):
+    match_score = [match_score]*n
+
+  if isinstance(mismatch_score,int):
+    mismatch_score = [mismatch_score]*n
+
+  if isinstance(gap_open_score,int):
+    gap_open_score = [gap_open_score]*n
+
+  if isinstance(gap_extend_score,int):
+    gap_extend_score = [gap_extend_score]*n
+
   curr_cost = [0]*(m+1)
   prev_cost = [0]*(m+1)
-  curr_gap1 = [0]*(m+1)
-  prev_gap1 = [0]*(m+1)
+  curr_gap1 = [0]*(m+1)  # Not needed
+  prev_gap1 = [0]*(m+1)  # Can use a scalar
   curr_gap2 = [0]*(m+1)
-  prev_gap2 = [0]*(m+1)
+  prev_gap2 = [0]*(m+1)  # Not needed, since curr_gap2 does not overlap
+
+  if anchor_left:
+    curr_cost[0] = curr_gap1[0] = curr_gap2[0] = 0
+    curr_cost[1] = curr_gap1[1] = curr_gap2[1] = gap_open_score[0]
+    for i in range(1,m):
+      curr_cost[i+1] = curr_gap1[i+1] = curr_gap2[i+1] = curr_cost[i] + gap_extend_score[0]
 
   edits     = np.zeros((n,m), dtype='S1')
 
@@ -1224,25 +1281,32 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
     curr_gap1,prev_gap1 = prev_gap1,curr_gap1
     curr_gap2,prev_gap2 = prev_gap2,curr_gap2
 
-    curr_cost[0] = curr_gap1[0] = curr_gap1[0] = 0
+    curr_cost[0] = prev_cost[0]+gap_extend_score[i] if anchor_left else 0
+    curr_gap1[0] = prev_gap1[0]+gap_extend_score[i] if anchor_left else 0
+    curr_gap2[0] = prev_gap2[0]+gap_extend_score[i] if anchor_left else 0
 
     for j,c2 in enumerate(s2):
       # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = prev_cost[j] + (match_score if c1==c2 else mismatch_score)
+      match  = prev_cost[j] + (match_score[i] if c1==c2 else mismatch_score[i])
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = curr_gap1[j+1] = max(curr_gap1[j] + gap_extend_score,
-                                    curr_cost[j] + gap_open_score)
+      insert = curr_gap1[j+1] = max(curr_gap1[j] + gap_extend_score[i],
+                                    curr_cost[j] + gap_open_score[i])
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = curr_gap2[j+1] = max(prev_gap2[j+1] + gap_extend_score,
-                                    prev_cost[j+1] + gap_open_score)
+      delete = curr_gap2[j+1] = max(prev_gap2[j+1] + gap_extend_score[i],
+                                    prev_cost[j+1] + gap_open_score[i])
 
       # Take best costing operation
-      curr_cost[j+1] = mcost = max(0, match, insert, delete)
+      mcost = max(match, insert, delete)
+
+      if not anchor_left:
+        mcost = max(0, mcost)
+
+      curr_cost[j+1] = mcost
 
       if mcost>score:
         end_i = i
@@ -1253,7 +1317,7 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
       # insertions over deletions.  This ambiguity for equal cost options
       # implies that there may not be a unique optimum edit sequence, but
       # one or more sequences of equal length.
-      if mcost==0:
+      if not anchor_left and mcost==0:
         pass
       elif mcost==match:
         edits[i,j]='=' if c1==c2 else 'X'
@@ -1263,7 +1327,12 @@ def smith_waterman_gotoh(s1, s2, match_score=1, mismatch_score=-1, gap_open_scor
         edits[i,j]='D'
 
   # Build and return a minimal edit sequence using the saved operations
-  start_i,start_j,cigar = _roll_cigar(end_i,end_j,edits)
+  if anchor_right:
+    end_i = n-1
+    end_j = m-1
+    score = mcost
+
+  start_i,start_j,cigar = _roll_cigar(end_i,end_j,edits,anchor_left)
 
   return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar
 
