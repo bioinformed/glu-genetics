@@ -142,6 +142,40 @@ def query_cytoband_by_name(con,name):
     raise KeyError('Ambiguous cytoband "%s"' % name)
 
 
+def query_contig_by_location(con,chrom,loc):
+  sql = '''
+  SELECT   name,start,stop
+  FROM     contig
+  WHERE    chrom = ?
+    AND    ? BETWEEN start AND stop
+  ORDER BY chrom,MIN(start,stop);
+  '''
+  if chrom.startswith('chr'):
+    chrom = chrom[3:]
+  cur = con.cursor()
+  cur.execute(sql, (chrom, loc))
+  return cur.fetchall()
+
+
+def query_contig_by_name(con,name):
+  sql1 = '''
+  SELECT   chrom,start,stop
+  FROM     contig
+  WHERE    name = ?;
+  '''
+
+  cur = con.cursor()
+  cur.execute(sql1, (name,))
+  results = cur.fetchall()
+
+  if not results:
+    return None
+  elif len(results) == 1:
+    return results[0]
+  elif len(results) > 1:
+    raise KeyError('Ambiguous contig "%s"' % name)
+
+
 def query_snps_by_name(con,name):
   sql = '''
   SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
@@ -167,15 +201,47 @@ def query_snp_by_name(con,name):
   return snps[0]
 
 
-def query_snps_by_location(con,chr,start,end):
+def query_snps_by_location(con,chrom,start,end):
   sql = '''
   SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
   FROM     snp
-  WHERE    chrom = ?
-    AND    start < ?
-    AND    end   > ?
+  WHERE    chrom  = ?
+    AND    start <= ?
+    AND    end   >= ?
   ORDER BY start;
   '''
   cur = con.cursor()
-  cur.execute(sql,(chr,end,start))
+  cur.execute(sql,(chrom,end,start))
   return cur.fetchall()
+
+
+def query_snps_by_location_rtree(con,chrom,start,end):
+
+  import time
+
+  t0 = time.time()
+  cur = con.cursor()
+  cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (end,start))
+  ids = cur.fetchall()
+  print '!!! Got %d ids in %.2f seconds' % (len(ids),time.time()-t0)
+
+  if not ids:
+    return []
+
+  ids = ','.join([ str(i[0]) for i in ids ])
+
+  sql = '''
+    SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
+    FROM     snp
+    WHERE    chrom = '%s'
+      AND    id in (%s)
+    ORDER BY start;'''
+
+  t0 = time.time()
+
+  cur.execute(sql % (chrom,ids))
+  rows = cur.fetchall()
+
+  print '!!! Got %d SNPs in %.2f seconds' % (len(rows),time.time()-t0)
+
+  return rows

@@ -12,7 +12,8 @@ import sys
 from   glu.lib.fileutils          import table_reader,table_writer,tryint
 
 from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name
+from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name, \
+                                         query_contig_by_name
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
@@ -92,6 +93,14 @@ def resolve_feature(con,feature,options):
       chr,start,end,color = cytoinfo
       strand = '+'
       feature = 'CYTOBAND'
+      found = True
+
+  if not found:
+    contiginfo = query_contig_by_name(con,name)
+    if contiginfo:
+      chr,start,end = contiginfo
+      strand = '+'
+      feature = 'CONTIG'
       found = True
 
   if not found:
