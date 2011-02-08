@@ -69,9 +69,9 @@ def option_parser():
   bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
                           action='callback', callback=check_option01,
                           help='Minimum d-prime threshold to output (default=0)')
-  bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.95,
+  bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.15,
                           action='callback', callback=check_option01,
-                          help='Minimum r-squared threshold to output (default=0.95)')
+                          help='Minimum r-squared threshold to output (default=0.15)')
 
   parser.add_option_group(inputgroup)
   parser.add_option_group(outputgroup)
