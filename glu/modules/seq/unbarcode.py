@@ -16,30 +16,49 @@ import numpy as np
 
 from   glu.lib.utils           import pair_generator
 from   glu.lib.fileutils       import autofile, hyphen, table_reader
+from   glu.lib.seqlib.edits    import levenshtein_distance, hamming_distance
 from   glu.lib.seqlib.edits    import levenshtein_sequence, hamming_sequence
 
 from   glu.modules.seq.convert import read_sequence, write_sequence, guess_informat_list
 
 
-def read_barcodes(filename):
+def read_barcodes(filename, trimb=0):
   barcodes      = table_reader(filename)
   header        = next(barcodes)
   barcode_tuple = namedtuple('barcode_tuple', 'id seq')
-  barcodes      = map(barcode_tuple._make, ( (id,seq.upper()) for id,seq in barcodes if id and seq) )
+  barcodes      = ( (id,seq.upper()) for id,seq in barcodes if id and seq )
+
+  if trimb:
+    barcodes    = ( (id,seq[:trimb]) for id,seq in barcodes )
+
+  barcodes      = map(barcode_tuple._make, barcodes)
+
   return barcodes
 
 
-def read_sequence_and_barcode(filename, location, barcode_len):
+def read_sequence_and_barcode(filename, location, trim5, trim3, trunc, barcode_len):
   seqs = read_sequence(filename, None)
 
   # FIXME: Add auto-detect
 
   if location=='454':
-    end = 4+barcode_len
+    start = 4 if trim5 is None else trim5
+    end   = start+barcode_len
+
     for seq in seqs:
       sseq = str(seq.seq)
-      assert sseq[:4]=='tcag'
-      barcode = sseq[4:end].upper()
+
+      if trunc is not None:
+        sseq = sseq[:trunc]
+
+      if trim3:
+        sseq = sseq[:-trim3]
+
+      if len(sseq)<end:
+        continue
+
+      #assert sseq[:4]=='tcag'
+      barcode = sseq[start:end].upper()
       yield barcode,seq
 
   elif location=='illumina':
@@ -63,7 +82,7 @@ def compute_barcode_distances(out,barcodes,distance_metric):
   barcodestats = defaultdict(lambda: [0]*(blen+1))
 
   for b1,b2 in pair_generator(barcodes):
-    d = len(distance_metric(b1.seq,b2.seq,compress=False))
+    d = distance_metric(b1.seq,b2.seq)
     barcodestats[b1.id][d] += 1
     barcodestats[b2.id][d] += 1
 
@@ -85,7 +104,7 @@ def option_parser():
                          'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
-  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT', default='fasta',
+  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT',
                     help='Output sequence format (default=fasta).  As above, except ace, ig, '
                          'pir, sff-trim, swiss.')
   parser.add_option('--destdir', dest='destdir', default='.',
@@ -94,6 +113,14 @@ def option_parser():
                     help='Distance metric for barcodes: levenshtein (default) or hamming')
   parser.add_option('--location', dest='location', metavar='LOC', default='454',
                     help='Barcode location: 454 (default) or illumina')
+  parser.add_option('--trim5', dest='trim5', metavar='N', type='int',
+                    help="Trim N 5' bases in reads prior to matching barcode")
+  parser.add_option('--trim3', dest='trim3', metavar='N', type='int',
+                    help="Trim N 3' bases in reads prior to matching barcode")
+  parser.add_option('--trimb', dest='trimb', metavar='N', type='int',
+                    help="Trim barcode to N bases")
+  parser.add_option('--trunc', dest='trunc', metavar='N', type='int',
+                    help="Truncate reads to N bases prior to matching barcode")
   parser.add_option('--maxerror', dest='maxerror', metavar='N', type='int',
                     help='Maximum allowed errors')
   parser.add_option('--mindist', dest='mindist', metavar='N', type='int', default=1,
@@ -116,9 +143,9 @@ def main():
 
   distance = options.distance.lower()
   if distance and 'levenshtein'.startswith(distance):
-    distance_metric = levenshtein_sequence
+    distance_metric = levenshtein_distance
   elif distance and 'hamming'.startswith(distance):
-    distance_metric = hamming_sequence
+    distance_metric = hamming_distance
   else:
     raise ValueError('Unknown distance metric: %s' % options.distance)
 
@@ -126,7 +153,7 @@ def main():
   if location not in ('454','illumina'):
     raise ValueError('Unknown barcode location: %s' % options.location)
 
-  barcodes     = read_barcodes(args[0])
+  barcodes     = read_barcodes(args[0], options.trimb)
   blen         = barcode_len(barcodes)
 
   out = autofile(hyphen(options.output,sys.stdout),'wb')
@@ -146,29 +173,35 @@ def main():
   decoded  = defaultdict(list)
 
   for filename in args[1:]:
-    for barcode,seq in read_sequence_and_barcode(filename, location, blen):
+    seqs = read_sequence_and_barcode(filename, location, options.trim5,
+                                               options.trim3, options.trunc, blen)
+
+    for barcode,seq in seqs:
       if len(barcode)!=blen:
         bad += 1
         continue
 
       if barcode not in cache:
-        distances = ( (m,distance_metric(barcode,m.seq,compress=False)) for m in barcodes )
-        distances = [ (len(ops),m,ops) for m,ops in distances ]
+        #distances = ( (m,distance_metric(barcode,m.seq,compress=False)) for m in barcodes )
+        #distances = [ (len(ops),m,ops) for m,ops in distances ]
+        distances = [ (distance_metric(barcode,m.seq),m) for m in barcodes ]
         distances.sort()
 
-        min_dist,min_barcode,min_ops    = distances[0]
-        min_count                   = sum(1 for d,m,ops in distances if d==min_dist)
-        next_dist,next_barcode,next_ops = distances[1]
+        min_dist,min_barcode   = distances[0]
+        min_count              = sum(1 for d,m in distances if d==min_dist)
+        next_dist,next_barcode = distances[1]
 
         if (options.maxerror is not None and min_dist>options.maxerror) or min_count>1 \
           or min_dist+options.mindist>next_dist:
-          min_barcode,min_ops='',[]
+          min_barcode = ''
 
-        cache[barcode] = min_dist,min_count,min_barcode,min_ops
+        #if min_barcode:
+        #  print min_barcode,barcode,'distance %d<=%d maxerror' % (min_dist,options.maxerror)
+
+        cache[barcode] = min_dist,min_count,min_barcode
         misses += 1
-
       else:
-        min_dist,min_count,min_barcode,min_ops = cache[barcode]
+        min_dist,min_count,min_barcode = cache[barcode]
         hits += 1
 
       #print min_barcode,'distance %d<=%d maxerror' % (min_dist,options.maxerror)
@@ -179,43 +212,50 @@ def main():
 
         match[min_dist] += 1
         barcodestats[min_barcode.id][min_dist] += 1
-        if min_dist==1:
-          op,pos,src,dst = min_ops[0]
-          if op=='S':
-            substats[pos+1,src,dst]+= 1
-            #posstats[pos,min_barcode.seq[pos]]+= 1
+        #if min_dist==1:
+        #  op,pos,src,dst = min_ops[0]
+        #  if op=='S':
+        #    substats[pos+1,src,dst]+= 1
+        #    #posstats[pos,min_barcode.seq[pos]]+= 1
       else:
         mismatch[min_dist] += 1
 
       #print seq.id,barcode,min_dist,min_count,min_barcode
 
-  for mid,sequences in decoded.iteritems():
-    filename = '%s/%s.%s' % (options.destdir,mid,options.outformat)
-    write_sequence(sequences, filename, options.outformat)
-    sequences[:] = []
+  if options.outformat:
+    for mid,sequences in decoded.iteritems():
+      filename = '%s/%s.%s' % (options.destdir,mid,options.outformat)
+      write_sequence(sequences, filename, options.outformat)
+      sequences[:] = []
 
-  decoded.clear()
+    decoded.clear()
 
   if not hits+misses:
     return
 
   hit_rate = hits/(hits+misses)*100 if hits+misses else 0
   out.write('      BAD BARCODES: %d\n' % bad)
-  out.write('   MATCH DISTANCES: %s\n' % match)
-  out.write('MISMATCH DISTANCES: %s\n' % mismatch)
+  out.write('   MATCH DISTANCES: %d : %s\n' % (sum(match),match))
+  out.write('MISMATCH DISTANCES: %d : %s\n' % (sum(mismatch),mismatch))
   out.write('    CACHE HIT RATE: %.3f%%\n\n' % hit_rate)
 
   #for pos in sorted(posstats):
   #  print pos,posstats[pos]
-
-  for i in xrange(1,blen+1):
-    out.write('%d %s\n' % (i,' '.join('%d' % sum(substats[i,b1,b2] for b2 in 'ACGTN') for b1 in 'ACGTN')))
-
+  #for i in xrange(1,blen+1):
+  #  out.write('%d %s\n' % (i,' '.join('%d' % sum(substats[i,b1,b2] for b2 in 'ACGTN') for b1 in 'ACGTN')))
   #for sub in sorted(substats):
   #  print sub,substats[sub]
 
+  total = 0
   for barcode in barcodes:
-    out.write('%s %s %s\n' % (barcode.id,barcode.seq,barcodestats[barcode.id]))
+    bstats = barcodestats[barcode.id]
+    if options.maxerror:
+      bstats = bstats[:options.maxerror+1]
+    total += sum(bstats)
+    out.write('%s %d %s\n' % (barcode.id,sum(bstats),bstats))
+
+  out.write('TOTAL    MATCHES: %d\n' % total)
+  out.write('TOTAL MISMATCHES: %d\n' % sum(mismatch))
 
 
 if __name__=='__main__':
