@@ -65,8 +65,8 @@ def guess_outformat(filename):
   return FORMAT_REMAP.get(f,f)
 
 
-def write_sequence(sequences, filename, outformat):
-  outformat = guess_outformat(filename) or outformat or 'fasta'
+def write_sequence(sequences, filename, outformat=None):
+  outformat = outformat or guess_outformat(filename) or 'fasta'
   outformat = FORMAT_REMAP.get(outformat,outformat)
   filename  = parse_augmented_filename(filename, {})
   outfile   = autofile(hyphen(filename,sys.stdout),'wb')
@@ -74,8 +74,17 @@ def write_sequence(sequences, filename, outformat):
   return SeqIO.write(sequences, outfile, outformat)
 
 
-def read_sequence(filename, informat):
-  informat = guess_informat(filename) or informat
+def sequence_writer(filename, outformat=None):
+  outformat = outformat or guess_outformat(filename) or 'fasta'
+  outformat = FORMAT_REMAP.get(outformat,outformat)
+  filename  = parse_augmented_filename(filename, {})
+  outfile   = autofile(hyphen(filename,sys.stdout),'wb')
+
+  return SeqIO._FormatToWriter[outformat](outfile)
+
+
+def read_sequence(filename, informat=None):
+  informat = informat or guess_informat(filename)
   informat = FORMAT_REMAP.get(informat,informat)
   filename = parse_augmented_filename(filename, {})
 
@@ -84,6 +93,10 @@ def read_sequence(filename, informat):
 
   return SeqIO.parse(autofile(filename,'rb'), informat)
 
+
+def trim_sequences(sequences, trim):
+  for seq in sequences:
+    yield seq[trim:]
 
 
 SOLEXA_SCORE_OFFSET = 64
@@ -133,9 +146,11 @@ def option_parser():
                          'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
-  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT', default='fasta',
+  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT',
                     help='Output sequence format (default=fasta).  As above, except ace, ig, '
                          'pir, sff-trim, swiss.')
+  parser.add_option('--trim', dest='trim', type='int', metavar='N', default=0,
+                    help='Trim N leading bases')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output file')
   return parser
@@ -153,6 +168,10 @@ def main():
     options.informat = guess_informat_list(args)
 
   sequences = chain.from_iterable(read_sequence(filename, options.informat) for filename in args)
+
+  if options.trim:
+    sequences = trim_sequences(sequences, options.trim)
+
   count     = write_sequence(sequences, options.output, options.outformat)
 
   print >> sys.stderr, 'Processed %d records' % count
