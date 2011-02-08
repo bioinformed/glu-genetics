@@ -875,6 +875,22 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
   >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
   '---cc'
   'acc.t'
+
+  >>> s1='AGACCAAGTCTCTGCTACCGTACATACTCGTACTGAGACTGCCAAGGCACACAGGGGATAG'
+  >>> s2='GCTGGTGCGACACAT'
+  >>> p1,p2,score,cigar = smith_waterman_gotoh(s1,s2,mismatch_score=-20)
+  >>> p1
+  slice(46, 53, None)
+  >>> p2
+  slice(6, 14, None)
+  >>> score
+  55
+  >>> cigar_to_string(cigar)
+  '2=1I5='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'GC-ACACA'
+  '..G.....'
   '''
   # Fall back to the standard Smith Waterman when the overhead of the Gotoh
   # scoring is not needed
