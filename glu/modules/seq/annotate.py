@@ -159,22 +159,69 @@ def get_snps(con):
 
 def get_snps_interval(con, chrom, ref_start, ref_end):
   cur = con.cursor()
-  #cur.execute('SELECT * FROM SNP WHERE chrom=? AND start<=? AND end>=?;', (chrom, ref_end, ref_start))
-  #cur.execute('SELECT * FROM SNP WHERE chrom=? AND start=? AND end=?;', (chrom, ref_start, ref_end))
 
-  t = time.time()
-  cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (ref_start,ref_end))
-  ids = cur.fetchall()
+  if 1:
+    cur.execute('SELECT * FROM snp WHERE chrom=? AND start<=? AND end>=?;', (chrom, ref_end, ref_start))
+    snps = cur.fetchall()
 
-  if not ids:
-    return
+  elif 0:
+    t0 = time.time()
+    cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (ref_end,ref_start))
+    ids = cur.fetchall()
+    t1 = time.time()
 
-  ids = ','.join([ str(i[0]) for i in ids ])
+    print 'RTREE: %.2f' % (t1-t0)
 
-  cur.execute('SELECT * from snp WHERE id IN (%s) AND chrom="%s"' % (ids,chrom))
+    if not ids:
+      return
 
-  make  = SNP._make
-  for row in cur:
+    ids = ','.join([ str(i[0]) for i in ids ])
+    cur.execute('SELECT * from snp WHERE id IN (%s) AND chrom="%s"' % (ids,chrom))
+    snps = cur.fetchall()
+    t2 = time.time()
+    print 'IDS: %.2f' % (t2-t1)
+
+  elif 0:
+    t0 = time.time()
+    cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (ref_end,ref_start))
+    ids = cur.fetchall()
+    t1 = time.time()
+
+    print 'RTREE: %.2f' % (t1-t0)
+
+    if not ids:
+      return
+
+    cur.execute('SELECT * FROM snp WHERE chrom=? AND start<=? AND end>=?;', (chrom, ref_end, ref_start))
+    snps = cur.fetchall()
+    t2 = time.time()
+    print 'RANGE: %.2f (%d)' % (t2-t1,len(snps))
+
+    ids = ','.join([ str(i[0]) for i in ids ])
+    cur.execute('SELECT * from snp WHERE id IN (%s) AND chrom="%s"' % (ids,chrom))
+    snps = cur.fetchall()
+    t3 = time.time()
+    print 'IDS: %.2f (%d)' % (t3-t2,len(snps))
+    print
+
+  else:
+    sql = '''SELECT *
+             FROM   snp
+             WHERE  id IN (SELECT id
+                           FROM   snp_index
+                           WHERE  start <= ?
+                              AND end   >= ?)
+               AND  chrom = ?;'''
+
+    t0 = time.time()
+    cur.execute(sql, (ref_end, ref_start, chrom))
+    snps = cur.fetchall()
+    t1 = time.time()
+
+    print 'JOIN: %.2f (%d)' % (t1-t0,len(snps))
+
+  make = SNP._make
+  for row in snps:
     # name chrom start end strand refAllele alleles vclass func weight
     row    = list(row)
     row[5] = row[5].replace('-','')
@@ -461,11 +508,8 @@ class VariantAnnotator(object):
     inexact  = set()
 
     for snp in snps:
-      #ref_alleles = set(str(snp.refAllele).split('/'))
-      #var_alleles = set(str(snp.alleles).split('/'))
-      #match = (snp.start==ref_start and snp.end==ref_end and ref_nuc in snp.refAllele \
-      #        and var&alleles)
-      match = False
+      alleles = set(str(snp.alleles).split('/'))
+      match   = (snp.start==ref_start and snp.end==ref_end and var&alleles)
       #print snp.name,snp.start,ref_start,snp.end,ref_end,snp.refAllele,ref_nuc,var,alleles,var&alleles,match
       #print snp.name,snp.start==ref_start,snp.end==ref_end,snp.refAllele,ref_nuc,
 
@@ -587,7 +631,7 @@ def main():
     header   = next(variants)
     extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
                 'REF_NUC_NEW','VAR_NUC_NEW','REF_AA_NEW','VAR_AA_NEW', 'dbSNP_exact','dbSNP_inexact']
-    out      = table_writer(sys.stdout)
+    out      = table_writer(options.output)
     out.writerow(header + extra[3:])
 
     stats = defaultdict(int)
