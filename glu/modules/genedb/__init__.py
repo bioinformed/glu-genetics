@@ -19,6 +19,17 @@ DEFAULT_PATHS  = [os.path.join(os.path.dirname(__file__),'data'),
                   '/usr/share/genedb']
 
 
+class GeneDBSQLite(object):
+  def __init__(self, filename):
+    self.con = sqlite3.connect(filename)
+
+  def cursor(self):
+    return self.con.cursor()
+
+  def commit(self):
+    return self.con.commit()
+
+
 def search_file(filename, path):
   '''
   Find a file given a search path
@@ -63,6 +74,6 @@ def open_genedb(dbname=None,path=None):
 
     if filename:
       sys.stderr.write('[INFO] Opening genedb: %s\n' % filename)
-      return sqlite3.connect(filename)
+      return GeneDBSQLite(filename)
 
   raise IOError('Cannot open genedb')
