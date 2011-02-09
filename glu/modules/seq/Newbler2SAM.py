@@ -16,6 +16,8 @@ from   operator                import itemgetter
 from   itertools               import groupby
 from   subprocess              import Popen, PIPE
 
+from   Bio                     import SeqIO
+
 from   glu.lib.utils           import namedtuple
 from   glu.lib.fileutils       import autofile,hyphen,table_writer,table_reader
 

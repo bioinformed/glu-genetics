@@ -7,7 +7,11 @@ from   collections             import defaultdict
 import numpy as np
 
 from   Bio               import SeqIO
-from   Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
+
+try:
+  from Bio.SeqIO.SffIO   import ReadRocheXmlManifest      as sff_manifest
+except ImportError:
+  from Bio.SeqIO.SffIO   import _sff_read_roche_index_xml as sff_manifest
 
 
 class SFFIndex(object):
@@ -85,5 +89,3 @@ def hard_trim(read,seq,qual,trim):
   qual = qual[hard_trim_left:seqlen-hard_trim_right]
 
   return seq,qual,hard_trim_left,hard_trim_right
-
-
