@@ -5,7 +5,7 @@ __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Departmen
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-import heapq
+
 from   operator  import itemgetter
 from   itertools import tee,izip,imap,count
 
@@ -39,61 +39,82 @@ def imerge(its, key=None):
   [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
   '''
   if key is None:
-    return _imerge(its)
+    return merge(*its)
 
   counter = count()
-  its_d = []
+  its_d   = []
+
   for it in its:
     it1,it2 = tee(it)
     its_d.append( izip(imap(key,it1), counter, it2) )
 
-  merged = _imerge(its_d)
+  merged = merge(*its_d)
 
   return imap(itemgetter(2), merged)
 
 
-def _imerge(its):
-  '''
-  Generator to efficiently merge sorted iterables using native Python sort
-  order.
+try:
+  from heapq import merge
 
-  Based on a non-micro optimized version of Raymond Hettinger's recipe at
-  http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/491285
+except ImportError:
+  from heapq import heapify, heappop, heapreplace
 
-  Equivalent, but much more efficient than:
+  def merge(*iterables):
+    '''Merge multiple sorted inputs into a single sorted output.
 
-    iter(sorted(*chain(*its)))
+    Similar to sorted(itertools.chain(*iterables)) but returns a generator,
+    does not pull the data into memory all at once, and assumes that each of
+    the input streams is already sorted (smallest to largest).
 
-  so long as the following invariant holds:
+    Based on heapq.merge from Python 2.7.
 
-    for it in its:
-      it = list(it)
-      assert it == sorted(it)
+    Equivalent, but much more efficient than:
 
-  @param its: list of sorted input sequences
-  @type  its: sequence
-  @return:    sequence of sorted values
-  @rtype:     iterator
+      iter(sorted(*chain(*its)))
 
-  >>> list(_imerge([range(5),range(5,11)]))
-  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  '''
-  pqueue = []
-  for i in imap(iter, its):
-    try:
-      pqueue.append((i.next(), i.next))
-    except StopIteration:
-      pass
+    so long as the following invariant holds:
 
-  heapq.heapify(pqueue)
+      for it in its:
+        it = list(it)
+        assert it == sorted(it)
 
-  while pqueue:
-    val, it = pqueue[0]
-    yield val
-    try:
-      heapq.heapreplace(pqueue, (it(), it))
-    except StopIteration:
-      heapq.heappop(pqueue)
+    @param its: list of sorted input sequences
+    @type  its: sequence
+    @return:    sequence of sorted values
+    @rtype:     iterator
+
+    >>> list(merge(range(5),range(5,11)))
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+    >>> list(merge([1,3,5,7], [0,2,4,8], [5,10,15,20], [], [25]))
+    [0, 1, 2, 3, 4, 5, 5, 7, 8, 10, 15, 20, 25]
+
+    '''
+    _heappop, _heapreplace, _StopIteration = heappop, heapreplace, StopIteration
+
+    h = []
+    h_append = h.append
+
+    for itnum,it in enumerate(map(iter, iterables)):
+      try:
+        next = it.next
+        h_append([next(), itnum, next])
+      except _StopIteration:
+        pass
+
+    heapify(h)
+
+    while 1:
+      try:
+        while 1:
+          v, itnum, next = s = h[0]   # raises IndexError when h is empty
+          yield v
+          s[0] = next()               # raises StopIteration when exhausted
+          _heapreplace(h, s)          # restore heap condition
+      except _StopIteration:
+        _heappop(h)                   # remove empty iterator
+      except IndexError:
+        return
 
 
 def _test():
