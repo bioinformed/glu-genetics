@@ -36,8 +36,8 @@ def read_barcodes(filename, trimb=0):
   return barcodes
 
 
-def read_sequence_and_barcode(filename, location, trim5, trim3, trunc, barcode_len):
-  seqs = read_sequence(filename, None)
+def read_sequence_and_barcode(filename, format, location, trim5, trim3, trunc, barcode_len):
+  seqs = read_sequence(filename, format)
 
   # FIXME: Add auto-detect
 
@@ -173,7 +173,7 @@ def main():
   decoded  = defaultdict(list)
 
   for filename in args[1:]:
-    seqs = read_sequence_and_barcode(filename, location, options.trim5,
+    seqs = read_sequence_and_barcode(filename, options.informat, location, options.trim5,
                                                options.trim3, options.trunc, blen)
 
     for barcode,seq in seqs:
