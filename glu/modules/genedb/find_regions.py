@@ -36,7 +36,9 @@ def option_parser():
                     help='maximum number of upstream SNPs (default=0 for no limit)')
   parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
                     help='maximum number of downstream SNPs (default=0 for no limit)')
-  parser.add_option('-o', '--output',   dest='output',   default='-',                metavar='FILE',
+  parser.add_option('-F', '--outformat', dest='outformat', default='GLU',              metavar='NAME',
+                    help='Output format (GLU or BED)')
+  parser.add_option('-o', '--output',   dest='output', default='-',                    metavar='FILE',
                     help="output file name, '-' for standard out")
   return parser
 
@@ -127,6 +129,29 @@ def resolve_features(con,features,options):
     yield resolve_feature(con,feature,options)
 
 
+def bed_format(results):
+  for row in results:
+    feature   = row[0]
+    chrom     = row[1]
+    start     = row[3]
+    end       = row[4]
+    strand    = row[2] or '+'
+    upbases   = row[5] or 0
+    downbases = row[6] or 0
+
+    if start is None or end is None:
+      continue
+
+    if strand=='+':
+      start -= upbases
+      end   += downbases
+    elif strand=='-':
+      start -= downbases
+      end   += upbases
+
+    yield chrom,start,end,feature
+
+
 def main():
   parser = option_parser()
   options,args = parser.parse_args()
@@ -135,13 +160,24 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
+  options.outformat = options.outformat.lower()
+
+  if options.outformat not in ('glu','bed'):
+    raise ValueError('Unknown output format selected: %s' % options.outformat)
+
   con = open_genedb(options.genedb)
   out = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(HEADER)
+
+  if options.outformat=='glu':
+    out.writerow(HEADER)
 
   for infile in args:
     features = table_reader(infile,want_header=True,hyphen=sys.stdin)
     results  = resolve_features(con,features,options)
+
+    if options.outformat=='bed':
+      results = bed_format(results)
+
     out.writerows(results)
 
 

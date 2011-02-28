@@ -44,6 +44,8 @@ def option_parser():
                     help='maximum number of upstream SNPs (default=0 for no limit)')
   parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
                     help='maximum number of downstream SNPs (default=0 for no limit)')
+  parser.add_option('-F', '--outformat', dest='outformat', default='GLU',              metavar='NAME',
+                    help='Output format (GLU or BED)')
   parser.add_option('-o', '--output',  dest='output', default='-', metavar='FILE',
                     help="the name of the output file, '-' for standard out")
   return parser
@@ -166,9 +168,16 @@ def main():
     parser.print_help(sys.stderr)
     sys.exit(2)
 
+  options.outformat = options.outformat.lower()
+
+  if options.outformat not in ('glu','bed'):
+    raise ValueError('Unknown output format selected: %s' % options.outformat)
+
   con = open_genedb(options.genedb)
   out = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(HEADER)
+
+  if options.outformat not in ('glu','bed'):
+    out.writerow(HEADER)
 
   filter_results = ResultFilter(options).filter
 
@@ -190,10 +199,15 @@ def main():
       results = filter_results(results)
       results = annotate_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
 
-      for result in results:
-        row = [ result[0], result[1], result[2]+1, result[3], result[4], result[5], result[6], result[7], result[8],
-                chrStart, chrEnd, name, strand, start, end, featuretype ]
-        out.writerow(row)
+      if options.outformat=='glu':
+        for result in results:
+          row = [ result[0], result[1], result[2]+1, result[3], result[4], result[5], result[6], result[7], result[8],
+                  chrStart, chrEnd, name, strand, start, end, featuretype ]
+          out.writerow(row)
+      else:
+        for result in results:
+          row = [ result[1], result[2], result[3], result[0] ]
+          out.writerow(row)
 
 
 if __name__ == '__main__':
