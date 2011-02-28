@@ -60,8 +60,8 @@ def read_groups(aligns,platform):
   else:
     raise ValueError('Unknown platform specified: %s' % platform)
 
-  for contig,contig_aligns in groupby(aligns,attrgetter('rname')):
-    if contig==-1:
+  for tid,contig_aligns in groupby(aligns,attrgetter('tid')):
+    if tid==-1:
       continue
 
     fwd = []

@@ -200,9 +200,9 @@ def load_bam(filename,options):
     aligns       = progress_loop(aligns, label='Loading BAM file: ', units='alignments')
     aligns       = filter_alignments(aligns, options.includealign, options.excludealign)
 
-    for contig_tid,contig_aligns in groupby(aligns, attrgetter('rname')):
-      contig_name   = contig_names[contig_tid]
-      contig_len    = contig_lens[contig_tid]
+    for tid,contig_aligns in groupby(aligns, attrgetter('tid')):
+      contig_name   = contig_names[tid]
+      contig_len    = contig_lens[tid]
       contig_aligns = ( (align.pos,align.aend,align) for align in contig_aligns )
 
       yield contig_name,contig_len,contig_aligns
