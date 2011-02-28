@@ -171,13 +171,15 @@ def target_filter(aligns,references,targets,stats,options):
             reads_PASS += 1
             bases_PASS += rlen
             yield align
+            break
 
-        reads_LOWOVERLAP += 1
-        bases_LOWOVERLAP += rlen
+        else:
+          reads_LOWOVERLAP += 1
+          bases_LOWOVERLAP += rlen
 
-        if fail:
-          align.is_qcfail = True
-          yield align
+          if fail:
+            align.is_qcfail = True
+            yield align
 
   finally:
     stats.reads[UNALIGNED]  += reads_UNALIGNED
