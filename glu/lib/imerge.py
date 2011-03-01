@@ -41,16 +41,9 @@ def imerge(its, key=None):
   if key is None:
     return merge(*its)
 
-  counter = count()
-  its_d   = []
+  its_d = [ ((key(item),item) for item in it) for it in its ]
 
-  for it in its:
-    it1,it2 = tee(it)
-    its_d.append( izip(imap(key,it1), counter, it2) )
-
-  merged = merge(*its_d)
-
-  return imap(itemgetter(2), merged)
+  return imap(itemgetter(1), merge(*its_d))
 
 
 try:
