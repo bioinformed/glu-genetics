@@ -81,8 +81,6 @@ def load_models(gdat,ignoreloci=False):
   @param   gfile: gdat file
   @type    gfile: h5py HDF5 file instance
   '''
-  print '!!! In load_models'
-
   model_cache = {}
   genome   = Genome()
   loci     = []
