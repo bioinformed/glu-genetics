@@ -81,6 +81,7 @@ def load_models(gdat,ignoreloci=False):
   @param   gfile: gdat file
   @type    gfile: h5py HDF5 file instance
   '''
+  print '!!! In load_models'
 
   model_cache = {}
   genome   = Genome()
@@ -90,12 +91,12 @@ def load_models(gdat,ignoreloci=False):
   for row in gdat['SNPs'][:].tolist():
     name,chromosome,location,alleles_forward = row[:4]
 
-    if alleles_forward in model_cache:
-      model   = model_cache[alleles_forward]
-    else:
-      model   = build_model(alleles=tuple(alleles_forward),max_alleles=2)
-      genos   = model.genotypes
-      model_cache[alleles_forward] = model
+    model = model_cache.get(alleles_forward)
+
+    if model is None:
+      a,b     = alleles_forward
+      genos   = [(a,a),(a,b),(b,b)] if a and b else [(a or b,a or b)]
+      model_cache[alleles_forward] = model = build_model(genotypes=genos, max_alleles=2)
 
     loci.append(name)
     models.append(model)
@@ -104,8 +105,12 @@ def load_models(gdat,ignoreloci=False):
       genome.loci[name] = Locus(name, model)
     else:
       if location == -1:
+        strand   = None
         location = None
-      genome.loci[name] = Locus(name, model, chromosome, location, '+')
+      else:
+        strand   = '+'
+
+      genome.loci[name] = Locus(name, model, chromosome, location, strand)
 
   return loci,genome,models
 
