@@ -9,7 +9,10 @@ __revision__  = '$Id$'
 
 
 import sys
+import heapq
 import optparse
+
+from   collections             import defaultdict
 
 from   glu.lib.fileutils       import list_reader, table_writer
 from   glu.lib.genolib         import geno_options
@@ -19,15 +22,15 @@ from   glu.modules.ld.tagzilla import check_option01, epsilon, sfloat, \
 
 
 def option_parser():
-  usage = 'usage: %prog [options] needles.lst haystack.lst genotypes...'
+  usage = 'usage: %prog [options] needles.lst genotypes...'
   parser = optparse.OptionParser(usage=usage)
 
   inputgroup = optparse.OptionGroup(parser, 'Input options')
 
   geno_options(inputgroup,input=True,filter=True)
 
-  inputgroup.add_option('-e', '--exclude', dest='exclude', metavar='FILE', default='',
-                          help='File containing loci that are excluded from being a surrogate')
+  inputgroup.add_option('--haystack', dest='haystack', metavar='FILE',
+                          help='List of SNPs eligable to be surrogates (minus any in needle.lst if --indirect is specifed)')
   inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
                           help='Ranges of genomic locations to analyze, specified as a comma separated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
@@ -65,7 +68,8 @@ def option_parser():
 
   bingroup.add_option('--indirect', dest='indirect', action='store_true',
                           help='Allow only indirect surrogates')
-
+  bingroup.add_option('-s', '--maxsurrogates', dest='maxsurrogates', metavar='N', type='int', default=0,
+                          help='Maximum number of surrogates (default=0 for unlimited)')
   bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
                           action='callback', callback=check_option01,
                           help='Minimum d-prime threshold to output (default=0)')
@@ -85,75 +89,78 @@ def main():
   parser = option_parser()
   options,args = parser.parse_args()
 
-  if len(args)<3:
+  if len(args)<2:
     parser.print_help(sys.stderr)
     sys.exit(2)
 
   exclude = set()
-
-  if options.exclude:
-    exclude = set(list_reader(options.exclude))
-  elif options.designscores:
-    exclude = set()
-
   if options.designscores:
     designscores = build_design_score(options.designscores)
     exclude.update(lname for lname,d in designscores.iteritems() if d <= epsilon)
 
   seen     = set()
   needle   = set(list_reader(args[0]))
-  haystack = set(list_reader(args[1]))-exclude
-  indirect = haystack-needle
 
-  if options.indirect:
-    haystack = indirect
+  if options.haystack:
+    haystack = set(list_reader(options.haystack))-exclude
+    indirect = haystack-needle
 
-  include  = needle|haystack
+    if options.indirect:
+      haystack = indirect
+
+    include = needle|haystack
+
+  else:
+    include = haystack = None
+
+  direct = needle if options.indirect else set()
 
   # ldsubset=needle
-  args = [ (options,arg) for arg in args[2:] ]
-  ldpairs = generate_ldpairs(args, {}, include, None, needle, options)
+  args = [ (options,arg) for arg in args[1:] ]
+  ldpairs = generate_ldpairs(args, {}, set(), None, needle, options)
 
-  missing = '',0
-  best_surrogate = {}
+  heappushpop    = heapq.heappushpop
+  heappush       = heapq.heappush
+  maxsurrogates  = options.maxsurrogates
+  best_surrogate = defaultdict(list)
+
+  def update_surrogates(lname,surrogate,r2):
+    surrogates = best_surrogate[lname]
+
+    if len(surrogates)<maxsurrogates:
+      heappush(surrogates, (r2,surrogate) )
+    elif r2>surrogates[0][0]:
+      heappushpop(surrogates, (r2,surrogate) )
+
   for pairs in ldpairs:
     for lname1,lname2,r2,dprime in pairs:
+      found = None
       seen.add(lname1)
       seen.add(lname2)
+
       if lname1==lname2:
-        continue
-      elif lname1 in needle and lname2 in indirect:
-        best_locus,best_r2 = best_surrogate.get(lname1,missing)
-        if r2 > best_r2:
-          best_surrogate[lname1] = lname2,r2
-      elif lname2 in needle and lname1 in indirect:
-        best_locus,best_r2 = best_surrogate.get(lname2,missing)
-        if r2 > best_r2:
-          best_surrogate[lname2] = lname1,r2
+        if lname1 in needle and lname1 not in direct:
+          update_surrogates(lname1,lname1,r2)
+      else:
+        if lname1 in needle and lname2 not in direct:
+          update_surrogates(lname1,lname2,r2)
+        if lname2 in needle and lname1 not in direct:
+          update_surrogates(lname2,lname1,r2)
 
   outfile = table_writer(options.output, hyphen=sys.stdout)
-  outfile.writerow(['LNAME','SURROGATE','RSQUARED','REASON'])
+  outfile.writerow(['LNAME','RANK','SURROGATE','RSQUARED','REASON'])
 
-  one    = sfloat(1)
-  reason = 'DIRECT'
-  direct = needle&seen&haystack
-  for lname in direct:
-    outfile.writerow([lname,lname,one,reason])
+  for lname in sorted(needle):
+    surrogates = best_surrogate.get(lname)
 
-  reason = 'INDIRECT'
-  for lname,(surrogate,r2) in best_surrogate.iteritems():
-    if lname not in direct:
-      outfile.writerow([lname,surrogate,sfloat(r2),reason])
-
-  reason_nos = 'NO SURROGATE'
-  reason_nod = 'NO DATA'
-
-  for lname in needle:
-    if lname not in direct and lname not in best_surrogate:
-      if lname in seen:
-        outfile.writerow([lname,'','',reason_nos])
-      else:
-        outfile.writerow([lname,'','',reason_nod])
+    if not surrogates:
+      reason = 'NO SURROGATE' if lname in seen else 'NO DATA'
+      outfile.writerow([lname,'','','',reason])
+    else:
+      surrogates.sort(reverse=True)
+      for i,(r2,sname) in enumerate(surrogates):
+        reason = 'DIRECT' if sname in needle else 'INDIRECT'
+        outfile.writerow([lname,i+1,sname,sfloat(r2),reason])
 
 
 if __name__ == '__main__':
