@@ -127,7 +127,7 @@ def main():
   def update_surrogates(lname,surrogate,r2):
     surrogates = best_surrogate[lname]
 
-    if len(surrogates)<maxsurrogates:
+    if not maxsurrogates or len(surrogates)<maxsurrogates:
       heappush(surrogates, (r2,surrogate) )
     elif r2>surrogates[0][0]:
       heappushpop(surrogates, (r2,surrogate) )
