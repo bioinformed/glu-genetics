@@ -408,7 +408,7 @@ def load_loci(filename,options,keep):
     fixedloci = fixedloci.transformed(include_samples=keep,order_samples=samples)
 
   if loci is None and fixedloci is None:
-    return None,None,[]
+    return None,None,None
 
   if loci is None:
     return None,fixedloci,fixedloci.samples
@@ -669,10 +669,14 @@ class LocusModelBuilder(object):
     except TypeError:
       phenos = list(phenos)
 
-    pidset            = set(p[0] for p in phenos) & set(locus_header)
-    self.phenos       = np.array([ p for p in phenos if p[0] in pidset], dtype=object)
-    locus_idx         = dict( (pid,i) for i,pid in enumerate(locus_header) )
-    self.geno_indices = [ locus_idx[p[0]] for p in self.phenos ]
+    pidset              = set(p[0] for p in phenos)
+
+    if locus_header is not None:
+      pidset           &= set(locus_header)
+      locus_idx         = dict( (pid,i) for i,pid in enumerate(locus_header) )
+      self.geno_indices = [ locus_idx[p[0]] for p in self.phenos ]
+
+    self.phenos         = np.array([ p for p in phenos if p[0] in pidset], dtype=object)
 
   def build_model(self,term,loci):
     if not len(self.phenos):
