@@ -28,7 +28,7 @@ HAPMAP_HEADERS = ['rs# SNPalleles chrom pos strand genome_build center protLSID 
                   'rs# alleles chrom pos strand assembly# center protLSID assayLSID panelLSID QCcode']
 
 
-def load_hapmap(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
+def load_hapmap(filename,format,genome=None,phenome=None,transform=None,extra_args=None,**kwargs):
   '''
   Load a HapMap genotype data file.
 
@@ -55,6 +55,13 @@ def load_hapmap(filename,format,genome=None,phenome=None,extra_args=None,**kwarg
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  includeloci = transform.loci.include
+  excludeloci = transform.loci.exclude
+
+  if includeloci is not None and excludeloci is not None:
+    includeloci -= excludeloci
+    excludeloci.clear()
 
   gfile = autofile(filename)
   gfile = dropwhile(lambda s: s.startswith('#'), gfile)
@@ -85,6 +92,13 @@ def load_hapmap(filename,format,genome=None,phenome=None,extra_args=None,**kwarg
         continue
 
       locus      = intern(fields[0].strip())
+
+      if includeloci is not None and locus not in includeloci:
+        continue
+
+      if excludeloci is not None and locus in excludeloci:
+        continue
+
       alleles    = tuple(sorted(fields[1].split('/')))
       chromosome = fields[2].strip()
       position   = tryint(fields[3].strip())

@@ -173,10 +173,6 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   elif is_str(phenome):
     phenome = load_phenome(phenome,extra_args=args)
 
-  loader = get_genostream_loader(format)
-  genos  = loader(filename, format, extra_args=args, genome=genome, phenome=phenome)
-
-  # Apply any requested transformations
   # FIXME: The length checking code is there because transformed may not be
   #        smart enough to handle null transformations as a matter of
   #        course.  This can be relaxed once that path is rechecked.
@@ -189,6 +185,11 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
     else:
       transform = more_transform
 
+  loader = get_genostream_loader(format)
+  genos  = loader(filename, format, extra_args=args,
+                            genome=genome, phenome=phenome, transform=transform)
+
+  # Apply any requested transformations
   if transform:
     genos = genos.transformed(transform)
 
@@ -198,6 +199,8 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   for k,v in args.items():
     if v is None:
       del args[k]
+
+  args.pop('transform',None)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -325,7 +328,8 @@ def transform_files(infiles,informat,ingenorepr,
     mergefunc = get_genomerger(mergefunc)
 
   genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,
-                              genome=genome,phenome=phenome,hyphen=inhyphen)
+                              genome=genome,phenome=phenome,transform=transform,
+                              hyphen=inhyphen)
                             .transformed(transform) for f in infiles ]
   n = len(genos)
 
