@@ -2,7 +2,7 @@
 
 from __future__ import with_statement
 
-__abstract__  = 'Merlin/MACH genotype format input/output objects'
+__abstract__  = 'Merlin genotype format input/output objects'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
@@ -11,7 +11,7 @@ __all__       = ['MerlinWriter', 'save_merlin', 'load_merlin']
 
 __genoformats__ = [
   #   LOADER         SAVER          WRITER       PFORMAT           ALIAS              EXTS
-  ('load_merlin', 'save_merlin', 'MerlinWriter', 'sdat', ['merlin','mach','linkage'], None) ]
+  ('load_merlin', 'save_merlin', 'MerlinWriter', 'sdat',     ['merlin','linkage'],    None) ]
 
 
 from   itertools                 import islice
