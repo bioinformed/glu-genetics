@@ -28,6 +28,37 @@ from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 PASS,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
 
 
+def set_readgroup(groupname,header,aligns):
+  RG = header.get('RG')
+
+  if not RG:
+    header['RG'] = {'ID':groupname,'PL':'unknown','SM':groupname}
+  else:
+    RG[:] = RG[0:1]
+    RG[0]['ID'] = RG[0]['SM'] = groupname
+
+  # Return a nested generator, since header update must occur immediately
+  def _set_readgroup():
+    rg = ('RG',groupname)
+
+    for align in aligns:
+      tags = align.tags
+      names,values = zip(*tags)
+
+      try:
+        idx = names.index('RG')
+        tags[idx] = rg
+
+      except ValueError:
+        tags.append(rg)
+
+      align.tags = tags
+
+      yield align
+
+  return _set_readgroup()
+
+
 def simple_filter(aligns,stats,options):
   minreadlen = options.minreadlen
 
@@ -266,13 +297,7 @@ class FilterStats(object):
     self.bases = [0]*4
 
 
-def sink_file(filename,header,references,lengths,aligns):
-  flags  = 'wb' if filename.endswith('.bam') else 'wh'
-
-  outbam = pysam.Samfile(filename, flags, header=header,
-                                          referencenames=references,
-                                          referencelengths=lengths)
-
+def sink_file(outbam,aligns):
   try:
     for align in aligns:
       outbam.write(align)
@@ -351,6 +376,8 @@ def option_parser():
   parser.add_option('--action', dest='action', metavar='X', default='fail',
                     help='Action to perform on failing alignments (drop or fail, default=fail)')
 
+  parser.add_option('--setreadgroup', dest='setreadgroup', type='str', metavar='RGNAME',
+                    help='Set all reads to specified read group name')
   parser.add_option('-o', '--output', dest='output', metavar='FILE',
                     help='Output BAM file')
   parser.add_option('-O', '--sumout', dest='sumout', metavar='FILE', default='-',
@@ -377,8 +404,16 @@ def main():
     flags   = 'rb' if filename.endswith('.bam') else 'r'
     samfiles.append(pysam.Samfile(filename, flags))
 
-  if 0: # Merging functionality is now part of our internal pysam tree
+  if len(samfiles)==1:
+    samfile    = samfiles[0]
+    header     = samfile.header
+    references = samfile.references
+    lengths    = samfile.lengths
+    aligns     = iter(samfile)
+
+  elif 0: # Merging functionality is now part of our internal pysam tree
     samfiles,header,references,lengths,aligns = merge_bams(samfiles)
+
   else:
     merger     = pysam.SamMergeFiles(samfiles)
     header     = merger.header
@@ -401,7 +436,16 @@ def main():
 
   try:
     if options.output:
-      sink_file(options.output,header,references,lengths,aligns)
+      if options.setreadgroup:
+        aligns = set_readgroup(options.setreadgroup,header,aligns)
+
+      flags  = 'wb' if options.output.endswith('.bam') else 'wh'
+
+      outbam = pysam.Samfile(options.output, flags, header=header,
+                                                    referencenames=references,
+                                                    referencelengths=lengths)
+
+      sink_file(outbam,aligns)
     else:
       sink_null(aligns)
 
