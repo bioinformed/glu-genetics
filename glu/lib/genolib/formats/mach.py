@@ -98,6 +98,7 @@ def load_mach(filename,format,genome=None,phenome=None,extra_args=None,**kwargs)
     n = len(loci)+2
 
     gmap = dict( ('%s/%s' % (a1,a2), (a1,a2)) for a1 in 'ACGT' for a2 in 'ACGT' )
+    gmap['N/N'] = None
 
     for line_num,line in enumerate(gfile):
       with gcdisabled():
