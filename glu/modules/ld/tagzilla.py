@@ -32,7 +32,7 @@ import optparse
 from   math                      import log, ceil
 from   operator                  import itemgetter
 from   collections               import defaultdict
-from   itertools                 import chain, groupby, izip, dropwhile
+from   itertools                 import chain, groupby, izip, dropwhile, count
 
 from   glu.lib.hwp               import hwp_biallelic
 from   glu.lib.stats             import mean, median
@@ -1632,8 +1632,9 @@ def filter_loci(loci, include, subset, options):
 
 
 def order_loci(loci):
+  counter = count().next
   def locus_key(l):
-    return l.chromosome,l.location,l.name
+    return l.chromosome,l.location,counter()
 
   return sorted(loci,key=locus_key)
 
