@@ -99,8 +99,8 @@ def option_parser():
   usage = 'usage: %prog [options] [barcode file] [input files..]'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT', default='sff',
-                    help='Input sequence format (default=sff).  Formats include: '
+  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT',
+                    help='Input sequence format.  Formats include: '
                          'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
