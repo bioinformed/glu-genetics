@@ -29,6 +29,7 @@ from   glu.lib.seqlib.intervaltree  import IntervalTree
 from   glu.lib.fileutils            import table_reader, table_writer
 
 from   glu.modules.genedb           import open_genedb
+from   glu.modules.genedb.queries   import query_cytoband_by_location
 
 
 
@@ -231,14 +232,14 @@ def get_snps_interval(con, chrom, ref_start, ref_end):
 
 
 def group_evidence(orig):
-  key_func = itemgetter(0,1,2,3,4,6,7,8,9,10,11)
+  key_func = itemgetter(0,1,3,4,5,6,7,8)
   orig.sort(key=key_func)
   new = []
   for key,values in groupby(orig, key_func):
     values = list(values)
     if len(values)>1:
-      transcripts = ','.join(sorted(set(v[5] for v in values)))
-      values[0][5] = transcripts
+      transcripts = ','.join(sorted(set(v[2] for v in values)))
+      values[0][2] = transcripts
     new.append(values[0])
 
   return new
@@ -271,7 +272,7 @@ class VariantAnnotator(object):
     for feature in self.feature_map[chrom].find(ref_start, ref_end):
       evidence.extend( self.classify_feature(feature.value, ref_start, ref_end, ref_nuc, var_nuc) )
 
-    ns = any('NON-SYNONYMOUS' in e[6] for e in evidence)
+    ns = any('NON-SYNONYMOUS' in e[3] for e in evidence)
     if nsonly and not ns:
       return []
 
@@ -288,19 +289,25 @@ class VariantAnnotator(object):
           three_prime.add(gene)
 
       for gene in five_prime:
-        evidence.append( [gene.chrom,ref_start,ref_end,"5' of gene",gene.symbol,gene.mRNA,'','',
+        evidence.append( ["5' of gene",gene.symbol,gene.mRNA,'','',
                           ref_nuc,var_nuc,'',''] )
 
       for gene in three_prime:
-        evidence.append( [gene.chrom,ref_start,ref_end,"3' of gene",gene.symbol,gene.mRNA,'','',
+        evidence.append( ["3' of gene",gene.symbol,gene.mRNA,'','',
                           ref_nuc,var_nuc,'',''] )
 
     if not evidence:
-      evidence.append( [chrom,ref_start,ref_end,'intergenic','','','','',ref_nuc,var_nuc,'',''] )
+      evidence.append( ['intergenic','','','','',ref_nuc,var_nuc,'',''] )
 
     evidence = group_evidence(evidence)
     dbsnp    = self.get_dbsnp(chrom, ref_start, ref_end, ref_nuc, var_nuc)
     evidence = [ e+dbsnp for e in evidence ]
+
+    cytoband = query_cytoband_by_location(self.con, chrom, ref_start)
+    cytoband = ','.join(c[0] for c in cytoband)
+
+    context  = [ chrom,cytoband,ref_start,ref_end ]
+    evidence = [ context+e for e in evidence ]
 
     return evidence
 
@@ -316,15 +323,6 @@ class VariantAnnotator(object):
     intersect = defaultdict(list)
     for inter in features.find(ref_start, ref_end):
       intersect[inter.value.type].append(inter.value)
-
-    if 0:
-      print gene
-      for type,values in sorted(intersect.iteritems()):
-        print '  %s: %s'  % (type,values)
-      print
-      for chrom,start,end,cds_index,exon_num,label in gene_parts:
-        if label!='intron':
-          print '  ',start,end,cds_index,exon_num,label
 
     evidence = []
     accession = gene.protein or gene.mRNA
@@ -353,18 +351,18 @@ class VariantAnnotator(object):
                                        ref_start, ref_end, ref_nuc, var_nuc)
       evidence.append(e)
     elif len(intersect['CDS'])>=1:
-      evidence.append([gene.chrom,ref_start,ref_end,parts,gene.symbol,accession,
+      evidence.append([parts,gene.symbol,accession,
                        'NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'',''])
     else:
-      evidence.append([gene.chrom,ref_start,ref_end,parts,gene.symbol,accession,
+      evidence.append([parts,gene.symbol,accession,
                        '',mut_type,ref_nuc,var_nuc,'',''])
 
     return evidence
 
 
   def classify_exonic_variant(self, gene, gene_parts, cds, ref_start, ref_end, ref_nuc, var_nuc):
-    accession = gene.protein or gene.mRNA
-    result = [gene.chrom,ref_start,ref_end,'CDS',gene.symbol,'%s:exon%d' % (accession,cds.exon_num)]
+    accession = gene.mRNA or gene.protein
+    result = ['CDS',gene.symbol,'%s:exon%d:strand=%s' % (accession,cds.exon_num,gene.strand)]
     exon_start = ref_start - cds.start
     exon_end   = ref_end   - cds.start
 
@@ -429,8 +427,13 @@ class VariantAnnotator(object):
 
     if gene.strand=='-':
       ref_var_start = len(ref_cds)-ref_var_start-1
-      ref_cds = ref_cds.reverse_complement()
-      var_cds = var_cds.reverse_complement()
+      ref_cds       = ref_cds.reverse_complement()
+      var_cds       = var_cds.reverse_complement()
+      ref_cds_nuc   = str(Seq(ref_nuc).reverse_complement())
+      var_cds_nuc   = str(Seq(var_nuc).reverse_complement())
+    else:
+      ref_cds_nuc   = ref_nuc
+      var_cds_nuc   = var_nuc
 
     try:
       ref_cds_aa = ref_cds.translate()
@@ -438,7 +441,7 @@ class VariantAnnotator(object):
     except TranslationError:
       mut_type.append('INVALID TRANSLATION')
       mut_type = ','.join(sorted(mut_type))
-      result += ['PRESUMED NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'','']
+      result += ['PRESUMED NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,'','']
       return result
 
     ref_aa,var_aa,aa_position = reduce_match(str(ref_cds_aa),str(var_cds_aa))
@@ -458,7 +461,7 @@ class VariantAnnotator(object):
       assert len(ref_aa)
 
       result[-1] += ':aa=%d' % (aa_position+1)
-      result += ['SYNONYMOUS',mut_type,ref_nuc,var_nuc,str(ref_aa),str(ref_aa)]
+      result += ['SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(ref_aa)]
       return result
 
     ref_stop = ref_aa.find('*')
@@ -478,8 +481,8 @@ class VariantAnnotator(object):
       mut_type.append('INSERTION')
 
     if 0:
-      print '  REF_NUC:',ref_nuc
-      print '  VAR_NUC:',var_nuc
+      print '  REF_NUC:',ref_cds_nuc
+      print '  VAR_NUC:',var_cds_nuc
       print '   REF_AA:',ref_aa
       print '   VAR_AA:',var_aa
       #print '  NUC_DIFF:',levenshtein_sequence(str(ref_cds),str(var_cds))
@@ -494,7 +497,8 @@ class VariantAnnotator(object):
 
     mut_type = ','.join(sorted(mut_type))
     result[-1] += ':aa=%d' % (aa_position+1)
-    result += ['NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,str(ref_aa),str(var_aa)]
+    result += ['NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(var_aa)]
+
     return result
 
 
@@ -625,7 +629,7 @@ def main():
     #for key in sorted(stats):
     #  print >> sys.stderr,key,stats[key]
 
-  if 1:
+  if 0:
     filename = args[0]
     variants = table_reader(filename)
     header   = next(variants)
@@ -637,11 +641,37 @@ def main():
     stats = defaultdict(int)
 
     for v in variants:
-      evidence = list(vs.classify(v[0], int(v[1]), int(v[2]), v[4]))
+      evidence = list(vs.classify(v[0], int(v[1]), int(v[2]), v[7]))
       evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[6] ] or [[]]
 
       for e in evidence:
         out.writerow(v+e[3:])
+
+  if 1:
+    filename = args[0]
+    variants = table_reader(filename)
+    out      = table_writer(options.output,hyphen=sys.stdout)
+
+
+    header    = ['CHROM','CYTOBAND','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS',
+                 'FUNC_TYPE','REF_NUC','VAR_NUC','REF_AA','VAR_AA', 'dbSNP_exact','dbSNP_inexact']
+    out.writerow(header)
+
+    for row in variants:
+      if not row or row[0].startswith('#'):
+        continue
+
+      chrom = row[0]
+      end   = int(row[1])
+      start = end-1
+      ref   = row[3]
+      var   = row[4].split(',')[0]
+
+      evidence = list(vs.classify(chrom, start, end, var, nsonly=True))
+      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[7] ]
+
+      for e in evidence:
+        out.writerow(e)
 
 
 if __name__=='__main__':
