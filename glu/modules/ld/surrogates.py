@@ -132,20 +132,36 @@ def main():
     elif r2>surrogates[0][0]:
       heappushpop(surrogates, (r2,surrogate) )
 
-  for pairs in ldpairs:
-    for lname1,lname2,r2,dprime in pairs:
-      found = None
-      seen.add(lname1)
-      seen.add(lname2)
+  if haystack is None:
+    for pairs in ldpairs:
+      for lname1,lname2,r2,dprime in pairs:
+        found = None
+        seen.add(lname1)
+        seen.add(lname2)
 
-      if lname1==lname2:
-        if lname1 in needle and lname1 not in direct:
-          update_surrogates(lname1,lname1,r2)
-      else:
-        if lname1 in needle and lname2 not in direct:
-          update_surrogates(lname1,lname2,r2)
-        if lname2 in needle and lname1 not in direct:
-          update_surrogates(lname2,lname1,r2)
+        if lname1==lname2:
+          if lname1 in needle and lname1 not in direct:
+            update_surrogates(lname1,lname1,r2)
+        else:
+          if lname1 in needle and lname2 not in direct:
+            update_surrogates(lname1,lname2,r2)
+          if lname2 in needle and lname1 not in direct:
+            update_surrogates(lname2,lname1,r2)
+  else:
+    for pairs in ldpairs:
+      for lname1,lname2,r2,dprime in pairs:
+        found = None
+        seen.add(lname1)
+        seen.add(lname2)
+
+        if lname1==lname2:
+          if lname1 in needle and lname1 in haystack:
+            update_surrogates(lname1,lname1,r2)
+        else:
+          if lname1 in needle and lname2 in haystack:
+            update_surrogates(lname1,lname2,r2)
+          if lname2 in needle and lname1 in haystack:
+            update_surrogates(lname2,lname1,r2)
 
   outfile = table_writer(options.output, hyphen=sys.stdout)
   outfile.writerow(['LNAME','RANK','SURROGATE','RSQUARED','REASON'])
