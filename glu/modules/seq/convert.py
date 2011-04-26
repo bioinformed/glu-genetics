@@ -94,9 +94,51 @@ def read_sequence(filename, informat=None):
   return SeqIO.parse(autofile(filename,'rb'), informat)
 
 
-def trim_sequences(sequences, trim):
+def trim_quality(seq,q):
+  import numpy as np
+
+  quals  = np.array(seq.letter_annotations['phred_quality'],dtype=int)
+
+  if len(seq):
+    scores = np.clip(quals-q,0,1e10).cumsum()
+    start  = np.where(scores>0)[0]
+
+    if not len(start):
+      return seq[:0]
+
+    start  = start[0]
+
+    stop   = np.where(scores>2)[0]
+
+    if not len(stop):
+      return seq[:0]
+
+    stop   = min(stop[-1],scores.argmax())+1
+    seq    = seq[start:stop]
+
+  return seq
+
+
+def trim_sequences(sequences, options):
+  trimleft    = options.trimleft    or 0
+  trimquality = options.trimquality or 0
+  minlen      = options.minlen      or 0
+
   for seq in sequences:
-    yield seq[trim:]
+    if trimleft:
+      seq = seq[trimleft:]
+
+    if trimquality:
+      seq = trim_quality(seq, trimquality)
+
+    if len(seq)>=minlen:
+      yield seq
+
+
+def drop_short(sequences, minlen):
+  for seq in sequences:
+    if len(seq)>=minlen:
+      yield seq
 
 
 SOLEXA_SCORE_OFFSET = 64
@@ -107,13 +149,34 @@ def QseqIterator(handle, alphabet = single_letter_alphabet):
   import csv
 
   q_mapping = {}
-  for letter in range(0, 255):
+  for letter in range(256):
       q_mapping[chr(letter)] = letter-SOLEXA_SCORE_OFFSET
 
-  reader = csv.reader(handle,dialect='excel-tab')
-  for row in reader:
+  filtermap = {'0':'Y','1':'N'}
 
-      id = name = '%s_%s:%s:%s:%s:%s/%s' % tuple(row[:7])
+  try:
+      filename = handle.name
+      parts    = filename.split('/')[-1].split('_')
+      read_num = parts[2]
+  except (IndexError,AttributeError):
+      read_num = '?'
+
+  reader = csv.reader(handle,dialect='excel-tab')
+
+  for row in reader:
+      # Row:
+      #   0 - Instrument name
+      #   1 - Run number
+      #   2 - Lane number
+      #   3 - Tile number
+      #   4 - X coordinate
+      #   5 - Y coordinate
+      #   6 - index
+      #   7 - read number
+      #   8 - sequence
+      #   9 - qc filtered?
+      id = name = '%s:%s:%s:%s:%s:%s:%s %s:%s:%s:%s' % (row[0],row[1],'?',row[2],row[3],row[4],row[5],
+                                                        read_num,filtermap[row[10]],0,row[6])
 
       seq = row[8].replace('.','N')
 
@@ -141,16 +204,20 @@ def option_parser():
   usage = 'usage: %prog [options] [input files..]'
   parser = optparse.OptionParser(usage=usage)
 
-  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT', default='sff',
-                    help='Input sequence format (default=sff).  Formats include: '
+  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT',
+                    help='Input sequence format.  Formats include: '
                          'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
   parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT',
                     help='Output sequence format (default=fasta).  As above, except ace, ig, '
                          'pir, sff-trim, swiss.')
-  parser.add_option('--trim', dest='trim', type='int', metavar='N', default=0,
+  parser.add_option('--trimleft', dest='trimleft', type='int', metavar='N', default=0,
                     help='Trim N leading bases')
+  parser.add_option('--trimquality', dest='trimquality', type='float', metavar='Q', default=0,
+                    help='Trim sequences based on quality valuesN leading bases')
+  parser.add_option('--minlen', dest='minlen', type='int', metavar='N',
+                    help='Drop sequences of length less than N')
   parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
                     help='Output file')
   return parser
@@ -169,8 +236,11 @@ def main():
 
   sequences = chain.from_iterable(read_sequence(filename, options.informat) for filename in args)
 
-  if options.trim:
-    sequences = trim_sequences(sequences, options.trim)
+  if options.trimleft or options.trimquality:
+    # Also drops short sequences
+    sequences = trim_sequences(sequences, options)
+  elif options.minlen:
+    sequences = drop_short(sequences, options.minlength)
 
   count     = write_sequence(sequences, options.output, options.outformat)
 
