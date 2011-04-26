@@ -398,7 +398,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   assayid_idx = find_index(header,['IlmnID','Ilmn ID'])
   name_idx    = find_index(header,['Name'])
   alleles_idx = find_index(header,['SNP'])
-  chr_idx     = find_index(header,['Chr'])
+  chr_idx     = find_index(header,['Chr','CHR'])
   loc_idx     = find_index(header,['MapInfo'])
   cstrand_idx = find_index(header,['CustomerStrand','SourceStrand'])
   dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
