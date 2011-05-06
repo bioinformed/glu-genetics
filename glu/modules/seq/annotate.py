@@ -12,32 +12,28 @@ import time
 import sys
 
 from   operator                     import itemgetter
-from   itertools                    import imap,count,izip,groupby
-from   collections                  import defaultdict, namedtuple
+from   itertools                    import imap, count, izip, groupby
+from   collections                  import defaultdict, namedtuple, OrderedDict
 
 from   pysam                        import Fastafile
 from   Bio.Seq                      import Seq
 from   Bio.Data.CodonTable          import TranslationError
 
 from   glu.lib.utils                import gcdisabled
-from   glu.lib.fileutils            import table_writer
+from   glu.lib.fileutils            import table_writer, table_reader
 from   glu.lib.progressbar          import progress_loop
 
-from   glu.lib.seqlib.edits         import levenshtein_sequence, reduce_match
+from   glu.lib.seqlib.edits         import reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
-from   glu.lib.fileutils            import table_reader, table_writer
-
 from   glu.modules.genedb           import open_genedb
-from   glu.modules.genedb.queries   import query_cytoband_by_location
-
+from   glu.modules.genedb.queries   import query_snps_by_location, query_cytoband_by_location
 
 
 Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
                           'cdsStart cdsEnd exonCount exonStarts exonEnds')
 
-SNP  = namedtuple('SNP',  'id name chrom start end strand refAllele alleles vclass func weight')
-
+SNP  = namedtuple('SNP',  'name chrom start end strand refAllele alleles vclass func weight')
 
 GeneFeature = namedtuple('GeneFeature', 'chrom start end cds_index exon_num type')
 
@@ -64,8 +60,7 @@ def decode_gene(gene):
     left,right    = "3' UTR","5' UTR"
     intron_offset = 0
 
-  n     = 1
-  last  = gene.txStart
+  last = gene.txStart
   cds_index = 0
 
   for exon_num,exon_start,exon_end in izip(exon_nums,starts,ends):
@@ -159,75 +154,15 @@ def get_snps(con):
 
 
 def get_snps_interval(con, chrom, ref_start, ref_end):
-  cur = con.cursor()
-
-  if 1:
-    cur.execute('SELECT * FROM snp WHERE chrom=? AND start<=? AND end>=?;', (chrom, ref_end, ref_start))
-    snps = cur.fetchall()
-
-  elif 0:
-    t0 = time.time()
-    cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (ref_end,ref_start))
-    ids = cur.fetchall()
-    t1 = time.time()
-
-    print 'RTREE: %.2f' % (t1-t0)
-
-    if not ids:
-      return
-
-    ids = ','.join([ str(i[0]) for i in ids ])
-    cur.execute('SELECT * from snp WHERE id IN (%s) AND chrom="%s"' % (ids,chrom))
-    snps = cur.fetchall()
-    t2 = time.time()
-    print 'IDS: %.2f' % (t2-t1)
-
-  elif 0:
-    t0 = time.time()
-    cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (ref_end,ref_start))
-    ids = cur.fetchall()
-    t1 = time.time()
-
-    print 'RTREE: %.2f' % (t1-t0)
-
-    if not ids:
-      return
-
-    cur.execute('SELECT * FROM snp WHERE chrom=? AND start<=? AND end>=?;', (chrom, ref_end, ref_start))
-    snps = cur.fetchall()
-    t2 = time.time()
-    print 'RANGE: %.2f (%d)' % (t2-t1,len(snps))
-
-    ids = ','.join([ str(i[0]) for i in ids ])
-    cur.execute('SELECT * from snp WHERE id IN (%s) AND chrom="%s"' % (ids,chrom))
-    snps = cur.fetchall()
-    t3 = time.time()
-    print 'IDS: %.2f (%d)' % (t3-t2,len(snps))
-    print
-
-  else:
-    sql = '''SELECT *
-             FROM   snp
-             WHERE  id IN (SELECT id
-                           FROM   snp_index
-                           WHERE  start <= ?
-                              AND end   >= ?)
-               AND  chrom = ?;'''
-
-    t0 = time.time()
-    cur.execute(sql, (ref_end, ref_start, chrom))
-    snps = cur.fetchall()
-    t1 = time.time()
-
-    print 'JOIN: %.2f (%d)' % (t1-t0,len(snps))
+  snps = query_snps_by_location(con, chrom, ref_start, ref_end)
 
   make = SNP._make
   for row in snps:
     # name chrom start end strand refAllele alleles vclass func weight
     row    = list(row)
-    row[5] = row[5].replace('-','')
-    row[6] = set(a.replace('-','') for a in row[6].split('/'))
-    row[8] = set(row[8].split(',')) if row[8] else set()
+    row[4] = row[4].replace('-','')
+    row[5] = set(a.replace('-','') for a in row[5].split('/'))
+    row[7] = set(row[7].split(',')) if row[7] else set()
     yield make(row)
 
 
@@ -247,8 +182,9 @@ def group_evidence(orig):
 
 class VariantAnnotator(object):
   def __init__(self, gene_db, reference_fasta):
-    self.reference = Fastafile(reference_fasta)
-    self.con       = open_genedb(gene_db)
+    self.reference  = Fastafile(reference_fasta)
+    self.con        = open_genedb(gene_db)
+    self.gene_cache = OrderedDict()
 
     trans = get_transcripts(self.con)
     trans = progress_loop(trans, label='Loading transcripts: ', units='transcripts')
@@ -258,6 +194,30 @@ class VariantAnnotator(object):
       feature_map[gene.chrom].insert(gene.txStart,gene.txEnd,gene)
 
     sys.stderr.write('Loading complete.\n')
+
+
+  def decode_gene(self,gene):
+    gene_cache = self.gene_cache
+    key = gene.id
+
+    try:
+      result = gene_cache.pop(key)
+    except KeyError:
+      gene_parts = list(decode_gene(gene))
+
+      features = IntervalTree()
+      for feature in gene_parts:
+        features.insert(feature.start,feature.end,feature)
+
+      result = gene_parts,features
+
+      if len(gene_cache)>=200:
+        gene_cache.popitem(0)
+
+    # Add result to end of LRU
+    gene_cache[key] = result
+
+    return result
 
 
   def classify(self, chrom, ref_start, ref_end, variant, nsonly=False):
@@ -315,10 +275,7 @@ class VariantAnnotator(object):
   def classify_feature(self, gene, ref_start, ref_end, ref_nuc, var_nuc):
     #print gene.name,gene.symbol,gene.strand,gene.txStart,gene.txEnd,gene.exonCount,gene.accession
 
-    gene_parts = list(decode_gene(gene))
-    features = IntervalTree()
-    for feature in gene_parts:
-      features.insert(feature.start,feature.end,feature)
+    gene_parts,features = self.decode_gene(gene)
 
     intersect = defaultdict(list)
     for inter in features.find(ref_start, ref_end):
@@ -503,7 +460,7 @@ class VariantAnnotator(object):
 
 
   def get_dbsnp(self, chrom, ref_start, ref_end, ref_nuc, var_nuc):
-    snps = list(get_snps_interval(self.con, chrom, ref_start, ref_end))
+    snps     = list(get_snps_interval(self.con, chrom, ref_start, ref_end))
 
     var_comp = str(Seq(var_nuc).complement())
     var      = set([var_nuc,var_comp])
