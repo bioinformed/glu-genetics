@@ -314,6 +314,7 @@ def handle_unaligned(alignment, action, trim, reads_seen, sfffiles):
       reads_seen.add(qname)
 
       seq    = str(read.seq)
+      # FIXME: SeqIO records already have quality scores!!!
       qual   = get_qual(read)
       rg     = 'RG:Z:%s' % qname[:9]
       start  = read.annotations['clip_qual_left']
