@@ -18,14 +18,15 @@ from   itertools             import groupby, imap
 import pysam
 
 from   glu.lib.utils         import consume
-from   glu.lib.fileutils     import autofile, hyphen
+from   glu.lib.fileutils     import autofile, hyphen, list_reader
 from   glu.lib.progressbar   import progress_loop
 
 from   glu.lib.seqlib.bed    import read_features
 from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 
 
-PASS,UNALIGNED,TOOSHORT,LOWOVERLAP = range(4)
+STATUS_COUNT = 5
+ONTARGET,OFFTARGET,UNALIGNED,TOOSHORT,CONTROL = range(STATUS_COUNT)
 
 
 def set_readgroup(groupname,header,aligns):
@@ -59,53 +60,82 @@ def set_readgroup(groupname,header,aligns):
   return _set_readgroup()
 
 
-def simple_filter(aligns,stats,options):
+def simple_filter(aligns,controls,stats,options):
   minreadlen = options.minreadlen
 
   fail = options.action=='fail'
 
+  reads_ONTARGET   = 0
+  bases_ONTARGET   = 0
+  lengs_ONTARGET   = stats.lengths[ONTARGET]
   reads_UNALIGNED  = 0
   bases_UNALIGNED  = 0
+  lengs_UNALIGNED  = stats.lengths[UNALIGNED]
   reads_TOOSHORT   = 0
   bases_TOOSHORT   = 0
-  reads_PASS       = 0
-  bases_PASS       = 0
+  lengs_TOOSHORT   = stats.lengths[TOOSHORT]
+  reads_CONTROL    = 0
+  bases_CONTROL    = 0
+  lengs_CONTROL    = stats.lengths[CONTROL]
 
   try:
-    for align in aligns:
-      rlen = align.rlen
+    for tid,contig_aligns in groupby(aligns, attrgetter('tid')):
+      if tid<0:
+        for align in contig_aligns:
+          rlen = align.rlen
 
-      if align.tid<0:
-        reads_UNALIGNED += 1
-        bases_UNALIGNED += rlen
+          reads_UNALIGNED       += 1
+          bases_UNALIGNED       += rlen
+          lengs_UNALIGNED[rlen] += 1
 
-        if fail:
-          align.is_qcfail = 1
-          yield align
+          if fail:
+            align.is_qcfail = 1
+            yield align
 
-      elif rlen<minreadlen:
-        reads_TOOSHORT += 1
-        bases_TOOSHORT += rlen
+      elif tid in controls:
+        for align in contig_aligns:
+          rlen = align.rlen
 
-        if fail:
-          align.is_qcfail = 1
-          yield align
+          reads_CONTROL       += 1
+          bases_CONTROL       += rlen
+          lengs_CONTROL[rlen] += 1
+
+          if fail:
+            align.is_qcfail = 1
+            yield align
 
       else:
-        reads_PASS += 1
-        bases_PASS += rlen
-        yield align
+        for align in contig_aligns:
+          rlen = align.rlen
+
+          if rlen<minreadlen:
+            reads_TOOSHORT       += 1
+            bases_TOOSHORT       += rlen
+            lengs_TOOSHORT[rlen] += 1
+
+            if fail:
+              align.is_qcfail = 1
+              yield align
+
+          else:
+            reads_ONTARGET       += 1
+            bases_ONTARGET       += rlen
+            lengs_ONTARGET[rlen] += 1
+
+            yield align
 
   finally:
-    stats.reads[UNALIGNED]  += reads_UNALIGNED
-    stats.bases[UNALIGNED]  += bases_UNALIGNED
-    stats.reads[TOOSHORT]   += reads_TOOSHORT
-    stats.bases[TOOSHORT]   += bases_TOOSHORT
-    stats.reads[PASS]       += reads_PASS
-    stats.bases[PASS]       += bases_PASS
+    stats.reads[ONTARGET]  += reads_ONTARGET
+    stats.bases[ONTARGET]  += bases_ONTARGET
+    stats.reads[UNALIGNED] += reads_UNALIGNED
+    stats.bases[UNALIGNED] += bases_UNALIGNED
+    stats.reads[TOOSHORT]  += reads_TOOSHORT
+    stats.bases[TOOSHORT]  += bases_TOOSHORT
+    stats.reads[CONTROL]   += reads_CONTROL
+    stats.bases[CONTROL]   += bases_CONTROL
 
 
-def target_filter(aligns,references,targets,stats,options):
+def target_filter(aligns,references,targets,controls,stats,options):
   contigs = set()
 
   minoverlap = options.minoverlap
@@ -114,14 +144,21 @@ def target_filter(aligns,references,targets,stats,options):
 
   fail = options.action=='fail'
 
+  reads_ONTARGET   = 0
+  bases_ONTARGET   = 0
+  lengs_ONTARGET   = stats.lengths[ONTARGET]
+  reads_OFFTARGET  = 0
+  bases_OFFTARGET  = 0
+  lengs_OFFTARGET  = stats.lengths[OFFTARGET]
   reads_UNALIGNED  = 0
   bases_UNALIGNED  = 0
+  lengs_UNALIGNED  = stats.lengths[UNALIGNED]
   reads_TOOSHORT   = 0
   bases_TOOSHORT   = 0
-  reads_LOWOVERLAP = 0
-  bases_LOWOVERLAP = 0
-  reads_PASS       = 0
-  bases_PASS       = 0
+  lengs_TOOSHORT   = stats.lengths[TOOSHORT]
+  reads_CONTROL    = 0
+  bases_CONTROL    = 0
+  lengs_CONTROL    = stats.lengths[CONTROL]
 
   try:
     for tid,contig_aligns in groupby(aligns, attrgetter('tid')):
@@ -136,8 +173,25 @@ def target_filter(aligns,references,targets,stats,options):
 
       if rname=='unaligned':
         for align in contig_aligns:
-          reads_UNALIGNED += 1
-          bases_UNALIGNED += align.rlen
+          rlen = align.rlen
+
+          reads_UNALIGNED       += 1
+          bases_UNALIGNED       += rlen
+          lengs_UNALIGNED[rlen] += 1
+
+          if fail:
+            align.is_qcfail = True
+            yield align
+
+        continue
+
+      if tid in controls:
+        for align in contig_aligns:
+          rlen = align.rlen
+
+          reads_CONTROL       += 1
+          bases_CONTROL       += rlen
+          lengs_CONTROL[rlen] += 1
 
           if fail:
             align.is_qcfail = True
@@ -152,8 +206,9 @@ def target_filter(aligns,references,targets,stats,options):
 
         # Fast-path 1: fail short aligns
         if rlen<minreadlen:
-          reads_TOOSHORT += 1
-          bases_TOOSHORT += rlen
+          reads_TOOSHORT       += 1
+          bases_TOOSHORT       += rlen
+          lengs_TOOSHORT[rlen] += 1
 
           if fail:
             align.is_qcfail = True
@@ -165,8 +220,9 @@ def target_filter(aligns,references,targets,stats,options):
 
         # Fast-path 2: No overlap with next target (if any)
         if align_end<next_start:
-          reads_LOWOVERLAP += 1
-          bases_LOWOVERLAP += rlen
+          reads_OFFTARGET       += 1
+          bases_OFFTARGET       += rlen
+          lengs_OFFTARGET[rlen] += 1
 
           if fail:
             align.is_qcfail = True
@@ -199,30 +255,38 @@ def target_filter(aligns,references,targets,stats,options):
 
           # Determine if the degree of overlap is sufficient
           if overlap_len>=minoverlap:
-            reads_PASS += 1
-            bases_PASS += rlen
+            reads_ONTARGET       += 1
+            bases_ONTARGET       += rlen
+            lengs_ONTARGET[rlen] += 1
+
             yield align
             break
 
         else:
-          reads_LOWOVERLAP += 1
-          bases_LOWOVERLAP += rlen
+          reads_OFFTARGET       += 1
+          bases_OFFTARGET       += rlen
+          lengs_OFFTARGET[rlen] += 1
 
           if fail:
             align.is_qcfail = True
             yield align
 
   finally:
-    stats.reads[UNALIGNED]  += reads_UNALIGNED
-    stats.bases[UNALIGNED]  += bases_UNALIGNED
-    stats.reads[TOOSHORT]   += reads_TOOSHORT
-    stats.bases[TOOSHORT]   += bases_TOOSHORT
-    stats.reads[LOWOVERLAP] += reads_LOWOVERLAP
-    stats.bases[LOWOVERLAP] += bases_LOWOVERLAP
-    stats.reads[PASS]       += reads_PASS
-    stats.bases[PASS]       += bases_PASS
+    stats.reads[ONTARGET]  += reads_ONTARGET
+    stats.bases[ONTARGET]  += bases_ONTARGET
+    stats.reads[OFFTARGET] += reads_OFFTARGET
+    stats.bases[OFFTARGET] += bases_OFFTARGET
+    stats.reads[UNALIGNED] += reads_UNALIGNED
+    stats.bases[UNALIGNED] += bases_UNALIGNED
+    stats.reads[TOOSHORT]  += reads_TOOSHORT
+    stats.bases[TOOSHORT]  += bases_TOOSHORT
+    stats.reads[CONTROL]   += reads_CONTROL
+    stats.bases[CONTROL]   += bases_CONTROL
 
 
+# UNUSED: This is a sanity-check implementation that uses an IntervalTree
+#         data structure and does not require any assumptions about the
+#         ordering of targets.
 def target_filter_generic(aligns,references,targets,stats,options):
   from   glu.lib.seqlib.intervaltree  import IntervalTree
 
@@ -279,22 +343,23 @@ def target_filter_generic(aligns,references,targets,stats,options):
         overlap_len += min(target.end,align_end)-max(target.start,align_start)
 
       if overlap_len<minoverlap:
-        reads[LOWOVERLAP] += 1
-        bases[LOWOVERLAP] += rlen
+        reads[OFFTARGET] += 1
+        bases[OFFTARGET] += rlen
 
         if fail:
           align.is_qcfail = True
           yield align
       else:
-        reads[PASS] += 1
-        bases[PASS] += rlen
+        reads[ONTARGET] += 1
+        bases[ONTARGET] += rlen
         yield align
 
 
 class FilterStats(object):
   def __init__(self):
-    self.reads = [0]*4
-    self.bases = [0]*4
+    self.reads   = [0]*STATUS_COUNT
+    self.bases   = [0]*STATUS_COUNT
+    self.lengths = [ [0]*6000 for i in range(STATUS_COUNT) ]
 
 
 def sink_file(outbam,aligns):
@@ -370,6 +435,10 @@ def option_parser():
                     help='Minimum read length filter')
   parser.add_option('--targets', dest='targets', metavar='BED',
                     help='Single track BED file containing all targeted intervals')
+  parser.add_option('--controls', dest='controls', metavar='CONTIGS',
+                    help='List of control contigs to allow those aligned '
+                          'reads to be counted seperately from other aligned reads '
+                          '(e.g.  PhiX controls)')
   parser.add_option('--minoverlap', dest='minoverlap', metavar='N', type='int', default=1,
                     help='Minimum alignment overlap with any target (default=1)')
 
@@ -421,6 +490,12 @@ def main():
     lengths    = merger.lengths
     aligns     = iter(merger)
 
+  controls = set()
+  if options.controls:
+    rmap     = dict( (contig,tid) for tid,contig in enumerate(references) )
+    controls = set(rmap.get(c) for c in set(list_reader(options.controls)))
+    controls.discard(None)
+
   aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
   aligns = filter_alignments(aligns, options.includealign, options.excludealign)
 
@@ -428,9 +503,9 @@ def main():
 
   if options.targets:
     targets = read_features(options.targets)
-    aligns  = target_filter(aligns,references,targets,stats,options)
+    aligns  = target_filter(aligns,references,targets,controls,stats,options)
   else:
-    aligns  = simple_filter(aligns,stats,options)
+    aligns  = simple_filter(aligns,controls,stats,options)
 
   complete = False
 
@@ -458,8 +533,9 @@ def main():
     for samfile in samfiles:
       samfile.close()
 
-  bases = stats.bases
-  reads = stats.reads
+  bases   = stats.bases
+  reads   = stats.reads
+  lengths = stats.lengths
 
   total_reads = sum(reads)
   total_bases = sum(bases)
@@ -476,8 +552,15 @@ def main():
                                               bases[status], percent(bases[status], total_bases))
 
   sumout.write('           STATUS       READS          %            BASES          %\n')
-  for status,name in enumerate(['Pass','Unaligned','Too short','Low overlap']):
+  for status,name in enumerate(['On-target','Off-target','Unaligned','Too short','Control']):
     sumout.write('  %15s: %s\n' % (name, stat_line(status)))
+
+  if 0:
+    sumout.write('\n\nREAD_LENGTH\tONTARGET_READS\tUNALIGNED_READS\tTOOSHORT_READS\tOFFTARGET_READS\n')
+    for i in xrange(len(lengths[0])):
+      status_lengths = [ l[i] for l in lengths ]
+      if sum(status_lengths):
+        sumout.write('%d\t%s\n' % (i, '\t'.join(str(l) for l in status_lengths)))
 
   if not complete:
     raise KeyboardInterrupt
