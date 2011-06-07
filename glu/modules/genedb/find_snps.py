@@ -186,8 +186,9 @@ def main():
     features = resolve_features(con,features,options)
 
     for name,chr,strand,start,end,mup,mdown,nup,ndown,featuretype in features:
-      if featuretype == 'UNKNOWN':
+      if featuretype == 'UNKNOWN' or start is None:
         continue
+
       start = int(start)
       end   = int(end or start)
       nup   = nup or 0

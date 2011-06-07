@@ -108,8 +108,7 @@ def resolve_feature(con,feature,options):
   if not found:
     snpinfo = query_snps_by_name(con,name)
     if len(snpinfo)==1:
-      lname,chr,start,strand = snpinfo[0]
-      end = start+1
+      name,chr,start,end,strand,refAllele,alleles,vclass,func,weight = snpinfo[0]
       feature = 'SNP'
       found = True
 

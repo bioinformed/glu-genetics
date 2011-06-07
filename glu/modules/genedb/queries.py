@@ -202,46 +202,28 @@ def query_snp_by_name(con,name):
 
 
 def query_snps_by_location(con,chrom,start,end):
-  sql = '''
-  SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
-  FROM     snp
-  WHERE    chrom  = ?
-    AND    start <= ?
-    AND    end   >= ?
-  ORDER BY start;
-  '''
   cur = con.cursor()
-  cur.execute(sql,(chrom,end,start))
-  return cur.fetchall()
 
-
-def query_snps_by_location_rtree(con,chrom,start,end):
-
-  import time
-
-  t0 = time.time()
-  cur = con.cursor()
-  cur.execute('SELECT id FROM snp_index WHERE start<=? AND end>=?', (end,start))
-  ids = cur.fetchall()
-  print '!!! Got %d ids in %.2f seconds' % (len(ids),time.time()-t0)
-
-  if not ids:
-    return []
-
-  ids = ','.join([ str(i[0]) for i in ids ])
-
-  sql = '''
+  if 'rtree' not in con.filename:
+    sql = '''
     SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
     FROM     snp
-    WHERE    chrom = '%s'
-      AND    id in (%s)
-    ORDER BY start;'''
+    WHERE    chrom = ?
+      AND    start < ?
+      AND    end   > ?
+    ORDER BY start,name;
+    '''
+  else:
+    sql = '''
+    SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
+    FROM     snp
+    WHERE    chrom = ?
+      AND    id in (SELECT id
+                    FROM   snp_index
+                    WHERE  start < ?
+                      AND  end   > ?)
+    ORDER BY start,name;
+    '''
 
-  t0 = time.time()
-
-  cur.execute(sql % (chrom,ids))
-  rows = cur.fetchall()
-
-  print '!!! Got %d SNPs in %.2f seconds' % (len(rows),time.time()-t0)
-
-  return rows
+  cur.execute(sql,(chrom,end,start))
+  return cur.fetchall()

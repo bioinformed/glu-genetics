@@ -12,7 +12,7 @@ import sys
 import sqlite3
 
 
-DEFAULT_GENEDB = ['genedb_hg18_snp130_rtree.db']
+DEFAULT_GENEDB = ['genedb_hg19_snp132_rtree.db']
 
 DEFAULT_PATHS  = [os.path.join(os.path.dirname(__file__),'data'),
                   '/usr/local/share/genedb',
@@ -21,6 +21,7 @@ DEFAULT_PATHS  = [os.path.join(os.path.dirname(__file__),'data'),
 
 class GeneDBSQLite(object):
   def __init__(self, filename):
+    self.filename = filename
     self.con = sqlite3.connect(filename)
 
   def cursor(self):
