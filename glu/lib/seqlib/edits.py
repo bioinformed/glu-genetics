@@ -1359,6 +1359,35 @@ except ImportError:
   pass
 
 
+def _benchmark():
+  import time
+
+  s1='AGACCAAGTCTCTGCTACCGTACATACTCGTACTGAGACTGCCAAGGCACACAGGGGATAGAGACCAAGTCTCTGCTACCGTACATACTCGTACTGAGACTGCCAAGGCACACAGGGGATAG'
+  s2='GCTGGTGCGACACATGCTGGTGCGACACGTGCGACACATGCTGGGGTGCGACACATGCTGGTGCGACACGTGCGACACATGCTGGTGCGACACAT'
+
+  N = 20000
+  t0 = time.time()
+  for i in range(N):
+    smith_waterman_gotoh(s1,s2,mismatch_score=-20)
+  t1 = time.time()
+
+  print 'Standard:  %8d aligns/s' % (N/(t1-t0))
+
+  t0 = time.time()
+  for i in range(N):
+    smith_waterman_gotoh2_score(s1,s2,mismatch_score=-20)
+  t1 = time.time()
+
+  print 'New score: %8d aligns/s' % (N/(t1-t0))
+
+  t0 = time.time()
+  for i in range(N):
+    smith_waterman_gotoh2_align(s1,s2,mismatch_score=-20)
+  t1 = time.time()
+
+  print 'New align: %8d aligns/s' % (N/(t1-t0))
+
+
 def _test():
   import doctest
   doctest.testmod()
