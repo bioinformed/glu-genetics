@@ -11,6 +11,7 @@ cimport cython
 cimport numpy as np
 
 from    libc.stdio          cimport sprintf
+from    libc.limits         cimport INT_MIN
 from    libc.stdlib         cimport malloc, realloc, calloc, free
 from    cpython             cimport PyString_Size, PyErr_NoMemory
 
@@ -929,9 +930,10 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
   cdef int  *curr_cost =  <int*>malloc((m+1)*sizeof(int))
   cdef int  *prev_cost =  <int*>malloc((m+1)*sizeof(int))
   cdef int  *curr_gap1 =  <int*>malloc((m+1)*sizeof(int))
-  cdef int  *prev_gap1 =  <int*>malloc((m+1)*sizeof(int))
   cdef int  *curr_gap2 =  <int*>malloc((m+1)*sizeof(int))
   cdef int  *prev_gap2 =  <int*>malloc((m+1)*sizeof(int))
+
+  cdef int local_match, local_mismatch, local_gap_open, local_gap_extend
 
   cdef Py_ssize_t i,j,start_i,end_i,start_j,end_j,score,mcost,match,insert,delete
   cdef char c1,c2,op
@@ -948,15 +950,19 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
       curr_cost[j] = curr_gap1[j] = curr_gap2[j] = 0
 
   for i in range(n):
+    local_match      = match_scores[i]
+    local_mismatch   = mismatch_scores[i]
+    local_gap_open   = gap_open_scores[i]
+    local_gap_extend = gap_extend_scores[i]
+
     c1 = ss1[i]
 
     curr_cost,prev_cost = prev_cost,curr_cost
-    curr_gap1,prev_gap1 = prev_gap1,curr_gap1
     curr_gap2,prev_gap2 = prev_gap2,curr_gap2
 
-    curr_cost[0] = prev_cost[0]+gap_extend_scores[i] if _anchor_left else 0
-    curr_gap1[0] = prev_gap1[0]+gap_extend_scores[i] if _anchor_left else 0
-    curr_gap2[0] = prev_gap2[0]+gap_extend_scores[i] if _anchor_left else 0
+    curr_cost[0] = prev_cost[0]+local_gap_extend if _anchor_left else 0
+    curr_gap1[0] = curr_gap1[0]+local_gap_extend if _anchor_left else 0
+    curr_gap2[0] = prev_gap2[0]+local_gap_extend if _anchor_left else 0
 
     for j in range(m):
       c2 = ss2[j]
@@ -965,20 +971,20 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
       # following edit operations:
 
       # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
-      match  = prev_cost[j]
+      match = prev_cost[j]
 
       if c1==c2:
-        match += match_scores[i]
+        match += local_match
       else:
-        match += mismatch_scores[i]
+        match += local_mismatch
 
       # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
-      insert = curr_gap1[j+1] = max2(curr_gap1[j] + gap_extend_scores[i],
-                                     curr_cost[j] + gap_open_scores[i])
+      insert = curr_gap1[j+1] = max2(curr_gap1[j] + local_gap_extend,
+                                     curr_cost[j] + local_gap_open)
 
       # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
-      delete = curr_gap2[j+1] = max2(prev_gap2[j+1] + gap_extend_scores[i],
-                                     prev_cost[j+1] + gap_open_scores[i])
+      delete = curr_gap2[j+1] = max2(prev_gap2[j+1] + local_gap_extend,
+                                     prev_cost[j+1] + local_gap_open)
 
       # Take best costing operation
       if not _anchor_left:
@@ -1022,7 +1028,6 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
 
   free(prev_gap2)
   free(curr_gap2)
-  free(prev_gap1)
   free(curr_gap1)
   free(prev_cost)
   free(curr_cost)
@@ -1030,3 +1035,370 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
   free(edits)
 
   return slice(start_i,end_i+1),slice(start_j,end_j+1),score,cigar
+
+
+@cython.boundscheck(False)
+def smith_waterman_gotoh2_align(s1, s2, match_score=10, mismatch_score=-9,
+                                        gap_open_score=-15, gap_extend_score=-6):
+  '''
+  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  alignment.  An alignment score and sequence of alignment operations are returned.
+
+  The operations to align s1 to s2 are returned as a sequence, represented
+  by extended CIGAR (Compact Idiosyncratic Gapped Alignment Report)
+  operations of the form:
+
+    Match:         CigarOp(op='=', count=n)
+    Mismatch:      CigarOp(op='X', count=n)
+    Insertion:     CigarOp(op='I', count=n)
+    Deletion:      CigarOp(op='D', count=n)
+
+  Match operations are inclusive of matching and mismatch characters
+
+  See: http://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
+
+       Smith, Temple F.; and Waterman, Michael S. (1981). "Identification
+       of Common Molecular Subsequences". Journal of Molecular Biology 147: 195–197.
+       http://gel.ym.edu.tw/~chc/AB_papers/03.pdf
+
+  This implementation is based on a standard dynamic programming algorithm,
+  requiring O(N*M) time and space, where N and M are the lengths of the two
+  sequences.  See the following for more information on these concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+  cost[i,j] = |
+              |     | 0
+              |     | cost[i-1,j-1] + m   if c1==c2     (match: perfect)
+              | min | cost[i-1,j-1] + mm  if c1!=c2     (match: substitution)
+              |     | cost[i,  j-1] + g                (insert c2)
+              |     | cost[i-1,j  ] + g                (delete c1)
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j] and the edit sequence is obtained by keeping note of which
+  operation was selected at each step and backtracking from the end to the
+  beginning.  This implementation saves space by only storing the last two
+  cost rows at any given time (cost[i-1], and cost[i]).
+
+  >>> s1,s2='b','abc'
+  >>> p1,p2,score,cigar = smith_waterman_gotoh2_align(s1,s2)
+  >>> score
+  10
+  >>> cigar_to_string(cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'b'
+  '.'
+
+  >>> s1,s2='abc','b'
+  >>> p1,p2,score,cigar = smith_waterman_gotoh2_align(s1,s2)
+  >>> p1
+  slice(1, 2, None)
+  >>> p2
+  slice(0, 1, None)
+  >>> score
+  10
+  >>> cigar_to_string(cigar)
+  '1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'b'
+  '.'
+
+  >>> s1,s2='abbcbbd','acd'
+  >>> p1,p2,score,cigar = smith_waterman_gotoh2_align(s1,s2,match_score=30)
+  >>> p1
+  slice(0, 7, None)
+  >>> p2
+  slice(0, 3, None)
+  >>> score
+  48
+  >>> cigar_to_string(cigar)
+  '1=2D1=2D1='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'abbcbbd'
+  '.--.--.'
+
+  >>> s1='AGACCAAGTCTCTGCTACCGTACATACTCGTACTGAGACTGCCAAGGCACACAGGGGATAG'
+  >>> s2='GCTGGTGCGACACAT'
+  >>> p1,p2,score,cigar = smith_waterman_gotoh2_align(s1,s2,mismatch_score=-20)
+  >>> p1
+  slice(46, 53, None)
+  >>> p2
+  slice(6, 14, None)
+  >>> score
+  55
+  >>> cigar_to_string(cigar)
+  '2=1I5='
+  >>> a1,a2 = cigar_alignment(s1[p1],s2[p2],cigar)
+  >>> print "'%s'\\n'%s'" % (a1,a2) # doctest: +NORMALIZE_WHITESPACE
+  'GC-ACACA'
+  '..G.....'
+  '''
+  cdef Py_ssize_t n    = PyString_Size(s1)
+  cdef Py_ssize_t m    = PyString_Size(s2)
+  cdef char *ss1       = s1
+  cdef char *ss2       = s2
+
+  cdef np.ndarray[int, ndim=1, mode="c"]      match_scores = np.empty(n, dtype=np.int32)
+  cdef np.ndarray[int, ndim=1, mode="c"]   mismatch_scores = np.empty(n, dtype=np.int32)
+  cdef np.ndarray[int, ndim=1, mode="c"]   gap_open_scores = np.empty(n, dtype=np.int32)
+  cdef np.ndarray[int, ndim=1, mode="c"] gap_extend_scores = np.empty(n, dtype=np.int32)
+
+  match_scores[:]      = match_score
+  mismatch_scores[:]   = mismatch_score
+  gap_open_scores[:]   = gap_open_score
+  gap_extend_scores[:] = gap_extend_score
+
+  cdef char *edits     = <char*>malloc(n*m*sizeof(char))
+  cdef int  *S         =  <int*>malloc(m*sizeof(int))
+  cdef int  *coldel    =  <int*>malloc(m*sizeof(int))
+  cdef int  NINF       = INT_MIN+100000
+  cdef int  Sup, Sleft, Sdiag, Stemp1, Stemp2, Sij, Smax, inscost, delcost
+
+  cdef int local_match, local_mismatch, local_gap_open, local_gap_extend
+
+  cdef unsigned int i,j,start_i,end_i,start_j,end_j
+  cdef char c1,c2,op,*editpos=edits
+
+  Sij = Smax = end_i = end_j = 0
+
+  for j in range(m):
+     coldel[j] = NINF
+     S[j]      = 0
+
+  for i in range(n):
+    local_match      = match_scores[i]
+    local_mismatch   = mismatch_scores[i]
+    local_gap_open   = gap_open_scores[i]
+    local_gap_extend = gap_extend_scores[i]
+
+    Sleft   = 0
+    Sdiag   = 0
+    inscost = NINF
+    c1      = ss1[i]
+
+    for j in range(m):
+      c2  = ss2[j]
+      Sup = S[j]
+
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
+
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
+      delcost  = coldel[j] + local_gap_extend
+      Stemp1   = Sup       + local_gap_open
+      inscost +=             local_gap_extend
+      Stemp2   = Sleft     + local_gap_open
+
+      if delcost < Stemp1:
+        delcost = Stemp1
+      if inscost < Stemp2:
+        inscost = Stemp2
+
+      # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
+      if c1==c2:
+        Sij = Sdiag + local_match
+        op  = '='
+      else:
+        Sij = Sdiag + local_mismatch
+        op  = 'X'
+
+      # Take best costing operation
+      if Sij < delcost:
+        Sij = delcost
+        op  = 'D'
+
+      if Sij < inscost:
+        Sij = inscost
+        op  = 'I'
+
+      if Sij < 0:
+        Sij = 0
+        op  = 0
+
+      if Sij > Smax:
+        Smax  = Sij
+        end_i = i
+        end_j = j
+
+      Sdiag        = Sup
+      S[j] = Sleft = Sij
+      coldel[j]    = delcost
+      editpos[0]   = op
+      editpos     += 1
+
+  start_i,start_j,cigar = _roll_cigar(n,m,end_i,end_j,edits,0)
+
+  free(coldel)
+  free(S)
+  free(edits)
+
+  return slice(<int>start_i,<int>end_i+1),slice(<int>start_j,<int>end_j+1),<int>Smax,cigar
+
+
+@cython.boundscheck(False)
+def smith_waterman_gotoh2_score(s1, s2, match_score=10, mismatch_score=-9,
+                                        gap_open_score=-15, gap_extend_score=-6):
+  '''
+  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  alignment.  An alignment score and sequence of alignment operations are returned.
+
+  The operations to align s1 to s2 are returned as a sequence, represented
+  by extended CIGAR (Compact Idiosyncratic Gapped Alignment Report)
+  operations of the form:
+
+    Match:         CigarOp(op='=', count=n)
+    Mismatch:      CigarOp(op='X', count=n)
+    Insertion:     CigarOp(op='I', count=n)
+    Deletion:      CigarOp(op='D', count=n)
+
+  Match operations are inclusive of matching and mismatch characters
+
+  See: http://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm
+
+       Smith, Temple F.; and Waterman, Michael S. (1981). "Identification
+       of Common Molecular Subsequences". Journal of Molecular Biology 147: 195–197.
+       http://gel.ym.edu.tw/~chc/AB_papers/03.pdf
+
+  This implementation is based on a standard dynamic programming algorithm,
+  requiring O(N*M) time and space, where N and M are the lengths of the two
+  sequences.  See the following for more information on these concepts:
+
+    http://en.wikipedia.org/wiki/Dynamic_programming
+    http://en.wikipedia.org/wiki/Big_O_notation
+
+  The the cost to transform s1[:i]->s2[:j] is based on the following
+  recurrence:
+
+              |  i                       if i>=0, j=0  (delete s1[:i])
+              |  j                       if i =0, j>0  (insert s2[:j])
+  cost[i,j] = |
+              |     | 0
+              |     | cost[i-1,j-1] + m   if c1==c2     (match: perfect)
+              | min | cost[i-1,j-1] + mm  if c1!=c2     (match: substitution)
+              |     | cost[i,  j-1] + g                (insert c2)
+              |     | cost[i-1,j  ] + g                (delete c1)
+
+  where c1=s1[i-1], c2=s2[j-1].  The resulting minimum edit distance is then
+  cost[i,j] and the edit sequence is obtained by keeping note of which
+  operation was selected at each step and backtracking from the end to the
+  beginning.  This implementation saves space by only storing the last two
+  cost rows at any given time (cost[i-1], and cost[i]).
+
+  >>> s1,s2='b','abc'
+  >>> smith_waterman_gotoh2_score(s1,s2)
+  10
+
+  >>> s1,s2='abc','b'
+  >>> smith_waterman_gotoh2_score(s1,s2)
+  10
+
+  >>> s1,s2='abbcbbd','acd'
+  >>> smith_waterman_gotoh2_score(s1,s2,match_score=30)
+  48
+
+  >>> s1='AGACCAAGTCTCTGCTACCGTACATACTCGTACTGAGACTGCCAAGGCACACAGGGGATAG'
+  >>> s2='GCTGGTGCGACACAT'
+  >>> smith_waterman_gotoh2_score(s1,s2,mismatch_score=-20)
+  55
+  '''
+  cdef Py_ssize_t n    = PyString_Size(s1)
+  cdef Py_ssize_t m    = PyString_Size(s2)
+  cdef char *ss1       = s1
+  cdef char *ss2       = s2
+
+  cdef np.ndarray[int, ndim=1, mode="c"]      match_scores = np.empty(n, dtype=np.int32)
+  cdef np.ndarray[int, ndim=1, mode="c"]   mismatch_scores = np.empty(n, dtype=np.int32)
+  cdef np.ndarray[int, ndim=1, mode="c"]   gap_open_scores = np.empty(n, dtype=np.int32)
+  cdef np.ndarray[int, ndim=1, mode="c"] gap_extend_scores = np.empty(n, dtype=np.int32)
+
+  match_scores[:]      = match_score
+  mismatch_scores[:]   = mismatch_score
+  gap_open_scores[:]   = gap_open_score
+  gap_extend_scores[:] = gap_extend_score
+
+  cdef int  *S         =  <int*>malloc(m*sizeof(int))
+  cdef int  *coldel    =  <int*>malloc(m*sizeof(int))
+  cdef int  NINF       = INT_MIN+100000
+  cdef int  Sup, Sleft, Sdiag, Stemp1, Stemp2, Sij, Smax, inscost, delcost
+
+  cdef int local_match, local_mismatch, local_gap_open, local_gap_extend
+
+  cdef unsigned int i,j,end_i,end_j
+  cdef char c1,c2
+
+  Sij = end_i = end_j = Smax = 0
+
+  for j in range(m):
+     coldel[j] = NINF
+     S[j]      = 0
+
+  for i in range(n):
+    local_match      = match_scores[i]
+    local_mismatch   = mismatch_scores[i]
+    local_gap_open   = gap_open_scores[i]
+    local_gap_extend = gap_extend_scores[i]
+
+    Sleft   = 0
+    Sdiag   = 0
+    inscost = NINF
+    c1      = ss1[i]
+
+    for j in range(m):
+      c2  = ss2[j]
+      Sup = S[j]
+
+      # Compute cost of transforming s1[0:i+1]->s2[0:j+1] allowing the
+      # following edit operations:
+
+      # Delete: transform s1[0:i]->s2[0:j+1] and delete s1[i]
+      # Insert: transform s1[0:i+1]->s2[0:j] and insert s2[j]
+      delcost  = coldel[j] + local_gap_extend
+      Stemp1   = Sup       + local_gap_open
+      inscost +=             local_gap_extend
+      Stemp2   = Sleft     + local_gap_open
+
+      if delcost < Stemp1:
+        delcost = Stemp1
+      if inscost < Stemp2:
+        inscost = Stemp2
+
+      # Match/Mismatch: transform s1[0:i]->s2[0:j] + match/mismatch cost
+      if c1==c2:
+        Sij = Sdiag + local_match
+      else:
+        Sij = Sdiag + local_mismatch
+
+      # Take best costing operation
+      if Sij < delcost:
+        Sij = delcost
+
+      if Sij < inscost:
+        Sij = inscost
+
+      if Sij < 0:
+        Sij = 0
+
+      if Sij > Smax:
+        end_i = i
+        end_j = j
+        Smax  = Sij
+
+      S[j] = Sleft = Sij
+      Sdiag        = Sup
+      coldel[j]    = delcost
+
+  free(coldel)
+  free(S)
+
+  return <int>end_i,<int>end_j,<int>Smax
