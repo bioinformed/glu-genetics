@@ -80,7 +80,10 @@ def sequence_writer(filename, outformat=None):
   filename  = parse_augmented_filename(filename, {})
   outfile   = autofile(hyphen(filename,sys.stdout),'wb')
 
-  return SeqIO._FormatToWriter[outformat](outfile)
+  try:
+    return SeqIO._FormatToWriter[outformat](outfile)
+  finally:
+    outfile.close()
 
 
 def read_sequence(filename, informat=None):
