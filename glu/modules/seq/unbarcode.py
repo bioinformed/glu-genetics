@@ -105,7 +105,7 @@ def option_parser():
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
   parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT',
-                    help='Output sequence format (default=fasta).  As above, except ace, ig, '
+                    help='Output sequence format.  As above, except ace, ig, '
                          'pir, sff-trim, swiss.')
   parser.add_option('--destdir', dest='destdir', default='.',
                     help='Destination directory for output files.  Write to input file directory by default.')
