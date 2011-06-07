@@ -27,7 +27,9 @@ from   glu.modules.genedb.queries import query_snps_by_location, query_gene_by_n
 #FIXME: Make even moe configurable
 HAPPATH='/usr/local/share/hapmap/'
 
-DATA = { 'hapmap27' : dict(   genome='genedb_ncbi36.3_dbsnp130',
+DATA = { 'hapmap28' : dict(   genome='genedb_ncbi36.3_dbsnp130',
+                           genotypes=HAPPATH+'build28/glu/hapmap_%(POP)s_%(CHR)s_r28_fwd_nr_b36.lbat'),
+         'hapmap27' : dict(   genome='genedb_ncbi36.3_dbsnp130',
                            genotypes=HAPPATH+'build27/glu/hapmap_%(POP)s_%(CHR)s_r27_fwd_nr_b36.lbat'),
          'hapmap26' : dict(   genome='genedb_ncbi36.3_dbsnp130',
                            genotypes=HAPPATH+'build26/forward/non-redundant/hapmap_%(POP)s_%(CHR)s_r26_fwd_nr_b36.lbat'),
