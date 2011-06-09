@@ -102,39 +102,39 @@ find_het(Py_ssize_t *a, Py_ssize_t *b, GenotypeObject *g)
 	return find_het_slowpath(a,b,g);
 }
 
-PyObject *diplos_to_haplos(Py_ssize_t diplos[9])
+static void
+diplos_to_haplos_c(Py_ssize_t *diplos, Py_ssize_t *haplos)
 {
 	/* Haplotype count matrix elements
 
 	                  haplotypes
 	               0   1   2   3   4
-	              AC  AD  BC  BD  Dbl.Het. (AC,BD or AD,BC)
-	    0: AA CC [ 2,  0,  0,  0, 0 ]
-	 d  0: A* C* [ 1,  0,  0,  0, 0 ]
-	 i  1: AA CD [ 1,  1,  0,  0, 0 ]
-	 p  2: AA DD [ 0,  2,  0,  0, 0 ]
-	 l  2: A* D* [ 0,  1,  0,  0, 0 ]
+	 d             AC  AD  BC  BD  Dbl.Het. (AC,BD or AD,BC)
+	 i  0: AA CC [ 2,  0,  0,  0, 0 ]
+	 p  1: AA CD [ 1,  1,  0,  0, 0 ]
+	 l  2: AA DD [ 0,  2,  0,  0, 0 ]
 	 o  3: AB CC [ 1,  0,  1,  0, 0 ]
 	 t  4: AB CD [ 0,  0,  0,  0, 1 ]
 	 y  5: AB DD [ 0,  1,  0,  1, 0 ]
 	 p  6: BB CC [ 0,  0,  2,  0, 0 ]
-	 e  6: B* C* [ 0,  0,  1,  0, 0 ]
-	 s  7: BB CD [ 0,  0,  1,  1, 0 ]
-	    8: BB DD [ 0,  0,  0,  2, 0 ]
-	    8: B* D* [ 0,  0,  0,  1, 0 ]
-
-	    NOTE: Multiplicities (1 for hemizygous vs. 2 for double homozygous)
-	          are taken into account by the diplotype counting.
+	 e  7: BB CD [ 0,  0,  1,  1, 0 ]
+	 s  8: BB DD [ 0,  0,  0,  2, 0 ]
 	*/
 
+	haplos[0] = 2*diplos[0] + diplos[1] + diplos[3];
+	haplos[1] = 2*diplos[2] + diplos[1] + diplos[5];
+	haplos[2] = 2*diplos[6] + diplos[3] + diplos[7];
+	haplos[3] = 2*diplos[8] + diplos[5] + diplos[7];
+	haplos[4] =   diplos[4];
+}
+
+static PyObject *
+diplos_to_haplos(Py_ssize_t *diplos)
+{
 	PyObject *haplo_counts;
 	Py_ssize_t i, haplos[5];
 
-	haplos[0] = diplos[0] + diplos[1] + diplos[3];
-	haplos[1] = diplos[2] + diplos[1] + diplos[5];
-	haplos[2] = diplos[6] + diplos[3] + diplos[7];
-	haplos[3] = diplos[8] + diplos[5] + diplos[7];
-	haplos[4] = diplos[4];
+	diplos_to_haplos_c(diplos, haplos);
 
 	haplo_counts = PyTuple_New(5);
 	if(!haplo_counts) return NULL;
@@ -163,7 +163,7 @@ genotype_categories(UnphasedMarkerModelObject *model)
 	gcat = malloc( sizeof(int)*glen );
 	if(!gcat) goto error;
 
-        homoz = 0;
+	homoz = 0;
 
 	for(i=0; i<glen; ++i)
 	{
@@ -207,40 +207,35 @@ error:
 static inline void
 count_2bit(Py_ssize_t *diplos, int cat1, int cat2)
 {
-	if(cat1>=0 && cat2>=0)
-		diplos[3*cat1+cat2] += (cat1!=1 && cat2!=1)? 2 : 1;
+	if(cat1>=0 && cat2>=0) diplos[3*cat1+cat2] += 1;
 }
 
 
-static PyObject *
-count_haplotypes_2bit(PyObject *self, PyObject *args)
+static int
+count_diplos_2bit_c(GenotypeArrayObject *genos1, GenotypeArrayObject *genos2, Py_ssize_t *diplos)
 {
-	GenotypeArrayObject *genos1, *genos2;
 	UnphasedMarkerModelObject *model1=NULL, *model2=NULL;
 	int *gcat1=NULL, *gcat2=NULL;
 	const unsigned char *g1, *g2;
 	const unsigned int *offsets;
-	Py_ssize_t len1, len2, i, diplos[9];
-
-	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
-		return NULL;
+	Py_ssize_t len1, len2, i;
 
 	if(!GenotypeArray_CheckExact(genos1))
 	{
 		PyErr_SetString(PyExc_TypeError,"genos1 must be a GenotypeArray instance");
-		return NULL;
+		return -1;
 	}
 
 	if(!GenotypeArray_CheckExact(genos2))
 	{
 		PyErr_SetString(PyExc_TypeError,"genos2 must be a GenotypeArray instance");
-		return NULL;
+		return -1;
 	}
 
 	if(genos1->descriptor->homogeneous != 2 || genos2->descriptor->homogeneous != 2)
 	{
 		PyErr_SetString(GenotypeRepresentationError, "genotype arrays must have homogeneous 2 bit width");
-		return NULL;
+		return -1;
 	}
 
 	len1 = PyList_Size(genos1->descriptor->models);
@@ -265,7 +260,7 @@ count_haplotypes_2bit(PyObject *self, PyObject *args)
 	if(offsets[0] != 0)
 	{
 		PyErr_SetString(GenotypeRepresentationError, "genotype array data must begin with zero offset");
-		return NULL;
+		return -1;
 	}
 
 	g1 = genos1->data;
@@ -309,25 +304,21 @@ count_haplotypes_2bit(PyObject *self, PyObject *args)
 done:
 	if(gcat1) free(gcat1);
 	if(gcat2) free(gcat2);
-	return diplos_to_haplos(diplos);
+	return 0;
 
 error:
 	if(gcat1) free(gcat1);
 	if(gcat2) free(gcat2);
-	return NULL;
+	return -1;
 }
 
-PyObject *
-count_haplotypes(PyObject *self, PyObject *args)
+static int
+count_diplos_c(PyObject *genos1, PyObject *genos2, Py_ssize_t *diplos)
 {
-	PyObject *genos1, *genos2;
 	GenotypeObject *g1=NULL, *g2=NULL;
 	UnphasedMarkerModelObject *model1=NULL, *model2=NULL;
-	Py_ssize_t len1, len2, i, a, b, diplos[9];
-	Py_ssize_t a1,a2,b1,b2,x,mult;
-
-	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
-		return NULL;
+	Py_ssize_t len1, len2, i, a, b;
+	Py_ssize_t a1,a2,b1,b2,x;
 
 	if(GenotypeArray_CheckExact(genos1) && GenotypeArray_CheckExact(genos2))
 	{
@@ -335,7 +326,7 @@ count_haplotypes(PyObject *self, PyObject *args)
 		GenotypeArrayObject *g2 = (GenotypeArrayObject *)genos2;
 		unsigned int *offsets = (unsigned int *)PyArray_DATA(g1->descriptor->offsets);
 		if(offsets[0] == 0 && g1->descriptor->homogeneous == 2 && g2->descriptor->homogeneous == 2)
-			return count_haplotypes_2bit(self, args);
+			return count_diplos_2bit_c(g1,g2,diplos);
 	}
 
 	len1 = PySequence_Size(genos1);
@@ -432,11 +423,7 @@ count_haplotypes(PyObject *self, PyObject *args)
 		else if(homozygous_for(g2,b2)) b = 2;
 		else                           b = 1;
 
-		mult = 1;
-		if(homozygous(g1) && homozygous(g2))
-			mult = 2;
-
-		diplos[3*a + b] += mult;
+		diplos[3*a + b] += 1;
 
 		Py_DECREF(g1);
 		Py_DECREF(g2);
@@ -444,26 +431,130 @@ count_haplotypes(PyObject *self, PyObject *args)
 	}
 
 done:
-	return diplos_to_haplos(diplos);
+	return 0;
 
 error:
 	Py_XDECREF(g1);
 	Py_XDECREF(g2);
-	return NULL;
+	return -1;
+}
+
+PyObject *
+count_diplotypes(PyObject *self, PyObject *args)
+{
+	PyObject *genos1, *genos2;
+	PyObject *diplo_counts;
+	Py_ssize_t diplos[9], i, ret;
+
+	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
+		return NULL;
+
+	ret = count_diplos_c(genos1, genos2, diplos);
+
+	if(ret<0) return NULL;
+
+	diplo_counts = PyTuple_New(9);
+	if(!diplo_counts) return NULL;
+
+	for(i = 0; i < 9; ++i)
+		PyTuple_SET_ITEM(diplo_counts, i, PyInt_FromSsize_t(diplos[i]) );
+
+	return diplo_counts;
+}
+
+PyObject *
+count_haplotypes(PyObject *self, PyObject *args)
+{
+	PyObject *genos1, *genos2;
+	Py_ssize_t diplos[9], ret;
+
+	if(!PyArg_ParseTuple(args, "OO", &genos1, &genos2))
+		return NULL;
+
+	ret = count_diplos_c(genos1, genos2, diplos);
+
+	if(ret<0) return NULL;
+		
+	return diplos_to_haplos(diplos);
+}
+
+static int
+convert_args(PyObject *args, Py_ssize_t *haplos)
+{
+	PyObject *arg1=NULL, *arg2=NULL;
+	Py_ssize_t diplos[9], arglen, ret;
+
+	if(args && PyTuple_Check(args) && PyTuple_Size(args)==5)
+	{
+		if(!PyArg_ParseTuple(args, "nnnnn", haplos, haplos+1, haplos+2, haplos+3, haplos+4))
+			return -1;
+		return 0;
+	}
+
+	if(!PyArg_ParseTuple(args, "O|O", &arg1, &arg2))
+		return -1;
+
+	if(arg2)
+	{
+		ret = count_diplos_c(arg1, arg2, diplos);
+
+		if(ret<0) return -1;
+			
+		diplos_to_haplos_c(diplos,haplos);
+		return 0;
+	}
+
+	if(!PyTuple_Check(arg1))
+	{
+		PyErr_SetString(PyExc_TypeError,"single argument must be tuple");
+		return -1;
+	}
+	
+	arglen = PyTuple_Size(args);
+
+	if(arglen<0) return -1;
+	else if(arglen==9)
+	{
+		if(!PyArg_ParseTuple(arg1, "nnnnnnnnn", diplos, diplos+1, diplos+2, diplos+3, diplos+4,
+		                                                diplos+5, diplos+6, diplos+7, diplos+8))
+			return -1;
+
+		diplos_to_haplos_c(diplos,haplos);
+		return 0;
+	}
+	else if(arglen==5)
+	{
+		if(!PyArg_ParseTuple(arg1, "nnnnn", haplos, haplos+1, haplos+2, haplos+3, haplos+4))
+			return -1;
+		return 0;
+	}
+	else
+	{
+		PyErr_SetString(PyExc_TypeError,"invalid argument");
+		return -1;
+	}
 }
 
 PyObject *
 estimate_ld(PyObject *self, PyObject *args)
 {
 	const double TOLERANCE = 10e-7;
+	Py_ssize_t haplos[5];
 	int    i;
 	long   c11, c12, c21, c22, dh, n;
 	double p, q, old_p11, p11, p12, p21, p22, a, nx1, nx2;
 	double d, d_max, dprime, r2;
 	PyObject *results;
 
-	if(!PyArg_ParseTuple(args, "lllll", &c11, &c12, &c21, &c22, &dh))
+
+	if(convert_args(args,haplos)<0)
 		return NULL;
+
+	c11 = haplos[0];
+	c12 = haplos[1];
+	c21 = haplos[2];
+	c22 = haplos[3];
+	dh  = haplos[4];
 
 	if(!dh && (c11+c12 == 0 || c21+c22 == 0 || c11+c21 == 0 || c12+c22 == 0))
 	{
