@@ -7,7 +7,7 @@ __copyright__ = 'Copyright (c) 2007-2010, BioInformed LLC and the U.S. Departmen
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-__all__       = ['WTCCCWriter', 'save_wtccc']
+__all__       = ['WTCCCWriter', 'save_wtccc', 'load_wtccc', 'load_wtccc_dosage']
 
 __genoformats__ = [
   #LOADER        SAVER          WRITER       PFORMAT  ALIAS    EXTS
@@ -92,7 +92,7 @@ def load_wtccc_samples(filename):
       pass
     elif len(fields)==1:
       sample = fields[0]
-    elif fields[0] and fields[1]:
+    elif fields[0] and fields[1] and fields[0]!=fields[1]:
       sample = '%s:%s' % (fields[0],fields[1])
     else:
       sample = fields[0] or fields[1]
@@ -231,6 +231,113 @@ def load_wtccc(filename,format,genome=None,phenome=None,extra_args=None,**kwargs
     genos = genos.transformed(recode_models=genome)
 
   return genos
+
+
+def load_wtccc_dosage(filename,format,genome=None,phenome=None,extra_args=None,**kwargs):
+  '''
+  Load a WTCCC file and return a NumPy array of dosage values
+
+  See http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html
+
+  @param     filename: file name or file object
+  @type      filename: str or file object
+  @param       format: text string expected in the first header field to
+                       indicate data format, if specified
+  @type        format: string
+  @param     genorepr: function to convert list genotype strings to desired
+                       internal representation
+  @type      genorepr: unary function
+  @param       genome: genome descriptor
+  @type        genome: Genome instance
+  @param       unique: rows and columns are uniquely labeled (default is True)
+  @type        unique: bool
+  @param   extra_args: optional dictionary to store extraneous arguments, instead of
+                       raising an error.
+  @type    extra_args: dict
+  @rtype             : GenomatrixStream
+
+  >>> from StringIO import StringIO
+  >>> data = StringIO(
+  ... '0 l1 0 A G 1 0 0 0 1 0 0 0 1\\n'
+  ... '0 l2 0 C G 0 0 0 0 1 0 0 0 0\\n'
+  ... '0 l3 0 C G 0 0 0 0 1 0 0 0 0\\n'
+  ... '0 l4 0 C T 0 .5 .5 1 0 0 0 1 0\\n')
+  >>> samples = StringIO('ID_1 ID_2 missing\\n0 0 0 0 0 0\\nf1 s1 0\\nf1 s2 0\\nf1 s3 0\\n')
+  >>> samples,genos = load_wtccc_dosage(data,'wtccc',samples=samples)
+  >>> samples
+  ('f1:s1', 'f1:s2', 'f1:s3')
+  >>> for row in genos:
+  ...   print row
+  ('l1', None, None, 'A', 'G', array([ 0. ,  0.5,  1. ]))
+  ('l2', None, None, 'C', 'G', array([ nan,  0.5,  nan]))
+  ('l3', None, None, 'C', 'G', array([ nan,  0.5,  nan]))
+  ('l4', None, None, 'C', 'T', array([ 0.75,  0.  ,  0.5 ]))
+  '''
+  if extra_args is None:
+    args = kwargs
+  else:
+    args = extra_args
+    args.update(kwargs)
+
+  filename  = parse_augmented_filename(filename,args)
+
+  format    = get_arg(args, ['format'])
+  samples   = get_arg(args, ['samples','s']) or guess_related_file(filename,['lst'])
+
+  if samples is None:
+    raise ValueError('Sample file must be specified when loading WTCCC files')
+
+  if extra_args is None and args:
+    raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
+
+  samples = list(load_wtccc_samples(samples))
+  gfile   = autofile(filename)
+
+  def _load_wtccc_dosage():
+    import numpy as np
+
+    m           = len(samples)
+    n           = 5+m*3
+    modelcache  = {}
+    dosagevals  = np.array([0,0.5,1],dtype=float)
+
+    for line_num,row in enumerate(gfile):
+      fields = row.split()
+
+      if len(fields) != n:
+        raise ValueError('Invalid WTCCC row on line %d of %s' % (line_num+1,namefile(filename)))
+
+      chrom   = fields[0]
+      lname   = fields[1]
+      loc     = fields[2]
+      a,b     = fields[3:5]
+      alleles = a,b
+
+      if chrom.startswith('chr'):
+        chrom = chrom[3:]
+
+      if chrom.upper()=='MT':
+        chrom = 'M'
+      elif chrom not in ('X','Y','XY','M'):
+        try:
+          if not (1<=int(chrom)<=22):
+            chrom = None
+        except ValueError:
+          chrom = None
+
+      try:
+        loc = int(loc) or None
+      except ValueError:
+        loc = None
+
+      genos  = np.array(fields[5:],dtype=float).reshape( (-1,3) )
+      dosage = (genos*dosagevals).sum(axis=1)/genos.sum(axis=1)
+
+      yield lname,chrom,loc,a,b,dosage
+
+  genos = _load_wtccc_dosage()
+
+  return samples,genos
 
 
 class WTCCCWriter(object):
