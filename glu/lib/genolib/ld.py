@@ -70,7 +70,7 @@ def count_haplotypes_native(genos1, genos2):
 
   model1       = genos1[0].model if genos1 else None
   model2       = genos2[0].model if genos2 else None
-  diplo_counts = count_diplotypes(genos1, genos2)
+  diplo_counts = summarize_diplotypes(genos1, genos2)
   het1,het2    = find_heterozygotes(model1,model2,diplo_counts)
   indices      = list( (2*i+j,i,j,(g1,g2)) for i,g1 in enumerate(het1) if g1 for j,g2 in enumerate(het2) if g2)
   x            = [0]*5
@@ -99,7 +99,7 @@ def count_haplotypes_native(genos1, genos2):
   return tuple(x)
 
 
-def count_diplotypes(genos1, genos2):
+def summarize_diplotypes(genos1, genos2):
   '''
   Return a list of diplotype frequencies and a sets of alleles from each locus
 
@@ -111,7 +111,7 @@ def count_diplotypes(genos1, genos2):
   >>> genos1 = model.genotypes*350
   >>> genos2 = model.genotypes*200+model.genotypes[1:]*200
 
-  >>> for g1,g2,n in sorted(count_diplotypes(genos1,genos2)):
+  >>> for g1,g2,n in sorted(summarize_diplotypes(genos1,genos2)):
   ...   print g1,g2,n
   (None, None) (None, None) 200
   (None, None) ('A', 'A') 50
@@ -129,7 +129,7 @@ def count_diplotypes(genos1, genos2):
 
   >>> genos1 = GenotypeArray(descr,genos1)
   >>> genos2 = GenotypeArray(descr,genos2)
-  >>> for g1,g2,n in sorted(count_diplotypes(genos1,genos2)):
+  >>> for g1,g2,n in sorted(summarize_diplotypes(genos1,genos2)):
   ...   print g1,g2,n
   (None, None) (None, None) 200
   (None, None) ('A', 'A') 50
@@ -309,10 +309,12 @@ try:
 
   # Load the optimized C versions, if available
   from glu.lib.genolib._genoarray import count_haplotypes as count_haplotypes_fast, \
+                                         count_diplotypes as count_diplotypes_fast, \
                                          estimate_ld      as estimate_ld_fast
 
 
   count_haplotypes = count_haplotypes_fast
+  count_diplotypes = count_diplotypes_fast
   estimate_ld      = estimate_ld_fast
 
   def test_count_haplotypes():
