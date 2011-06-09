@@ -104,6 +104,7 @@ PyObject *genoarray_ibs(PyObject *self, PyObject *args);
 
 /* LD */
 PyObject *count_haplotypes(PyObject *self, PyObject *args);
+PyObject *count_diplotypes(PyObject *self, PyObject *args);
 PyObject *estimate_ld(PyObject *self, PyObject *args);
 
 /* Exceptions */

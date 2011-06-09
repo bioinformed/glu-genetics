@@ -3838,6 +3838,7 @@ init_genoarray(void)
 		{"merge_unanimous",	merge_unanimous_func,	METH_VARARGS,
 		 "Merge a list of genotypes requiring non-missing genotypes to be unanimous or they are setting to missing"},
 		{"count_haplotypes",	count_haplotypes,	METH_VARARGS, "Count haplotypes at two loci"},
+		{"count_diplotypes",	count_diplotypes,	METH_VARARGS, "Count diplotypes at two loci"},
 		{"estimate_ld",	estimate_ld,	METH_VARARGS, "Compute LD statistics from haplotype counts"},
 		{NULL}  /* Sentinel */
 	};
