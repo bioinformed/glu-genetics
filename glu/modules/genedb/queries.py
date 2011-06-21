@@ -56,32 +56,66 @@ def query_gene_by_name(con,gene):
 
 
 def query_gene_neighborhood(con,chrom,start,end,up,dn):
-  sql = '''
-  SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
-  FROM     gene
-  WHERE    chrom  = ?
-    AND  ((strand = '+' AND txStart<? AND txEnd>?)
-       OR (strand = '-' AND txStart<? AND txEnd>?))
-  GROUP BY symbol
-  ORDER BY chrom,start,end,symbol,canonical DESC
-  '''
   cur = con.cursor()
-  cur.execute(sql, (chrom,end+dn,start-up,end+up,start-dn))
+
+  if 'rtree' not in con.filename:
+    sql = '''
+    SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
+    FROM     gene
+    WHERE    chrom  = ?
+      AND  ((strand = '+' AND txStart<? AND txEnd>?)
+         OR (strand = '-' AND txStart<? AND txEnd>?))
+    GROUP BY symbol
+    ORDER BY chrom,start,end,symbol,canonical DESC
+    '''
+    cur.execute(sql, (chrom,end+dn,start-up,end+up,start-dn))
+  else:
+    sql = '''
+    SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
+    FROM     gene
+    WHERE    chrom  = ?
+      AND    id in (SELECT id
+                    FROM   gene_index
+                    WHERE  txStart < ?
+                      AND  txEnd   > ?)
+      AND  ((strand = '+' AND txStart<? AND txEnd>?)
+         OR (strand = '-' AND txStart<? AND txEnd>?))
+    GROUP BY symbol
+    ORDER BY chrom,start,end,symbol,canonical DESC
+    '''
+    d = max(dn,up)
+    cur.execute(sql, (chrom,end+d,start-d,end+dn,start-up,end+up,start-dn))
+
   return cur.fetchall()
 
 
-def query_genes_by_location(con,chr,start,end):
-  sql = '''
-  SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
-  SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
-  FROM     gene
-  WHERE    chrom = ?
-    AND    txStart<? AND txEnd>?
-  GROUP BY symbol
-  ORDER BY chrom,start,end,symbol,canonical DESC
-  '''
+def query_genes_by_location(con,chrom,start,end):
+  if 'rtree' not in con.filename:
+    sql = '''
+    SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
+    SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
+    FROM     gene
+    WHERE    chrom = ?
+      AND    txStart<? AND txEnd>?
+    GROUP BY symbol
+    ORDER BY chrom,start,end,symbol,canonical DESC
+    '''
+  else:
+    sql = '''
+    SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
+    SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
+    FROM     gene
+    WHERE    chrom = ?
+      AND    id in (SELECT id
+                    FROM   gene_index
+                    WHERE  txStart < ?
+                      AND  txEnd   > ?)
+    GROUP BY symbol
+    ORDER BY chrom,start,end,symbol,canonical DESC
+    '''
+
   cur = con.cursor()
-  cur.execute(sql, (chr, loc))
+  cur.execute(sql, (chrom, start, end))
   return cur.fetchall()
 
 
