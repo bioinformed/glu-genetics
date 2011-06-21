@@ -154,7 +154,8 @@ def rowsby(data, columns=None, rowkeyfunc=None, colkeyfunc=None, valuefunc=None,
   return columns,_rowsby()
 
 
-def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None, roworder=None, colorder=None):
+def xtab(data, rowkeyfunc=None, colkeyfunc=None, valuefunc=None, 
+               aggregatefunc=None, roworder=None, colorder=None):
   '''
   Build a table of rows by columns from a sequence that can be interpreted
   as a triple of (row key, column key, value).  Values with the same row and
@@ -211,6 +212,10 @@ def xtab(data, rowkeyfunc, colkeyfunc, valuefunc, aggregatefunc=None, roworder=N
   get0 = itemgetter(0)
   get1 = itemgetter(1)
   get2 = itemgetter(2)
+
+  rowkeyfunc = rowkeyfunc or get0
+  colkeyfunc = colkeyfunc or get1
+  valuefunc  = valuefunc  or get2
 
   rowkeys  = dict( (rowkey,i) for i,rowkey in enumerate(roworder or []) )
   colkeys  = dict( (colkey,i) for i,colkey in enumerate(colorder or []) )
