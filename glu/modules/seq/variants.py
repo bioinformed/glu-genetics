@@ -558,7 +558,7 @@ def main():
     sys.exit(2)
 
   if not options.reference:
-    sys.stderr.write('ERROR: Reference genome sequence required')
+    sys.stderr.write('ERROR: Reference genome sequence required\n')
     sys.exit(2)
 
   reference = pysam.Fastafile(options.reference)
