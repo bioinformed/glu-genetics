@@ -514,15 +514,6 @@ class GenotripleStream(GenotypeStream):
     if transform.filter_nonfounders:
       triples = filter_genotriples_founders(triples,'nonfounder')
 
-    # Optimize includes and excludes
-    if transform.samples.include is not None and transform.samples.exclude is not None:
-      transform.samples.include -= transform.samples.exclude
-      transform.samples.exclude  = None
-
-    if transform.loci.include is not None and transform.loci.exclude is not None:
-      transform.loci.include -= transform.loci.exclude
-      transform.loci.exclude  = None
-
     # Sample and locus includes
     if transform.samples.include is not None or transform.loci.include is not None:
       triples = filter_genotriples(triples,transform.samples.include,transform.loci.include)
@@ -1336,15 +1327,6 @@ class GenomatrixStream(GenotypeStream):
       genos = filter_genomatrixstream_founders(genos, 'founders')
     if transform.filter_nonfounders:
       genos = filter_genomatrixstream_founders(genos, 'nonfounders')
-
-    # Optimize includes and excludes
-    if rowtransform.include is not None and rowtransform.exclude is not None:
-      rowtransform.include -= rowtransform.exclude
-      rowtransform.exclude  = None
-
-    if coltransform.include is not None and coltransform.exclude is not None:
-      coltransform.include -= coltransform.exclude
-      coltransform.exclude  = None
 
     # Apply row includes and excludes
     if rowtransform.exclude:
@@ -2838,7 +2820,13 @@ def rename_genomatrixstream_alleles(genos, rename_alleles, warn=False):
           try:
             row = [ ((r[g[0]],r[g[1]]) if g else g.alleles()) for g in row ]
           except KeyError:
-            raise ValueError('Invalid remapping for locus %s genotype %s' % (locus,g))
+            import sys
+            msg = 'Invalid remapping for locus=%s genotype=%s mapping=%s' % (locus,g,r)
+            if warn:
+              print >> sys.stderr,'WARNING:',msg
+              row = [ (None,None) ]*len(row)
+            else:
+              raise ValueError(msg)
 
         yield locus,row
 
@@ -2855,7 +2843,10 @@ def rename_genomatrixstream_alleles(genos, rename_alleles, warn=False):
         try:
           row = [ ((r[g[0]],r[g[1]]) if g and r else g.alleles()) for locus,g,r in izip_exact(genos.loci,row,remaps) ]
         except KeyError:
-          raise ValueError('Invalid remapping for locus %s genotype %s' % (locus,g))
+          if warn:
+            raise NotImplementedError('Warning mode not implemented for sdat renaming')
+          else:
+            raise ValueError('Invalid remapping for locus=%s genotype=%s mapping=%s' % (locus,g,r))
 
         yield sample,row
 

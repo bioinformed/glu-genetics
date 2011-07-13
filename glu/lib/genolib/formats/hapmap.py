@@ -59,10 +59,6 @@ def load_hapmap(filename,format,genome=None,phenome=None,transform=None,extra_ar
   includeloci = transform.loci.include
   excludeloci = transform.loci.exclude
 
-  if includeloci is not None and excludeloci is not None:
-    includeloci -= excludeloci
-    excludeloci.clear()
-
   gfile = autofile(filename)
   gfile = dropwhile(lambda s: s.startswith('#'), gfile)
 
@@ -138,6 +134,9 @@ def load_hapmap(filename,format,genome=None,phenome=None,transform=None,extra_ar
 
   if unique:
     genos = genos.unique_checked()
+
+  if transform:
+    genos = genos.transformed(transform)
 
   return genos
 

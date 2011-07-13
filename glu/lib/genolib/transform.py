@@ -394,6 +394,11 @@ class GenoSubTransform(object):
     if not isinstance(order, seq_type):
       order = list_reader(order)
 
+    # Optimize includes and excludes
+    if include is not None and exclude is not None:
+      include -= exclude
+      exclude  = None
+
     self.include = include
     self.exclude = exclude
     self.rename  = rename

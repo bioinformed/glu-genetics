@@ -189,18 +189,19 @@ def load_genostream(filename, transform=None, extra_args=None, **kwargs):
   genos  = loader(filename, format, extra_args=args,
                             genome=genome, phenome=phenome, transform=transform)
 
-  # Apply any requested transformations
+  # Apply any requested transformations if the loader did not ensure that
+  # all transformations were applied
+  transform = args.pop('transform',None)
+
   if transform:
     genos = genos.transformed(transform)
 
-  # Kludge until extra_args is smarter about default values.
-  #   This is needed in the short term for genorepr=None for formats that do
-  #   not use genoreprs.
+  # Clean None-valued arguments.  This kludge until extra_args is smarter
+  # about default values.  It is needed in the short term for genorepr=None
+  # for formats that do not use genoreprs.
   for k,v in args.items():
     if v is None:
       del args[k]
-
-  args.pop('transform',None)
 
   if extra_args is None and args:
     raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -329,8 +330,7 @@ def transform_files(infiles,informat,ingenorepr,
 
   genos = [ load_genostream(f,format=informat,genorepr=ingenorepr,
                               genome=genome,phenome=phenome,transform=transform,
-                              hyphen=inhyphen)
-                            .transformed(transform) for f in infiles ]
+                              hyphen=inhyphen) for f in infiles ]
   n = len(genos)
 
   if outformat is None:
