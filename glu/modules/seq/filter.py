@@ -33,7 +33,7 @@ def set_readgroup(groupname,header,aligns):
   RG = header.get('RG')
 
   if not RG:
-    header['RG'] = {'ID':groupname,'PL':'unknown','SM':groupname}
+    header['RG'] = [{'ID':groupname,'PL':'unknown','SM':groupname}]
   else:
     RG[:] = RG[0:1]
     RG[0]['ID'] = RG[0]['SM'] = groupname
@@ -43,10 +43,10 @@ def set_readgroup(groupname,header,aligns):
     rg = ('RG',groupname)
 
     for align in aligns:
-      tags = align.tags
-      names,values = zip(*tags)
+      tags = align.tags or []
 
       try:
+        names,values = zip(*tags)
         idx = names.index('RG')
         tags[idx] = rg
 
@@ -556,7 +556,7 @@ def main():
     sumout.write('  %15s: %s\n' % (name, stat_line(status)))
 
   if 0:
-    sumout.write('\n\nREAD_LENGTH\tONTARGET_READS\tUNALIGNED_READS\tTOOSHORT_READS\tOFFTARGET_READS\n')
+    sumout.write('\n\nREAD_LENGTH\tONTARGET_READS\tOFFTARGET_READS\tUNALIGNED_READS\tTOOSHORT_READS\tCONTROL\n')
     for i in xrange(len(lengths[0])):
       status_lengths = [ l[i] for l in lengths ]
       if sum(status_lengths):
