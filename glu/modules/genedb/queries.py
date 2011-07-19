@@ -115,7 +115,7 @@ def query_genes_by_location(con,chrom,start,end):
     '''
 
   cur = con.cursor()
-  cur.execute(sql, (chrom, start, end))
+  cur.execute(sql, (chrom, end, start))
   return cur.fetchall()
 
 
@@ -131,6 +131,21 @@ def query_cytoband_by_location(con,chrom,loc):
     chrom = chrom[3:]
   cur = con.cursor()
   cur.execute(sql, (chrom, loc))
+  return cur.fetchall()
+
+
+def query_cytobands_by_location(con,chrom,start,end):
+  sql = '''
+  SELECT   band,start,stop,color
+  FROM     cytoband
+  WHERE    chrom = ?
+    AND    start<? AND stop>?
+  ORDER BY chrom,start,stop;
+  '''
+  if chrom.startswith('chr'):
+    chrom = chrom[3:]
+  cur = con.cursor()
+  cur.execute(sql, (chrom,end,start))
   return cur.fetchall()
 
 
@@ -210,24 +225,27 @@ def query_contig_by_name(con,name):
     raise KeyError('Ambiguous contig "%s"' % name)
 
 
-def query_snps_by_name(con,name):
+def query_snps_by_name(con,name,canonical=True):
   sql = '''
   SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
   FROM     snp
-  WHERE    name %s
-  '''
+  WHERE    name %s'''
+
   if '%' in name:
     sql = sql % 'LIKE ?'
   else:
     sql = sql % '= ?'
+
+  if canonical:
+    sql += "\n    AND    chrom NOT LIKE '%!_%' ESCAPE '!'"
 
   cur = con.cursor()
   cur.execute(sql,(name,))
   return cur.fetchall()
 
 
-def query_snp_by_name(con,name):
-  snps = query_snps_by_name(con,name)
+def query_snp_by_name(con,name,canonical=True):
+  snps = query_snps_by_name(con,name,canonical)
   if not snps:
     raise KeyError('Cannot find snp "%s"' % name)
   elif len(snps) > 1:
