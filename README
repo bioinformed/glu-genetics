@@ -1,0 +1,81 @@
+Welcome to GLU: Genotype Library and Utilities
+
+GLU provides command-line tools for the management of large amounts of SNP
+genotype data and programs to check its quality and to test for association
+between SNP markers with continuous or discrete trait phenotypes.
+
+This will be an informative, witty, and insightful README file at some
+point.  In the mean time, please excuse the current humble incarnation.
+
+Installation
+============
+
+Please refer to the installation directions on the GLU web site or refer to
+the INSTALL.rst file in the docs/ directory.
+
+Running GLU
+===========
+
+To run GLU::
+
+        glu -h
+        glu <module>
+
+Getting started
+===============
+
+For information on getting started, please refer to the GLU online
+documentation, the text documentation in the docs/ directory, or run::
+
+        glu intro
+
+GLU project resources
+=====================
+
+The main project site for the open source development of GLU is:
+
+  http://code.google.com/p/glu-genetics
+
+Source code and binary versions for Linux (64-bit), Mac OS X, and Microsoft
+Windows may be downloaded from:
+
+  http://code.google.com/p/glu-genetics/downloads
+
+Bugs and feature requests for GLU should be posted to the GLU issue tracker
+available from:
+
+  http://code.google.com/p/glu-genetics/issues/
+
+To subscribe to the GLU Users group, visit:
+
+  http://groups.google.com/group/glu-users
+
+To subscribe to the GLU Developers group, visit:
+
+  http://groups.google.com/group/glu-dev
+
+It is highly recommended that interested users and developers join one or
+both of these groups, since this is where most of the GLU-related discussion
+will take place and where help may be obtained.  You can join from the links
+at the bottom or right side of the GLU project page.
+
+  * You will need to create a Google Account, which is painless and does not
+    require a GMail account.
+
+    - If you do have a GMail account and want email from the group to be
+      sent to another address, then please sign off from GMail before
+      attempting to join either group.
+
+    - Otherwise, if you are logged into GMail your group subscription may
+      default to your GMail account.
+
+  * Click "Create an account now"
+
+  * Enter your email address (e.g. you@mail.nih.gov), enter a new and unique
+    password, and the other information they request.
+
+Need help?
+==========
+
+Please use the GLU User Group mailing list if you have any questions,
+suggestions, or would like to help improve GLU.

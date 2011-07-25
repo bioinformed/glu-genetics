@@ -1,0 +1,24 @@
+gene_info: Entrez Gene
+	ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/README
+	ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/gene_info.gz
+
+gene.q, seq_gene.md: NCBI Mapview
+	ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/README
+	ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/ARCHIVE/BUILD.35.1/mapview/gene.q.gz
+	ftp://ftp.ncbi.nlm.nih.gov/genomes/H_sapiens/ARCHIVE/BUILD.35.1/mapview/seq_gene.md.gz
+
+Cytoband data:
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/cytoBand.txt.gz
+
+SNP data:
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayAffy5.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayAffy6.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayAffy250Nsp.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayAffy250Sty.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina300.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina550.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina650.txt.gz
+	http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/snpArrayIllumina1M.txt.gz
+
+miRBase
+	ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/genomes/hsa.gff

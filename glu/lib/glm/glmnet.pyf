@@ -1,0 +1,188 @@
+!    -*- f90 -*-
+! Note: the context of this file is case sensitive.
+
+python module _glmnet ! in
+    interface  ! in :_glmnet
+        subroutine elnet(ka,parm,no,ni,x,y,w,njd,jd,vp,ne,nx,nlam,flmin,ulam,thr,isd,lmu,a0,ca,ia,nin,rsq,alm,nlp,jerr) ! in :_glmnet:GLMnet.f
+            integer optional,intent(in) :: ka=1
+            real intent(in) :: parm=1.0
+            integer optional,check(shape(x,0)==no),depend(x),intent(in) :: no=shape(x,0)
+            integer optional,check(shape(x,1)==ni),depend(x),intent(in) :: ni=shape(x,1)
+            real dimension(no,ni),intent(in,overwrite) :: x
+            real dimension(no),depend(no),intent(in,overwrite) :: y
+            real dimension(no),depend(no),intent(in,overwrite) :: w
+            integer optional,check(len(jd)>=njd),depend(jd),intent(in) :: njd=len(jd)
+            integer dimension(njd),intent(in) :: jd
+            real dimension(ni),depend(ni),intent(in) :: vp
+            integer optional,intent(in),depend(x) :: ne=shape(x,1)
+            integer intent(in) :: nx
+            integer optional,intent(in) :: nlam=100
+            real intent(in) :: flmin
+            real dimension(nlam),intent(in) :: ulam
+            real intent(in) :: thr = 1.0e-4
+            integer intent(in) :: isd = 1
+            integer intent(out) :: lmu
+            real dimension(nlam),depend(nlam),intent(out) :: a0
+            real dimension(nx,nlam),depend(nlam,nx),intent(out) :: ca
+            integer dimension(nx),depend(nx),intent(out) :: ia
+            integer dimension(nlam),depend(nlam),intent(out) :: nin
+            real dimension(nlam),depend(nlam),intent(out) :: rsq
+            real dimension(nlam),depend(nlam),intent(out) :: alm
+            integer intent(out) :: nlp
+            integer intent(out) :: jerr
+        end subroutine elnet
+        subroutine uncomp(ni,ca,ia,nin,a) ! in :_glmnet:GLMnet.f
+            integer intent(in) :: ni
+            real dimension(*),check(len(ca)>=nin),depend(nin),intent(in) :: ca
+            integer dimension(*),check(len(ia)>=nin),depend(nin),intent(in) :: ia
+            integer :: nin
+            real dimension(ni),intent(out) :: a
+        end subroutine uncomp
+        subroutine modval(a0,ca,ia,nin,n,x,f) ! in :_glmnet:GLMnet.f
+            real intent(in) :: a0
+            real dimension(nin),intent(in)  :: ca
+            integer dimension(nin),depend(nin),intent(in)  :: ia
+            integer optional,check(len(ca)>=nin),depend(ca),intent(in)  :: nin=len(ca)
+            integer optional,check(shape(x,0)==n),depend(x),intent(in)  :: n=shape(x,0)
+            real dimension(n,*),intent(in)  :: x
+            real dimension(n),depend(n),intent(out)  :: f
+        end subroutine modval
+        subroutine spelnet(ka,parm,no,ni,x,ix,jx,y,w,njd,jd,vp,ne,nx,nlam,flmin,ulam,thr,isd,lmu,a0,ca,ia,nin,rsq,alm,nlp,jerr) ! in :_glmnet:GLMnet.f
+            integer optional,intent(in) :: ka=1
+            real intent(in) :: parm=1.0
+            integer optional,check(len(y)>=no),depend(y),intent(in) :: no=len(y)
+            integer optional,check(len(vp)>=ni),depend(vp),intent(in) :: ni=len(vp)
+            real dimension(*),intent(in,overwrite) :: x
+            integer dimension(*),intent(in) :: ix
+            integer dimension(*),intent(in) :: jx
+            real dimension(no),intent(in,overwrite) :: y
+            real dimension(no),depend(no),intent(in,overwrite) :: w
+            integer optional,check(len(jd)>=njd),depend(jd),intent(in) :: njd=len(jd)
+            integer dimension(njd),intent(in) :: jd
+            real dimension(ni),intent(in) :: vp
+            integer intent(in) :: ne
+            integer intent(in) :: nx
+            integer optional,intent(in) :: nlam=100
+            real intent(in) :: flmin
+            real dimension(nlam),intent(in) :: ulam
+            real intent(in) :: thr = 1.0e-4
+            integer intent(in) :: isd = 1
+            integer intent(out) :: lmu
+            real dimension(nlam),depend(nlam),intent(out) :: a0
+            real dimension(nx,nlam),depend(nlam),intent(out) :: ca
+            integer dimension(nx),depend(nx),intent(out) :: ia
+            integer dimension(nlam),depend(nlam),intent(out) :: nin
+            real dimension(nlam),depend(nlam),intent(out) :: rsq
+            real dimension(nlam),depend(nlam),intent(out) :: alm
+            integer intent(out) :: nlp
+            integer intent(out) :: jerr
+        end subroutine spelnet
+        subroutine cmodval(a0,ca,ia,nin,x,ix,jx,n,f) ! in :_glmnet:GLMnet.f
+            real intent(in) :: a0
+            real dimension(*),intent(in)  :: ca
+            integer dimension(*),intent(in)  :: ia
+            integer intent(in) :: nin
+            real dimension(*),intent(in) :: x
+            integer dimension(*),intent(in)  :: ix
+            integer dimension(*),intent(in)  :: jx
+            integer optional,check(len(f)>=n),depend(f),intent(in)  :: n=len(f)
+            real dimension(n),intent(out)  :: f
+        end subroutine cmodval
+        subroutine lognet(parm,no,ni,nc,x,y,njd,jd,vp,ne,nx,nlam,flmin,ulam,thr,isd,maxit,kopt,lmu,a0,ca,ia,nin,dev,alm,nlp,jerr) ! in :_glmnet:GLMnet.f
+            real intent(in) :: parm=1.0
+            integer optional,check(shape(x,0)==no),depend(x),intent(in) :: no=shape(x,0)
+            integer optional,check(shape(x,1)==ni),depend(x),intent(in) :: ni=shape(x,1)
+            integer optional,depend(y),intent(in) :: nc=shape(y,1)
+            real dimension(no,ni),intent(in) :: x
+            real dimension(no,nc),intent(in) :: y
+            integer optional,check(len(jd)>=njd),depend(jd),intent(in) :: njd=len(jd)
+            integer dimension(njd),intent(in) :: jd
+            real dimension(ni),depend(ni),intent(in) :: vp
+            integer optional,intent(in) :: ne=shape(x,1)
+            integer intent(in) :: nx
+            integer optional,intent(in) :: nlam=100
+            real intent(in) :: flmin
+            real dimension(nlam),intent(in) :: ulam
+            real intent(in) :: thr = 1.0e-4
+            integer intent(in) :: isd = 1
+            integer intent(in) :: maxit = 100
+            integer intent(in) :: kopt
+            integer intent(out) :: lmu
+            real dimension(nc,nlam),intent(out) :: a0
+            real dimension(nx,nc,nlam),depend(nc,nlam),intent(out) :: ca
+            integer dimension(nx),depend(nx),intent(out) :: ia
+            integer dimension(nlam),depend(nlam),intent(out) :: nin
+            real dimension(nlam),depend(nlam),intent(out) :: dev
+            real dimension(nlam),depend(nlam),intent(out) :: alm
+            integer intent(out) :: nlp
+            integer intent(out) :: jerr
+        end subroutine lognet
+        subroutine luncomp(ni,nx,nc,ca,ia,nin,a) ! in :_glmnet:GLMnet.f
+            integer optional,check(shape(a,0)==ni),depend(a),intent(in) :: ni=shape(a,0)
+            integer optional,check(shape(ca,0)==nx),depend(ca),intent(in) :: nx=shape(ca,0)
+            integer optional,check(shape(ca,1)==nc),depend(ca),intent(in) :: nc=shape(ca,1)
+            real dimension(nx,nc),intent(in) :: ca
+            integer dimension(nx),depend(nx),intent(in) :: ia
+            integer intent(in) :: nin
+            real dimension(ni,nc),depend(nc),intent(out) :: a
+        end subroutine luncomp
+        subroutine lmodval(nt,x,nc,nx,a0,ca,ia,nin,ans) ! in :_glmnet:GLMnet.f
+            integer optional,check(shape(x,0)==nt),depend(x),intent(in) :: nt=shape(x,0)
+            real dimension(nt,*),intent(in) :: x
+            integer optional,check(len(a0)>=nc),depend(a0),intent(in) :: nc=len(a0)
+            integer optional,check(shape(ca,0)==nx),depend(ca),intent(in) :: nx=shape(ca,0)
+            real dimension(nc),intent(in) :: a0
+            real dimension(nx,nc),depend(nc),intent(in) :: ca
+            integer dimension(nx),depend(nx),intent(in) :: ia
+            integer intent(in) :: nin
+            real dimension(nc,nt),depend(nc,nt),intent(out) :: ans
+        end subroutine lmodval
+        subroutine splognet(parm,no,ni,nc,x,ix,jx,y,njd,jd,vp,ne,nx,nlam,flmin,ulam,thr,isd,maxit,kopt,lmu,a0,ca,ia,nin,dev,alm,nlp,jerr) ! in :_glmnet:GLMnet.f
+            real intent(in) :: parm=1.0
+            integer optional,check(shape(y,0)==no),depend(y),intent(in) :: no=shape(y,0)
+            integer optional,check(len(vp)>=ni),depend(vp),intent(in) :: ni=len(vp)
+            integer optional,check(shape(a0,0)==nc),depend(a0),intent(in) :: nc=shape(a0,0)
+            real dimension(*),intent(in) :: x
+            integer dimension(*),intent(in) :: ix
+            integer dimension(*),intent(in) :: jx
+            real dimension(no,max(2,nc)),depend(nc),intent(in) :: y
+            integer optional,check(len(jd)>=njd),depend(jd),intent(in) :: njd=len(jd)
+            integer dimension(njd),intent(in) :: jd
+            real dimension(ni),intent(in) :: vp
+            integer intent(in) :: ne
+            integer optional,check(shape(ca,0)==nx),depend(ca),intent(in) :: nx=shape(ca,0)
+            integer optional,intent(in) :: nlam=100
+            real intent(in) :: flmin
+            real dimension(nlam),intent(in) :: ulam
+            real intent(in) :: thr = 1.0e-4
+            integer intent(in) :: isd = 1
+            integer intent(in) :: maxit = 100
+            integer intent(in) :: kopt
+            integer intent(out) :: lmu
+            real dimension(nc,nlam),depend(nlam),intent(out) :: a0
+            real dimension(nx,nc,nlam),depend(nc,nlam),intent(out) :: ca
+            integer dimension(nx),depend(nx),intent(out) :: ia
+            integer dimension(nlam),depend(nlam),intent(out) :: nin
+            real dimension(nlam),depend(nlam),intent(out) :: dev
+            real dimension(nlam),depend(nlam),intent(out) :: alm
+            integer intent(out) :: nlp
+            integer intent(out) :: jerr
+        end subroutine splognet
+        subroutine lcmodval(nc,nx,a0,ca,ia,nin,x,ix,jx,n,f) ! in :_glmnet:GLMnet.f
+            integer optional,check(len(a0)>=nc),depend(a0),intent(in) :: nc=len(a0)
+            integer optional,check(shape(ca,0)==nx),depend(ca),intent(in) :: nx=shape(ca,0)
+            real dimension(nc),intent(in) :: a0
+            real dimension(nx,nc),depend(nc),intent(in) :: ca
+            integer dimension(*),intent(in) :: ia
+            integer :: nin
+            real dimension(*),intent(in) :: x
+            integer dimension(*),intent(in) :: ix
+            integer dimension(*),intent(in) :: jx
+            integer optional,check(shape(f,1)==n),depend(f),intent(in) :: n=shape(f,1)
+            real dimension(nc,n),depend(nc),intent(out) :: f
+        end subroutine lcmodval
+    end interface
+end python module glmnet
+
+! This file was auto-generated with f2py (version:2_5972).
+! See http://cens.ioc.ee/projects/f2py2e/

@@ -1,0 +1,52 @@
+==================
+GLU 1.0+ TODO LIST
+==================
+
+-------------
+documentation
+-------------
+
+  * Update installation documentation
+  * Complete user reference guide
+  * Complete user tutorial
+  * Complete developer reference guide
+
+------------
+distribution
+------------
+
+  * ==DONE== Prepare Linux binary distribution (AMD64 and Intel64)
+  * ==DONE== Prepare OSX binary distribution
+  * ==DONE== Prepare win32 binary distribution (AMD and Intel)
+
+-------
+genolib
+-------
+
+  * Improve genoarray exceptions so they can be better distinguished and
+    handled
+
+  * File format auto-detection based on headers (HapMap, ldat, sdat, ?bat, primarily)
+
+  * Add support for yet another WTCCC format: https://www.wtccc.org.uk/info/data_formats.shtml
+
+  * Improve file format support:
+    * PLINK text (http://pngu.mgh.harvard.edu/~purcell/plink/data.shtml)
+    * PLINK binary (http://pngu.mgh.harvard.edu/~purcell/plink/binary.shtml)
+    * MERLIN/MACH (http://www.sph.umich.edu/csg/abecasis/MACH/tour/)
+    * GenABEL (http://rss.acs.unt.edu/Rdoc/library/GenABEL/html/GenABEL-package.html)
+    * PHASE (http://stephenslab.uchicago.edu/instruct2.1.pdf)
+    * STRUCTURE (http://pritch.bsd.uchicago.edu/software/structure22/readme.pdf)
+    * WTCCC (http://www.stats.ox.ac.uk/%7Emarchini/software/gwas/file_format.html)
+
+
+-------------
+modules.assoc
+-------------
+
+  * Optimize unadjusted models
+  * Add ordinal logistic regression
+  * Add support for MACH dosage and posterior genotype probability models
+  * Add GLM for correlated data (Pete wants to look at Framingham)
+  * Add user-level support for regression weights
+  * Add robust variance estimator(s)
