@@ -11,7 +11,7 @@ __revision__  = '$Id$'
 import gc
 import sys
 import time
-import optparse
+import argparse
 import traceback
 
 import pkgutil
@@ -120,31 +120,39 @@ def module_info(name,module,out=sys.stderr):
 
 
 def option_parser():
-  usage = 'usage: %prog [options] [module] [args...]'
-  parser = optparse.OptionParser(usage=usage, version='%%prog %s' % __version__, add_help_option=False)
-  parser.disable_interspersed_args()
+  descr  = 'Driver program used to launch GLU modules\n'
 
-  parser.add_option('-h', '--help', dest='help', action='store_true',
-                    help='show this help message, then exit')
-  parser.add_option('-s', '--stats', dest='stats', action='store_true',
-                    help='display program runtime statistics')
-  parser.add_option('-v', '--verbose', dest='verbose', action='store_true',
-                    help='verbose error output')
+  epilog = '''For information on how to get started run the "intro" module,'
+              usually as "glu intro".  For a list of available modules run'
+              "glu list".'''
 
-  devopts = optparse.OptionGroup(parser, 'Options for software developers & power users')
+  parser = argparse.ArgumentParser(description=descr, epilog=epilog, add_help=False)
 
-  devopts.add_option('--path', dest='path', action='store_true',
-                     help='Display GLU package installation path')
-  devopts.add_option('-p', '--profile', dest='profile', action='store_true',
-                     help='Profile GLU code to find performance bottlenecks')
-  devopts.add_option('--profiler', dest='profiler', metavar='P', default='python',
-                     help='Set the profiler to use when -p is specified')
-  devopts.add_option('--gcstats', dest='gcstats', action='store_true',
-                     help='Generate statistics from the runtime object garbage collector')
-  devopts.add_option('--gcthreshold', dest='gcthreshold', metavar='N', type='int', default=1000000,
-                     help='Set the threshold for triggering collection of generation-0 objects')
+  parser.add_argument('module', metavar='module', type=str, nargs='?',
+                      help='GLU module to launch')
+  parser.add_argument('module_args', nargs=argparse.REMAINDER,
+                      help='module options (see specific module help for a list)')
 
-  parser.add_option_group(devopts)
+  parser.add_argument('-h', '--help', dest='help', action='store_true',
+                      help='show this help message, then exit')
+  parser.add_argument('-s', '--stats', dest='stats', action='store_true',
+                      help='display program runtime statistics')
+  parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+                      help='verbose error output')
+  parser.add_argument('--version', action='version', version=__version__)
+
+  devopts = parser.add_argument_group('Options for software developers and power users')
+
+  devopts.add_argument('--path', dest='path', action='store_true',
+                       help='Display GLU package installation path')
+  devopts.add_argument('-p', '--profile', dest='profile', action='store_true',
+                       help='Profile GLU code to find performance bottlenecks')
+  devopts.add_argument('--profiler', dest='profiler', metavar='P', default='python',
+                       help='Set the profiler to use when -p is specified')
+  devopts.add_argument('--gcstats', dest='gcstats', action='store_true',
+                       help='Generate statistics from the runtime object garbage collector')
+  devopts.add_argument('--gcthreshold', dest='gcthreshold', metavar='N', type=int, default=1000000,
+                       help='Set the threshold for triggering collection of generation-0 objects')
 
   return parser
 
@@ -156,17 +164,16 @@ def write_traceback():
 
 def main():
   parser = option_parser()
-  glu_options,args = parser.parse_args()
+  glu_options = parser.parse_args()
+
+  print glu_options
 
   if glu_options.path:
     sys.stderr.write('GLU interpreter version: %s\n' % sys.version)
     sys.stderr.write('GLU import path: %s\n\n' % glu.__file__)
 
-  if glu_options.help or not args:
+  if glu_options.help or not glu_options.module:
     parser.print_help(sys.stderr)
-    sys.stderr.write('\nFor information on how to get started run the "intro" module,\n'
-                     'usually as "glu intro".  For a list of available modules run\n'
-                     '"glu list".\n\n')
     return 2
 
   if glu_options.gcstats:
@@ -175,9 +182,9 @@ def main():
   if glu_options.gcthreshold >= 0:
     gc.set_threshold(glu_options.gcthreshold,100,10)
 
-  module_name     = args[0]
+  module_name     = glu_options.module
   module_fullname = 'glu.modules.' + module_name
-  module_options  = args[1:]
+  module_options  = glu_options.module_args
 
   if glu_options.stats:
     cstart = time.clock()
