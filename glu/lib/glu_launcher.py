@@ -19,6 +19,8 @@ import pkg_resources
 
 import glu
 
+from   glu.lib.glu_argparse import GLUArgumentParser
+
 
 try:
   __version__ = pkg_resources.resource_string('glu','VERSION').strip()
@@ -126,7 +128,7 @@ def option_parser():
               usually as "glu intro".  For a list of available modules run'
               "glu list".'''
 
-  parser = argparse.ArgumentParser(description=descr, epilog=epilog, add_help=False)
+  parser = GLUArgumentParser(description=descr, epilog=epilog, add_help=False)
 
   parser.add_argument('module', metavar='module', type=str, nargs='?',
                       help='GLU module to launch')
