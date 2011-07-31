@@ -9,10 +9,10 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils          import table_reader,table_writer,resolve_column_headers
+from   glu.lib.fileutils      import table_reader,table_writer,resolve_column_headers
 
-from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
+from   glu.lib.genedb         import open_genedb
+from   glu.lib.genedb.queries import query_snps_by_name,query_gene_neighborhood,query_cytoband_by_location
 
 
 HEADER = ['CHROMOSOME','CYTOBAND','START','END','GENE NEIGHBORHOOD','dbSNP ANNOTATION']

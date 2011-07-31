@@ -15,13 +15,13 @@ import select
 import fcntl
 import subprocess
 
-from   itertools                  import groupby
-from   operator                   import itemgetter
+from   itertools               import groupby
+from   operator                import itemgetter
 
-from   glu.lib.fileutils          import list_reader,table_reader
-from   glu.modules.ld.tagzilla    import locus_result_sequence
-from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_snps_by_location, query_gene_by_name
+from   glu.lib.fileutils       import list_reader,table_reader
+from   glu.modules.ld.tagzilla import locus_result_sequence
+from   glu.lib.genedb          import open_genedb
+from   glu.lib.genedb.queries  import query_snps_by_location, query_gene_by_name
 
 
 #FIXME: Make even moe configurable

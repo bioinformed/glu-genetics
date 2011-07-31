@@ -26,8 +26,8 @@ from   glu.lib.progressbar          import progress_loop
 from   glu.lib.seqlib.edits         import reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
-from   glu.modules.genedb           import open_genedb
-from   glu.modules.genedb.queries   import query_snps_by_location, query_cytoband_by_location
+from   glu.lib.genedb               import open_genedb
+from   glu.lib.genedb.queries       import query_snps_by_location, query_cytoband_by_location
 
 
 Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '

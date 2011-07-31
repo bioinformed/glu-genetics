@@ -21,7 +21,7 @@ import pysam
 from   glu.lib.utils            import Counter, namedtuple, iter_queue, unique
 from   glu.lib.fileutils        import table_reader, table_writer
 
-from   glu.modules.genedb       import open_genedb
+from   glu.lib.genedb           import open_genedb
 from   glu.modules.seq.annotate import VariantAnnotator
 
 

@@ -9,11 +9,11 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils          import table_reader,table_writer,tryint
+from   glu.lib.fileutils      import table_reader,table_writer,tryint
 
-from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name, \
-                                         query_contig_by_name
+from   glu.lib.genedb         import open_genedb
+from   glu.lib.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name, \
+                                     query_contig_by_name
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',

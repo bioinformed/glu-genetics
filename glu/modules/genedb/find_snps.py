@@ -14,9 +14,10 @@ from   operator                        import itemgetter
 
 from   glu.lib.fileutils               import list_reader,table_reader,table_writer
 
-from   glu.modules.genedb              import open_genedb
+from   glu.lib.genedb                  import open_genedb
+from   glu.lib.genedb.queries          import query_snps_by_location
+
 from   glu.modules.genedb.find_regions import resolve_features
-from   glu.modules.genedb.queries      import query_snps_by_location
 
 
 HEADER = ['LOCUS','CHROMOSOME','START','END','STRAND','REF_ALLELE','OBSERVED_ALLELES','dbSNP_VCLASS','dbSNP_FUNC',
