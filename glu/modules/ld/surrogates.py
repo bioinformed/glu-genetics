@@ -10,88 +10,77 @@ __revision__  = '$Id$'
 
 import sys
 import heapq
-import optparse
 
 from   collections             import defaultdict
 
 from   glu.lib.fileutils       import list_reader, table_writer
 from   glu.lib.genolib         import geno_options
 
-from   glu.modules.ld.tagzilla import check_option01, epsilon, sfloat, \
+from   glu.modules.ld.tagzilla import epsilon, sfloat, \
                                       build_design_score, generate_ldpairs
 
 
 def option_parser():
-  usage = 'usage: %prog [options] needles.lst genotypes...'
-  parser = optparse.OptionParser(usage=usage)
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  inputgroup = optparse.OptionGroup(parser, 'Input options')
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('needles',              help='Tabular or delimited file of markers')
+  parser.add_argument('genotypes', nargs='+', help='Input genotype file(s)')
+
+  inputgroup = parser.add_argument_group('Input options')
 
   geno_options(inputgroup,input=True,filter=True)
 
-  inputgroup.add_option('--haystack', dest='haystack', metavar='FILE',
+  inputgroup.add_argument('--haystack', metavar='FILE',
                           help='List of SNPs eligable to be surrogates (minus any in needle.lst if --indirect is specifed)')
-  inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
+  inputgroup.add_argument('-R', '--range', metavar='S-E,...', default='',
                           help='Ranges of genomic locations to analyze, specified as a comma separated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
                                'to be open.  The end coordinate is exclusive and not included in the range.')
-  inputgroup.add_option('-D', '--designscores', dest='designscores', metavar='FILE', type='str', action='append',
+  inputgroup.add_argument('-D', '--designscores', metavar='FILE', type=str, action='append',
                           help='Read in design scores or other weights to use as criteria to choose the optimal tag for each bin')
-  inputgroup.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
+  inputgroup.add_argument('--designdefault', metavar='N', type=float, default=0,
                           help='Default design score for any locus not found in a design file')
-  inputgroup.add_option('-L', '--limit', dest='limit', metavar='N', type='int', default=0,
+  inputgroup.add_argument('-L', '--limit', metavar='N', type=int, default=0,
                           help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
 
-  outputgroup = optparse.OptionGroup(parser, 'Output options')
+  outputgroup = parser.add_argument_group('Output options')
 
-  outputgroup.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  outputgroup.add_argument('-o', '--output', metavar='FILE', default='-',
                           help="Output tabular LD information for bins to FILE ('-' for standard out)")
 
-  genoldgroup = optparse.OptionGroup(parser, 'Genotype and LD estimation options')
+  genoldgroup = parser.add_argument_group('Genotype and LD estimation options')
 
-  genoldgroup.add_option('-a', '--minmaf', dest='maf', metavar='FREQ', type='float', default=0.05,
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument('-a', '--minmaf', dest='maf', metavar='FREQ', type=float, default=0.05,
                           help='Minimum minor allele frequency (MAF) (default=0.05)')
-  genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
+  genoldgroup.add_argument('-c', '--mincompletion', metavar='N', default=0, type=int,
                           help='Drop loci with less than N valid genotypes. Default=0')
-  genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument(      '--mincompletionrate', metavar='N', default=0, type=float,
                           help='Drop loci with completion rate less than N (0-1). Default=0')
-  genoldgroup.add_option('-m', '--maxdist', dest='maxdist', metavar='D', type='int', default=200,
+  genoldgroup.add_argument('-m', '--maxdist', metavar='D', type=int, default=200,
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
-  genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument('-P', '--hwp', metavar='p', default=None, type=float,
                           help='Filter out loci that fail to meet a minimum significance level (pvalue) for a '
                                'test Hardy-Weinberg proportion (no default)')
 
-  bingroup = optparse.OptionGroup(parser, 'LD threshold options')
+  bingroup = parser.add_argument_group('LD threshold options')
 
-  bingroup.add_option('--indirect', dest='indirect', action='store_true',
+  bingroup.add_argument('--indirect', action='store_true',
                           help='Allow only indirect surrogates')
-  bingroup.add_option('-s', '--maxsurrogates', dest='maxsurrogates', metavar='N', type='int', default=0,
+  bingroup.add_argument('-s', '--maxsurrogates', metavar='N', type=int, default=0,
                           help='Maximum number of surrogates (default=0 for unlimited)')
-  bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
-                          action='callback', callback=check_option01,
+  bingroup.add_argument('-d', '--dthreshold', dest='d', metavar='DPRIME', type=float, default=0.,
                           help='Minimum d-prime threshold to output (default=0)')
-  bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.15,
-                          action='callback', callback=check_option01,
+  bingroup.add_argument('-r', '--rthreshold', dest='r', metavar='N', type=float, default=0.15,
                           help='Minimum r-squared threshold to output (default=0.15)')
-
-  parser.add_option_group(inputgroup)
-  parser.add_option_group(outputgroup)
-  parser.add_option_group(genoldgroup)
-  parser.add_option_group(bingroup)
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)<2:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   exclude = set()
   if options.designscores:
@@ -99,7 +88,7 @@ def main():
     exclude.update(lname for lname,d in designscores.iteritems() if d <= epsilon)
 
   seen     = set()
-  needle   = set(list_reader(args[0]))
+  needle   = set(list_reader(options.needles))
 
   if options.haystack:
     haystack = set(list_reader(options.haystack))-exclude
@@ -116,8 +105,7 @@ def main():
   direct = needle if options.indirect else set()
 
   # ldsubset=needle
-  args = [ (options,arg) for arg in args[1:] ]
-  ldpairs = generate_ldpairs(args, {}, set(), None, needle, options)
+  ldpairs = generate_ldpairs(options, {}, set(), None, needle)
 
   heappushpop    = heapq.heappushpop
   heappush       = heapq.heappush

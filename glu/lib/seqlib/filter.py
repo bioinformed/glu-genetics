@@ -122,10 +122,10 @@ def filter_alignments(alignments, include, exclude):
 def alignment_filter_options(group):
   opts = ', '.join(sorted(SUPPORTED_OPTIONS))
 
-  group.add_option('--includealign', dest='includealign', action='append', metavar='OPTS',
+  group.add_argument('--includealign', action='append', metavar='OPTS',
                    help='Include alignments that meet the specified comma separated criteria. '
                         'These include: ' + opts)
-  group.add_option('--excludealign', dest='excludealign', action='append', metavar='OPTS',
+  group.add_argument('--excludealign', action='append', metavar='OPTS',
                    help='Exclude alignments that meet the specified comma separated criteria. '
                         ' See --includealign for supported criteria.')
 

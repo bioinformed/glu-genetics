@@ -412,12 +412,12 @@ def compute_frequencies(freq_model,sample_count,models,geno_counts):
   return geno_freqs
 
 
-def load(options,args):
+def load(options):
   # Load samples to test
-  sys.stderr.write('Loading %s...\n' % args[0])
-  test = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                 genome=options.loci,phenome=options.pedigree,
-                                 transform=options, hyphen=sys.stdin).as_sdat()
+  sys.stderr.write('Loading %s...\n' % options.test_genotypes)
+  test = load_genostream(options.test_genotypes,format=options.informat,genorepr=options.ingenorepr,
+                         genome=options.loci,phenome=options.pedigree,transform=options,
+                         hyphen=sys.stdin).as_sdat()
 
   # Initialize masks
   loci = test.loci
@@ -425,9 +425,9 @@ def load(options,args):
 
   # Load source populations, align loci, and compute frequencies
   pops = []
-  for arg in args[1:]:
-    sys.stderr.write('Loading %s...\n' % arg)
-    genos = load_genostream(arg,format=options.informat,genorepr=options.ingenorepr,
+  for filename in options.pop_genotypes:
+    sys.stderr.write('Loading %s...\n' % filename)
+    genos = load_genostream(filename,format=options.informat,genorepr=options.ingenorepr,
                                 genome=test.genome,phenome=options.pedigree,
                                 transform=options,includeloci=locusset,orderloci=loci)
 
@@ -458,8 +458,8 @@ def load(options,args):
   return test,pops
 
 
-def build_labels(options,args):
-  k = len(args)-1
+def build_labels(options):
+  k = len(options.pop_genotypes)
 
   labels = []
   for label in options.labels:
@@ -471,7 +471,7 @@ def build_labels(options,args):
   if len(labels) != len(set(labels)):
     raise ValueError('Duplicate population label specified')
 
-  if len(labels) > len(args)-1:
+  if len(labels) > k:
     raise ValueError('Too many population labels specified')
 
   while len(labels) < k:
@@ -481,39 +481,36 @@ def build_labels(options,args):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] test_genotypes pop1_genotypes pop2_genotypes [pop3_genotypes...]'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('test_genotypes',            help='Input genotypes to test')
+  parser.add_argument('pop_genotypes',  nargs='+', help='Population reference genotypes')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('--labels', dest='labels', metavar='LABELS', action='append', default=[],
+  parser.add_argument('--labels', metavar='LABELS', action='append', default=[],
                     help='Population labels (specify one per population separated with commas)')
-  parser.add_option('--model', dest='model', metavar='MODEL', default='HWP',
+  parser.add_argument('--model', metavar='MODEL', default='HWP',
                     help='Model for genotype frequencies.  HWP to assume Hardy-Weinberg proportions, '
                          'otherwise GENO to fit genotypes based on frequency.  (Default=HWP)')
-  parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.80,
+  parser.add_argument('-t', '--threshold', metavar='N', type=float, default=0.80,
                     help='Imputed ancestry threshold (default=0.80)')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='output table file name')
-  parser.add_option('-P', '--progress', dest='progress', action='store_true',
+  parser.add_argument('-P', '--progress', action='store_true',
                     help='Show analysis progress bar, if possible')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser    = option_parser()
+  options   = parser.parse_args()
 
-  if len(args) < 2:
-    parser.print_help()
-    sys.exit(2)
-
-  # Build population labels
-  labels    = build_labels(options,args)
-  test,pops = load(options,args)
+  labels    = build_labels(options)
+  test,pops = load(options)
 
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(['SAMPLE']+labels+['IMPUTED_ANCESTRY'])

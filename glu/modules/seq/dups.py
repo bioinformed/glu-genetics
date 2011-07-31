@@ -131,34 +131,29 @@ def pick_duplicates(groups, method):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] in.bam'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('--platform', dest='platform', metavar='NAME', default='neutral',
+  parser.add_argument('bamfile', help='Input BAM file')
+
+  parser.add_argument('--platform', metavar='NAME', default='neutral',
                     help='Sequencing platform: neutral, 454 (default=neutral).')
-  parser.add_option('--action', dest='action', metavar='ACTION', default='keep',
+  parser.add_argument('--action', metavar='ACTION', default='keep',
                     help='Action to perform for duplicate reads: keep, drop.  Default=keep')
-  parser.add_option('--pick', dest='pick', metavar='METHOD', default='best',
+  parser.add_argument('--pick', metavar='METHOD', default='best',
                     help='Method of selecting primary alignment when keeping duplicate reads: best, random.  Default=best')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE',
+  parser.add_argument('-o', '--output', metavar='FILE',
                     help='Output BAM file')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser   = option_parser()
+  options  = parser.parse_args()
 
-  if len(args)!=1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  bamfile  = args[0]
-
-  inbam    = pysam.Samfile(bamfile,'rb')
+  inbam    = pysam.Samfile(options.bamfile,'rb')
   aligns   = inbam.fetch()
   aligns   = progress_loop(aligns, label='Loading BAM file: ', units='alignments')
   groups   = read_groups(aligns,options.platform)
@@ -188,7 +183,7 @@ def main():
 
   if options.output!='-':
     print
-    print 'Statistics for %s:'   % bamfile
+    print 'Statistics for %s:'   % options.bamfile
     print '  Total  Mbps: %0.2f' % (total_len/1000000)
     print '  Total Reads: %8d'   % total_count
     print '    Dup Reads: %8d'   % dup_count
@@ -198,7 +193,7 @@ def main():
   if options.output:
     duplicates = pick_duplicates(groups, options.pick)
 
-    inbam    = pysam.Samfile(bamfile,'rb')
+    inbam    = pysam.Samfile(options.bamfile,'rb')
     aligns   = inbam.fetch(until_eof=True)
     aligns   = progress_loop(aligns, label='Saving BAM file: ', units='alignments')
     aligns   = handle_duplicates(aligns, options.action, duplicates)

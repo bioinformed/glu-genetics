@@ -415,40 +415,37 @@ def split(genos, outformat, prefix, suffix, options):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,output=True)
 
-  parser.add_option('-d', '--destdir', dest='destdir', default='',
+  parser.add_argument('-d', '--destdir', default='',
                     help='Destination directory for output files.  Write to input file directory by default.')
-  parser.add_option('--maxrows', dest='maxrows', metavar='N', type='int',
+  parser.add_argument('--maxrows', metavar='N', type=int,
                     help='Split matrix output so that each contains at most N rows of data')
-  parser.add_option('--locusgroups', dest='locusgroups', metavar='FILE',
+  parser.add_argument('--locusgroups', metavar='FILE',
                     help='map from locus name to locus group')
-  parser.add_option('--samplegroups', dest='samplegroups', metavar='FILE',
+  parser.add_argument('--samplegroups', metavar='FILE',
                     help='map from samples name to sample group')
-  parser.add_option('--defaultsamplegroup', dest='defaultsamplegroup', metavar='NAME',
+  parser.add_argument('--defaultsamplegroup', metavar='NAME',
                     help='Default group for any unmapped sample')
-  parser.add_option('--defaultlocusgroup', dest='defaultlocusgroup', metavar='NAME',
+  parser.add_argument('--defaultlocusgroup', metavar='NAME',
                     help='Default group for any unmapped locus')
-  parser.add_option('--template', dest='template', metavar='NAME', type='str',
+  parser.add_argument('--template', metavar='NAME', type=str,
                     help='The template for names of the output files')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options, args = parser.parse_args()
+  parser   = option_parser()
+  options  = parser.parse_args()
 
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  filename = options.template or args[0]
+  filename = options.template or options.genotypes
 
   # FIXME: Must know about augmented filenames
   if filename == '-':
@@ -457,11 +454,11 @@ def main():
 
   prefix,suffix = split_fullname(filename,options.destdir)
 
-  genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                  genome=options.loci,phenome=options.pedigree,hyphen=sys.stdin)
+  genos = load_genostream(options.genotypes,format=options.informat,genorepr=options.ingenorepr,
+                          genome=options.loci,phenome=options.pedigree,hyphen=sys.stdin)
 
   outformat = (options.outformat or guess_outformat(options.template)
-            or guess_outformat(args[0]) or options.informat or genos.format)
+            or guess_outformat(options.genotypes) or options.informat or genos.format)
 
   split(genos, outformat, prefix, suffix, options)
 

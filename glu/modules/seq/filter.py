@@ -424,52 +424,49 @@ def merge_bams(samfiles):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] in.bam'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('bamfile', nargs='+', help='Input BAM file(s)')
 
   alignment_filter_options(parser)
 
-  parser.add_option('--minreadlen', dest='minreadlen', metavar='N', type='int', default=0,
+  parser.add_argument('--minreadlen', metavar='N', type=int, default=0,
                     help='Minimum read length filter')
-  parser.add_option('--targets', dest='targets', metavar='BED',
+  parser.add_argument('--targets', metavar='BED',
                     help='Single track BED file containing all targeted intervals')
-  parser.add_option('--controls', dest='controls', metavar='CONTIGS',
+  parser.add_argument('--controls', metavar='CONTIGS',
                     help='List of control contigs to allow those aligned '
                           'reads to be counted seperately from other aligned reads '
                           '(e.g.  PhiX controls)')
-  parser.add_option('--minoverlap', dest='minoverlap', metavar='N', type='int', default=1,
+  parser.add_argument('--minoverlap', metavar='N', type=int, default=1,
                     help='Minimum alignment overlap with any target (default=1)')
 
-  parser.add_option('--action', dest='action', metavar='X', default='fail',
+  parser.add_argument('--action', metavar='X', default='fail',
                     help='Action to perform on failing alignments (drop or fail, default=fail)')
 
-  parser.add_option('--setreadgroup', dest='setreadgroup', type='str', metavar='RGNAME',
+  parser.add_argument('--setreadgroup', type=str, metavar='RGNAME',
                     help='Set all reads to specified read group name')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE',
+  parser.add_argument('-o', '--output', metavar='FILE',
                     help='Output BAM file')
-  parser.add_option('-O', '--sumout', dest='sumout', metavar='FILE', default='-',
+  parser.add_argument('-O', '--sumout', metavar='FILE', default='-',
                     help='Summary output file')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if not args:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   options.action = options.action.lower()
 
   if options.action not in ('drop','fail'):
     raise ValueError('Invalid filter action selected')
 
-  samfiles   = []
-  for filename in args:
+  samfiles = []
+  for filename in options.bamfile:
     flags   = 'rb' if filename.endswith('.bam') else 'r'
     samfiles.append(pysam.Samfile(filename, flags))
 

@@ -81,45 +81,40 @@ def estimate_ibs_given_ibd(x,n):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('--frequencies', dest='frequencies', metavar='FILE',
+  parser.add_argument('--frequencies', metavar='FILE',
                     help='Optional genotype file to estimate allele frequencies')
-  parser.add_option('--includetest', dest='includetest', metavar='FILE', action='append',
+  parser.add_argument('--includetest', metavar='FILE', action='append',
                     help='List of samples to test')
-  parser.add_option('--excludetest', dest='excludetest', metavar='FILE', action='append',
+  parser.add_argument('--excludetest', metavar='FILE', action='append',
                     help='List of samples not to test')
-  parser.add_option('--testpairs', dest='testpairs', metavar='FILE',
+  parser.add_argument('--testpairs', metavar='FILE',
                     help='File containing a list of pairs to test')
 
-  parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.90,
+  parser.add_argument('-t', '--threshold', metavar='N', type=float, default=0.90,
                     help='Output only pairs with estimated IBD0 sharing less than N (default=0.90)')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='output table file name')
-  parser.add_option('-P', '--progress', dest='progress', action='store_true',
+  parser.add_argument('-P', '--progress', action='store_true',
                     help='Show analysis progress bar, if possible')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args) != 1:
-    parser.print_help()
-    sys.exit(2)
-
-  testfile = args[0]
-  freqfile = options.frequencies or testfile
+  parser   = option_parser()
+  options  = parser.parse_args()
+  freqfile = options.frequencies or options.genotypes
 
   # Allow specification of a different genotype file with which to estimate allele frequencies
-  if testfile==freqfile:
+  if options.genotypes==freqfile:
     options.frequencies = None
 
   sys.stderr.write('Opening genotype data file...\n')
@@ -148,9 +143,9 @@ def main():
     options.includesamples.extend(options.includetest or [])
     options.excludesamples.extend(options.excludetest or [])
 
-    genos = load_genostream(testfile,format=options.informat,genorepr=options.ingenorepr,
-                                     genome=options.loci,phenome=options.pedigree,
-                                     transform=options, hyphen=sys.stdin).as_sdat().materialize()
+    genos = load_genostream(options.genotypes,format=options.informat,genorepr=options.ingenorepr,
+                            genome=options.loci,phenome=options.pedigree,
+                            transform=options, hyphen=sys.stdin).as_sdat().materialize()
 
   # Apply test includes and excludes to the existing genotypes
   elif options.includetest or options.excludetest:

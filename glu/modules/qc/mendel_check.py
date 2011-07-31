@@ -127,33 +127,30 @@ def parent_offspring_concordance(parent1, parent2, child, locusstats):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output Mendelian concordance by sample')
-  parser.add_option('-O', '--locout', dest='locout', metavar='FILE',
+  parser.add_argument('-O', '--locout', metavar='FILE',
                     help='Output Mendelian concordance by locus')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  genos = load_genostream(args[0],format=options.informat,
-                                  genorepr=options.ingenorepr,
-                                  genome=options.loci,
-                                  phenome=options.pedigree,
-                                  transform=options)
+  genos   = load_genostream(options.genotypes,format=options.informat,
+                            genorepr=options.ingenorepr,
+                            genome=options.loci,
+                            phenome=options.pedigree,
+                            transform=options)
 
   if genos.samples:
     pset = set()

@@ -87,39 +87,32 @@ def split_fullname(filename):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] gdat'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('--includesamples', dest='includesamples', metavar='FILE', action='append',
+  parser.add_argument('gdatfile', help='GLU GDAT input file')
+
+  parser.add_argument('--includesamples', metavar='FILE', action='append',
                     help='List of samples to include, all others will be skipped')
-  parser.add_option('--excludesamples', dest='excludesamples', metavar='FILE', action='append',
+  parser.add_argument('--excludesamples', metavar='FILE', action='append',
                     help='List of samples to exclude, only samples not present will be kept')
-  parser.add_option('--renamesamples', dest='renamesamples', metavar='FILE',
+  parser.add_argument('--renamesamples', metavar='FILE',
                     help='Rename samples from a file containing rows of original name, tab, new name')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE',
-                    help='Output genotype file name')
+  parser.add_argument('-o', '--output', metavar='FILE', required=True,
+                    help='Output genotype file name template')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)!=1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  if not options.output:
-    sys.stderr.write('ERROR: An output filename template must be specified')
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   prefix,sep,suffix = split_fullname(options.output)
 
   transform = GenoTransform.from_object(options)
 
-  gdat      = h5py.File(args[0],'r')
+  gdat      = h5py.File(options.gdatfile,'r')
   data      = cnv_data(gdat,transform)
   genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 

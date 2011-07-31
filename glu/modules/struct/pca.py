@@ -204,34 +204,30 @@ def do_pca(genos,n=None):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output principle components (eigenvectors) to FILE (default is "-" for standard out)')
-  parser.add_option('-O', '--vecout', dest='vecout', metavar='FILE',
+  parser.add_argument('-O', '--vecout', metavar='FILE',
                     help='Output eigenvalues and statistics to FILE')
 
-  parser.add_option('--vectors', dest='vectors', metavar='N', type='int', default=10,
+  parser.add_argument('--vectors', metavar='N', type=int, default=10,
                     help='Output the top N eigenvectors.  Set to 0 for all.  Default=10')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                  genome=options.loci,phenome=options.pedigree,
-                                  transform=options).as_ldat()
+  genos   = load_genostream(options.genotypes,format=options.informat,genorepr=options.ingenorepr,
+                            genome=options.loci,phenome=options.pedigree,transform=options).as_ldat()
 
   values,vectors = do_pca(genos,n=options.vectors or None)
 

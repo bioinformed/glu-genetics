@@ -154,7 +154,7 @@ def rowsby(data, columns=None, rowkeyfunc=None, colkeyfunc=None, valuefunc=None,
   return columns,_rowsby()
 
 
-def xtab(data, rowkeyfunc=None, colkeyfunc=None, valuefunc=None, 
+def xtab(data, rowkeyfunc=None, colkeyfunc=None, valuefunc=None,
                aggregatefunc=None, roworder=None, colorder=None):
   '''
   Build a table of rows by columns from a sequence that can be interpreted

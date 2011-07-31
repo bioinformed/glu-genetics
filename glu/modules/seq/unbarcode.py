@@ -94,52 +94,50 @@ def compute_barcode_distances(out,barcodes,distance_metric):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] [barcode file] [input files..]'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT',
+  parser.add_argument('barcodes',             help='Tabular or delimited file of barcode ID and sequences')
+  parser.add_argument('sequences', nargs='*', help='Input sequence file(s)')
+
+  parser.add_argument('-f', '--informat', metavar='FORMAT',
                     help='Input sequence format.  Formats include: '
                          'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
-  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT',
+  parser.add_argument('-F', '--outformat', metavar='FORMAT',
                     help='Output sequence format.  As above, except ace, ig, '
                          'pir, sff-trim, swiss.')
-  parser.add_option('--destdir', dest='destdir', default='.',
+  parser.add_argument('--destdir', default='.',
                     help='Destination directory for output files.  Write to input file directory by default.')
-  parser.add_option('--distance', dest='distance', metavar='TYPE', default='levenshtein',
+  parser.add_argument('--distance', metavar='TYPE', default='levenshtein',
                     help='Distance metric for barcodes: levenshtein (default) or hamming')
-  parser.add_option('--location', dest='location', metavar='LOC', default='454',
+  parser.add_argument('--location', metavar='LOC', default='454',
                     help='Barcode location: 454 (default) or illumina')
-  parser.add_option('--trim5', dest='trim5', metavar='N', type='int',
+  parser.add_argument('--trim5', metavar='N', type=int,
                     help="Trim N 5' bases in reads prior to matching barcode")
-  parser.add_option('--trim3', dest='trim3', metavar='N', type='int',
+  parser.add_argument('--trim3', metavar='N', type=int,
                     help="Trim N 3' bases in reads prior to matching barcode")
-  parser.add_option('--trimb', dest='trimb', metavar='N', type='int',
+  parser.add_argument('--trimb', metavar='N', type=int,
                     help="Trim barcode to N bases")
-  parser.add_option('--trunc', dest='trunc', metavar='N', type='int',
+  parser.add_argument('--trunc', metavar='N', type=int,
                     help="Truncate reads to N bases prior to matching barcode")
-  parser.add_option('--maxerror', dest='maxerror', metavar='N', type='int',
+  parser.add_argument('--maxerror', metavar='N', type=int,
                     help='Maximum allowed errors')
-  parser.add_option('--mindist', dest='mindist', metavar='N', type='int', default=1,
+  parser.add_argument('--mindist', metavar='N', type=int, default=1,
                     help='Minimum edit distance to next best match')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output file')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)<1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   if options.informat is None:
-    options.informat = guess_informat_list(args[1:])
+    options.informat = guess_informat_list(options.sequences)
 
   distance = options.distance.lower()
   if distance and 'levenshtein'.startswith(distance):
@@ -153,7 +151,7 @@ def main():
   if location not in ('454','illumina'):
     raise ValueError('Unknown barcode location: %s' % options.location)
 
-  barcodes     = read_barcodes(args[0], options.trimb)
+  barcodes     = read_barcodes(options.barcodes, options.trimb)
   blen         = barcode_len(barcodes)
 
   out = autofile(hyphen(options.output,sys.stdout),'wb')
@@ -172,7 +170,7 @@ def main():
   posstats = defaultdict(int)
   decoded  = defaultdict(list)
 
-  for filename in args[1:]:
+  for filename in options.sequences:
     seqs = read_sequence_and_barcode(filename, options.informat, location, options.trim5,
                                                options.trim3, options.trunc, blen)
 

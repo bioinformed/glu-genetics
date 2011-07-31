@@ -157,40 +157,37 @@ class GCSummary(object):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] lbdfile...'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('lbdfile', nargs='+', help='LBD file(s)')
 
   geno_options(parser,filter=True,transform=True,output=True)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output genotype file name')
-  parser.add_option('-m', '--abmap', dest='abmap', metavar='FILE',
-                    help='Mappings from A and B probes to other allele codings')
-  parser.add_option('-M', '--manifest', dest='manifest', metavar='FILE',
-                    help='Illumina manifest file (BPM or CSV)')
-  parser.add_option('-s', '--targetstrand', dest='targetstrand', metavar='T', default='customer',
-                    help='Target strand based on Illumina manifest file: ab, top, bottom, forward, '
-                         'reverse, customer (default), anticustomer, design, antidesign')
-  parser.add_option('-t', '--gcthreshold', dest='gcthreshold', type='float', metavar='N', default=0,
-                    help='Genotypes with GC score less than N set to missing')
-  parser.add_option('-w', '--warnings', action='store_true', dest='warnings',
-                    help='Emit warnings and A/B calls for SNPs with invalid manifest data')
-  parser.add_option('--samplestats', dest='samplestats', metavar='FILE',
-                    help='Output per sample average GC statistics to FILE')
-  parser.add_option('--locusstats',  dest='locusstats',  metavar='FILE',
-                    help='Output per locus average GC statistics to FILE')
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
+                      help='Output genotype file name')
+  parser.add_argument('-m', '--abmap', metavar='FILE',
+                      help='Mappings from A and B probes to other allele codings')
+  parser.add_argument('-M', '--manifest', metavar='FILE',
+                      help='Illumina manifest file (BPM or CSV)')
+  parser.add_argument('-s', '--targetstrand', metavar='T', default='customer',
+                      help='Target strand based on Illumina manifest file: ab, top, bottom, forward, '
+                           'reverse, customer (default), anticustomer, design, antidesign')
+  parser.add_argument('-t', '--gcthreshold', type=float, metavar='N', default=0,
+                      help='Genotypes with GC score less than N set to missing')
+  parser.add_argument('-w', '--warnings', action='store_true',
+                      help='Emit warnings and A/B calls for SNPs with invalid manifest data')
+  parser.add_argument('--samplestats', metavar='FILE',
+                      help='Output per sample average GC statistics to FILE')
+  parser.add_argument('--locusstats',  metavar='FILE',
+                      help='Output per locus average GC statistics to FILE')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if not args:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   genome = Genome()
 
@@ -221,12 +218,12 @@ def main():
 
   transform = GenoTransform.from_options(options)
 
-  args = iter(args)
-  loci,gentrain,samples = read_Illumina_LBD(args.next(),transform)
+  lbdfiles = iter(options.lbdfile)
+  loci,gentrain,samples = read_Illumina_LBD(lbdfiles.next(),transform)
 
   loci = list(loci)
-  for arg in args:
-    more_loci,more_gentrain,more_samples = read_Illumina_LBD(arg,transform)
+  for filename in lbdfiles:
+    more_loci,more_gentrain,more_samples = read_Illumina_LBD(filename,transform)
 
     if list(more_loci) != loci:
       raise RuntimeError('Genotype headers do not match')

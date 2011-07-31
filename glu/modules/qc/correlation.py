@@ -332,38 +332,36 @@ def correlation_dosage(options,filename1,filename2):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] group1 group2'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('group1', help='Group 1 genotype file')
+  parser.add_argument('group2', help='Group 2 genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='output table file name')
-  parser.add_option('-P', '--progress', dest='progress', action='store_true',
+  parser.add_argument('-P', '--progress', action='store_true',
                     help='Show analysis progress bar, if possible')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 2:
-    parser.print_help()
-    sys.exit(2)
-
-  format1  = guess_format(args[0], ['dosage'])
-  format2  = guess_format(args[1], ['dosage'])
+  format1 = guess_format(options.group1, ['dosage'])
+  format2 = guess_format(options.group2, ['dosage'])
 
   np.seterr(all='ignore')
 
   if 'dosage' in (format1,format2):
-    correlation_dosage(options,*args)
+    correlation_dosage(options,options.group1,options.group2)
   else:
-    correlation_genos(options,*args)
+    correlation_genos(options,options.group1,options.group2)
 
 
 def _test():

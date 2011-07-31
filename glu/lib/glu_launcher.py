@@ -135,25 +135,25 @@ def option_parser():
   parser.add_argument('module_args', nargs=argparse.REMAINDER,
                       help='module options (see specific module help for a list)')
 
-  parser.add_argument('-h', '--help', dest='help', action='store_true',
+  parser.add_argument('-h', '--help', action='store_true',
                       help='show this help message, then exit')
-  parser.add_argument('-s', '--stats', dest='stats', action='store_true',
+  parser.add_argument('-s', '--stats', action='store_true',
                       help='display program runtime statistics')
-  parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+  parser.add_argument('-v', '--verbose', action='store_true',
                       help='verbose error output')
   parser.add_argument('--version', action='version', version=__version__)
 
   devopts = parser.add_argument_group('Options for software developers and power users')
 
-  devopts.add_argument('--path', dest='path', action='store_true',
+  devopts.add_argument('--path', action='store_true',
                        help='Display GLU package installation path')
-  devopts.add_argument('-p', '--profile', dest='profile', action='store_true',
+  devopts.add_argument('-p', '--profile', action='store_true',
                        help='Profile GLU code to find performance bottlenecks')
-  devopts.add_argument('--profiler', dest='profiler', metavar='P', default='python',
+  devopts.add_argument('--profiler', metavar='P', default='python',
                        help='Set the profiler to use when -p is specified')
-  devopts.add_argument('--gcstats', dest='gcstats', action='store_true',
+  devopts.add_argument('--gcstats', action='store_true',
                        help='Generate statistics from the runtime object garbage collector')
-  devopts.add_argument('--gcthreshold', dest='gcthreshold', metavar='N', type=int, default=1000000,
+  devopts.add_argument('--gcthreshold', metavar='N', type=int, default=1000000,
                        help='Set the threshold for triggering collection of generation-0 objects')
 
   return parser
@@ -165,30 +165,28 @@ def write_traceback():
 
 
 def main():
-  parser = option_parser()
-  glu_options = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  print glu_options
-
-  if glu_options.path:
+  if options.path:
     sys.stderr.write('GLU interpreter version: %s\n' % sys.version)
     sys.stderr.write('GLU import path: %s\n\n' % glu.__file__)
 
-  if glu_options.help or not glu_options.module:
+  if options.help or not options.module:
     parser.print_help(sys.stderr)
     return 2
 
-  if glu_options.gcstats:
+  if options.gcstats:
     gc.set_debug(gc.DEBUG_STATS)
 
-  if glu_options.gcthreshold >= 0:
-    gc.set_threshold(glu_options.gcthreshold,100,10)
+  if options.gcthreshold >= 0:
+    gc.set_threshold(options.gcthreshold,100,10)
 
-  module_name     = glu_options.module
+  module_name     = options.module
   module_fullname = 'glu.modules.' + module_name
-  module_options  = glu_options.module_args
+  module_options  = options.module_args
 
-  if glu_options.stats:
+  if options.stats:
     cstart = time.clock()
     tstart = time.time()
 
@@ -210,13 +208,13 @@ def main():
       sys.stderr.write('Unable to execute module %s.\n' % module_name)
       return
 
-    if glu_options.stats:
+    if options.stats:
       sys.stderr.write('[%s] Execution start\n' % time.asctime())
 
     sys.argv = ['glu %s' % module_name] + module_options
 
-    if glu_options.profile:
-      run_profile(glu_options,progmain)
+    if options.profile:
+      run_profile(options,progmain)
     else:
       progmain()
 
@@ -227,7 +225,7 @@ def main():
   except KeyboardInterrupt:
     sys.stderr.write('\n[%s] Execution aborted by user\n' % time.asctime())
 
-    if glu_options.verbose:
+    if options.verbose:
       write_traceback()
 
     ret = 1
@@ -235,7 +233,7 @@ def main():
   except GLUError, e:
     sys.stderr.write('\n%s\n\n[%s] Execution aborted due to reported error\n' % (e,time.asctime()))
 
-    if glu_options.verbose:
+    if options.verbose:
       write_traceback()
 
     ret = 1
@@ -243,7 +241,7 @@ def main():
   except IOError, e:
     sys.stderr.write('\n%s\n\n[%s] Execution aborted due to input/output error\n' % (e,time.asctime()))
 
-    if glu_options.verbose:
+    if options.verbose:
       write_traceback()
 
     ret = 1
@@ -256,7 +254,7 @@ def main():
 
     sys.stderr.write('''\nWell, that could have gone better.\n''')
 
-    if not glu_options.verbose:
+    if not options.verbose:
       sys.stderr.write('''
 Execution aborted due to a problem with the program input, parameters
 supplied, an error in the program.  Please examine the error message below.
@@ -285,10 +283,10 @@ Command line:
     sys.stderr.write('\n[%s] Execution aborted due to a fatal error\n' % time.asctime())
 
   else:
-    if glu_options.stats:
+    if options.stats:
       sys.stderr.write('[%s] Execution completed successfully\n' % time.asctime())
 
-  if glu_options.stats:
+  if options.stats:
     sys.stderr.write('[%s] Clock time: %s, CPU time: %s\n' % (time.asctime(),
                                                               format_elapsed_time(time.time()  - tstart),
                                                               format_elapsed_time(time.clock() - cstart)))

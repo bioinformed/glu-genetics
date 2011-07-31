@@ -15,49 +15,36 @@ from   glu.lib.genolib.io        import transform_files, geno_options
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes...'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  ioopts = optparse.OptionGroup(parser, 'Input/Output Options')
+  parser.add_argument('genotypes', nargs='+', help='Input genotype file(s)')
 
-  ioopts.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  ioopts = parser.add_argument_group('Input/Output Options')
+
+  ioopts.add_argument('-o', '--output', metavar='FILE', default='-', required=True,
                     help='Output transformed data to FILE (default is "-" for standard out)')
 
   geno_options(ioopts,input=True,output=True)
 
-  mopts = optparse.OptionGroup(parser, 'Genotype Merging and Reporting')
+  mopts = parser.add_argument_group('Genotype Merging and Reporting')
   geno_options(mopts,merge=True)
 
-  filter = optparse.OptionGroup(parser, 'Filtering')
+  filter = parser.add_argument_group('Filtering')
   geno_options(filter,filter=True)
 
-  trans = optparse.OptionGroup(parser, 'Transformations')
+  trans = parser.add_argument_group('Transformations')
   geno_options(trans,transform=True)
-
-  parser.add_option_group(ioopts)
-  parser.add_option_group(mopts)
-  parser.add_option_group(filter)
-  parser.add_option_group(trans)
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if not args:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  if not options.output:
-    parser.print_help(sys.stderr)
-    sys.stderr.write('Error: Must specify output file\n')
-    sys.exit(2)
-
-  infiles = sorted(set(args))
+  infiles = sorted(set(options.genotypes))
   merger  = get_genomerger(options.merge, bool(options.samplemerge or options.locusmerge))
 
   transform = GenoTransform.from_options(options)
