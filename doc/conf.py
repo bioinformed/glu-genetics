@@ -180,3 +180,5 @@ latex_documents = [
 #pngmath_dvipng_args = ['-gamma 1.5', '-D 110', '-bg Transparent']
 #pngmath_use_preview = True
 
+autodoc_default_flags = ['members', 'undoc-members']
+autoclass_content = "both"

@@ -12,3 +12,4 @@ in some places terse and incomplete.
    :maxdepth: 2
 
    intro
+   api
