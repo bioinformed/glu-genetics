@@ -475,6 +475,51 @@ def izip_exact(*iterables):
   return izip(*[first] + rest)
 
 
+def parallel_coordinate_iterator(sequences, keyfunc):
+  '''
+  Iterate over several ordered sequences and return a list of values at each
+  distinct key value.
+
+  >>> from operator import itemgetter
+  >>> seq1 = [(1,'A'),(2,'B'),        (4,'D')]
+  >>> seq2 = [        (2,'b'),                (5,'E')]
+  >>> seq3 = [(1,'W'),(2,'X'),(3,'Y'),        (5,'Z')]
+  >>> seqs = (seq1,seq2,seq3)
+  >>> p    = parallel_coordinate_iterator(seqs,itemgetter(0))
+  >>> for row in p:
+  ...   print row
+  [(1, 'A'), None, (1, 'W')]
+  [(2, 'B'), (2, 'b'), (2, 'X')]
+  [None, None, (3, 'Y')]
+  [(4, 'D'), None, None]
+  [None, (5, 'E'), (5, 'Z')]
+  '''
+  from heapq     import merge
+  from itertools import groupby
+  from operator  import itemgetter
+
+  n = len(sequences)
+
+  # Must be a function or else i will be unbound across sequences and will
+  # vary with outer iteration
+  def _decorate(seq,index):
+    return ((keyfunc(x),index,x) for x in seq)
+
+  iters = [ _decorate(s,i) for i,s in enumerate(sequences) ]
+
+  for key,items in groupby(merge(*iters),itemgetter(0)):
+    row = [None]*n
+
+    for k,i,value in items:
+      if row[i] is not None:
+        row = None
+        break
+      row[i] = value
+
+    if row:
+      yield row
+
+
 def deprecated(func):
   '''
   This is a decorator which can be used to mark functions as deprecated. It
@@ -588,6 +633,12 @@ def chunk(iterable, size, pad=_chunk_nothing):
     yield block
 
 
+def chunk_iter(iterable, size, pad=_chunk_nothing):
+  for c in chunk(iterable, size, pad):
+    for item in c:
+      yield item
+
+
 def enum(typename, field_names):
   '''
   Create a new enumeration type
@@ -688,6 +739,58 @@ class iter_queue(deque):
       raise ValueError('No more values')
 
     return value
+
+
+def generator_thread(source, maxsize=1000, chunksize=1000):
+  '''
+  Run a generator in a seperate thread
+
+
+  >>> list(generator_thread(range(10)))
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  '''
+  import threading
+  import Queue
+
+  def sendto_queue(source,q):
+    put = q.put
+    if chunksize<=1:
+      for item in source:
+        put(item)
+    else:
+      source = iter(source)
+      items  = True
+      while items:
+        items = list(islice(source, chunksize))
+        put(items)
+
+    put(StopIteration)
+
+  def genfrom_queue(q):
+    _StopIteration = StopIteration
+    get = q.get
+
+    if chunksize<=1:
+      while True:
+        item = get()
+        if item is _StopIteration:
+          break
+        yield item
+    else:
+      while True:
+        items = get()
+        if items is _StopIteration:
+          break
+        for item in items:
+          yield item
+
+  q = Queue.Queue(maxsize)
+
+  thr = threading.Thread(target=sendto_queue, args=(source,q))
+  thr.setDaemon(True)
+  thr.start()
+
+  return genfrom_queue(q)
 
 
 def _test():
