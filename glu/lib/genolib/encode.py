@@ -717,6 +717,8 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
           loc.model = build_model(alleles,base=loc.model)
         except GenotypeRepresentationError:
           _encoding_error(lname,set(alleles)-set(loc.model.alleles),loc.model,warn)
+          # FIXME: Need recovery code
+          continue
 
         cache = cachemap.get(loc.model)
         if cache is None:
@@ -773,6 +775,7 @@ def encode_genomatrixstream_from_strings(columns,genos,format,genorepr,genome=No
                   loc.model = build_model(alleles=geno,base=loc.model)
                 except GenotypeRepresentationError:
                   _encoding_error(columns[i],set(geno)-set(loc.model.alleles),loc.model,warn)
+                  # FIXME: Need recovery code
 
               model = loc.model
               if models[i] is not model:
