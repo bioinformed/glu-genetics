@@ -674,7 +674,7 @@ class LocusModelBuilder(object):
     if locus_header is not None:
       pidset           &= set(locus_header)
       locus_idx         = dict( (pid,i) for i,pid in enumerate(locus_header) )
-      self.geno_indices = [ locus_idx[p[0]] for p in self.phenos ]
+      self.geno_indices = [ locus_idx[p[0]] for p in phenos ]
 
     self.phenos         = np.array([ p for p in phenos if p[0] in pidset], dtype=object)
 
