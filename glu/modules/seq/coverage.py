@@ -255,16 +255,21 @@ def output_summary_coverage(all_coverage, options):
   target_len = all_coverage.sum(axis=1)
   genome_len = target_len.sum()
 
-  for i in xrange(max_track+1):
-    depth = i*coverage_width
-    if i==max_track:
-      depth = '>=%d' % depth
-    elif coverage_width!=1:
-      depth = '%d-%d' % (depth,depth+coverage_width-1)
+  results = []
+  on_target = off_target = 0
 
-    out.writerow([depth] + percent3(all_coverage[1,i],target_len[1])
-                         + percent3(all_coverage[0,i],target_len[0])
-                         + percent3(all_coverage[:,i].sum(),genome_len) )
+  for i in reversed(xrange(max_track+1)):
+    depth = '>=%d' % (i*coverage_width)
+
+    on_target  += all_coverage[1,i]
+    off_target += all_coverage[0,i]
+
+    results.append([depth] + percent3(on_target,            target_len[1])
+                           + percent3(off_target,           target_len[0])
+                           + percent3(on_target+off_target, genome_len) )
+
+  results.reverse()
+  out.writerows(results)
 
 
 def output_target_coverage(targets, target_coverage, options):
