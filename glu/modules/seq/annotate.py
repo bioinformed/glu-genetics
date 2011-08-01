@@ -421,14 +421,20 @@ class VariantAnnotator(object):
       result += ['SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(ref_aa)]
       return result
 
+    # Classify non-synonymous change by comparing AA sequences
+
     ref_stop = ref_aa.find('*')
     var_stop = var_aa.find('*')
-    if ref_stop==-1:
-      ref_stop = len(var_aa)+1
 
-    premature_stop = var_stop>=0 and var_stop<ref_stop
-    if premature_stop:
+    if ref_stop==-1:
+      ref_stop = len(ref_aa)
+    if var_stop==-1:
+      var_stop = len(var_aa)
+
+    if var_stop<ref_stop:
       mut_type.append('PREMATURE STOP')
+    elif var_stop>ref_stop:
+      mut_type.append('LOSS OF STOP')
 
     if len(ref_aa)==len(var_aa):
       mut_type.append('SUBSTITUTION')
@@ -603,8 +609,52 @@ def main():
 
       for e in evidence:
         out.writerow(v+e[3:])
+  if 0:
+    filename = args[0]
+    variants = table_reader(filename)
+    header   = next(variants)
+    extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
+                'REF_NUC_NEW','VAR_NUC_NEW','REF_AA_NEW','VAR_AA_NEW', 'dbSNP_exact','dbSNP_inexact']
+    out      = table_writer(options.output)
+    out.writerow(header + extra[3:])
 
-  if 1:
+    stats = defaultdict(int)
+
+    for v in variants:
+      evidence = list(vs.classify(v[0], int(v[1]), int(v[2]), v[7]))
+      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[6] ] or [[]]
+
+      for e in evidence:
+        out.writerow(v+e[3:])
+
+  if 0:
+    filename = args[0]
+    variants = table_reader(filename,hyphen=sys.stdin)
+    header   = next(variants)
+    out      = table_writer(options.output,hyphen=sys.stdout)
+
+
+    header    = header+['CHROM','CYTOBAND','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS',
+                 'FUNC_TYPE','REF_NUC','VAR_NUC','REF_AA','VAR_AA', 'dbSNP_exact','dbSNP_inexact']
+    out.writerow(header)
+
+    for row in variants:
+      if not row or row[0].startswith('#'):
+        continue
+
+      chrom = row[0]
+      start = int(row[1])
+      end   = int(row[2])
+      ref   = row[3]
+      var   = row[4].split(',')[0]
+
+      evidence = list(vs.classify(chrom, start, end, var, nsonly=True))
+      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[7] ]
+
+      for e in evidence:
+        out.writerow(row+e)
+
+  if 1:  # *** VCF, SNPs only ***
     filename = args[0]
     variants = table_reader(filename)
     out      = table_writer(options.output,hyphen=sys.stdout)
