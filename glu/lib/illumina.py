@@ -383,6 +383,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     def errorhandler(msg):
       raise ValueError(msg)
 
+  gstrandmap   = {'+':'F','-':'R'}
   indelmap     = {'D':'-','I':'+','A':'A','C':'C','G':'G','T':'T'}
   strandmap    = {STRAND_UNKNOWN:STRAND_UNKNOWN,'+':'-','-':'+'}
   NA           = ('N','A')
@@ -391,7 +392,9 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   validstrand  = set(('top','bot','p','plus','m','minus'))
   plusminus    = set(('p','plus','m','minus'))
 
-  assert targetstrand in ('top','bottom','forward','reverse','customer','anticustomer','design','antidesign')
+  assert targetstrand in ('top','bottom','forward','reverse', \
+                          'real_forward','real_reverse',
+                          'customer','anticustomer','design','antidesign')
 
   manifest    = iter(manifest)
   header      = manifest.next()
@@ -402,6 +405,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   loc_idx     = find_index(header,['MapInfo'])
   cstrand_idx = find_index(header,['CustomerStrand','SourceStrand'])
   dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
+  gstrand_idx = find_index(header,['GenomicStrand'],optional=True)
   topseq_idx  = find_index(header,['TopGenomicSeq'])
   probea_idx  = find_index(header,['AlleleA_ProbeSeq'],optional=True)
   probeb_idx  = find_index(header,['AlleleB_ProbeSeq'],optional=True)
@@ -415,6 +419,9 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     dstrand = assay[dstrand_idx].lower()
     topseq  = assay[topseq_idx]
     gstrand = assay[assayid_idx].split('_')[-2]
+
+    if targetstrand in ('real_forward','real_reverse'):
+      gstrand = assay[gstrand_idx] or 'U'
 
     if chr.startswith('chr'):
       chr = chr[3:]
@@ -431,7 +438,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
-    if gstrand not in 'FRU':
+    if gstrand not in '+-FRU':
       errorhandler('Unknown gstrand %s for %s' % (gstrand,lname))
       yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
@@ -488,7 +495,13 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       yield lname,chr,loc,STRAND_UNKNOWN,None
       continue
 
-    if gstrand != 'U':
+    if gstrand == '+':
+      forward = True
+      strand  = '+'
+    elif gstrand == '-':
+      forward = False
+      strand  = '-'
+    elif gstrand != 'U':
       # Get the strand orientation of the design sequence
       # Alleles are forward strand if the tstrand matches the design strand
       # and the design is on the forward strand or the converse of both
@@ -496,6 +509,8 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       forward = (tstrand != dstrand) ^ (gstrand == 'F')
       strand  = '+' if forward else '-'
     else:
+      if targetstrand in ('real_forward','real_reverse') and gstrand == 'U':
+        raise ValueError("Unknown strand for assay '%s'" % lname)
       if targetstrand in ('forward','reverse') and gstrand == 'U':
         raise ValueError("Unknown strand for assay '%s'" % lname)
       strand = STRAND_UNKNOWN
@@ -506,7 +521,9 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
            or  (targetstrand == 'antidesign'   and tstrand == dstrand)
            or  (targetstrand == 'top'          and tstrand != 'top'  )
            or  (targetstrand == 'bottom'       and tstrand != 'bot'  )
+           or  (targetstrand == 'real_forward' and not forward       )
            or  (targetstrand == 'forward'      and not forward       )
+           or  (targetstrand == 'real_reverse' and     forward       )
            or  (targetstrand == 'reverse'      and     forward       ))
 
     if flip:
