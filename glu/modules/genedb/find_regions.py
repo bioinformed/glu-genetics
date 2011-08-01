@@ -13,10 +13,10 @@ from   glu.lib.fileutils          import table_reader,table_writer,tryint
 
 from   glu.modules.genedb         import open_genedb
 from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name, \
-                                         query_contig_by_name
+                                         query_contig_by_name, query_cytobands_by_location
 
 
-HEADER = ['FEATURE_NAME','CHROMOSOME','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
+HEADER = ['FEATURE_NAME','CHROMOSOME','CYTOBAND','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
           'BASES_DOWN','SNPS_UP','SNPS_DOWN','FEATURE_TYPE']
 
 
@@ -56,7 +56,7 @@ def is_int(i):
 
 def resolve_feature(con,feature,options):
   name        = feature[0]
-  chr         = feature[1] or None
+  chrom       = feature[1] or None
   strand      = feature[2] or '+'
   start       = coalesce(tryint(feature[3]))
   end         = coalesce(tryint(feature[4]))
@@ -71,10 +71,10 @@ def resolve_feature(con,feature,options):
     feature = 'SNP'
     found = True
 
-  if not found and chr and start and end:
+  if not found and chrom and start and end:
     found = True
     geneinfo = query_genes_by_name(con,name)
-    if any( (chr,start,end) == (gi[2],gi[3],gi[4]) for gi in geneinfo):
+    if any( (chrom,start,end) == (gi[2],gi[3],gi[4]) for gi in geneinfo):
       feature = 'GENE'
     else:
       feature = 'REGION'
@@ -82,7 +82,7 @@ def resolve_feature(con,feature,options):
   if not found:
     geneinfo = query_genes_by_name(con,name)
     if len(geneinfo) == 1:
-      name,chr,start,end,strand = geneinfo[0][1:6]
+      name,chrom,start,end,strand = geneinfo[0][1:6]
       feature = geneinfo[0][6]
       found = True
     elif len(geneinfo) > 1:
@@ -92,7 +92,7 @@ def resolve_feature(con,feature,options):
   if not found:
     cytoinfo = query_cytoband_by_name(con,name)
     if cytoinfo:
-      chr,start,end,color = cytoinfo
+      chrom,start,end,color = cytoinfo
       strand = '+'
       feature = 'CYTOBAND'
       found = True
@@ -100,7 +100,7 @@ def resolve_feature(con,feature,options):
   if not found:
     contiginfo = query_contig_by_name(con,name)
     if contiginfo:
-      chr,start,end = contiginfo
+      chrom,start,end = contiginfo
       strand = '+'
       feature = 'CONTIG'
       found = True
@@ -108,7 +108,7 @@ def resolve_feature(con,feature,options):
   if not found:
     snpinfo = query_snps_by_name(con,name)
     if len(snpinfo)==1:
-      name,chr,start,end,strand,refAllele,alleles,vclass,func,weight = snpinfo[0]
+      name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight = snpinfo[0]
       feature = 'SNP'
       found = True
 
@@ -119,7 +119,9 @@ def resolve_feature(con,feature,options):
   if not found:
     feature = 'UNKNOWN'
 
-  return name,chr,strand,start,end,upbases,downbases,upsnps,downsnps,feature
+  bands = ','.join(b[0] for b in query_cytobands_by_location(con,chrom,start,end))
+
+  return name,chrom,bands,strand,start,end,upbases,downbases,upsnps,downsnps,feature
 
 
 def resolve_features(con,features,options):
@@ -132,11 +134,11 @@ def bed_format(results):
   for row in results:
     feature   = row[0]
     chrom     = row[1]
-    start     = row[3]
-    end       = row[4]
+    start     = row[4]
+    end       = row[5]
     strand    = row[2] or '+'
-    upbases   = row[5] or 0
-    downbases = row[6] or 0
+    upbases   = row[6] or 0
+    downbases = row[7] or 0
 
     if start is None or end is None:
       continue

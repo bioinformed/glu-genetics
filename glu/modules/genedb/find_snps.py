@@ -185,7 +185,7 @@ def main():
     features = table_reader(infile,want_header=True,hyphen=sys.stdin)
     features = resolve_features(con,features,options)
 
-    for name,chr,strand,start,end,mup,mdown,nup,ndown,featuretype in features:
+    for name,chrom,bands,strand,start,end,mup,mdown,nup,ndown,featuretype in features:
       if featuretype == 'UNKNOWN' or start is None:
         continue
 
@@ -193,17 +193,18 @@ def main():
       end   = int(end or start)
       nup   = nup or 0
       ndown = ndown or 0
-      chrStart,chrEnd = feature_margin(start,end,strand,int(mup or 0),int(mdown or 0))
+      chromStart,chromEnd = feature_margin(start,end,strand,int(mup or 0),int(mdown or 0))
 
-      results = query_snps_by_location(con,chr,chrStart,chrEnd)
+      results = query_snps_by_location(con,chrom,chromStart,chromEnd)
       results = [ r[:-1] for r in results ]
       results = filter_results(results)
       results = annotate_results(results,start,end,strand,int(nup or 0),int(ndown or 0))
 
       if options.outformat=='glu':
         for result in results:
-          row = [ result[0], result[1], result[2]+1, result[3], result[4], result[5], result[6], result[7], result[8],
-                  chrStart, chrEnd, name, strand, start, end, featuretype ]
+          row = [ result[0], result[1], result[2]+1, result[3], result[4], result[5],
+                  result[6], result[7], result[8], chromStart, chromEnd, name, strand,
+                  start, end, featuretype ]
           out.writerow(row)
       else:
         for result in results:
