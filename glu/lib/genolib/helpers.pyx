@@ -98,3 +98,27 @@ def encode_ab_to_snps(np.ndarray abgenos):
     snps[k] = val
 
   return snpgenos
+
+
+def pair_generator(items):
+  '''
+  Generator for distinct pairs of items
+
+  @param items: sequence of items
+  @type  items: sequence
+  @return     : distinct pairs of items
+  @rtype      : generator of tuples
+
+  >>> pairs = pair_generator(['A','B','C'])
+  >>> for item1,item2 in pairs:
+  ...   print item1,item2
+  B A
+  C A
+  C B
+  '''
+  if not isinstance(items, (list,tuple)):
+    items = list(items)
+  n = len(items)
+  for i in xrange(n):
+    for j in xrange(0,i):
+      yield items[i],items[j]
