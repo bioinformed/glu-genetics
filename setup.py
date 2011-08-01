@@ -70,7 +70,6 @@ def glmnet_config():
 
 def cython_modules():
   try:
-    raise ImportError
     from Cython.Build import cythonize
 
     ext = [
