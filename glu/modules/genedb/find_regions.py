@@ -9,11 +9,11 @@ __revision__  = '$Id$'
 
 import sys
 
-from   glu.lib.fileutils          import table_reader,table_writer,tryint
+from   glu.lib.fileutils      import table_reader,table_writer,tryint
 
-from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name, \
-                                         query_contig_by_name, query_cytobands_by_location
+from   glu.lib.genedb         import open_genedb
+from   glu.lib.genedb.queries import query_genes_by_name, query_snps_by_name, query_cytoband_by_name, \
+                                     query_contig_by_name, query_cytobands_by_location
 
 
 HEADER = ['FEATURE_NAME','CHROMOSOME','CYTOBAND','STRAND','FEATURE_START','FEATURE_END','BASES_UP',
@@ -21,24 +21,25 @@ HEADER = ['FEATURE_NAME','CHROMOSOME','CYTOBAND','STRAND','FEATURE_START','FEATU
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] file'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+  parser.add_argument('table', nargs='+', help='Tabular or delimited input file')
+
+  parser.add_argument('-g', '--genedb',   metavar='NAME',
                       help='Genedb genome annotation database name or file')
-  parser.add_option('-u', '--upbases',   dest='upbases',   default=20000, type='int',  metavar='N',
+  parser.add_argument('-u', '--upbases',   default=20000, type=int,  metavar='N',
                     help='upstream margin in bases (default=20000)')
-  parser.add_option('-d', '--downbases', dest='downbases', default=10000, type='int',  metavar='N',
+  parser.add_argument('-d', '--downbases', default=10000, type=int,  metavar='N',
                     help='downstream margin in bases (default=10000)')
-  parser.add_option('-U', '--upsnps',    dest='upsnps',                   type='int',  metavar='N',
+  parser.add_argument('-U', '--upsnps',    type=int,  metavar='N',
                     help='maximum number of upstream SNPs (default=0 for no limit)')
-  parser.add_option('-D', '--downsnps',  dest='downsnps',                 type='int',  metavar='N',
+  parser.add_argument('-D', '--downsnps',  type=int,  metavar='N',
                     help='maximum number of downstream SNPs (default=0 for no limit)')
-  parser.add_option('-F', '--outformat', dest='outformat', default='GLU',              metavar='NAME',
+  parser.add_argument('-F', '--outformat', default='GLU',              metavar='NAME',
                     help='Output format (GLU or BED)')
-  parser.add_option('-o', '--output',   dest='output', default='-',                    metavar='FILE',
+  parser.add_argument('-o', '--output',   default='-',                    metavar='FILE',
                     help="output file name, '-' for standard out")
   return parser
 
@@ -154,12 +155,8 @@ def bed_format(results):
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if not args:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   options.outformat = options.outformat.lower()
 
@@ -172,8 +169,8 @@ def main():
   if options.outformat=='glu':
     out.writerow(HEADER)
 
-  for infile in args:
-    features = table_reader(infile,want_header=True,hyphen=sys.stdin)
+  for filename in options.table:
+    features = table_reader(filename,want_header=True,hyphen=sys.stdin)
     results  = resolve_features(con,features,options)
 
     if options.outformat=='bed':

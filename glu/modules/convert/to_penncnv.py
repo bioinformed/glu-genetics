@@ -21,21 +21,13 @@ from   glu.modules.convert.to_gada import split_fullname, option_parser, cnv_dat
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)!=1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  if not options.output:
-    sys.stderr.write('ERROR: An output filename template must be specified')
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   prefix,sep,suffix = split_fullname(options.output)
 
   transform = GenoTransform.from_object(options)
-  gdat      = h5py.File(args[0],'r')
+  gdat      = h5py.File(options.gdatfile,'r')
   data      = cnv_data(gdat,transform)
   genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 

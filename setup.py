@@ -8,19 +8,30 @@
 import os
 import sys
 
+try:
+  try:
+    import setuptools
 
-from ez_setup import use_setuptools
-use_setuptools()
+  except ImportError:
+    import distribute_setup
+    distribute_setup.use_setuptools()
+
+except ImportError:
+  import ez_setup
+  ez_setup.use_setuptools()
 
 
 # minimum versions required
-min_python_version = (2,6)
+requires = ['numpy>=1.3', 'scipy>=0.7', 'tables>=2.1.2', 'ply>=2.5']
+
+min_python_version = (2,7)
 min_cython_version = '1.4'
-min_numpy_version  = '1.0.2'
-min_scipy_version  = '0.5.2'
-min_tables_version = '2.0'
+min_numpy_version  = '1.3'
+min_scipy_version  = '0.7'
+min_tables_version = '2.1.2'
+min_h5py_version   = '1.2.1'
 min_ply_version    = '2.5'
-min_nose_version   = '0.10.4'
+min_nose_version   = '1.0.0'
 
 
 if sys.version_info < min_python_version:
@@ -29,9 +40,10 @@ if sys.version_info < min_python_version:
   sys.exit(1)
 
 
-from   setuptools           import find_packages, Extension
 import numpy as np
-from   numpy.distutils.core import setup as numpy_setup
+
+from   setuptools           import find_packages, Extension
+from   numpy.distutils.core import setup
 
 
 def get_version():
@@ -47,8 +59,9 @@ Intended Audience :: Developers
 Intended Audience :: Information Technology
 Intended Audience :: Science/Research
 License :: OSI Approved :: BSD License
-Programming Language :: Python :: 2.5
+Programming Language :: Python :: 2.7
 Programming Language :: C
+Programming Language :: Fortran
 Topic :: Scientific/Engineering
 Topic :: Software Development
 Topic :: Database
@@ -58,9 +71,6 @@ Operating System :: POSIX
 Operating System :: MacOS :: MacOS X
 Operating System :: Microsoft :: Windows
 '''
-
-#entry_points    = { 'console_scripts':['glu = glu.lib.glu_launcher:main'] },
-
 
 def glmnet_config():
   from numpy.distutils.misc_util import Configuration
@@ -98,7 +108,7 @@ def cython_modules():
 
 
 def main():
-  numpy_setup(name       = 'glu',
+  setup(name             = 'glu',
         version          = get_version(),
         author           = 'Kevin Jacobs',
         author_email     = 'jacobske@mail.nih.gov',
@@ -111,12 +121,7 @@ def main():
                             'test for association between SNP markers with continuous or discrete '
                             'trait phenotypes.'),
         classifiers      = filter(None, classifiers.split('\n')),
-        install_requires = ['numpy>=%s'  % min_numpy_version,
-                            'scipy>=%s'  % min_scipy_version,
-                            'tables>=%s' % min_tables_version,
-                            'ply>=%s'    % min_ply_version  ],
-        setup_requires   = ['numpy>=%s'  % min_numpy_version],
-        tests_require    = ['nose>=%s'   % min_nose_version ],
+        install_requires = requires,
         packages         = find_packages(),
         include_package_data = True,
         scripts          = ['bin/glu'],
@@ -133,7 +138,9 @@ def main():
                                                                include_dirs = [np.get_include()]),
                         Extension('glu.modules.ld.pqueue',          sources = ['glu/modules/ld/pqueue.c']),
                         glmnet_config(),
-                      ] + cython_modules() )
+                      ] + cython_modules(),
+        entry_points={ 'console_scripts'    : ['glu = glu.lib.glu_launcher:main'],
+                     } )
 
 
 if __name__ == '__main__':

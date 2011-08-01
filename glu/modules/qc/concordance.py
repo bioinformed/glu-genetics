@@ -280,41 +280,40 @@ def output_allele_maps(amap,mapfile):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
+
+  parser = GLUArgumentParser(description=__abstract__)
+
   usage = 'Usage: %prog [options] reference comparison...'
+  parser.add_argument('reference',             help='Reference genotype file')
+  parser.add_argument('comparison', nargs='+', help='Comparison genotype file(s)')
 
-  parser = optparse.OptionParser(usage=usage)
-
-  parser.add_option('-f', '--refformat',  dest='refformat', metavar='FILE', default=None,
+  parser.add_argument('-f', '--refformat',  metavar='FILE', default=None,
                      help='The file format for reference genotype data')
-  parser.add_option('-F', '--compformat', dest='compformat',metavar='FILE', default=None,
+  parser.add_argument('-F', '--compformat', metavar='FILE', default=None,
                      help='The file format for other(comparison) genotype data')
-  parser.add_option('-r', '--remap',     dest='remap',     metavar='FILE',
+  parser.add_argument('-r', '--remap',     metavar='FILE',
                      help='Determine and output the optimal allele mapping based on greatest concordance')
-  parser.add_option('-a', '--allelemap', dest='allelemap', metavar='FILE',
+  parser.add_argument('-a', '--allelemap', metavar='FILE',
                      help='A list of loci to remap the comparison data alleles to the reference data alleles')
-  parser.add_option('-o',           dest='sampleout', metavar='FILE',
+  parser.add_argument('-o',           dest='sampleout', metavar='FILE',
                      help='Output the concordance statistics by sample to FILE')
-  parser.add_option('-O',           dest='locusout',  metavar='FILE',
+  parser.add_argument('-O',           dest='locusout',  metavar='FILE',
                      help='Output the concordance statistics by locus to FILE')
-  parser.add_option('--samplemap',  dest='samplemap', metavar='FILE',
+  parser.add_argument('--samplemap',  metavar='FILE',
                      help='Map the sample ids for the comparison data to the set of ids in the sample equivalence map')
-  parser.add_option('--locusmap',   dest='locusmap',  metavar='FILE',
+  parser.add_argument('--locusmap',   metavar='FILE',
                      help='Map the locus ids for the comparison data to the set of ids in the locus equivalence map')
-  parser.add_option('--sampleeq',   dest='sampleeq',  metavar='FILE',
+  parser.add_argument('--sampleeq',   metavar='FILE',
                      help='Equivalence mapping between the sample ids from the comparison data and the reference data')
-  parser.add_option('--locuseq',    dest='locuseq',   metavar='FILE',
+  parser.add_argument('--locuseq',    metavar='FILE',
                      help='Equivalence mapping between the locus ids from the comparison data and the reference data')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args) < 2:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   # Load equivalence maps as many-to-many mappings between final reference
   # names and final comparison names.  Since we match comparison to reference,
@@ -335,10 +334,10 @@ def main():
     sampleeq = map_reader(options.sampleeq)
     eqsample = invert_dict(sampleeq)
 
-  refgenos  = load_reference_genotypes(args[0],options.refformat,locuseq,sampleeq)
+  refgenos  = load_reference_genotypes(options.reference,options.refformat,locuseq,sampleeq)
 
-  compgenos = [ load_comparison_genotypes(arg, options.compformat, eqlocus, eqsample,
-                options.locusmap, options.samplemap) for arg in args[1:] ]
+  compgenos = [ load_comparison_genotypes(filename, options.compformat, eqlocus, eqsample,
+                options.locusmap, options.samplemap) for filename in options.comparison ]
 
   compgenos = GenotripleStream.from_streams(compgenos).transformed(filter_missing=True)
 

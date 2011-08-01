@@ -43,7 +43,7 @@ def load_mach_info(filename,genome):
 
     lname   = row[0]
     alleles = tuple(row[1:3])
-    
+
     model = modelcache.get(alleles)
     if model is None:
       model = modelcache[alleles] = build_model(alleles=alleles,max_alleles=2)

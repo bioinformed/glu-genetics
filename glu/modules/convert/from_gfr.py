@@ -363,32 +363,30 @@ def gdat_writer(gdat, gfr_data, genome, abmap, transform):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] manifest.bpm gfr.txt[.gz/.bz2] -o output.gdat'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('--includesamples', dest='includesamples', metavar='FILE', action='append',
+  parser.add_argument('manifest', help='Illumina BPM manifest file')
+  parser.add_argument('gfrfile',  help='Illumina Genotype Final Report (GFR) file')
+
+  parser.add_argument('--includesamples', metavar='FILE', action='append',
                     help='List of samples to include, all others will be skipped')
-  parser.add_option('--excludesamples', dest='excludesamples', metavar='FILE', action='append',
+  parser.add_argument('--excludesamples', metavar='FILE', action='append',
                     help='List of samples to exclude, only samples not present will be kept')
-  parser.add_option('--renamesamples', dest='renamesamples', metavar='FILE',
+  parser.add_argument('--renamesamples', metavar='FILE',
                     help='Rename samples from a file containing rows of original name, tab, new name')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE',
+  parser.add_argument('-o', '--output', metavar='FILE', required=True,
                     help='Output genotype file name')
-  parser.add_option('-w', '--warnings', action='store_true', dest='warnings',
+  parser.add_argument('-w', '--warnings', action='store_true',
                     help='Emit warnings and A/B calls for SNPs with invalid manifest data')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)!=2 or not options.output:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   errorhandler = None
   if options.warnings:
@@ -397,13 +395,13 @@ def main():
 
   sys.stderr.write('Loading Illumina manifest file...')
   genome = Genome()
-  abmap  = create_Illumina_abmap(args[0],genome,targetstrand='forward',
+  abmap  = create_Illumina_abmap(options.manifest,genome,targetstrand='forward',
                                          errorhandler=errorhandler)
   sys.stderr.write('done.\n')
 
   transform  = GenoTransform.from_object(options)
 
-  num_snps,num_samples,manifest,gfr_data = read_gfr(args[1])
+  num_snps,num_samples,manifest,gfr_data = read_gfr(options.gfrfile)
   gdat       = create_gdat(options.output, num_snps, num_samples)
 
   #gfr_data  = progress_bar(gfr_data,num_samples)
@@ -412,9 +410,9 @@ def main():
   attrs = gdat.attrs
   attrs['GLU_FORMAT']   = 'gdat'
   attrs['GLU_VERSION']  = 1
-  attrs['ManifestPath'] = args[0]
-  attrs['SourceFile']   = args[1]
-  attrs['ManifestName'] = manifest or os.path.basename(args[0])
+  attrs['ManifestPath'] = options.manifest
+  attrs['SourceFile']   = options.gfrfile
+  attrs['ManifestName'] = manifest or os.path.basename(options.manifest)
   attrs['SNPCount']     = len(gdat['SNPs'])
   attrs['SampleCount']  = len(gdat['Genotype'])
 

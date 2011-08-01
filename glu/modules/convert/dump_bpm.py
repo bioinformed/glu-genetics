@@ -13,25 +13,21 @@ from   glu.lib.illumina  import IlluminaManifest
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] manifest.bpm'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('manifest', help='Illumina BPM manifest file')
+
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output manifest information')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  manifest = IlluminaManifest(args[0])
+  parser   = option_parser()
+  options  = parser.parse_args()
+  manifest = IlluminaManifest(options.manifest)
   rows     = iter(manifest)
   header   = rows.next()
 

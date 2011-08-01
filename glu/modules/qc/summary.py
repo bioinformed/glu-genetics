@@ -165,43 +165,40 @@ def format_rate(numerator, denominator):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('--hwp', dest='hwp', action='store_true',
+  parser.add_argument('--hwp', action='store_true',
                     help='Test for deviation from Hardy-Weinberg proportions')
-  parser.add_option('-s', '--summaryout', dest='summaryout', metavar='FILE', default='-',
+  parser.add_argument('-s', '--summaryout', metavar='FILE', default='-',
                     help='Summary output file name')
-  parser.add_option('-o', '--locusout', dest='locusout', metavar='FILE',
+  parser.add_argument('-o', '--locusout', metavar='FILE',
                     help='Locus output table file name')
-  parser.add_option('-O', '--sampleout', dest='sampleout', metavar='FILE',
+  parser.add_argument('-O', '--sampleout', metavar='FILE',
                     help='Sample output table file name')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   # Include lists are used to communicate the universe of attempted samples/loci
   # Any not observed in the genotype data are classified as "missing"
   includeloci    = set(list_reader(options.includeloci))    if options.includeloci    else None
   includesamples = set(list_reader(options.includesamples)) if options.includesamples else None
 
-  options.includeloci    =   includeloci
+  options.includeloci    = includeloci
   options.includesamples = includesamples
 
-  genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
-                                  genome=options.loci,phenome=options.pedigree,
-                                  transform=options, hyphen=sys.stdin)
+  genos = load_genostream(options.genotypes,format=options.informat,genorepr=options.ingenorepr,
+                          genome=options.loci,phenome=options.pedigree,
+                          transform=options, hyphen=sys.stdin)
 
   loci,locus_counts,samples,sample_counts = summarize(genos)
   sample_totals = sum(sample_counts, np.zeros(4))

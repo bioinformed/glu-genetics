@@ -17,26 +17,28 @@ from   glu.lib.fileutils   import table_reader,tryint1,table_writer,resolve_colu
 
 
 def option_parser():
-  import optparse
-  usage = 'Usage: %prog [options] table1 table2'
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('table1', help='First table to join')
+  parser.add_argument('table2', help='Second table to join')
+
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
 
-  parser.add_option('-1', '--key1', dest='key1',
+  parser.add_argument('-1', '--key1',
                     help='Table 1 key column numbers or names.  Comma separated, with '
-                         'default to common headers')
-  parser.add_option('-2', '--key2', dest='key2',
+                         'defaulting to common headers')
+  parser.add_argument('-2', '--key2',
                     help='Table 2 key column numbers or names')
-  parser.add_option('--prefix1', dest='prefix1', metavar='P1',
+  parser.add_argument('--prefix1', metavar='P1',
                     help='prefix to prepend to each non-key header name in table1')
-  parser.add_option('--prefix2', dest='prefix2',  metavar='P2',
+  parser.add_argument('--prefix2', metavar='P2',
                     help='prefix to prepend to each non-key header name in table2')
-  parser.add_option('-U', '--uniquejoin', dest='uniquejoin', action='store_true',
+  parser.add_argument('-U', '--uniquejoin', action='store_true',
                     help='Require that rows with valid keys from table2 are unique')
-  parser.add_option('-j', '--join', dest='join', default='left',
+  parser.add_argument('-j', '--join', default='left', choices=['left','inner'],
                     help="Join type: 'left' (default) or 'inner'")
 
   table_options(parser)
@@ -230,27 +232,19 @@ def left_join(table1,table2,key1=None,key2=None,unique=False,inner=False,
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 2:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  table1  = table_reader(options.table1,hyphen=sys.stdin,want_header=True)
+  table2  = table_reader(options.table2,hyphen=sys.stdin,want_header=True)
 
-  join_type = options.join.lower()
-  if join_type not in ('left','inner'):
-    raise ValueError('Invalid join type specified: %s' % join_type)
+  table   = left_join(table1,table2,key1=options.key1,key2=options.key2,
+                      unique=options.uniquejoin,inner=(join_type=='inner'),
+                      prefix1=options.prefix1,prefix2=options.prefix2)
 
-  table1 = table_reader(args[0],hyphen=sys.stdin,want_header=True)
-  table2 = table_reader(args[1],hyphen=sys.stdin,want_header=True)
+  out     = table_writer(options.output,hyphen=sys.stdout)
 
-  table  = left_join(table1,table2,key1=options.key1,key2=options.key2,
-                    unique=options.uniquejoin,inner=(join_type=='inner'),
-                    prefix1=options.prefix1,prefix2=options.prefix2)
-
-  out   = table_writer(options.output,hyphen=sys.stdout)
-
-  table = cook_table(table,options)
+  table   = cook_table(table,options)
 
   out.writerows(table)
 

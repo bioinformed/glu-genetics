@@ -21,22 +21,23 @@ errbypedhead  = ['FAMILY','INDIVIDUAL','LEVEL_1_ERRORS','LEVEL_2_ERRORS','LEVEL_
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage, add_help_option=False)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True)
 
-  parser.add_option('-o', '--errdetails',  dest='errdetails',  default='-', metavar='FILE',
+  parser.add_argument('-o', '--errdetails',  default='-', metavar='FILE',
                     help="The output file containing genotype matrix after elimination, '-' for standard out")
-  parser.add_option('--locsum', dest='locsum', default='-', metavar='FILE',
+  parser.add_argument('--locsum', default='-', metavar='FILE',
                     help="The output file containing summary of errors by locus, '-' for standard out")
-  parser.add_option('--locdet', dest='locdet', default='-', metavar='FILE',
+  parser.add_argument('--locdet', default='-', metavar='FILE',
                     help="The output file containing details of errors by locus, '-' for standard out")
-  parser.add_option('--pedsum', dest='pedsum', default='-', metavar='FILE',
+  parser.add_argument('--pedsum', default='-', metavar='FILE',
                     help="The output file containing summary of errors by pedigree, '-' for standard out")
-  parser.add_option('--peddet', dest='peddet', default='-', metavar='FILE',
+  parser.add_argument('--peddet', default='-', metavar='FILE',
                     help="The output file containing details of errors by pedigree, '-' for standard out")
 
   return parser
@@ -624,17 +625,13 @@ def output_file(filename,*headers):
 
 
 def main():
-  parser=option_parser()
-  options,args=parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  genos = load_genostream(args[0],format=options.informat,
-                                  genorepr=options.ingenorepr,
-                                  genome=options.loci,
-                                  phenome=options.pedigree).as_ldat()
+  genos = load_genostream(options.genotypes,format=options.informat,
+                          genorepr=options.ingenorepr,
+                          genome=options.loci,
+                          phenome=options.pedigree).as_ldat()
 
   if options.errdetails:
     outdetails = output_file(options.errdetails,['']+genos.samples)

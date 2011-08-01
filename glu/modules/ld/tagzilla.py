@@ -27,7 +27,6 @@ import re
 import sys
 import copy
 import time
-import optparse
 
 from   math                      import log, ceil
 from   operator                  import itemgetter
@@ -1320,12 +1319,12 @@ def binner_vector(loci, binsets, lddata, includes, get_tags_required=None):
     yield lname,results
 
 
-def generate_ldpairs_vector(args, include, subset, ldsubset, options):
+def generate_ldpairs_vector(options, include, subset, ldsubset):
   labels = get_populations(options.multipopulation)
   pops = len(labels)
-  regions = len(args) // pops
+  regions = len(options.genotypes) // pops
 
-  if len(args) % pops != 0:
+  if len(options.genotypes) % pops != 0:
     raise TagZillaError('ERROR: The number of input files must be a multiple of the number of populations')
 
   for i in xrange(regions):
@@ -1333,9 +1332,9 @@ def generate_ldpairs_vector(args, include, subset, ldsubset, options):
     multi_options = []
     locusmap = []
 
-    for file_options,filename in args[i*pops:(i+1)*pops]:
+    for filename in options.genotypes[i*pops:(i+1)*pops]:
       lmap    = {}
-      regions = generate_ldpairs_from_file(filename, lmap, include, subset, ldsubset, file_options)
+      regions = generate_ldpairs_from_file(filename, lmap, include, subset, ldsubset, options)
       pairs   = chain(*regions)
 
       ldpairs.append(pairs)
@@ -1687,9 +1686,9 @@ def update_locus_map(locusmap, loci):
   locusmap.update(addloci)
 
 
-def generate_ldpairs(args, locusmap, include, subset, ldsubset, options):
-  for file_options,filename in args:
-    regions = generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, file_options)
+def generate_ldpairs(options, locusmap, include, subset, ldsubset):
+  for filename in options.genotypes:
+    regions = generate_ldpairs_from_file(filename, locusmap, include, subset, ldsubset, options)
 
     for ldpairs in regions:
       yield ldpairs
@@ -1743,145 +1742,95 @@ def get_tags_required_function(options):
     return None
 
 
-class TagZillaOptionParser(optparse.OptionParser):
-  def _process_args(self, largs, rargs, values):
-    '''_process_args(largs : [string],
-                     rargs : [string],
-                     values : Values)
-
-    Process command-line arguments and populate 'values', consuming
-    options and arguments from 'rargs'.  If 'allow_interspersed_args' is
-    false, stop at the first non-option argument.  If true, accumulate any
-    interspersed non-option arguments in 'largs'.
-    '''
-    while rargs:
-      arg = rargs[0]
-      # We handle bare '--' explicitly, and bare '-' is handled by the
-      # standard arg handler since the short arg case ensures that the
-      # len of the opt string is greater than 1.
-      if arg == '--':
-        del rargs[0]
-        return
-      elif arg.startswith('--'):
-        # process a single long option (possibly with value(s))
-        self._process_long_opt(rargs, values)
-      elif arg.startswith('-') and len(arg) > 1:
-        # process a cluster of short options (possibly with
-        # value(s) for the last one only)
-        self._process_short_opts(rargs, values)
-      elif self.allow_interspersed_args:
-        self._process_arg(arg)
-      else:
-        return
-
-  def _process_arg(self, arg):
-    self.largs.append( (copy.deepcopy(self.values),arg) )
-    del self.rargs[0]
-
-
-def check_option01(option, opt_str, value, parser):
-  if not (0 <= value <= 1):
-    raise optparse.OptionValueError('option %s: value must be between 0 and 1.  Got %s' % (opt_str,value))
-  setattr(parser.values, option.dest, value)
-
-
 def option_parser():
-  usage = 'usage: %prog [options] genotypes [options] genotypes'
-  parser = TagZillaOptionParser(usage=usage)
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  inputgroup = optparse.OptionGroup(parser, 'Input options')
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', nargs='+', help='Input genotype file(s)')
+
+  inputgroup = parser.add_argument_group('Input options')
 
   geno_options(inputgroup,input=True,filter=True)
 
-  inputgroup.add_option('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
+  inputgroup.add_argument('-e', '--excludetag', dest='exclude', metavar='FILE', default='',
                           help='File containing loci that are excluded from being a tag')
-  inputgroup.add_option('-i', '--includeuntyped', dest='include_untyped', metavar='FILE', default='',
+  inputgroup.add_argument('-i', '--includeuntyped', dest='include_untyped', metavar='FILE', default='',
                           help='File containing loci that are obligatorily tags and untyped (may not cover another obligate locus)')
-  inputgroup.add_option('-I', '--includetyped', dest='include_typed', metavar='FILE', default='',
+  inputgroup.add_argument('-I', '--includetyped', dest='include_typed', metavar='FILE', default='',
                           help='File containing loci that are obligatorily tags but have been typed (may cover another typed locus)')
 
-  inputgroup.add_option('-s', '--subset', dest='subset', metavar='FILE', default='',
+  inputgroup.add_argument('-s', '--subset', metavar='FILE', default='',
                           help='File containing loci to be used in analysis')
-  inputgroup.add_option('-S', '--ldsubset', dest='ldsubset', metavar='FILE', default='',
+  inputgroup.add_argument('-S', '--ldsubset', metavar='FILE', default='',
                           help='File containing loci within the region these loci LD will be analyzed (see -d/--maxdist)')
-  inputgroup.add_option('-R', '--range', dest='range', metavar='S-E,...', default='',
+  inputgroup.add_argument('-R', '--range', metavar='S-E,...', default='',
                           help='Ranges of genomic locations to analyze, specified as a comma separated list of start and '
                                'end coordinates "S-E".  If either S or E is not specified, then the ranges are assumed '
                                'to be open.  The end coordinate is exclusive and not included in the range.')
-  inputgroup.add_option('-D', '--designscores', dest='designscores', metavar='FILE', type='str', action='append',
+  inputgroup.add_argument('-D', '--designscores', metavar='FILE', type=str, action='append',
                           help='Read in design scores or other weights to use as criteria to choose the optimal tag for each bin')
-  inputgroup.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
+  inputgroup.add_argument('--designdefault', metavar='N', type=float, default=0,
                           help='Default design score for any locus not found in a design file')
-  inputgroup.add_option('-L', '--limit', dest='limit', metavar='N', type='int', default=0,
+  inputgroup.add_argument('-L', '--limit', metavar='N', type=int, default=0,
                           help='Limit the number of loci considered to N for testing purposes (default=0 for unlimited)')
 
-  outputgroup = optparse.OptionGroup(parser, 'Output options')
+  outputgroup = parser.add_argument_group('Output options')
 
-  outputgroup.add_option('-b', '--summary', dest='sumfile', metavar='FILE', default='-',
+  outputgroup.add_argument('-b', '--summary', dest='sumfile', metavar='FILE', default='-',
                           help="Output summary tables FILE (default='-' for standard out)")
-  outputgroup.add_option('-B', '--bininfo', dest='bininfo', metavar='FILE',
+  outputgroup.add_argument('-B', '--bininfo', metavar='FILE',
                           help='Output summary information about each bin to FILE')
-  outputgroup.add_option('-H', '--histomax', dest='histomax', metavar='N', type='int', default=10,
+  outputgroup.add_argument('-H', '--histomax', metavar='N', type=int, default=10,
                           help='Largest bin size output in summary histogram output (default=10)')
-  outputgroup.add_option('-k', '--skip', dest='skip', default=0, action='count',
+  outputgroup.add_argument('-k', '--skip', default=0, action='count',
                           help='Skip output of untagged or excluded loci')
-  outputgroup.add_option('-o', '--output', dest='output', metavar='FILE', default=None,
+  outputgroup.add_argument('-o', '--output', metavar='FILE', default=None,
                           help="Output tabular LD information for bins to FILE ('-' for standard out)")
-  outputgroup.add_option('-O', '--locusinfo', dest='locusinfo', metavar='FILE',
+  outputgroup.add_argument('-O', '--locusinfo', metavar='FILE',
                           help='Output locus information to FILE')
-  outputgroup.add_option('-u', '--saveldpairs', dest='saveldpairs', metavar='FILE',
+  outputgroup.add_argument('-u', '--saveldpairs', metavar='FILE',
                           help='Output pairwise LD estimates to FILE')
-  outputgroup.add_option('-x', '--extra', dest='extra', action='count',
+  outputgroup.add_argument('-x', '--extra', action='count',
                           help='Output inter-bin LD statistics')
 
-  genoldgroup = optparse.OptionGroup(parser, 'Genotype and LD estimation options')
+  genoldgroup = parser.add_argument_group('Genotype and LD estimation options')
 
-  genoldgroup.add_option('-a', '--minmaf', dest='maf', metavar='FREQ', type='float', default=0.05,
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument('-a', '--minmaf', dest='maf', metavar='FREQ', type=float, default=0.05,
                           help='Minimum minor allele frequency (MAF) (default=0.05)')
-  genoldgroup.add_option('-A', '--minobmaf', dest='obmaf', metavar='FREQ', type='float', default=None,
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument('-A', '--minobmaf', dest='obmaf', metavar='FREQ', type=float, default=None,
                           help='Minimum minor allele frequency (MAF) for obligate tags (defaults to -a/--minmaf)')
-  genoldgroup.add_option('-c', '--mincompletion', dest='mincompletion', metavar='N', default=0, type='int',
+  genoldgroup.add_argument('-c', '--mincompletion', metavar='N', default=0, type=int,
                           help='Drop loci with less than N valid genotypes (default=0)')
-  genoldgroup.add_option(      '--mincompletionrate', dest='mincompletionrate', metavar='N', default=0, type='float',
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument(      '--mincompletionrate', metavar='N', default=0, type=float,
                           help='Drop loci with completion rate less than N (0-1) (default=0)')
-  genoldgroup.add_option('-m', '--maxdist', dest='maxdist', metavar='D', type='int', default=200,
+  genoldgroup.add_argument('-m', '--maxdist', metavar='D', type=int, default=200,
                           help='Maximum inter-marker distance in kb for LD comparison (default=200)')
-  genoldgroup.add_option('-P', '--hwp', dest='hwp', metavar='p', default=None, type='float',
-                          action='callback', callback=check_option01,
+  genoldgroup.add_argument('-P', '--hwp', metavar='p', default=None, type=float,
                           help='Filter out loci that fail to meet a minimum significance level (pvalue) for a '
                                'test Hardy-Weinberg proportion (no default)')
 
-  bingroup = optparse.OptionGroup(parser, 'Binning options')
+  bingroup = parser.add_argument_group('Binning options')
 
-  bingroup.add_option('-M', '--multipopulation', dest='multipopulation', metavar='N or P1,P2,...',
+  bingroup.add_argument('-M', '--multipopulation', metavar='N or P1,P2,...',
                           help='Multipopulation tagging where every N input files represent a group of populations. '
                                'May be specified as an integer N or a comma separated list of population labels.')
-  bingroup.add_option('-d', '--dthreshold', dest='d', metavar='DPRIME', type='float', default=0.,
-                          action='callback', callback=check_option01,
+  bingroup.add_argument('-d', '--dthreshold', dest='d', metavar='DPRIME', type=float, default=0.,
                           help='Minimum d-prime threshold to output (default=0)')
-  bingroup.add_option('-r', '--rthreshold', dest='r', metavar='N', type='float', default=0.8,
-                          action='callback', callback=check_option01,
+  bingroup.add_argument('-r', '--rthreshold', dest='r', metavar='N', type=float, default=0.8,
                           help='Minimum r-squared threshold to output (default=0.8)')
-  bingroup.add_option('-t', '--targetbins', dest='targetbins', metavar='N', type='int', default=0,
+  bingroup.add_argument('-t', '--targetbins', metavar='N', type=int, default=0,
                           help='Stop when N bins have been selected (default=0 for unlimited)')
-  bingroup.add_option('-T', '--targetloci', dest='targetloci', metavar='N', type='int', default=0,
+  bingroup.add_argument('-T', '--targetloci', metavar='N', type=int, default=0,
                           help='Stop when N loci have been tagged (default=0 for unlimited)')
-  bingroup.add_option('-C', '--tagcriteria', dest='tagcriteria', type='str', metavar='crit', action='append',
+  bingroup.add_argument('-C', '--tagcriteria', type=str, metavar='crit', action='append',
                           help='Use the specified criteria to choose the optimal tag for each bin')
-  bingroup.add_option('-z', '--locipertag', dest='locipertag', metavar='N', type='int', default=None,
+  bingroup.add_argument('-z', '--locipertag', metavar='N', type=int, default=None,
                           help='Ensure that bins contain more than one tag per N loci.  Bins with an insufficient number of tags will be reduced.')
-  bingroup.add_option('-Z', '--loglocipertag', dest='loglocipertag', metavar='B', type='float', default=None,
+  bingroup.add_argument('-Z', '--loglocipertag', metavar='B', type=float, default=None,
                           help='Ensure that bins contains more than one tag per log_B(loci).  Bins with an insufficient number of tags will be reduced.')
-  bingroup.add_option('--skipbinning', dest='skipbinning', action='count',
+  bingroup.add_argument('--skipbinning', action='count',
                           help='Skip binning step.  Typically used in conjunction with -u/--saveldpairs')
-
-  parser.add_option_group(inputgroup)
-  parser.add_option_group(outputgroup)
-  parser.add_option_group(genoldgroup)
-  parser.add_option_group(bingroup)
 
   return parser
 
@@ -1956,7 +1905,7 @@ class Includes(object):
     return len(self.typed)+len(self.untyped)
 
 
-def tagzilla_single(options,args):
+def tagzilla_single(options):
   subset          = None
   include_untyped = None
   include_typed   = None
@@ -1986,7 +1935,7 @@ def tagzilla_single(options,args):
   tagselector  = TagSelector(designscores, tagcriteria)
 
   locusmap = {}
-  ldpairs = generate_ldpairs(args, locusmap, includes, subset, ldsubset, options)
+  ldpairs = generate_ldpairs(options, locusmap, includes, subset, ldsubset)
 
   if options.saveldpairs:
     ldpairs = save_ldpairs(options.saveldpairs, ldpairs)
@@ -2057,7 +2006,7 @@ def subset_tags(result, tags, recommended=None):
     result.recommended_tags = list(recommended.intersection(tags))
 
 
-def tagzilla_multi(options,args):
+def tagzilla_multi(options):
   subset          = None
   ldsubset        = None
   include_untyped = None
@@ -2088,7 +2037,7 @@ def tagzilla_multi(options,args):
 
   pairinfo,locusinfo,bininfo,sumfile = build_output(options, exclude)
 
-  ldpairs = generate_ldpairs_vector(args, includes, subset, ldsubset, options)
+  ldpairs = generate_ldpairs_vector(options, includes, subset, ldsubset)
   results = do_tagging_vector(ldpairs, includes, exclude, designscores, options)
 
   labels = get_populations(options.multipopulation)
@@ -2161,19 +2110,15 @@ def tagzilla_multi(options,args):
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if not args:
-    parser.print_help(sys.stdout)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   pops = len(get_populations(options.multipopulation))
 
   if pops > 1:
-    return tagzilla_multi(options,args)
+    return tagzilla_multi(options)
   else:
-    return tagzilla_single(options,args)
+    return tagzilla_single(options)
 
 
 if __name__ == '__main__':

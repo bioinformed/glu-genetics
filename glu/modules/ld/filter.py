@@ -10,7 +10,6 @@ __revision__  = '$Id$'
 
 
 import sys
-import optparse
 
 from   itertools               import islice
 
@@ -18,25 +17,26 @@ from   glu.lib.fileutils       import table_reader, table_writer, resolve_column
 from   glu.lib.genolib         import load_genostream, geno_options
 from   glu.lib.genolib.ld      import count_haplotypes, estimate_ld
 
-from   glu.modules.ld.tagzilla import check_option01
-
 
 def option_parser():
-  usage = 'usage: %prog [options] snplist genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  from glu.lib.glu_argparse import GLUArgumentParser
+
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('snplist',   help='Tabular or delimited file of SNP names')
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('-r', '--r2threshold', dest='r2threshold', metavar='N', type='float', default=0.80,
-                          action='callback', callback=check_option01,
+  parser.add_argument('-r', '--r2threshold', metavar='N', type=float, default=0.80,
                           help='Minimum r-squared threshold (default=0.80)')
-  parser.add_option('-m', dest='maxdist', metavar='BASES', default=200000, type='int',
+  parser.add_argument('-m', dest='maxdist', metavar='BASES', default=200000, type=int,
                     help='Maximum distance in bases between loci to apply LD check.  default=200000')
-  parser.add_option('--lheader', dest='lheader', default='Locus',
+  parser.add_argument('--lheader', default='Locus',
                     help='Locus header column name or number (default=Locus)')
-  parser.add_option('-L', '--limit', dest='limit', metavar='N', type='int', default=0,
+  parser.add_argument('-L', '--limit', metavar='N', type=int, default=0,
                           help='Filter the top N loci (default=0 for unlimited)')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output LD filter results to FILE')
 
   return parser
@@ -52,13 +52,9 @@ def close(loc1,loc2,maxdist):
 
 def main():
   parser = option_parser()
-  options,args = parser.parse_args()
+  options= parser.parse_args()
 
-  if len(args) != 2:
-    parser.print_help()
-    return
-
-  rows   = table_reader(args[0],hyphen=sys.stdin)
+  rows   = table_reader(options.snplist,hyphen=sys.stdin)
   header = rows.next()
   index  = resolve_column_header(header,options.lheader)
 
@@ -67,9 +63,9 @@ def main():
 
   rows   = list(rows)
   snps   = set(row[index] for row in rows)
-  genos  = load_genostream(args[1],format=options.informat,genorepr=options.ingenorepr,
-                                    genome=options.loci,phenome=options.pedigree,
-                                    transform=options, hyphen=sys.stdin)
+  genos  = load_genostream(options.genotypes,format=options.informat,genorepr=options.ingenorepr,
+                           genome=options.loci,phenome=options.pedigree,
+                           transform=options, hyphen=sys.stdin)
   genos  = genos.transformed(include_loci=snps).as_ldat().materialize()
   genome = genos.genome
 

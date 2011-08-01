@@ -12,28 +12,23 @@ from   glu.lib.fileutils   import table_reader,table_writer,cook_table,table_opt
 
 
 def option_parser():
-  import optparse
-  usage = 'Usage: %prog [options] table'
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  table_options(parser)
+  parser.add_argument('table', help="File name or '-' for stdin", default='-')
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  table = table_reader(args[0],hyphen=sys.stdin,want_header=True)
+  table = table_reader(options.table,hyphen=sys.stdin,want_header=True)
   out   = table_writer(options.output,hyphen=sys.stdout)
 
   table = cook_table(table,options)

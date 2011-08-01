@@ -7,6 +7,7 @@ __revision__  = '$Id$'
 
 
 import optparse
+import argparse
 
 from   types             import NoneType
 from   collections       import defaultdict
@@ -278,7 +279,7 @@ class GenoTransform(object):
 
   @staticmethod
   def from_object(transform):
-    if isinstance(transform, optparse.Values) or transform.__class__ is optparse.Values:
+    if isinstance(transform, (argparse.Namespace,optparse.Values)) or transform.__class__ is optparse.Values:
       transform = GenoTransform.from_options(transform)
     elif isinstance(transform, dict):
       transform = GenoTransform.from_kwargs(transform)

@@ -22,67 +22,65 @@ from   glu.lib.association import build_models,print_results_linear,format_pvalu
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] phenotypes [genotypes]'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  input = optparse.OptionGroup(parser, 'Input options')
+  parser.add_argument('phenotypes',            help='tabular or delimited file of phenotypes and covariates')
+  parser.add_argument('genotypes',  nargs='?', help='genotype file in any format supported by GLU')
+
+  input = parser.add_argument_group('Input options')
 
   geno_options(input,input=True,filter=True)
 
-  input.add_option('--fixedloci', dest='fixedloci', metavar='FILE',
+  input.add_argument('--fixedloci', metavar='FILE',
                     help='Genotypes for fixed loci that can be included in the model')
-  input.add_option('--minmaf', dest='minmaf', metavar='N', default=0.01, type='float',
+  input.add_argument('--minmaf', metavar='N', default=0.01, type=float,
                     help='Minimum minor allele frequency filter')
-  input.add_option('--mingenos', dest='mingenos', metavar='N', default=10, type='int',
+  input.add_argument('--mingenos', metavar='N', default=10, type=int,
                     help='Minimum number of observed genotype filter.  default=10')
 
   table_options(input)
 
-  analysis = optparse.OptionGroup(parser, 'Analysis options')
+  analysis = parser.add_argument_group('Analysis options')
 
-  analysis.add_option('--model', dest='model', metavar='FORMULA',
+  analysis.add_argument('--model', metavar='FORMULA',
                       help='General formula for model to fit')
-  analysis.add_option('--test', dest='test', metavar='FORMULA',
+  analysis.add_argument('--test', metavar='FORMULA',
                       help='Formula terms to test.  Default is to test all genotype effects if a model is specified, '
                            'otherwise a 2df genotype test (GENO(locus)).')
-  analysis.add_option('--stats', dest='stats', default='score', metavar='T1,T2,..',
+  analysis.add_argument('--stats', default='score', metavar='T1,T2,..',
                       help='Comma separated list of test statistics to apply to each model.  Supported tests '
                            'include score, Wald, and likelihood ratio statistics.  Values: score, wald, lrt.')
-  analysis.add_option('--scan', dest='scan', metavar='NAME', default='locus',
+  analysis.add_argument('--scan', metavar='NAME', default='locus',
                       help='Name of locus over which to scan, used in --model, --test and --display (default=locus)')
-  analysis.add_option('--pid', dest='pid', metavar='NAME', default='1',
+  analysis.add_argument('--pid', metavar='NAME', default='1',
                       help='Column name or number of subject in the phenotype file (default=1)')
-  analysis.add_option('--pheno', dest='pheno', metavar='NAME', default='2',
+  analysis.add_argument('--pheno', metavar='NAME', default='2',
                       help='Phenotype column name or number in the phenotype file (default=2)')
-  analysis.add_option('--refalleles', dest='refalleles', metavar='FILE',
+  analysis.add_argument('--refalleles', metavar='FILE',
                       help='Mapping of locus name to the corresponding reference allele')
-  analysis.add_option('--allowdups', dest='allowdups', action='store_true', default=False,
+  analysis.add_argument('--allowdups', action='store_true', default=False,
                       help='Allow duplicate individuals in the data (e.g., to accommodate weighting '
                            'or incidence density sampling)')
 
-  output = optparse.OptionGroup(parser, 'Output options')
+  output = parser.add_argument_group('Output options')
 
-  output.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  output.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output summary results to FILE')
-  output.add_option('-O', '--details', dest='details', metavar='FILE',
+  output.add_argument('-O', '--details', metavar='FILE',
                     help='Output detailed results to FILE')
-  output.add_option('--display', dest='display', metavar='FORMULA',
+  output.add_argument('--display', metavar='FORMULA',
                       help='Formula terms to display in the summary output table.  Defaults to all test terms.')
-  output.add_option('--detailsmaxp', dest='detailsmaxp', metavar='P', type='float', default=1.0,
+  output.add_argument('--detailsmaxp', metavar='P', type=float, default=1.0,
                     help='Output detailed results for only pvalues below P threshold')
-  output.add_option('-v', '--verbose', dest='verbose', metavar='LEVEL', type='int', default=1,
+  output.add_argument('-v', '--verbose', metavar='LEVEL', type=int, default=1,
                     help='Verbosity level of diagnostic output.  O for none, 1 for some (default), 2 for exhaustive.')
-  output.add_option('--se', dest='se', action='store_true', default=False,
+  output.add_argument('--se', action='store_true', default=False,
                       help='Show standard errors around each estimate')
-  output.add_option('--ci', dest='ci', default=0, type='float', metavar='N',
+  output.add_argument('--ci', default=0, type=float, metavar='N',
                     help='Show confidence interval around each estimate of width N.  Set to zero to inhibit '
                          'output.  Default=0')
-
-  parser.add_option_group(input)
-  parser.add_option_group(analysis)
-  parser.add_option_group(output)
 
   return parser
 
@@ -139,24 +137,19 @@ def summary_header(options):
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
+  phenos  = options.phenotypes
+  genos   = options.genotypes
 
-  if len(args) not in (1,2):
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  phenos = args[0]
-  genos  = args[1] if len(args)==2 else None
-
-  if options.ci < 0 or options.ci > 1:
-    raise ValueError('Confidence interval must be between 0 and 1')
+  if not (0<=options.ci<=1):
+    parser.error('Confidence interval must be between 0 and 1')
 
   out = table_writer(options.output,hyphen=sys.stdout)
   if options.details:
     details = autofile(hyphen(options.details,sys.stdout),'w')
     if details is out:
-      raise ValueError('Cannot send summary and detailed output to stdout')
+      parser.error('Summary and detailed output cannot both be sent to stdout')
 
   loci,fixedloci,gterms,models = build_models(phenos, genos, options, deptype=float)
 

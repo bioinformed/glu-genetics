@@ -26,8 +26,8 @@ from   glu.lib.progressbar          import progress_loop
 from   glu.lib.seqlib.edits         import reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
-from   glu.modules.genedb           import open_genedb
-from   glu.modules.genedb.queries   import query_snps_by_location, query_cytoband_by_location
+from   glu.lib.genedb               import open_genedb
+from   glu.lib.genedb.queries       import query_snps_by_location, query_cytoband_by_location
 
 
 Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
@@ -489,31 +489,24 @@ class VariantAnnotator(object):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] infile.bam'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+  parser.add_argument('variants', help='Input variant file')
+
+  parser.add_argument('-g', '--genedb',   metavar='NAME',
                       help='Genedb genome annotation database name or file')
-  parser.add_option('-r', '--reference',   dest='reference', metavar='NAME',
+  parser.add_argument('-r', '--reference',   metavar='NAME', required=True,
                       help='Reference genome sequence (FASTA + FAI files)')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output variant file')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)!=1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  if not options.reference:
-    sys.stderr.write('ERROR: Reference genome sequence required\n')
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   vs = VariantAnnotator(options.genedb, options.reference)
 
@@ -593,7 +586,7 @@ def main():
     #  print >> sys.stderr,key,stats[key]
 
   if 0:
-    filename = args[0]
+    filename = options.variants
     variants = table_reader(filename)
     header   = next(variants)
     extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
@@ -610,7 +603,7 @@ def main():
       for e in evidence:
         out.writerow(v+e[3:])
   if 0:
-    filename = args[0]
+    filename = options.variants
     variants = table_reader(filename)
     header   = next(variants)
     extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
@@ -628,7 +621,7 @@ def main():
         out.writerow(v+e[3:])
 
   if 0:
-    filename = args[0]
+    filename = options.variants
     variants = table_reader(filename,hyphen=sys.stdin)
     header   = next(variants)
     out      = table_writer(options.output,hyphen=sys.stdout)
@@ -655,7 +648,7 @@ def main():
         out.writerow(row+e)
 
   if 1:  # *** VCF, SNPs only ***
-    filename = args[0]
+    filename = options.variants
     variants = table_reader(filename)
     out      = table_writer(options.output,hyphen=sys.stdout)
 

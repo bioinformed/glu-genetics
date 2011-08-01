@@ -373,42 +373,38 @@ def validate_trimming(options):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] 454PairAlign.txt[.gz|.bz2] [SFFfiles.sff..]'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('--reflist', dest='reflist', metavar='FILE',
+  parser.add_argument('pairalign',             help='454PairAlign.txt[.gz|.bz2] file')
+  parser.add_argument('sfffile',   nargs='*',  help='Simple Flowgram Format (SFF) files')
+
+  parser.add_argument('--reflist', metavar='FILE',
                     help='Reference genome contig list')
-  parser.add_option('--remapcontig', dest='remapcontig', metavar='FILE',
+  parser.add_argument('--remapcontig', metavar='FILE',
                     help='Contig remapping')
-  parser.add_option('--trim', dest='trim', metavar='ACTION', default='all',
+  parser.add_argument('--trim', metavar='ACTION', default='all',
                     help='Trim feature(s) of reads.  Comma separated list of: flowkey, adapter, lowquality, unaligned, all.  Default=all')
-  parser.add_option('--maligned', dest='maligned', metavar='ACTION', default='keep-all',
+  parser.add_argument('--maligned', metavar='ACTION', default='keep-all',
                     help='Action to perform for multiply aligned reads: keep-primary, keep-all, unalign, drop.  Default=keep-all')
-  parser.add_option('--mpick', dest='mpick', metavar='METHOD', default='best',
+  parser.add_argument('--mpick', metavar='METHOD', default='best',
                     help='Method of selecting primary alignment when keeping multiply aligned reads: best, random.  Default=best')
-  parser.add_option('--unaligned', dest='unaligned', metavar='ACTION', default='keep',
+  parser.add_argument('--unaligned', metavar='ACTION', default='keep',
                     help='Action to perform for unaligned reads: keep, drop.  Default=keep')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output SAM file')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if not args:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser    = option_parser()
+  options   = parser.parse_args()
 
   validate_trimming(options)
 
-  alignfile = autofile(hyphen(args[0],sys.stdin))
-
-  sfffiles  = args[1:]
-  sffindex  = SFFIndex(sfffiles)
+  alignfile = autofile(hyphen(options.pairalign,sys.stdin))
+  sffindex  = SFFIndex(options.sfffile)
 
   write_bam = options.output.endswith('.bam')
 
@@ -446,13 +442,13 @@ def main():
       rg_seen.add(row[1])
       out.writerow(row)
 
-  print >> sys.stderr, 'Generating alignment from %s to %s' % (args[0],options.output)
+  print >> sys.stderr, 'Generating alignment from %s to %s' % (options.pairalign,options.output)
   reads_seen = set()
 
   alignment = read_pair_align(alignfile)
   alignment = pair_align_records(alignment, options.trim, sffindex)
   alignment = handle_maligned(alignment,  options.maligned,  options.mpick, reads_seen)
-  alignment = handle_unaligned(alignment, options.unaligned, options.trim,  reads_seen, sfffiles)
+  alignment = handle_unaligned(alignment, options.unaligned, options.trim,  reads_seen, options.sfffile)
 
   if options.remapcontig:
     alignment = remap_contigs(alignment, load_contig_remap(options.remapcontig))

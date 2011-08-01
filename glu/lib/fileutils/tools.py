@@ -20,22 +20,22 @@ __all__ = ['cook_table', 'sort_table', 'uniq_table', 'subset_variables',
 
 
 def table_options(parser):
-  parser.add_option('-c', '--categorical', dest='categorical', metavar='VAR', action='append',
-                    help='Create indicator variables based on values of VAR')
-  parser.add_option('--columnexpr', dest='columnexpr', metavar='VAR=EXPR', action='append',
-                    help='Add a new column VAR with the value determined by expression EXPR')
-  parser.add_option('--includevar', dest='includevar', metavar='VAR=VAL', action='append',
-                    help='Include only records with variable VAR equal to VAL')
-  parser.add_option('--excludevar', dest='excludevar', metavar='VAR=VAL', action='append',
-                    help='Exclude all records with variable VAR equal to VAL')
-  parser.add_option('--filterexpr', dest='filterexpr', metavar='EXPR', action='append',
-                    help='Filter all records where EXPR is not true')
-  parser.add_option('--query', dest='query', metavar='SQL', action='append',
-                    help='Execute in-memory SQL query on all records')
-  parser.add_option('-s', '--sort', dest='sort', metavar='VAR', action='append',
-                    help='Sort rows based on values in column VAR')
-  parser.add_option('-u', '--uniq', dest='uniq', action='store_true',
-                    help='Produce only unique rows by collapsing consecutive duplicate rows')
+  parser.add_argument('-c', '--categorical', metavar='VAR', action='append',
+                      help='Create indicator variables based on values of VAR')
+  parser.add_argument('--columnexpr', metavar='VAR=EXPR', action='append',
+                      help='Add a new column VAR with the value determined by expression EXPR')
+  parser.add_argument('--includevar', metavar='VAR=VAL', action='append',
+                      help='Include only records with variable VAR equal to VAL')
+  parser.add_argument('--excludevar', metavar='VAR=VAL', action='append',
+                      help='Exclude all records with variable VAR equal to VAL')
+  parser.add_argument('--filterexpr', metavar='EXPR', action='append',
+                      help='Filter all records where EXPR is not true')
+  parser.add_argument('--query', metavar='SQL', action='append',
+                      help='Execute in-memory SQL query on all records')
+  parser.add_argument('-s', '--sort', metavar='VAR', action='append',
+                      help='Sort rows based on values in column VAR')
+  parser.add_argument('-u', '--uniq', action='store_true',
+                      help='Produce only unique rows by collapsing consecutive duplicate rows')
   return parser
 
 

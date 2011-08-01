@@ -15,13 +15,13 @@ import select
 import fcntl
 import subprocess
 
-from   itertools                  import groupby
-from   operator                   import itemgetter
+from   itertools               import groupby
+from   operator                import itemgetter
 
-from   glu.lib.fileutils          import list_reader,table_reader
-from   glu.modules.ld.tagzilla    import locus_result_sequence
-from   glu.modules.genedb         import open_genedb
-from   glu.modules.genedb.queries import query_snps_by_location, query_gene_by_name
+from   glu.lib.fileutils       import list_reader,table_reader
+from   glu.modules.ld.tagzilla import locus_result_sequence
+from   glu.lib.genedb          import open_genedb
+from   glu.lib.genedb.queries  import query_snps_by_location, query_gene_by_name
 
 
 #FIXME: Make even moe configurable
@@ -310,55 +310,52 @@ class SubprocessManager(object):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] dataset outdir jobfile'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-D', '--designscores', dest='designscores', metavar='FILE', action='append',
+  parser.add_argument('dataset', help='Name of reference data set')
+  parser.add_argument('outdir',  help='Output directory name')
+  parser.add_argument('jobfile', help='Tabular or delimited job definition file')
+
+  parser.add_argument('-D', '--designscores', metavar='FILE', action='append',
                     help='Design scores (optional)')
-  parser.add_option('--designdefault', dest='designdefault', metavar='N', type='float', default=0,
+  parser.add_argument('--designdefault', metavar='N', type=float, default=0,
                     help='Default design score for any locus not found in a design file')
-  parser.add_option('-i', '--include',   dest='include', metavar='FILE',
+  parser.add_argument('-i', '--include',   metavar='FILE',
                       help='Obligate tags (optional)')
-  parser.add_option('--upstream',   dest='upstream',   default=20000, type='int',  metavar='N',
+  parser.add_argument('--upstream',   default=20000, type=int,  metavar='N',
                     help='upstream margin in bases')
-  parser.add_option('--downstream', dest='downstream', default=10000, type='int',  metavar='N',
+  parser.add_argument('--downstream', default=10000, type=int,  metavar='N',
                     help='downstream margin in bases')
-  parser.add_option('--dryrun', dest='dryrun', action='store_true',
+  parser.add_argument('--dryrun', action='store_true',
                           help='Perform a dryrun. Perform all processing except actually tagging')
-  parser.add_option('--maxqueue', dest='maxqueue', default=1, type='int',
+  parser.add_argument('--maxqueue', default=1, type=int,
                           help='Maximum number of jobs to queue in parallel')
-  parser.add_option('--cmdprefix', dest='cmdprefix', metavar='VALUE',
+  parser.add_argument('--cmdprefix', metavar='VALUE',
                     help='Command prefix for running tagzilla (useful for scheduling jobs)')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
-  if len(args) != 3:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  if args[0] not in DATA:
-    sys.stderr.write('[ERROR] Invalid dataset specified: %s\n' % args[0])
+  if options.dataset not in DATA:
+    sys.stderr.write('[ERROR] Invalid dataset specified: %s\n' % options.dataset)
     sys.stderr.write('[ERROR] Choices are: %s\n' % ', '.join(sorted(DATA)))
     sys.exit(2)
 
-  config = DATA[args[0]]
+  config = DATA[options.dataset]
 
   con = open_genedb(config.get('genome'))
 
-  outdir = args[1]
-
-  if not os.path.isdir(outdir):
-    sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % outdir)
+  if not os.path.isdir(options.outdir):
+    sys.stderr.write('[ERROR] Output directory is not a directory: %s\n' % options.outdir)
     sys.exit(1)
 
-  taskfile   = table_reader(args[2])
+  taskfile   = table_reader(options.jobfile)
   header     = taskfile.next()
   tasks      = sorted( extend(strip(t),12) for t in taskfile )
   tasks      = sorted(clean_tasks(con,tasks,options))
@@ -387,7 +384,7 @@ def main():
     if manager:
       time.sleep(startdelay)
 
-    proc=run_tagzilla(config,outdir,project,gene,dprime,r2,population,chromosome,snps,
+    proc=run_tagzilla(config,options.outdir,project,gene,dprime,r2,population,chromosome,snps,
                       maf,include,exclude,options.designscores,options.designdefault,
                       options.include,options.cmdprefix)
     manager.add(proc)
@@ -405,12 +402,12 @@ def main():
     ptags = set()
     for task in ptasks:
       project,population,gene,chromosome,start,stop,strand,dprime,r2,maf,include,exclude,snps = task
-      qsnps,tags,obligate,excl = get_tags(outdir,project,gene,include,exclude)
+      qsnps,tags,obligate,excl = get_tags(options.outdir,project,gene,include,exclude)
 
       design = tags|obligate
       ptags.update(tags|obligate)
 
-      designfile = file(project_file(outdir,project,gene,'design.lst'),'w')
+      designfile = file(project_file(options.outdir,project,gene,'design.lst'),'w')
       for rs in sorted(design):
         designfile.write('%s\n' % rs)
 
@@ -423,16 +420,16 @@ def main():
     if options.dryrun:
       continue
 
-    designfile = file(project_file(outdir,project,'design.lst'),'w')
+    designfile = file(project_file(options.outdir,project,'design.lst'),'w')
     for rs in ptags:
       designfile.write('%s\n' % rs)
 
-    pdir = project_path(outdir,project)
+    pdir = project_path(options.outdir,project)
     command = 'glu ld.binsum "%s"/*/loci.out > "%s"/sum.out 2>/dev/null' % (pdir,pdir)
     binsum = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, bufsize=1)
     sys.stderr.write(binsum.stdout.read())
 
-    sumfile = file(project_file(outdir,project,'genesum.out'),'w')
+    sumfile = file(project_file(options.outdir,project,'genesum.out'),'w')
     for gene,n in sorted(genecounts.iteritems()):
       sumfile.write('%s\t%d\n' % (gene,n))
 

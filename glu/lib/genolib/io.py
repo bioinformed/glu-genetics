@@ -28,64 +28,64 @@ from   glu.lib.genolib.formats   import guess_informat, guess_informat_list, gue
 
 def geno_options(group,input=False,output=False,merge=False,filter=False,transform=False):
   if input:
-    group.add_option('-f', '--informat', dest='informat', metavar='NAME',
-                      help='Input genotype format')
-    group.add_option('-g', '--ingenorepr', dest='ingenorepr', metavar='REP',
-                      help='Input genotype representation')
+    group.add_argument('-f', '--informat', metavar='NAME',
+                       help='Input genotype format')
+    group.add_argument('-g', '--ingenorepr', metavar='REP',
+                       help='Input genotype representation')
 
   if output:
-    group.add_option('-F','--outformat',  dest='outformat', metavar='NAME',
-                      help='Output genotype format')
-    group.add_option('-G', '--outgenorepr', dest='outgenorepr', metavar='REP',
-                      help='Output genotype representation')
+    group.add_argument('-F','--outformat',  metavar='NAME',
+                       help='Output genotype format')
+    group.add_argument('-G', '--outgenorepr', metavar='REP',
+                       help='Output genotype representation')
 
   if input or output:
-    group.add_option('-l', '--loci', dest='loci', metavar='FILE',
-                      help='Locus description file and options')
-    group.add_option('-p', '--pedigree', dest='pedigree', metavar='FILE',
-                      help='Pedigree description file and options')
+    group.add_argument('-l', '--loci', metavar='FILE',
+                       help='Locus description file and options')
+    group.add_argument('-p', '--pedigree', metavar='FILE',
+                       help='Pedigree description file and options')
 
   if merge:
-    group.add_option('--merge', dest='merge', metavar='METHOD:T', default='unanimous',
-                      help='Genotype merge algorithm and optional consensus threshold used to form a '
+    group.add_argument('--merge', metavar='METHOD:T', default='unanimous',
+                       help='Genotype merge algorithm and optional consensus threshold used to form a '
                            'consensus genotypes. Values=unique,unanimous,vote,ordered.  Value may be '
                            'optionally followed by a colon and a threshold.  Default=unanimous')
-    group.add_option('--samplemerge', dest='samplemerge', metavar='FILE',
-                    help='Sample concordance statistics output to FILE (optional)')
-    group.add_option('--locusmerge',  dest='locusmerge',  metavar='FILE',
-                    help='Locus concordance statistics output to FILE (optional)')
+    group.add_argument('--samplemerge', metavar='FILE',
+                       help='Sample concordance statistics output to FILE (optional)')
+    group.add_argument('--locusmerge',  metavar='FILE',
+                       help='Locus concordance statistics output to FILE (optional)')
 
   if filter:
-    group.add_option('--filtermissing', action='store_true', dest='filtermissing',
-                      help='Filters out the samples or loci with missing genotypes')
+    group.add_argument('--filtermissing', action='store_true',
+                       help='Filters out the samples or loci with missing genotypes')
 
-    group.add_option('--includesamples', dest='includesamples', metavar='FILE', action='append',
-                      help='List of samples to include')
-    group.add_option('--includeloci', dest='includeloci', metavar='FILE', action='append',
-                      help='List of loci to include')
+    group.add_argument('--includesamples', metavar='FILE', action='append',
+                       help='List of samples to include')
+    group.add_argument('--includeloci', metavar='FILE', action='append',
+                       help='List of loci to include')
 
-    group.add_option('--excludesamples', dest='excludesamples', metavar='FILE', action='append',
-                      help='List of samples to exclude')
-    group.add_option('--excludeloci', dest='excludeloci', metavar='FILE', action='append',
-                      help='List of loci to exclude')
+    group.add_argument('--excludesamples', metavar='FILE', action='append',
+                       help='List of samples to exclude')
+    group.add_argument('--excludeloci', metavar='FILE', action='append',
+                       help='List of loci to exclude')
 
-    group.add_option('--filterfounders', action='store_true', dest='filterfounders',
-                      help='Excludes founders')
-    group.add_option('--filternonfounders', action='store_true', dest='filternonfounders',
-                      help='Excludes non-founders')
+    group.add_argument('--filterfounders', action='store_true',
+                       help='Excludes founders')
+    group.add_argument('--filternonfounders', action='store_true',
+                       help='Excludes non-founders')
 
   if transform:
-    group.add_option('--renamesamples', dest='renamesamples', metavar='FILE',
-                      help='Rename samples from a file containing rows of original name, tab, new name')
-    group.add_option('--renameloci', dest='renameloci', metavar='FILE',
-                      help='Rename loci from a file containing rows of original name, tab, new name')
-    group.add_option('--renamealleles', dest='renamealleles', metavar='FILE',
-                      help='Rename alleles based on file of locus name, tab, old alleles (comma separated), '
+    group.add_argument('--renamesamples', metavar='FILE',
+                       help='Rename samples from a file containing rows of original name, tab, new name')
+    group.add_argument('--renameloci', metavar='FILE',
+                       help='Rename loci from a file containing rows of original name, tab, new name')
+    group.add_argument('--renamealleles', metavar='FILE',
+                       help='Rename alleles based on file of locus name, tab, old alleles (comma separated), '
                            'tab, new alleles (comma separated)')
-    group.add_option('--ordersamples', dest='ordersamples', metavar='FILE',
-                      help='Order samples based on the order of names in FILE')
-    group.add_option('--orderloci', dest='orderloci', metavar='FILE',
-                      help='Order loci based on the order of names in FILE')
+    group.add_argument('--ordersamples', metavar='FILE',
+                        help='Order samples based on the order of names in FILE')
+    group.add_argument('--orderloci', metavar='FILE',
+                        help='Order loci based on the order of names in FILE')
 
 ########################################################################################################
 

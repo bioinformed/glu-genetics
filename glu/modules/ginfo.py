@@ -21,21 +21,22 @@ def emit(filename,rows):
 
 
 def option_parser():
-  import optparse
-  usage = 'Usage: %prog [options] genofile...'
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genofile', nargs='+', help='Genotype file(s)')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('-z', '--lazy', dest='lazy', action='store_true', default=False,
-                    help='Be lazy and never materialize the genotypes.  Some results may come back unknown')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
-                    help='Output results (default is "-" for standard out)')
-  parser.add_option('--outputloci',   dest='outputloci',    metavar='FILE',
-                     help='Output the list of loci to FILE')
-  parser.add_option('--outputsamples',dest='outputsamples', metavar='FILE',
-                     help='Output the list of samples to FILE')
+  parser.add_argument('-z', '--lazy', action='store_true', default=False,
+                      help='Be lazy and never materialize the genotypes.  Some results may come back unknown.')
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
+                      help='Output results (default is "-" for standard out)')
+  parser.add_argument('--outputloci',   metavar='FILE',
+                       help='Output the list of loci to FILE')
+  parser.add_argument('--outputsamples',metavar='FILE',
+                       help='Output the list of samples to FILE')
   return parser
 
 
@@ -98,20 +99,16 @@ def ginfo(filename,options,out):
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args) < 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   out = autofile(hyphen(options.output,sys.stdout),'w')
 
-  if len(args) > 1 and (options.outputsamples or options.outputloci):
+  if len(options.genofile) > 1 and (options.outputsamples or options.outputloci):
     raise ValueError('Cannot output samples or loci when multiple input files are specified')
 
-  for arg in args:
-    ginfo(arg,options,out)
+  for filename in options.genofile:
+    ginfo(filename,options,out)
 
 
 if __name__=='__main__':

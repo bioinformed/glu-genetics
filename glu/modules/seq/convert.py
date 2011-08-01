@@ -202,42 +202,39 @@ SeqIO._FormatToIterator['qseq'] = QseqIterator
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] [input files..]'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-f', '--informat', dest='informat', metavar='FORMAT',
+  parser.add_argument('seqfile', nargs='+', help='Input sequence file(s)')
+
+  parser.add_argument('-f', '--informat', metavar='FORMAT',
                     help='Input sequence format.  Formats include: '
                          'ace, clustal, embl, fasta, fastq/fastq-sanger, fastq-solexa, fastq-illumina, '
                          'genbank/gb, ig (IntelliGenetics), nexus, phd, phylip, pir, stockholm, '
                          'sff, sff-trim, swiss (SwissProt), tab (Agilent eArray), qual')
-  parser.add_option('-F', '--outformat', dest='outformat', metavar='FORMAT',
+  parser.add_argument('-F', '--outformat', metavar='FORMAT',
                     help='Output sequence format (default=fasta).  As above, except ace, ig, '
                          'pir, sff-trim, swiss.')
-  parser.add_option('--trimleft', dest='trimleft', type='int', metavar='N', default=0,
+  parser.add_argument('--trimleft', type=int, metavar='N', default=0,
                     help='Trim N leading bases')
-  parser.add_option('--trimquality', dest='trimquality', type='float', metavar='Q', default=0,
+  parser.add_argument('--trimquality', type=float, metavar='Q', default=0,
                     help='Trim sequences based on quality valuesN leading bases')
-  parser.add_option('--minlen', dest='minlen', type='int', metavar='N',
+  parser.add_argument('--minlen', type=int, metavar='N',
                     help='Drop sequences of length less than N')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output file')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if not args:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   if options.informat is None:
-    options.informat = guess_informat_list(args)
+    options.informat = guess_informat_list(options.seqfile)
 
-  sequences = chain.from_iterable(read_sequence(filename, options.informat) for filename in args)
+  sequences = chain.from_iterable(read_sequence(filename, options.informat) for filename in options.seqfile)
 
   if options.trimleft or options.trimquality:
     # Also drops short sequences

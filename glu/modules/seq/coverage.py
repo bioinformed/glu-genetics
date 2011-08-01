@@ -336,42 +336,39 @@ def parse_maxcoverage(options):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] in.bam'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('bamfile', help='Input BAM file')
 
   alignment_filter_options(parser)
 
-  parser.add_option('--targets', dest='targets', metavar='BED',
+  parser.add_argument('--targets', metavar='BED',
                     help='Single track BED file containing all targetd intervals')
-  parser.add_option('--region', dest='region', metavar='REGION',
+  parser.add_argument('--region', metavar='REGION',
                     help='Region over which to compute as "", "contig", or "contig:start-stop".  '
                          'Default="" (all aligned reads)')
-  parser.add_option('--maxcoverage', dest='maxcoverage', metavar='N:M', type='str', default='100:5',
+  parser.add_argument('--maxcoverage', metavar='N:M', type=str, default='100:5',
                     help='Maximum coverage depth N to track in intervals of width M')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Overall coverage statistics')
-  parser.add_option('-O', '--targetout', dest='targetout', metavar='FILE',
+  parser.add_argument('-O', '--targetout', metavar='FILE',
                     help='Per-target coverage statistics')
-  parser.add_option('--intervalout', dest='intervalout', metavar='FILE',
+  parser.add_argument('--intervalout', metavar='FILE',
                     help='Output coverage by position interval')
 
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)!=1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
+  parser  = option_parser()
+  options = parser.parse_args()
 
   parse_maxcoverage(options)
 
-  regions   = load_regions(args[0],options)
-  targets   = read_features(options.targets)
+  regions = load_regions(options.bamfile,options)
+  targets = read_features(options.targets)
 
   contig_intervals = interval_pileup(regions)
   target_intervals = target_pileup(contig_intervals, targets)

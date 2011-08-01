@@ -1,4 +1,12 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import division
+
+__gluindex__  = True
+__abstract__  = 'Simple probabilistic variant caller'
+__copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__license__   = 'See GLU license for terms by running: glu license'
+__revision__  = '$Id$'
 
 import os
 import sys
@@ -13,7 +21,7 @@ import pysam
 from   glu.lib.utils            import Counter, namedtuple, iter_queue, unique
 from   glu.lib.fileutils        import table_reader, table_writer
 
-from   glu.modules.genedb       import open_genedb
+from   glu.lib.genedb           import open_genedb
 from   glu.modules.seq.annotate import VariantAnnotator
 
 
@@ -531,40 +539,33 @@ def annotate_variants(variants, gene_db, reference):
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] infile.bam'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
 
-  parser.add_option('-a', '--annotate', dest='annotate', action='store_true',
+  parser.add_argument('bamfile', help='Input BAM file')
+
+  parser.add_argument('-a', '--annotate', action='store_true',
                     help='Annotate called variants')
-  parser.add_option('-g', '--genedb',   dest='genedb', metavar='NAME',
+  parser.add_argument('-g', '--genedb',   metavar='NAME',
                     help='Genedb genome annotation database name or file')
-  parser.add_option('-r', '--reference',   dest='reference', metavar='NAME',
+  parser.add_argument('-r', '--reference',   metavar='NAME', required=True,
                     help='Reference genome sequence (FASTA + FAI files)')
-  parser.add_option('--locations', dest='locations', metavar='FILE',
+  parser.add_argument('--locations', metavar='FILE',
                     help='Locations at which to call variants')
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output variant file')
   return parser
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
-
-  if len(args)!=1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
-
-  if not options.reference:
-    sys.stderr.write('ERROR: Reference genome sequence required\n')
-    sys.exit(2)
+  parser    = option_parser()
+  options   = parser.parse_args()
 
   reference = pysam.Fastafile(options.reference)
 
-  flags = 'rb' if args[0].endswith('.bam') else 'r'
-  inbam = pysam.Samfile(args[0], flags)
+  flags = 'rb' if options.bamfile.endswith('.bam') else 'r'
+  inbam = pysam.Samfile(options.bamfile, flags)
 
   header = ['CHROM','START','END','DEPTH','REF_NUC',
             'ALLELE_A','DEPTH_A', 'ALLELE_B','DEPTH_B',

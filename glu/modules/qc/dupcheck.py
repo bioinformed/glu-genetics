@@ -23,29 +23,30 @@ from   glu.lib.genolib.genoarray import genoarray_concordance
 
 
 def option_parser():
-  import optparse
+  from glu.lib.glu_argparse import GLUArgumentParser
 
-  usage = 'usage: %prog [options] genotypes'
-  parser = optparse.OptionParser(usage=usage)
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('genotypes', help='Input genotype file')
 
   geno_options(parser,input=True,filter=True)
 
-  parser.add_option('-e', '--duplicates', dest='duplicates', metavar='FILE',
+  parser.add_argument('-e', '--duplicates', metavar='FILE',
                     help='Mapping from sample identifier to subject identifier')
-  parser.add_option('--testpairs', dest='testpairs', metavar='FILE',
+  parser.add_argument('--testpairs', metavar='FILE',
                     help='File containing a list of pairs to test')
-  parser.add_option('--testexp', dest='testexp', action='store_true',
+  parser.add_argument('--testexp', action='store_true',
                     help='Check only expected duplicate pairs')
-  parser.add_option('-t', '--threshold', dest='threshold', metavar='N', type='float', default=0.80,
+  parser.add_argument('-t', '--threshold', metavar='N', type=float, default=0.80,
                     help='Minimum proportion genotype concordance threshold for duplicates (default=0.8)')
-  parser.add_option('-m', '--mingenos', dest='mingenos', metavar='N', type='int', default=20,
+  parser.add_argument('-m', '--mingenos', metavar='N', type=int, default=20,
                     help='Minimum number of concordant genotypes to be considered informative (default=20)')
 
-  parser.add_option('-o', '--output', dest='output', metavar='FILE', default='-',
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output duplicate report')
-  parser.add_option('--dupout', dest='dupout', metavar='FILE',
+  parser.add_argument('--dupout', metavar='FILE',
                     help='Output sets of observed duplicate samples')
-  parser.add_option('-P', '--progress', dest='progress', action='store_true',
+  parser.add_argument('-P', '--progress', action='store_true',
                     help='Show analysis progress bar, if possible')
 
   return parser
@@ -132,17 +133,13 @@ def file_pairs(genos, pairfile):
 
 
 def main():
-  parser = option_parser()
-  options,args = parser.parse_args()
+  parser  = option_parser()
+  options = parser.parse_args()
 
   threshold = options.threshold
 
   if threshold < 0 or threshold > 1:
     raise ValueError('Invalid threshold %s given.  Must be between 0 and 1.' % threshold)
-
-  if len(args) != 1:
-    parser.print_help(sys.stderr)
-    sys.exit(2)
 
   expected_dupset = union_find()
   observed_dupset = union_find()
@@ -153,7 +150,7 @@ def main():
       for dup in dupset:
         expected_dupset.union(dupset[0],dup)
 
-  genos = load_genostream(args[0],format=options.informat,genorepr=options.ingenorepr,
+  genos = load_genostream(options.genotypes,format=options.informat,genorepr=options.ingenorepr,
                                    genome=options.loci,phenome=options.pedigree,
                                    transform=options)
 
