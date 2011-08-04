@@ -21,6 +21,8 @@ def option_parser():
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output results (default is "-" for standard out)')
 
+  table_options(parser)
+
   return parser
 
 

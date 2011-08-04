@@ -239,7 +239,7 @@ def main():
   table2  = table_reader(options.table2,hyphen=sys.stdin,want_header=True)
 
   table   = left_join(table1,table2,key1=options.key1,key2=options.key2,
-                      unique=options.uniquejoin,inner=(join_type=='inner'),
+                      unique=options.uniquejoin,inner=(options.join=='inner'),
                       prefix1=options.prefix1,prefix2=options.prefix2)
 
   out     = table_writer(options.output,hyphen=sys.stdout)
