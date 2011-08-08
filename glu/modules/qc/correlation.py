@@ -15,16 +15,20 @@ from   itertools                     import izip
 
 import numpy as np
 
-from   glu.lib.utils                 import Counter
-from   glu.lib.fileutils             import table_writer, guess_format
-from   glu.lib.progressbar           import progress_loop
-from   glu.lib.association           import estimate_maf
+from   glu.lib.utils                  import Counter
+from   glu.lib.fileutils              import table_writer, guess_format
+from   glu.lib.progressbar            import progress_loop
+from   glu.lib.association            import estimate_maf
 
-from   glu.lib.genolib               import load_genostream, geno_options
-from   glu.lib.genolib.transform     import GenoTransform
-from   glu.lib.genolib.ld            import count_haplotypes, count_diplotypes, estimate_ld
+from   glu.lib.genolib                import load_genostream, geno_options
+from   glu.lib.genolib.transform      import GenoTransform
+from   glu.lib.genolib.ld             import count_diplotypes, estimate_ld
 
-from   glu.lib.genolib.formats.wtccc import load_wtccc_dosage
+from   glu.lib.genolib.formats.wtccc  import load_wtccc_dosage
+from   glu.lib.genolib.formats.beagle import load_beagle_dosage
+
+
+DOSAGE_FORMATS=('beagle','wtccc')
 
 
 def load_genos(options,filename1,filename2):
@@ -81,7 +85,6 @@ def load_genos(options,filename1,filename2):
 
 
 def genos_to_dosage(locus):
-  model        = locus.descriptor[0]
   indices      = locus.indices()
   mask         = indices==0
   dosage       = (indices-1.0)/2.0
@@ -95,10 +98,10 @@ def load_dosage(options,filename1,filename2):
 
   trans    = GenoTransform.from_options(options)
 
-  format1  = guess_format(filename1, ['dosage'])
-  format2  = guess_format(filename2, ['dosage'])
+  format1  = guess_format(filename1, ['wtccc'])
+  format2  = guess_format(filename2, ['wtccc'])
 
-  if format1!='dosage':
+  if format1 not in DOSAGE_FORMATS:
     genos1   = load_genostream(filename1,format=options.informat,genorepr=options.ingenorepr,
                                          genome=options.loci,phenome=options.pedigree,
                                          transform=options).as_ldat()
@@ -114,8 +117,11 @@ def load_dosage(options,filename1,filename2):
     else:
       trans.loci.include &= loci1
 
-  else:
+  elif format1=='wtccc':
     samples1,dosage1 = load_wtccc_dosage(filename1,'wtccc')
+    loci1 = None
+  elif format1=='beagle':
+    samples1,dosage1 = load_beagle_dosage(filename1,'beagle')
     loci1 = None
 
   if trans.samples.include is None:
@@ -125,7 +131,7 @@ def load_dosage(options,filename1,filename2):
 
   sys.stderr.write('Loading %s...\n' % filename2)
 
-  if format2!='dosage':
+  if format2 not in DOSAGE_FORMATS:
     genos2   = load_genostream(filename2,format=options.informat,genorepr=options.ingenorepr,
                                          genome=options.loci,phenome=options.pedigree,
                                          transform=options).as_ldat()
@@ -136,8 +142,11 @@ def load_dosage(options,filename1,filename2):
     loci2    = set(genos2.loci)
     samples2 = genos2.samples
 
-  else:
+  elif format2=='wtccc':
     samples2,dosage2 = load_wtccc_dosage(filename2,'wtccc')
+    loci2 = None
+  elif format2=='beagle':
+    samples2,dosage2 = load_beagle_dosage(filename2,'beagle')
     loci2 = None
 
   sys.stderr.write('Merging loci...\n')
@@ -156,8 +165,8 @@ def load_dosage(options,filename1,filename2):
                                   includesamples=samples,ordersamples=samples,
                                   repack=True)
 
-    dosage1 = ( (lname1,genos_to_dosage(genos)) for lname,genos in genos1)
-    dosage2 = ( (lname2,genos_to_dosage(genos)) for lname,genos in genos2)
+    dosage1 = ( (lname,genos_to_dosage(genos)) for lname,genos in genos1)
+    dosage2 = ( (lname,genos_to_dosage(genos)) for lname,genos in genos2)
 
   elif loci1 is not None:
     smap     = [ (s,i) for i,s in enumerate(samples2) if s in sset ]
@@ -187,7 +196,7 @@ def load_dosage(options,filename1,filename2):
     dosage2 = ( (lname,genos_to_dosage(genos)) for lname,genos in genos2)
 
   else:
-    raise RuntimeError('Dosage comparison of two WTCCC files is not yet supported')
+    raise RuntimeError('Comparison of two dosage files is not yet supported')
 
   return dosage1,dosage2
 
@@ -258,12 +267,12 @@ def trend_r2_dips(dips):
    return r2
 
 
-def correlation_genos(filename1,filename2):
-  genos1,genos2 = load(options,filename1,filename2)
+def correlation_genos(options,filename1,filename2):
+  genos1,genos2 = load_genos(options,filename1,filename2)
   genos         = izip(genos1,genos2)
 
   out = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(['LOCUS','SAMPLES','MISSING1','MAF1','MISSING2','MAF2','CONCORDANCE','COMPS','R2','HAPLOS'])
+  out.writerow(['LOCUS','SAMPLES','MISSING1','MAF1','MISSING2','MAF2','CONCORDANCE','COMPS','R2_EM','R2_TREND'])
 
   if options.progress:
     genos = progress_loop(genos, length=len(genos1.loci), units='loci')
@@ -279,12 +288,11 @@ def correlation_genos(filename1,filename2):
     maf2     = estimate_maf(counts2)
     missing2 = counts2.get( (None,None), 0 ) / len(locus2)
 
-    #haps     = count_haplotypes(locus1, locus2)
     dips     = count_diplotypes(locus1, locus2)
 
     r2_em,dp = estimate_ld(dips)
-    r2_trend = trend_r2(locus1,locus2)
-    r2_trend2= trend_r2_dips(dips)
+    #r2_trend= trend_r2(locus1,locus2)
+    r2_trend = trend_r2_dips(dips)
 
     concord  = comps = 0
     for a,b in izip(locus1,locus2):
@@ -295,7 +303,7 @@ def correlation_genos(filename1,filename2):
 
     concord = concord/comps if comps else 1
 
-    out.writerow([lname1,len(locus1),missing1,maf1,missing2,maf2,concord,comps,r2_em,str(haps)])
+    out.writerow([lname1,len(locus1),missing1,maf1,missing2,maf2,concord,comps,r2_em, r2_trend])
 
 
 def correlation_dosage(options,filename1,filename2):
@@ -353,12 +361,12 @@ def main():
   parser  = option_parser()
   options = parser.parse_args()
 
-  format1 = guess_format(options.group1, ['dosage'])
-  format2 = guess_format(options.group2, ['dosage'])
+  format1 = guess_format(options.group1, ['wtccc','beagle'])
+  format2 = guess_format(options.group2, ['wtccc','beagle'])
 
   np.seterr(all='ignore')
 
-  if 'dosage' in (format1,format2):
+  if format1 in DOSAGE_FORMATS or format2 in DOSAGE_FORMATS:
     correlation_dosage(options,options.group1,options.group2)
   else:
     correlation_genos(options,options.group1,options.group2)
