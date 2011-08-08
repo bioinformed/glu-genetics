@@ -649,7 +649,7 @@ def main():
 
   if 1:  # *** VCF, SNPs only ***
     filename = options.variants
-    variants = table_reader(filename)
+    variants = table_reader(filename,hyphen=sys.stdin)
     out      = table_writer(options.output,hyphen=sys.stdout)
 
 
