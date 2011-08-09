@@ -88,6 +88,7 @@ def cython_modules():
                                                    include_dirs = [np.get_include()]),
             Extension('glu.lib.seqlib._cigar',          sources = ['glu/lib/seqlib/_cigar.pyx']),
             Extension('glu.lib.seqlib._edits',          sources = ['glu/lib/seqlib/_edits.pyx']),
+            Extension('glu.lib.seqlib.gc',              sources = ['glu/lib/seqlib/gc.pyx']),
             Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.pyx']),
           ]
 
@@ -101,6 +102,7 @@ def cython_modules():
                                                    include_dirs = [np.get_include()]),
             Extension('glu.lib.seqlib._cigar',          sources = ['glu/lib/seqlib/_cigar.c']),
             Extension('glu.lib.seqlib._edits',          sources = ['glu/lib/seqlib/_edits.c']),
+            Extension('glu.lib.seqlib.gc',              sources = ['glu/lib/seqlib/gc.c']),
             Extension('glu.lib.seqlib.intervaltree',    sources = ['glu/lib/seqlib/intervaltree.c']),
           ]
 
