@@ -23,6 +23,7 @@ from   glu.lib.genolib.transform import GenoTransform
 from   glu.modules.cnv.gdat      import get_gcmodel, gc_correct
 
 
+
 def decode(data, scale, nanval):
   nans       = data==nanval
   data       = data.astype(float)
@@ -38,9 +39,8 @@ def cnv_data(gdat,transform):
 
   snps      = gdat['SNPs'][:]
   samples   = gdat['Samples'][:]
-  genos     = gdat['Genotype']
-  lrr       = gdat['LRR_QN']
-  baf       = gdat['BAF_QN']
+  lrr       = gdat['LRR']
+  baf       = gdat['BAF']
 
   lrr_scale = lrr.attrs['SCALE']
   lrr_nan   = lrr.attrs['NAN']
@@ -65,7 +65,7 @@ def cnv_data(gdat,transform):
     sample_lrr = decode(lrr[i], lrr_scale, lrr_nan)
     sample_baf = decode(baf[i], baf_scale, baf_nan)
 
-    yield sample,snps,genos[i],sample_lrr,sample_baf
+    yield sample,snps,sample_lrr,sample_baf
 
 
 def split_fullname(filename):
@@ -118,26 +118,25 @@ def main():
   transform = GenoTransform.from_object(options)
 
   gdat      = h5py.File(options.gdatfile,'r')
+  manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
   data      = cnv_data(gdat,transform)
-  genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 
   if gccorrect:
-    manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
     print 'Loading GC/CpG model for %s...' % manifest
+    manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
     gcdesign,gcmask = get_gcmodel(filename)
 
-  for sample,snps,geno,lrr,baf in data:
+  for sample,snps,lrr,baf in data:
     out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix))
-    out.writerow( ('Name','Chr','Position','Log.R.Ratio','B.Allele.Freq','GType') )
+    out.writerow( ('Name','Chromosome','Position','Log R Ratio','B Allele Freq') )
 
     if gccorrect:
-      lrr = gc_correct(lrr, gcdesign, gcmask, minval=-2, maxval=2)
+      lrr = gc_correct(lrr, gcdesign, gcmask)
 
-    sample_data = izip(snps,lrr,baf,geno)
-    for (lname,chrom,location,alleles_forward),l,b,geno in sample_data:
-      if l==l: # aka np.isfinite(l)
-        out.writerow( (lname,chrom,location,l,b,genomap[geno]) )
+    sample_data = izip(snps,lrr,baf)
+    for (lname,chrom,location,alleles_forward),l,b in sample_data:
+      out.writerow( (lname,chrom,location,l,b) )
 
 
 if __name__ == '__main__':

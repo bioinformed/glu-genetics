@@ -7,6 +7,7 @@ from   operator                  import itemgetter
 from   itertools                 import groupby, izip, count
 from   collections               import defaultdict
 
+import scipy.stats
 
 from   glu.lib.utils             import is_str,namedtuple
 from   glu.lib.fileutils         import parse_augmented_filename,get_arg, \
@@ -16,7 +17,14 @@ from   glu.lib.glm               import Linear
 IndexEntry = namedtuple('IndexEntry', 'id name gdat index manifest')
 
 
-def decode(data, scale, nanval):
+def gdat_encode_f(data, scale, minval, maxval, nanval):
+  data = data*scale
+  np.clip(data, minval, maxval, out=data)
+  data[~np.isfinite(data)] = nanval
+  return data
+
+
+def gdat_decode(data, scale, nanval):
   nans       = data==nanval
   data       = data.astype(float)
   data[nans] = np.nan
@@ -107,8 +115,8 @@ class GDATFile(object):
         sys.stderr.write('Invalid null sample name... skipping.\n')
         continue
 
-      sample_lrr = decode(lrr[i], lrr_scale, lrr_nan)
-      sample_baf = decode(baf[i], baf_scale, baf_nan)
+      sample_lrr = gdat_decode(lrr[i], lrr_scale, lrr_nan)
+      sample_baf = gdat_decode(baf[i], baf_scale, baf_nan)
 
       yield sample,snps,genos[i],sample_lrr,sample_baf
 
@@ -126,8 +134,13 @@ class GDATFile(object):
 
     gdat      = self.gdat
     genos     = gdat['Genotype']
-    lrr       = gdat['LRR']
-    baf       = gdat['BAF']
+
+    if 0:
+      lrr     = gdat['LRR']
+      baf     = gdat['BAF']
+    else:
+      lrr     = gdat['LRR_QN']
+      baf     = gdat['BAF_QN']
 
     lrr_scale = lrr.attrs['SCALE']
     lrr_nan   = lrr.attrs['NAN']
@@ -135,10 +148,10 @@ class GDATFile(object):
     baf_scale = baf.attrs['SCALE']
     baf_nan   = baf.attrs['NAN']
 
-    sample_lrr = decode(lrr[index], lrr_scale, lrr_nan)
-    sample_baf = decode(baf[index], baf_scale, baf_nan)
+    sample_lrr = gdat_decode(lrr[index], lrr_scale, lrr_nan)
+    sample_baf = gdat_decode(baf[index], baf_scale, baf_nan)
 
-    return sample_lrr,sample_baf
+    return genos[index],sample_lrr,sample_baf
 
 
   def chromosomes(self):
@@ -256,7 +269,7 @@ class GDATIndex(object):
     self.con.commit()
 
 
-def print_regression_results(sample,scheme,linear_model,out):
+def print_regression_results(sample,scheme,linear_model):
   y     = linear_model.y
   b     = linear_model.beta.reshape(-1)
   stde  = (linear_model.ss*linear_model.W.diagonal())**0.5
@@ -267,9 +280,10 @@ def print_regression_results(sample,scheme,linear_model,out):
   ss_t  = np.var(linear_model.y,ddof=1)
   r2    = 1 - linear_model.ss/ss_t
 
+  print '  GC correct: ss_r=%.2f ss_t=%.2f r2=%.2f' % (linear_model.ss**0.5,ss_t**0.5,r2)
   #tvs   = ['%.2f' % tv for tv in t[1:]]
-  tvs   = []
-  out.writerow([sample,scheme]+tvs+[linear_model.ss**0.5,ss_t**0.5,r2])
+  #tvs   = []
+  #out.writerow([sample,scheme]+tvs+[linear_model.ss**0.5,ss_t**0.5,r2])
 
 
 def get_gcmodel(filename):
@@ -277,6 +291,8 @@ def get_gcmodel(filename):
 
   try:
     gc       = gcdata['GC'][:].T
+    gcmeans  = gc.sum(axis=1)
+    gc      -= gcmeans.reshape(-1,1)
     n        = len(gc)
     ones     = np.ones((n,1), dtype=float)
     gcdesign = np.hstack( [ones,gc] )
@@ -286,19 +302,34 @@ def get_gcmodel(filename):
     gcdata.close()
 
 
-def gc_correct(lrr,gcdesign,gcmask):
-  mask   = np.isfinite(lrr)&gcmask&(lrr>=-2)&(lrr<=2)
+def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None,keep_mean=False):
+  mask  = np.isfinite(lrr)
+  mask &= gcmask
+
+  if minval is not None:
+    mask &= lrr>=minval
+
+  if maxval is not None:
+    mask &= lrr<=maxval
 
   lrr_masked      = lrr[mask]
   gcdesign_masked = gcdesign[mask]
 
-  lm = Linear(lrr_masked, gcdesign_masked)
+  if thin is None:
+    lm = Linear(lrr_masked, gcdesign_masked)
+  else:
+    lm = Linear(lrr_masked[::thin], gcdesign_masked[::thin])
+
   lm.fit()
 
-  #print_regression_results('','LRR', lm, table_writer(sys.stdout))
+  print_regression_results('','LRR', lm)
 
-  lrr_adj = np.empty_like(lrr)
-  lrr_adj.fill(np.nan)
-  lrr_adj[mask] = lrr_masked - np.dot(gcdesign_masked,lm.beta.reshape(-1,1)).reshape(-1)
+  beta = lm.beta.reshape(-1,1)
+
+  if keep_mean:
+    beta[0,0] = 0
+
+  #lrr_adj[mask] -= np.dot(gcdesign_masked,beta).reshape(-1)
+  lrr_adj = lrr-np.dot(gcdesign,beta).reshape(-1)
 
   return lrr_adj

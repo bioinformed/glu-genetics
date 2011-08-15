@@ -26,6 +26,26 @@ from   glu.modules.cnv.gdat import GDATIndex, GDATFile, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot import plot_chromosome
 
 
+def get_normal_mask(lrr,chrom_indices,events,options):
+  normal_mask = (lrr==lrr)
+
+  if options.chromid and options.segstart and options.segstop:
+    for chrom,chrom_events in groupby(events,key=attrgetter(options.chromid)):
+      if chrom.startswith('chr'):
+        chrom = chrom[4:]
+
+      pos,index    = chrom_indices[chrom]
+
+      for i,event in enumerate(events):
+        start      = int(getattr(event,options.segstart))
+        stop       = int(getattr(event,options.segstop ))
+        event_mask = (pos>=start)&(pos<stop)
+
+        normal_mask[index] &= ~event_mask
+
+  return normal_mask
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -61,7 +81,7 @@ def main():
   indexfile = GDATIndex(options.index)
 
   gcmodels  = {}
-  manifests = {}
+  chip_indices = {}
 
   events    = table_reader(options.events)
   header    = next(events)
@@ -71,6 +91,8 @@ def main():
   events.sort(key=attrgetter(options.assayid,options.chromid))
 
   for assay,assay_events in groupby(events,key=attrgetter(options.assayid)):
+    assay_events = list(assay_events)
+
     locations  = indexfile.get(assay)
 
     if not locations:
@@ -78,19 +100,21 @@ def main():
       continue
 
     for gdat,offset in locations:
-      gdatname = '_'.join(os.path.basename(gdat.filename).replace('.gdat','').split('_')[:2])
-      manifest = gdat.attrs['ManifestName'].replace('.bpm','')
+      gdatname      = '_'.join(os.path.basename(gdat.filename).replace('.gdat','').split('_')[:2])
+      manifest      = gdat.attrs['ManifestName'].replace('.bpm','')
 
-      chroms   = manifests.get(manifest)
+      chrom_indices = chip_indices.get(manifest)
 
-      if chroms is None:
-        print 'Loading manifest for %s...' % manifest
-        chroms = manifests[manifest] = gdat.chromosomes()
+      if chrom_indices is None:
+        print 'Loading mapping information for %s...' % manifest
+        chrom_indices = chip_indices[manifest] = gdat.chromosomes()
 
       print 'GDAT:',gdatname,assay
-      lrr,baf  = gdat[offset]
-      mask     = np.isfinite(lrr)&(lrr>=-2)&(lrr<=2)
-      lrr     -= lrr[mask].mean()
+
+      genos,lrr,baf = gdat[offset]
+      normal_mask   = get_normal_mask(lrr,chrom_indices,assay_events,options)
+      mask          = normal_mask&(lrr>=-2)&(lrr<=2)
+      lrr          -= lrr[mask].mean()
 
       if gccorrect:
         gcmodel  = gcmodels.get(manifest)
@@ -100,20 +124,22 @@ def main():
           gcmodels[manifest] = gcmodel = get_gcmodel(filename)
 
         gcdesign,gcmask = gcmodel
-        lrr_adj   = gc_correct(lrr, gcdesign, gcmask)
+        lrr_adj         = gc_correct(lrr, gcdesign, gcmask&normal_mask)
 
       for chrom,chrom_events in groupby(assay_events,key=attrgetter(options.chromid)):
         if chrom.startswith('chr'):
           chrom = chrom[4:]
 
         chrom_events = list(chrom_events)
-        pos,index    = chroms[chrom]
+        pos,index    = chrom_indices[chrom]
+
+        chrom_genos  = genos[index]
         chrom_baf    = baf[index]
         chrom_lrr    = None
 
         if gccorrect:
-          chrom_lrr = lrr_adj[index]
-          mask = np.isfinite(chrom_lrr)&np.isfinite(chrom_baf)&(chrom_lrr>=-2)&(chrom_lrr<=2)
+          chrom_lrr  = lrr_adj[index]
+          mask       = np.isfinite(chrom_lrr)&np.isfinite(chrom_baf)&(chrom_lrr>=-2)&(chrom_lrr<=2)
 
           if mask.sum()<100:
             chrom_lrr = None
@@ -133,9 +159,8 @@ def main():
         plotname = '%s/%s' % (options.outdir,plotname)
         title    = options.title.format(**variables)
 
-        plot_chromosome(plotname, options.segstart, options.segstop,
-                        pos[mask], chrom_lrr[mask], chrom_baf[mask],
-                        title=title, events=chrom_events)
+        plot_chromosome(plotname, pos[mask], chrom_lrr[mask], chrom_baf[mask], genos=chrom_genos[mask],
+                        title=title, events=chrom_events, startattr=options.segstart, stopattr=options.segstop)
 
 
 if __name__=='__main__':
