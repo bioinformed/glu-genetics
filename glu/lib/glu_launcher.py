@@ -205,10 +205,12 @@ def main():
     try:
       progmain = module.main
     except AttributeError:
+      sys.stdout.flush()
       sys.stderr.write('Unable to execute module %s.\n' % module_name)
       return
 
     if options.stats:
+      sys.stdout.flush()
       sys.stderr.write('[%s] Execution start\n' % time.asctime())
 
     sys.argv = ['glu %s' % module_name] + module_options
@@ -219,10 +221,12 @@ def main():
       progmain()
 
   except ModuleMissingError:
+    sys.stdout.flush()
     sys.stderr.write('Unable to find module %s.  Please verify the module name and try again.\n' % module_name)
     return 1
 
   except KeyboardInterrupt:
+    sys.stdout.flush()
     sys.stderr.write('\n[%s] Execution aborted by user\n' % time.asctime())
 
     if options.verbose:
@@ -231,6 +235,7 @@ def main():
     ret = 1
 
   except GLUError, e:
+    sys.stdout.flush()
     sys.stderr.write('\n%s\n\n[%s] Execution aborted due to reported error\n' % (e,time.asctime()))
 
     if options.verbose:
@@ -239,6 +244,7 @@ def main():
     ret = 1
 
   except IOError, e:
+    sys.stdout.flush()
     sys.stderr.write('\n%s\n\n[%s] Execution aborted due to input/output error\n' % (e,time.asctime()))
 
     if options.verbose:
@@ -252,6 +258,7 @@ def main():
   except BaseException, e:
     ret = 1
 
+    sys.stdout.flush()
     sys.stderr.write('''\nWell, that could have gone better.\n''')
 
     if not options.verbose:
@@ -284,9 +291,11 @@ Command line:
 
   else:
     if options.stats:
+      sys.stdout.flush()
       sys.stderr.write('[%s] Execution completed successfully\n' % time.asctime())
 
   if options.stats:
+    sys.stdout.flush()
     sys.stderr.write('[%s] Clock time: %s, CPU time: %s\n' % (time.asctime(),
                                                               format_elapsed_time(time.time()  - tstart),
                                                               format_elapsed_time(time.clock() - cstart)))
