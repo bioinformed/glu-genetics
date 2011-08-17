@@ -12,14 +12,12 @@ import sys
 
 from   itertools                   import izip
 
-import h5py
-
 from   glu.lib.fileutils           import table_writer
 
 from   glu.lib.genolib.transform   import GenoTransform
 
-from   glu.modules.convert.to_gada import split_fullname, cnv_data
-from   glu.modules.cnv.gdat        import get_gcmodel, gc_correct
+from   glu.modules.convert.to_gada import split_fullname
+from   glu.modules.cnv.gdat        import GDATFile, get_gcmodel, gc_correct
 
 
 def option_parser():
@@ -51,14 +49,14 @@ def main():
 
   transform = GenoTransform.from_object(options)
 
-  gdat      = h5py.File(options.gdatfile,'r')
-  data      = cnv_data(gdat,transform)
+  gdat      = GDATFile(options.gdatfile)
+  data      = gdat.cnv_iter(transform)
 
   if gccorrect:
     print 'Loading GC/CpG model for %s...' % manifest
     manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
-    gcdesign,gcmask = get_gcmodel(filename)
+    gcdesign,gcmask = get_gcmodel(filename, gdat.chromosome_index)
 
   for sample,snps,geno,lrr,baf in data:
     out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix))

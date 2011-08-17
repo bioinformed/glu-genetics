@@ -9,13 +9,12 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-import h5py
 import numpy    as np
 import numpy.ma as ma
 
 from   glu.lib.fileutils import table_reader
 
-from   glu.modules.cnv.gdat import gdat_encode_f, gdat_decode, get_gcmodel, gc_correct
+from   glu.modules.cnv.gdat import GDATFile, gdat_encode_f, gdat_decode, get_gcmodel, gc_correct
 
 
 BAF_TYPE   = np.int16
@@ -197,12 +196,18 @@ def update_centers(r,t,g,r_g,t_g,n_g,genos,mask):
   t_g[mask] += t[mask]
 
 
-def create_gdat_qn(gdat,s,n):
+def finalize_centers(r_g,t_g,n_g):
+  r_g       /= n_g
+  t_g       /= n_g
+
+
+def create_gdat_qn(gdatobject,s,n):
   comp         = dict(compression='gzip',compression_opts=5)
   chunks       = (1,s)
   shape        = (n,s)
   shuffle      = False
 
+  gdat         = gdatobject.gdat
   BAF_QN       = gdat.require_dataset('BAF_QN', shape, BAF_TYPE,
                                       maxshape=shape,chunks=chunks,shuffle=shuffle,
                                       fillvalue=BAF_NAN,**comp)
@@ -240,14 +245,14 @@ def main():
 
   gccorrect = bool(options.gcmodel or options.gcmodeldir)
 
-  gdat      = h5py.File(options.gdat,'r+')
+  gdat      = GDATFile(options.gdat,'r+')
   qnorm     = True
 
   if gccorrect:
     manifest = gdat.attrs['ManifestName'].replace('.bpm','')
     print 'Loading GC/CpG model for %s...' % manifest
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
-    gcdesign,gcmask = get_gcmodel(filename)
+    gcdesign,gcmask = get_gcmodel(filename, gdat.chromosome_index)
 
   X         = gdat['X']
   Y         = gdat['Y']
@@ -275,81 +280,69 @@ def main():
   np.set_printoptions(linewidth=120,precision=2,suppress=True)
   np.seterr(all='ignore')
 
-  n_AA      = np.zeros(s, dtype=int  )
-  r_AA      = np.zeros(s, dtype=float)
-  t_AA      = np.zeros(s, dtype=float)
-  n_AB      = np.zeros(s, dtype=int  )
-  r_AB      = np.zeros(s, dtype=float)
-  t_AB      = np.zeros(s, dtype=float)
-  n_BB      = np.zeros(s, dtype=int  )
-  r_BB      = np.zeros(s, dtype=float)
-  t_BB      = np.zeros(s, dtype=float)
+  n_AA        = np.zeros(s, dtype=int  )
+  r_AA        = np.zeros(s, dtype=float)
+  t_AA        = np.zeros(s, dtype=float)
+  n_AB        = np.zeros(s, dtype=int  )
+  r_AB        = np.zeros(s, dtype=float)
+  t_AB        = np.zeros(s, dtype=float)
+  n_BB        = np.zeros(s, dtype=int  )
+  r_BB        = np.zeros(s, dtype=float)
+  t_BB        = np.zeros(s, dtype=float)
 
   for i in xrange(n):
     print 'Sample %5d / %d' % (i+1,n)
 
-    x       = gdat_decode(X[i], x_scale, x_nan)
-    y       = gdat_decode(Y[i], y_scale, y_nan)
+    x         = gdat_decode(X[i], x_scale, x_nan)
+    y         = gdat_decode(Y[i], y_scale, y_nan)
 
     if qnorm:
-      x,y   = compute_qn(x,y)
+      x,y     = compute_qn(x,y)
 
-    r       = x+y
-    t       = (2/np.pi)*np.arctan2(y,x)
+    r         = x+y
+    t         = (2/np.pi)*np.arctan2(y,x)
 
-    genosi  = genos[i]
+    genosi    = genos[i]
 
-    mask    = np.isfinite(r)&np.isfinite(t)
+    mask      = np.isfinite(r)&np.isfinite(t)
 
     update_centers(r,t,'AA',r_AA,t_AA,n_AA,genosi,mask)
     update_centers(r,t,'AB',r_AB,t_AB,n_AB,genosi,mask)
     update_centers(r,t,'BB',r_BB,t_BB,n_BB,genosi,mask)
 
-    if 0:
-      print '  GENOS:',genosi[:10]
-      print '      x:',x[:10]
-      print '      y:',y[:10]
-      print '      r:',r[:10]
-      print '      t:',t[:10]
-      print '    nAA:',n_AA[:10]
-      print '    nAB:',n_AB[:10]
-      print '    nBB:',n_BB[:10]
+  finalize_centers(r_AA,t_AA,n_AA)
+  finalize_centers(r_AB,t_AB,n_AB)
+  finalize_centers(r_BB,t_BB,n_BB)
 
-  r_AA    /= n_AA
-  t_AA    /= n_AA
-  r_AB    /= n_AB
-  t_AB    /= n_AB
-  t_BB    /= n_BB
-  r_BB    /= n_BB
+  bad         = t_AA>=t_AB
+  bad        |= t_AB>=t_BB
+  bad        |= t_AA>=t_BB
 
-  invalid  = t_AA>=t_AB
-  invalid |= t_AB>=t_BB
-  invalid |= t_AA>=t_BB
-
-  t_AA[invalid] = np.nan
-  t_AB[invalid] = np.nan
-  t_BB[invalid] = np.nan
+  t_AA[bad]   = np.nan
+  t_AB[bad]   = np.nan
+  t_BB[bad]   = np.nan
 
   create_gdat_qn(gdat,s,n)
+
   LRR_QN = gdat['LRR_QN']
   BAF_QN = gdat['BAF_QN']
 
   for i in xrange(n):
     print 'Sample %5d / %d' % (i+1,n)
 
-    x       = gdat_decode(X[i], x_scale, x_nan)
-    y       = gdat_decode(Y[i], y_scale, y_nan)
+    x         = gdat_decode(X[i], x_scale, x_nan)
+    y         = gdat_decode(Y[i], y_scale, y_nan)
 
     if qnorm:
-      x,y   = compute_qn(x,y)
+      x,y     = compute_qn(x,y)
 
-    r       = x+y
-    t       = (2/np.pi)*np.arctan2(y,x)
+    r         = x+y
+    t         = (2/np.pi)*np.arctan2(y,x)
 
-    lrr,baf = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
+    lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
 
     if gccorrect:
-      lrr   = gc_correct(lrr, gcdesign, gcmask, minval=-2, maxval=2, thin=5)
+      lrr     = gc_correct(lrr, gcdesign, gcmask, minval=-2, maxval=2)
 
     LRR_QN[i] = gdat_encode_f(lrr, LRR_SCALE, LRR_MIN, LRR_MAX, LRR_NAN)
     BAF_QN[i] = gdat_encode_f(baf, BAF_SCALE, BAF_MIN, BAF_MAX, BAF_NAN)

@@ -13,15 +13,13 @@ import sys
 
 from   itertools                 import izip
 
-import h5py
 import numpy as np
 
 from   glu.lib.fileutils         import table_writer
 
 from   glu.lib.genolib.transform import GenoTransform
 
-from   glu.modules.cnv.gdat      import get_gcmodel, gc_correct
-
+from   glu.modules.cnv.gdat      import GDATFile, get_gcmodel, gc_correct
 
 
 def decode(data, scale, nanval):
@@ -30,42 +28,6 @@ def decode(data, scale, nanval):
   data[nans] = np.nan
   data      /= scale
   return data
-
-
-def cnv_data(gdat,transform):
-  include   = transform.samples.include
-  exclude   = transform.samples.exclude
-  rename    = transform.samples.rename
-
-  snps      = gdat['SNPs'][:]
-  samples   = gdat['Samples'][:]
-  lrr       = gdat['LRR']
-  baf       = gdat['BAF']
-
-  lrr_scale = lrr.attrs['SCALE']
-  lrr_nan   = lrr.attrs['NAN']
-
-  baf_scale = baf.attrs['SCALE']
-  baf_nan   = baf.attrs['NAN']
-
-  for i,sample in enumerate(samples):
-    if include is not None and sample not in include:
-      continue
-
-    if exclude is not None and sample in exclude:
-      continue
-
-    if rename is not None:
-      sample = rename.get(sample,sample)
-
-    if not sample:
-      sys.stderr.write('Invalid null sample name... skipping.\n')
-      continue
-
-    sample_lrr = decode(lrr[i], lrr_scale, lrr_nan)
-    sample_baf = decode(baf[i], baf_scale, baf_nan)
-
-    yield sample,snps,sample_lrr,sample_baf
 
 
 def split_fullname(filename):
@@ -117,15 +79,15 @@ def main():
 
   transform = GenoTransform.from_object(options)
 
-  gdat      = h5py.File(options.gdatfile,'r')
+  gdat      = GDATFile(options.gdatfile)
   manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
-  data      = cnv_data(gdat,transform)
+  data      = gdat.cnv_iter(transform)
 
   if gccorrect:
     print 'Loading GC/CpG model for %s...' % manifest
     manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
-    gcdesign,gcmask = get_gcmodel(filename)
+    gcdesign,gcmask = get_gcmodel(filename, gdat.chromosome_index)
 
   for sample,snps,lrr,baf in data:
     out = table_writer('%s%s%s.%s' % (prefix,sep,sample,suffix))

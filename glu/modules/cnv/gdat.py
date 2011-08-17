@@ -17,6 +17,19 @@ from   glu.lib.glm               import Linear
 IndexEntry = namedtuple('IndexEntry', 'id name gdat index manifest')
 
 
+CHROM_LIST  = [ str(i) for i in range(1,23) ] + [ 'X', 'Y', 'XY', 'M' ]
+
+
+def lazy_property(fn):
+    attr_name = '_lazy_' + fn.__name__
+    @property
+    def _lazy_property(self):
+        if not hasattr(self, attr_name):
+            setattr(self, attr_name, fn(self))
+        return getattr(self, attr_name)
+    return _lazy_property
+
+
 def gdat_encode_f(data, scale, minval, maxval, nanval):
   data = data*scale
   np.clip(data, minval, maxval, out=data)
@@ -33,14 +46,14 @@ def gdat_decode(data, scale, nanval):
 
 
 class GDATFile(object):
-  def __init__(self,filename,extra_args=None,**kwargs):
+  def __init__(self,filename,mode='r',extra_args=None,**kwargs):
     if extra_args is None:
       args = kwargs
     else:
       args = extra_args
       args.update(kwargs)
 
-    filename     = parse_augmented_filename(filename,args)
+    filename = parse_augmented_filename(filename,args)
 
     if extra_args is None and args:
       raise ValueError('Unexpected filename arguments: %s' % ','.join(sorted(args)))
@@ -51,7 +64,10 @@ class GDATFile(object):
     if compressed_filename(filename):
       raise ValueError('Binary genotype files must not have a compressed extension')
 
-    self.gdat     = h5py.File(filename,'r')
+    if mode not in ('r','r+'):
+      raise ValueError('Unsupported GDAT file mode: %s' % mode)
+
+    self.gdat     = h5py.File(filename,mode)
     self.filename = filename
     gdat          = self.gdat
     self.attrs    = gdat.attrs
@@ -74,32 +90,95 @@ class GDATFile(object):
     if sample_count!=len(gdat['Genotype']):
       raise ValueError('Inconsistent gdat sample metadata. gdat file may be corrupted.')
 
-    self.snps    = gdat['SNPs'][:]
-    self.samples = gdat['Samples'][:]
-    self.sample_index = dict( (name,i) for i,name in enumerate(self.samples) )
+  @lazy_property
+  def snps(self):
+    return self.gdat['SNPs'][:]
 
+  @lazy_property
+  def samples(self):
+    return self.gdat['Samples'][:]
 
-  def cnvdata(self,transform=None):
-    gdat      = self.gdat
-    snps      = self.snps
-    samples   = self.samples
+  @lazy_property
+  def sample_index(self):
+    return dict( (name,i) for i,name in enumerate(self.samples) )
 
-    genos     = gdat['Genotype']
-    lrr       = gdat['LRR']
-    baf       = gdat['BAF']
+  @lazy_property
+  def chromosome_index(self):
+    snps     = self.snps
+    n        = len(snps)
+    index    = np.arange(n).astype([('index',int)])
+    chroms   = snps['chromosome'].astype('S10')
+    chromset = set(chroms)
+    chroms   = chroms.astype([('chromosome','S10')])
+    locs     = snps['location'].astype(int).astype([('location',int)])
+    snps     = rfn.merge_arrays([chroms,locs,index])
 
-    lrr_scale = lrr.attrs['SCALE']
-    lrr_nan   = lrr.attrs['NAN']
+    snps.sort()
 
-    baf_scale = baf.attrs['SCALE']
-    baf_nan   = baf.attrs['NAN']
+    index = {}
+    for name in chromset:
+      mask        = snps['chromosome']==name
+      indices     = snps['index'][mask]
+      pos         = snps['location'][mask]
+      index[name] = pos,indices
+
+    return index
+
+  def cnv_data(self,index):
+    if isinstance(index,str):
+      index = self.sample_index[index]
+
+    if not isinstance(index,int):
+      raise ValueError('Unsupported addressing mode: %s' % index)
+
+    gdat       = self.gdat
+    genos      = gdat['Genotype']
+
+    if 'LRR_QN' in gdat:
+      lrr      = gdat['LRR_QN']
+      baf      = gdat['BAF_QN']
+    else:
+      lrr      = gdat['LRR']
+      baf      = gdat['BAF']
+
+    lrr_scale  = lrr.attrs['SCALE']
+    lrr_nan    = lrr.attrs['NAN']
+
+    baf_scale  = baf.attrs['SCALE']
+    baf_nan    = baf.attrs['NAN']
+
+    sample     = self.samples[index]
+    sample_lrr = gdat_decode(lrr[index], lrr_scale, lrr_nan)
+    sample_baf = gdat_decode(baf[index], baf_scale, baf_nan)
+
+    return sample,genos[index],sample_lrr,sample_baf
+
+  def cnv_iter(self,transform=None):
+    gdat       = self.gdat
+    snps       = self.snps
+    samples    = self.samples
+
+    genos      = gdat['Genotype']
+
+    if 'LRR_QN' in gdat:
+      lrr      = gdat['LRR_QN']
+      baf      = gdat['BAF_QN']
+    else:
+      lrr      = gdat['LRR']
+      baf      = gdat['BAF']
+
+    lrr_scale  = lrr.attrs['SCALE']
+    lrr_nan    = lrr.attrs['NAN']
+
+    baf_scale  = baf.attrs['SCALE']
+    baf_nan    = baf.attrs['NAN']
 
     if transform is not None:
-      include = transform.samples.include
-      exclude = transform.samples.exclude
-      rename  = transform.samples.rename
+      include  = transform.samples.include
+      exclude  = transform.samples.exclude
+      rename   = transform.samples.rename
     else:
-      include = exclude = rename = None
+      include  = exclude = rename = None
 
     for i,sample in enumerate(samples):
       if include is not None and sample not in include:
@@ -120,62 +199,11 @@ class GDATFile(object):
 
       yield sample,snps,genos[i],sample_lrr,sample_baf
 
+  def __getitem__(self,item):
+    return self.gdat[item]
 
   def __len__(self):
-    return len(self.samples)
-
-
-  def __getitem__(self,index):
-    if isinstance(index,str):
-      index = self.sample_index[index]
-
-    if not isinstance(index,int):
-      raise ValueError('Unsupported addressing mode: %s' % index)
-
-    gdat      = self.gdat
-    genos     = gdat['Genotype']
-
-    if 0:
-      lrr     = gdat['LRR']
-      baf     = gdat['BAF']
-    else:
-      lrr     = gdat['LRR_QN']
-      baf     = gdat['BAF_QN']
-
-    lrr_scale = lrr.attrs['SCALE']
-    lrr_nan   = lrr.attrs['NAN']
-
-    baf_scale = baf.attrs['SCALE']
-    baf_nan   = baf.attrs['NAN']
-
-    sample_lrr = gdat_decode(lrr[index], lrr_scale, lrr_nan)
-    sample_baf = gdat_decode(baf[index], baf_scale, baf_nan)
-
-    return genos[index],sample_lrr,sample_baf
-
-
-  def chromosomes(self):
-    snps     = self.snps
-    n        = len(snps)
-    index    = np.arange(n).astype([('index',int)])
-    chroms   = snps['chromosome'].astype('S10')
-    chromset = set(chroms)
-    chroms   = chroms.astype([('chromosome','S10')])
-    locs     = snps['location'].astype(int).astype([('location',int)])
-    snps     = rfn.merge_arrays([chroms,locs,index])
-
-    snps.sort()
-
-    chroms = {}
-    for chromname in chromset:
-      mask    = snps['chromosome']==chromname
-      indices = snps['index'][mask]
-      pos     = snps['location'][mask]
-
-      chroms[chromname] = pos,indices
-
-    return chroms
-
+    return self.sample_count
 
   def close(self):
     self.gdat.close()
@@ -286,7 +314,7 @@ def print_regression_results(sample,scheme,linear_model):
   #out.writerow([sample,scheme]+tvs+[linear_model.ss**0.5,ss_t**0.5,r2])
 
 
-def get_gcmodel(filename):
+def get_gcmodel(filename,chrom_indices,chrom_means=True):
   gcdata     = h5py.File(filename,'r')
 
   try:
@@ -294,15 +322,26 @@ def get_gcmodel(filename):
     gcmeans  = gc.sum(axis=1)
     gc      -= gcmeans.reshape(-1,1)
     n        = len(gc)
-    ones     = np.ones((n,1), dtype=float)
-    gcdesign = np.hstack( [ones,gc] )
+
+    if not chrom_means:
+      means  = np.ones((n,1), dtype=float)
+    else:
+      m      = len(CHROM_LIST)
+      means  = np.zeros((n,m), dtype=float)
+      for i,chrom in enumerate(CHROM_LIST):
+        pos,index      = chrom_indices[chrom]
+        means[index,i] = 1
+
+    gcdesign = np.hstack( [means,gc] )
     gcmask   = np.isfinite(gcdesign.sum(axis=1))
+
     return gcdesign,gcmask
+
   finally:
     gcdata.close()
 
 
-def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None,keep_mean=False):
+def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None):
   mask  = np.isfinite(lrr)
   mask &= gcmask
 
@@ -313,6 +352,7 @@ def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None,keep_mean=F
     mask &= lrr<=maxval
 
   lrr_masked      = lrr[mask]
+  lrr_masked     -= lrr_masked.mean()
   gcdesign_masked = gcdesign[mask]
 
   if thin is None:
@@ -326,10 +366,20 @@ def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None,keep_mean=F
 
   beta = lm.beta.reshape(-1,1)
 
-  if keep_mean:
-    beta[0,0] = 0
+  n         = len(CHROM_LIST)
+  weights   = gcdesign[:,:n].sum(axis=0)
+  weights  /= weights.sum()
+  alphas    = (beta[:n].reshape(-1)*weights)
+  alpha     = alphas.sum()
 
-  #lrr_adj[mask] -= np.dot(gcdesign_masked,beta).reshape(-1)
-  lrr_adj = lrr-np.dot(gcdesign,beta).reshape(-1)
+  if 0:
+    print '!!!   alpha=',alpha
+    print '      betas=',beta[:n].reshape(-1)
+    print '    weights=',weights
+    print '     alphas=',alphas
+
+  beta[:n]  = 0
+  lrr_adj   = lrr-np.dot(gcdesign,beta).reshape(-1)
+  lrr_adj  -= alpha
 
   return lrr_adj

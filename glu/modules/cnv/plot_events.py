@@ -1,4 +1,4 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 __gluindex__  = True
 __abstract__  = 'Plot intensity and allelic ratio data from indexed GDAT files'
@@ -10,7 +10,6 @@ __revision__  = '$Id$'
 import os
 import sys
 
-import h5py
 import numpy as np
 import scipy
 import scipy.stats
@@ -20,19 +19,19 @@ from   operator             import itemgetter,attrgetter
 
 from   collections          import namedtuple
 
-from   glu.lib.fileutils    import table_reader, table_writer
+from   glu.lib.fileutils    import table_reader, table_writer, cook_table, table_options
 
-from   glu.modules.cnv.gdat import GDATIndex, GDATFile, get_gcmodel, gc_correct
+from   glu.modules.cnv.gdat import GDATIndex, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot import plot_chromosome
 
 
-def get_normal_mask(lrr,chrom_indices,events,options):
-  normal_mask = (lrr==lrr)
+def get_assay_normal_mask(lrr,chrom_indices,events,options):
+  normal_mask = np.ones_like(lrr,dtype=bool)
 
   if options.chromid and options.segstart and options.segstop:
     for chrom,chrom_events in groupby(events,key=attrgetter(options.chromid)):
       if chrom.startswith('chr'):
-        chrom = chrom[4:]
+        chrom = chrom[3:]
 
       pos,index    = chrom_indices[chrom]
 
@@ -42,6 +41,19 @@ def get_normal_mask(lrr,chrom_indices,events,options):
         event_mask = (pos>=start)&(pos<stop)
 
         normal_mask[index] &= ~event_mask
+
+  return normal_mask
+
+
+def get_chrom_normal_mask(pos,events,options):
+  normal_mask = np.ones_like(pos,dtype=bool)
+
+  if options.chromid and options.segstart and options.segstop:
+    for i,event in enumerate(events):
+      start        = int(getattr(event,options.segstart))
+      stop         = int(getattr(event,options.segstop ))
+      event_mask   = (pos>=start)&(pos<=stop)
+      normal_mask &= ~event_mask
 
   return normal_mask
 
@@ -69,6 +81,7 @@ def option_parser():
                                       help='Segment start index column name (default=SEGSTART)')
   parser.add_argument('--segstop',    metavar='COLUMN', default='SEGSTOP',
                                       help='Segment stop index column name (default=SEGSTOP)')
+  table_options(parser)
 
   return parser
 
@@ -84,6 +97,7 @@ def main():
   chip_indices = {}
 
   events    = table_reader(options.events)
+  events    = cook_table(events,options)
   header    = next(events)
   Event     = namedtuple('Event', header)._make
   events    = [ Event(e) for e in events ]
@@ -107,28 +121,28 @@ def main():
 
       if chrom_indices is None:
         print 'Loading mapping information for %s...' % manifest
-        chrom_indices = chip_indices[manifest] = gdat.chromosomes()
+        chrom_indices = chip_indices[manifest] = gdat.chromosome_index
 
       print 'GDAT:',gdatname,assay
 
-      genos,lrr,baf = gdat[offset]
-      normal_mask   = get_normal_mask(lrr,chrom_indices,assay_events,options)
-      mask          = normal_mask&(lrr>=-2)&(lrr<=2)
-      lrr          -= lrr[mask].mean()
+      assay_id,genos,lrr,baf = gdat.cnv_data(offset)
+      normal_mask  = get_assay_normal_mask(lrr,chrom_indices,assay_events,options)
+      mask         = normal_mask&(lrr>=-2)&(lrr<=2)
+      lrr         -= lrr[mask].mean()
 
       if gccorrect:
         gcmodel  = gcmodels.get(manifest)
         if gcmodel is None:
           print 'Loading GC/CpG model for %s...' % manifest
           filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
-          gcmodels[manifest] = gcmodel = get_gcmodel(filename)
+          gcmodels[manifest] = gcmodel = get_gcmodel(filename,chrom_indices)
 
         gcdesign,gcmask = gcmodel
-        lrr_adj         = gc_correct(lrr, gcdesign, gcmask&normal_mask)
+        lrr_adj         = gc_correct(lrr, gcdesign, gcmask&normal_mask,minval=-3,maxval=3)
 
       for chrom,chrom_events in groupby(assay_events,key=attrgetter(options.chromid)):
         if chrom.startswith('chr'):
-          chrom = chrom[4:]
+          chrom = chrom[3:]
 
         chrom_events = list(chrom_events)
         pos,index    = chrom_indices[chrom]
@@ -137,20 +151,28 @@ def main():
         chrom_baf    = baf[index]
         chrom_lrr    = None
 
+        normal       = get_chrom_normal_mask(pos, chrom_events, options)
+
         if gccorrect:
           chrom_lrr  = lrr_adj[index]
-          mask       = np.isfinite(chrom_lrr)&np.isfinite(chrom_baf)&(chrom_lrr>=-2)&(chrom_lrr<=2)
+          valid      = (chrom_lrr>=-2)&(chrom_lrr<=2)
 
-          if mask.sum()<100:
+          if valid.sum()<100:
             chrom_lrr = None
 
         if chrom_lrr is None:
-          chrom_lrr = lrr[index]
-          mask      = np.isfinite(chrom_lrr)&np.isfinite(chrom_baf)&(chrom_lrr>=-2)&(chrom_lrr<=2)
+          chrom_lrr  = lrr[index]
+          valid      = (chrom_lrr>=-2)&(chrom_lrr<=2)
 
-        print '  chr%-3s LRR=%6.3f +/ %.3f, BAF=%.2f +/ %.2f' %  \
-                    (chrom,chrom_lrr[mask].mean(),1.96*chrom_lrr[mask].std(),
-                           chrom_baf[mask].mean(),1.96*chrom_baf[mask].std())
+        normal       =   normal &valid
+        abnormal     = (~normal)&valid
+
+        print '  chr%-3s Normal: LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
+                    (chrom,chrom_lrr[normal].mean(),1.96*chrom_lrr[normal].std(),
+                           chrom_baf[normal].mean(),1.96*chrom_baf[normal].std())
+        print '       Abnormal: LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
+                          (chrom_lrr[abnormal].mean(),1.96*chrom_lrr[abnormal].std(),
+                           chrom_baf[abnormal].mean(),1.96*chrom_baf[abnormal].std())
 
         variables = chrom_events[0]._asdict()
         variables.update(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom)
@@ -159,7 +181,7 @@ def main():
         plotname = '%s/%s' % (options.outdir,plotname)
         title    = options.title.format(**variables)
 
-        plot_chromosome(plotname, pos[mask], chrom_lrr[mask], chrom_baf[mask], genos=chrom_genos[mask],
+        plot_chromosome(plotname, pos[valid], chrom_lrr[valid], chrom_baf[valid], genos=chrom_genos[valid],
                         title=title, events=chrom_events, startattr=options.segstart, stopattr=options.segstop)
 
 

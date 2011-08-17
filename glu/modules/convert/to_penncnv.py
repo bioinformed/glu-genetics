@@ -12,12 +12,11 @@ import sys
 
 from   itertools                   import izip
 
-import h5py
-
 from   glu.lib.fileutils           import table_writer
 
 from   glu.lib.genolib.transform   import GenoTransform
-from   glu.modules.convert.to_gada import split_fullname, option_parser, cnv_data
+from   glu.modules.convert.to_gada import split_fullname, option_parser
+from   glu.modules.cnv.gdat        import GDATFile
 
 
 def main():
@@ -27,8 +26,8 @@ def main():
   prefix,sep,suffix = split_fullname(options.output)
 
   transform = GenoTransform.from_object(options)
-  gdat      = h5py.File(options.gdatfile,'r')
-  data      = cnv_data(gdat,transform)
+  gdat      = GDATFile(options.gdatfile)
+  data      = gdat.cnv_iter(transform)
   genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 
   for sample,snps,geno,lrr,baf in data:
