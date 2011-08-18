@@ -235,10 +235,12 @@ def main():
       out.writerow(result)
       continue
 
-    counts = zeros( (len(null.categories),3), dtype=int )
+    counts   = zeros( (len(null.categories),3), dtype=int )
+    phenomap = dict( (c,i) for i,c in enumerate(null.categories) )
     if len(base.y.flat) and len(base.X.flat):
       for pheno,geno in izip(base.y[:,0],base.X[:,0]):
-        counts[pheno,geno] += 1
+        pindex = phenomap[pheno]
+        counts[pindex,geno] += 1
 
     mafs = (counts*[0.,0.5,1.]).sum(axis=1)/counts.sum(axis=1)
     mafs[~isfinite(mafs)] = 0
