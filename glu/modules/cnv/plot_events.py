@@ -32,6 +32,8 @@ def get_assay_normal_mask(lrr,chrom_indices,events,options):
     for chrom,chrom_events in groupby(events,key=attrgetter(options.chromid)):
       if chrom.startswith('chr'):
         chrom = chrom[3:]
+      if chrom.upper()=='MT':
+        chrom = 'M'
 
       pos,index    = chrom_indices[chrom]
 

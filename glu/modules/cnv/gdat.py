@@ -67,27 +67,26 @@ class GDATFile(object):
     if mode not in ('r','r+'):
       raise ValueError('Unsupported GDAT file mode: %s' % mode)
 
-    self.gdat     = h5py.File(filename,mode)
-    self.filename = filename
-    gdat          = self.gdat
-    self.attrs    = gdat.attrs
-    attrs         = gdat.attrs
-    format_found  = attrs.get('GLU_FORMAT')
-    gdat_version  = attrs.get('GLU_VERSION')
-    snp_count     = attrs.get('SNPCount')
-    sample_count  = attrs.get('SampleCount')
+    self.gdat          = h5py.File(filename,mode)
+    self.filename      = filename
+    gdat               = self.gdat
+    self.attrs         = gdat.attrs
+    self.format_found  = gdat.attrs.get('GLU_FORMAT')
+    self.gdat_version  = gdat.attrs.get('GLU_VERSION')
+    self.snp_count     = gdat.attrs.get('SNPCount')
+    self.sample_count  = gdat.attrs.get('SampleCount')
 
-    if format_found!='gdat':
+    if self.format_found!='gdat':
       raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
                           % (namefile(filename),format,format_found))
 
-    if gdat_version!=1:
+    if self.gdat_version!=1:
       raise ValueError('Unknown gdat file version: %s' % gdat_version)
 
-    if snp_count!=len(gdat['SNPs']):
+    if self.snp_count!=len(gdat['SNPs']):
       raise ValueError('Inconsistent gdat SNP metadata. gdat file may be corrupted.')
 
-    if sample_count!=len(gdat['Genotype']):
+    if self.sample_count!=len(gdat['Genotype']):
       raise ValueError('Inconsistent gdat sample metadata. gdat file may be corrupted.')
 
   @lazy_property
@@ -120,6 +119,12 @@ class GDATFile(object):
       mask        = snps['chromosome']==name
       indices     = snps['index'][mask]
       pos         = snps['location'][mask]
+
+      if name.startswith('chr'):
+        name = name[3:]
+      if name.upper()=='MT':
+        name = 'M'
+
       index[name] = pos,indices
 
     return index
@@ -314,7 +319,7 @@ def print_regression_results(sample,scheme,linear_model):
   #out.writerow([sample,scheme]+tvs+[linear_model.ss**0.5,ss_t**0.5,r2])
 
 
-def get_gcmodel(filename,chrom_indices,chrom_means=True):
+def get_gcmodel(filename,chrom_indices=None,extra_terms=0):
   gcdata     = h5py.File(filename,'r')
 
   try:
@@ -323,14 +328,15 @@ def get_gcmodel(filename,chrom_indices,chrom_means=True):
     gc      -= gcmeans.reshape(-1,1)
     n        = len(gc)
 
-    if not chrom_means:
-      means  = np.ones((n,1), dtype=float)
+    if chrom_indices is None:
+      means  = np.ones((n,1+extra_terms), dtype=float)
     else:
-      m      = len(CHROM_LIST)
+      m      = len(CHROM_LIST)+extra_terms
       means  = np.zeros((n,m), dtype=float)
       for i,chrom in enumerate(CHROM_LIST):
-        pos,index      = chrom_indices[chrom]
-        means[index,i] = 1
+        if chrom in chrom_indices:
+          pos,index      = chrom_indices[chrom]
+          means[index,i] = 1
 
     gcdesign = np.hstack( [means,gc] )
     gcmask   = np.isfinite(gcdesign.sum(axis=1))
@@ -354,6 +360,9 @@ def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None):
   lrr_masked      = lrr[mask]
   lrr_masked     -= lrr_masked.mean()
   gcdesign_masked = gcdesign[mask]
+
+  if not len(lrr_masked):
+    return lrr
 
   if thin is None:
     lm = Linear(lrr_masked, gcdesign_masked)

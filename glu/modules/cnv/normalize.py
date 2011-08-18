@@ -9,10 +9,13 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-import numpy    as np
-import numpy.ma as ma
+from   math                 import modf
 
-from   glu.lib.fileutils import table_reader
+import numpy as np
+
+from   glu.lib.fileutils    import table_reader
+
+from   glu.lib.glm          import Linear
 
 from   glu.modules.cnv.gdat import GDATFile, gdat_encode_f, gdat_decode, get_gcmodel, gc_correct
 
@@ -226,6 +229,104 @@ def create_gdat_qn(gdatobject,s,n):
   LRR_QN.attrs['MAX']   = LRR_MAX
 
 
+def regress_center(p, design, dmask, genos, p_AA, p_AB, p_BB, thin=None):
+  AA           =  genos=='AA'
+  AB           =  genos=='AB'
+  BB           =  genos=='BB'
+
+  valid        = (genos!='  ')
+  valid       &= np.isfinite(p)
+  valid       &= dmask
+
+  design[:,1]  = p
+
+  expected     = np.empty_like(p)
+  expected[AA] = p_AA[AA]
+  expected[AB] = p_AB[AB]
+  expected[BB] = p_BB[BB]
+
+  valid       &= np.isfinite(expected)
+
+  expected     = expected[valid].reshape(-1,1)
+  design       = design[valid]
+
+  if thin:
+    expected   = expected[::thin]
+    design     = design[::thin]
+
+  lm = Linear(expected, design)
+
+  lm.fit()
+
+  ss_t  = np.var(lm.y,ddof=1)
+  r2    = 1 - lm.ss/ss_t
+  beta  = lm.beta.reshape(-1)
+
+  print '  Regress to center: r2=%.2f beta=%s' % (r2,beta)
+
+  return beta
+
+
+def adjust_center(p,beta,design,dmask):
+  p_adj        = np.empty_like(p)
+  p_adj.fill(np.nan)
+
+  valid        = np.isfinite(p)
+  valid       &= dmask
+  design[:,1]  = p
+  p_adj[valid] = np.dot(design[valid],beta.reshape(-1,1))
+
+  return p_adj
+
+
+def quantile(data,k):
+  mask = np.isfinite(data)
+  data = data[mask]
+
+  data.sort()
+
+  n    = len(data)-1
+  f,w  = modf(n*k)
+  w    = int(w)
+
+  if f < 1e-10:
+    q = data[w]
+  else:
+    q = (1-f)*data[w] + f*data[w+1]
+
+  return q
+
+
+def gdat_decoder(table):
+  if 'SCALE' not in table.attrs:
+    return rows
+
+  def _decoder(table):
+    scale = table.attrs['SCALE']
+    nan   = table.attrs['NAN']
+    for row in table:
+      yield gdat_decode(row, scale, nan)
+
+  return _decoder(table)
+
+
+def block_iter(table,chunksize):
+  start = 0
+  last  = len(table)
+
+  while start<last:
+    stop = min(last,start+chunksize)
+    chunk = table[start:stop]
+    for row in chunk:
+      yield row
+    start = stop
+
+
+def parallel_gdat_iter(*tables):
+  iters = [ gdat_decoder(table,block_iter(table,table.chunks[0])) for table in tables ]
+  return izip(*iters)
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -235,6 +336,8 @@ def option_parser():
 
   parser.add_argument('--gcmodel',     metavar='GCM',  help='GC model file to use')
   parser.add_argument('--gcmodeldir',  metavar='DIR',  help='GC models directory')
+  parser.add_argument('--maxmissing', metavar='RATE', default=0.02, type=float,
+                          help='Maximum missing rate for assays to estimate cluster centers (default=0.02)')
 
   return parser
 
@@ -246,39 +349,72 @@ def main():
   gccorrect = bool(options.gcmodel or options.gcmodeldir)
 
   gdat      = GDATFile(options.gdat,'r+')
+  n         = gdat.sample_count
+  s         = gdat.snp_count
   qnorm     = True
 
   if gccorrect:
     manifest = gdat.attrs['ManifestName'].replace('.bpm','')
     print 'Loading GC/CpG model for %s...' % manifest
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
-    gcdesign,gcmask = get_gcmodel(filename, gdat.chromosome_index)
+    design,dmask = get_gcmodel(filename, extra_terms=1)
+  else:
+    design  = np.ones( (s,2), dtype=float )
+    dmask   = design[0]==1
 
   X         = gdat['X']
   Y         = gdat['Y']
+  GC        = gdat['GC']
   LRR       = gdat['LRR']
   BAF       = gdat['BAF']
-
-  x_scale   = X.attrs['SCALE']
-  x_nan     = X.attrs['NAN']
-
-  y_scale   = Y.attrs['SCALE']
-  y_nan     = Y.attrs['NAN']
-
-  lrr_scale = LRR.attrs['SCALE']
-  lrr_nan   = LRR.attrs['NAN']
-
-  baf_scale = BAF.attrs['SCALE']
-  baf_nan   = BAF.attrs['NAN']
-
-  genos     = gdat['Genotype']
-
-  n,s       = X.shape
+  genotypes = gdat['Genotype']
 
   print 'SNPs=%d, samples=%d' % (s,n)
 
   np.set_printoptions(linewidth=120,precision=2,suppress=True)
   np.seterr(all='ignore')
+
+  print 'PASS 1: Estimate intensity distribution...'
+
+  n_AA        = np.zeros(s, dtype=int  )
+  x_AA        = np.zeros(s, dtype=float)
+  y_AA        = np.zeros(s, dtype=float)
+  n_AB        = np.zeros(s, dtype=int  )
+  x_AB        = np.zeros(s, dtype=float)
+  y_AB        = np.zeros(s, dtype=float)
+  n_BB        = np.zeros(s, dtype=int  )
+  x_BB        = np.zeros(s, dtype=float)
+  y_BB        = np.zeros(s, dtype=float)
+
+  skipped     = 0
+
+  for i,(x,y,genos) in enumerate(parallel_gdat_iter(X,Y,genotypes)):
+    print 'Sample %5d / %d' % (i+1,n)
+
+    missing   = (genos=='  ').sum() / s
+
+    if missing > options.maxmissing:
+      #print '  ... skipping due to missing rate %.2f%% > %.2f%%' % (missing*100,options.maxmissing*100)
+      skipped += 1
+      continue
+
+    mask      = np.isfinite(x)&np.isfinite(y)
+
+    update_centers(x,y,'AA',x_AA,y_AA,n_AA,genos,mask)
+    update_centers(x,y,'AB',x_AB,y_AB,n_AB,genos,mask)
+    update_centers(x,y,'BB',x_BB,y_BB,n_BB,genos,mask)
+
+  finalize_centers(x_AA,y_AA,n_AA)
+  finalize_centers(x_AB,y_AB,n_AB)
+  finalize_centers(x_BB,y_BB,n_BB)
+
+  if skipped:
+    print '  Skipped %d samples (%.2f%% ) for missing rate > %.2f%%' % (skipped,skipped/n*100,options.maxmissing*100)
+
+  print 'PASS 2: Quantile normalization...'
+
+  beta_xs     = []
+  beta_ys     = []
 
   n_AA        = np.zeros(s, dtype=int  )
   r_AA        = np.zeros(s, dtype=float)
@@ -290,11 +426,26 @@ def main():
   r_BB        = np.zeros(s, dtype=float)
   t_BB        = np.zeros(s, dtype=float)
 
-  for i in xrange(n):
+  for i,(x,y,genos,gqual) in enumerate(parallel_gdat_iter(X,Y,genotypes,GC)):
     print 'Sample %5d / %d' % (i+1,n)
 
-    x         = gdat_decode(X[i], x_scale, x_nan)
-    y         = gdat_decode(Y[i], y_scale, y_nan)
+    min_qual  = quantile(gqual,0.5)
+
+    qmask     = gqual>=min_qual
+    qmask    &= dmask
+
+    beta_x    = regress_center(x,design,dmask,genos,x_AA,x_AB,x_BB,thin=5)
+    beta_y    = regress_center(y,design,dmask,genos,y_AA,y_AB,y_BB,thin=5)
+
+    beta_xs.append(beta_x)
+    beta_ys.append(beta_y)
+
+    missing   = (genos=='  ').sum() / s
+    if missing > options.maxmissing:
+      continue
+
+    x         = adjust_center(x,beta_x,design,dmask)
+    y         = adjust_center(y,beta_y,design,dmask)
 
     if qnorm:
       x,y     = compute_qn(x,y)
@@ -302,17 +453,17 @@ def main():
     r         = x+y
     t         = (2/np.pi)*np.arctan2(y,x)
 
-    genosi    = genos[i]
-
     mask      = np.isfinite(r)&np.isfinite(t)
 
-    update_centers(r,t,'AA',r_AA,t_AA,n_AA,genosi,mask)
-    update_centers(r,t,'AB',r_AB,t_AB,n_AB,genosi,mask)
-    update_centers(r,t,'BB',r_BB,t_BB,n_BB,genosi,mask)
+    update_centers(r,t,'AA',r_AA,t_AA,n_AA,genos,mask)
+    update_centers(r,t,'AB',r_AB,t_AB,n_AB,genos,mask)
+    update_centers(r,t,'BB',r_BB,t_BB,n_BB,genos,mask)
 
   finalize_centers(r_AA,t_AA,n_AA)
   finalize_centers(r_AB,t_AB,n_AB)
   finalize_centers(r_BB,t_BB,n_BB)
+
+  print 'PASS 3: Updating LRR and BAF...'
 
   bad         = t_AA>=t_AB
   bad        |= t_AB>=t_BB
@@ -327,11 +478,11 @@ def main():
   LRR_QN = gdat['LRR_QN']
   BAF_QN = gdat['BAF_QN']
 
-  for i in xrange(n):
+  for i,(x,y,genos) in enumerate(parallel_gdat_iter(X,Y,genotypes)):
     print 'Sample %5d / %d' % (i+1,n)
 
-    x         = gdat_decode(X[i], x_scale, x_nan)
-    y         = gdat_decode(Y[i], y_scale, y_nan)
+    x         = adjust_center(x,beta_xs[i],design,dmask)
+    y         = adjust_center(y,beta_ys[i],design,dmask)
 
     if qnorm:
       x,y     = compute_qn(x,y)
@@ -339,10 +490,10 @@ def main():
     r         = x+y
     t         = (2/np.pi)*np.arctan2(y,x)
 
-    lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
+    beta_r    = regress_center(r,design,dmask,genos,r_AA,r_AB,r_BB,thin=5)
+    r         = adjust_center(r,beta_r,design,dmask)
 
-    if gccorrect:
-      lrr     = gc_correct(lrr, gcdesign, gcmask, minval=-2, maxval=2)
+    lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
 
     LRR_QN[i] = gdat_encode_f(lrr, LRR_SCALE, LRR_MIN, LRR_MAX, LRR_NAN)
     BAF_QN[i] = gdat_encode_f(baf, BAF_SCALE, BAF_MIN, BAF_MAX, BAF_NAN)
