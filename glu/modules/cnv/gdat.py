@@ -1,23 +1,33 @@
+import sys
 import h5py
 import sqlite3
 import numpy as np
 import numpy.lib.recfunctions as rfn
 
-from   operator                  import itemgetter
-from   itertools                 import groupby, izip, count
-from   collections               import defaultdict
-
-import scipy.stats
+from   itertools                 import izip
 
 from   glu.lib.utils             import is_str,namedtuple
-from   glu.lib.fileutils         import parse_augmented_filename,get_arg, \
-                                        compressed_filename,namefile
+from   glu.lib.fileutils         import parse_augmented_filename, compressed_filename, namefile
 from   glu.lib.glm               import Linear
+
 
 IndexEntry = namedtuple('IndexEntry', 'id name gdat index manifest')
 
 
 CHROM_LIST  = [ str(i) for i in range(1,23) ] + [ 'X', 'Y', 'XY', 'M' ]
+
+
+BAF_TYPE   = np.int16
+BAF_SCALE  =  10000
+BAF_NAN    = np.iinfo(BAF_TYPE).min
+BAF_MIN    = np.iinfo(BAF_TYPE).min+1
+BAF_MAX    = np.iinfo(BAF_TYPE).max
+
+LRR_TYPE   = np.int32
+LRR_SCALE  = 100000
+LRR_NAN    = np.iinfo(LRR_TYPE).min
+LRR_MIN    = np.iinfo(LRR_TYPE).min+1
+LRR_MAX    = np.iinfo(LRR_TYPE).max
 
 
 def lazy_property(fn):
@@ -78,10 +88,10 @@ class GDATFile(object):
 
     if self.format_found!='gdat':
       raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
-                          % (namefile(filename),format,format_found))
+                          % (namefile(filename),format,self.format_found))
 
     if self.gdat_version!=1:
-      raise ValueError('Unknown gdat file version: %s' % gdat_version)
+      raise ValueError('Unknown gdat file version: %s' % self.gdat_version)
 
     if self.snp_count!=len(gdat['SNPs']):
       raise ValueError('Inconsistent gdat SNP metadata. gdat file may be corrupted.')
@@ -214,6 +224,110 @@ class GDATFile(object):
     self.gdat.close()
 
 
+def gdat_decoder(table,rows):
+  if 'SCALE' not in table.attrs:
+    return rows
+
+  def _decoder(table,rows):
+    scale = table.attrs['SCALE']
+    nan   = table.attrs['NAN']
+    for row in rows:
+      yield gdat_decode(row, scale, nan)
+
+  return _decoder(table,rows)
+
+
+def block_iter(table):
+  chunksize = table.chunks[0]
+  start     = 0
+  last      = len(table)
+
+  while start<last:
+    stop  = min(last,start+chunksize)
+    chunk = table[start:stop]
+    for row in chunk:
+      yield row
+    start = stop
+
+
+def parallel_gdat_iter(*tables):
+  iters = [ gdat_decoder(table,block_iter(table)) for table in tables ]
+  return izip(*iters)
+
+
+class BatchTableWriter(object):
+  def __init__(self,table):
+    self.table     = table
+    self.batchsize = table.chunks[0]
+    self.scale     = table.attrs['SCALE']
+    self.nan       = table.attrs['NAN']
+    self.min       = table.attrs['MIN']
+    self.max       = table.attrs['MAX']
+    self.batch     = []
+    self.index     = 0
+
+  def write(self, value):
+    batch = self.batch
+    batch.append(value.reshape(-1))
+
+    if len(batch)>=self.batchsize:
+      self.flush()
+
+  def flush(self):
+    batch = self.batch
+
+    if not batch:
+      return
+
+    table = self.table
+
+    if len(batch)==1:
+      chunk             = gdat_encode_f(batch[0], self.scale, self.min, self.max, self.nan)
+      table[self.index] = chunk
+      self.index       += 1
+    else:
+      chunk             = [ gdat_encode_f(c, self.scale, self.min, self.max, self.nan) for c in batch ]
+      chunk             = np.array(chunk, dtype=table.dtype)
+
+      start             = self.index
+      end               = start+len(batch)
+
+      table[start:end]  = chunk
+
+      self.index        = end
+
+    batch[:] = []
+
+  def close(self):
+    self.flush()
+    self.table = None
+
+
+def create_gdat_qn(gdatobject,s,n):
+  comp         = dict(compression='gzip',compression_opts=5)
+  chunks       = (1,s)
+  shape        = (n,s)
+  shuffle      = False
+
+  gdat         = gdatobject.gdat
+  BAF_QN       = gdat.require_dataset('BAF_QN', shape, BAF_TYPE,
+                                      maxshape=shape,chunks=chunks,shuffle=shuffle,
+                                      fillvalue=BAF_NAN,**comp)
+  BAF_QN.attrs['SCALE'] = BAF_SCALE
+  BAF_QN.attrs['NAN']   = BAF_NAN
+  BAF_QN.attrs['MIN']   = BAF_MIN
+  BAF_QN.attrs['MAX']   = BAF_MAX
+
+  LRR_QN       = gdat.require_dataset('LRR_QN', shape, LRR_TYPE,
+                                      maxshape=shape,chunks=chunks,shuffle=shuffle,
+                                      fillvalue=LRR_NAN,**comp)
+
+  LRR_QN.attrs['SCALE'] = LRR_SCALE
+  LRR_QN.attrs['NAN']   = LRR_NAN
+  LRR_QN.attrs['MIN']   = LRR_MIN
+  LRR_QN.attrs['MAX']   = LRR_MAX
+
+
 def sqlite_magic(con):
   con.execute('PRAGMA synchronous=OFF;')
   con.execute('PRAGMA journal_mode=OFF;')
@@ -302,23 +416,6 @@ class GDATIndex(object):
     self.con.commit()
 
 
-def print_regression_results(sample,scheme,linear_model):
-  y     = linear_model.y
-  b     = linear_model.beta.reshape(-1)
-  stde  = (linear_model.ss*linear_model.W.diagonal())**0.5
-  t     = b/stde
-  n,m   = linear_model.X.shape
-  p     = 2*scipy.stats.distributions.t.cdf(-abs(t),n-m)
-
-  ss_t  = np.var(linear_model.y,ddof=1)
-  r2    = 1 - linear_model.ss/ss_t
-
-  print '  GC correct: ss_r=%.2f ss_t=%.2f r2=%.2f' % (linear_model.ss**0.5,ss_t**0.5,r2)
-  #tvs   = ['%.2f' % tv for tv in t[1:]]
-  #tvs   = []
-  #out.writerow([sample,scheme]+tvs+[linear_model.ss**0.5,ss_t**0.5,r2])
-
-
 def get_gcmodel(filename,chrom_indices=None,extra_terms=0):
   gcdata     = h5py.File(filename,'r')
 
@@ -371,7 +468,7 @@ def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None):
 
   lm.fit()
 
-  print_regression_results('','LRR', lm)
+  print '  GC correct: r2=%.2f, p=%s' % (lm.r2(),lm.p_values(phred=True))
 
   beta = lm.beta.reshape(-1,1)
 

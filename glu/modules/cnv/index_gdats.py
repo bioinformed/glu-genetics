@@ -29,7 +29,12 @@ def main():
   indexfile = GDATIndex(options.index)
 
   for filename in options.gdat:
-    gdat     = GDATFile(filename)
+    try:
+      gdat     = GDATFile(filename)
+    except IOError:
+      print 'Unable to open GDAT file: %s' % filename
+      continue
+
     manifest = gdat.attrs['ManifestName']
 
     print 'GDAT: %s (snps=%d, samples=%d, manifest=%s)' % (filename,len(gdat.snps),len(gdat.samples),manifest)

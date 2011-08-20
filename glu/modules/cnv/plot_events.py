@@ -8,18 +8,15 @@ __revision__  = '$Id$'
 
 
 import os
-import sys
 
 import numpy as np
-import scipy
-import scipy.stats
 
 from   itertools            import groupby
-from   operator             import itemgetter,attrgetter
+from   operator             import attrgetter
 
 from   collections          import namedtuple
 
-from   glu.lib.fileutils    import table_reader, table_writer, cook_table, table_options
+from   glu.lib.fileutils    import table_reader, cook_table, table_options
 
 from   glu.modules.cnv.gdat import GDATIndex, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot import plot_chromosome
@@ -112,11 +109,11 @@ def main():
     locations  = indexfile.get(assay)
 
     if not locations:
-      print 'ASSAY %s not found' % (assay)
+      print 'ASSAY %s not found' % assay
       continue
 
     for gdat,offset in locations:
-      gdatname      = '_'.join(os.path.basename(gdat.filename).replace('.gdat','').split('_')[:2])
+      gdatname      = '_'.join(os.path.splitext(os.path.basename(gdat.filename))[0].split('_')[:2])
       manifest      = gdat.attrs['ManifestName'].replace('.bpm','')
 
       chrom_indices = chip_indices.get(manifest)
@@ -129,7 +126,12 @@ def main():
 
       assay_id,genos,lrr,baf = gdat.cnv_data(offset)
       normal_mask  = get_assay_normal_mask(lrr,chrom_indices,assay_events,options)
-      mask         = normal_mask&(lrr>=-2)&(lrr<=2)
+      mask         = normal_mask&np.isfinite(lrr)&(lrr>=-2)&(lrr<=2)
+
+      if not mask.sum():
+        print '  ASSAY %s DOES NOT CONTAIN VALID LRR/BAF data' % assay
+        continue
+
       lrr         -= lrr[mask].mean()
 
       if gccorrect:
