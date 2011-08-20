@@ -12,6 +12,8 @@ from   itertools    import izip
 
 import numpy as np
 
+import scipy.stats
+
 from   numpy        import dot
 from   scipy.linalg import svd,cholesky,norm,inv,schur,rsf2csf,LinAlgError
 
@@ -1688,6 +1690,25 @@ class Linear(object):
     self.right_singlular_matrix = vt.T
 
     return L,beta,W,ss
+
+  def p_values(self, phred=False):
+    y     = self.y
+    b     = self.beta.reshape(-1)
+    stde  = (self.ss*self.W.diagonal())**0.5
+    t     = b/stde
+    n,m   = self.X.shape
+    p     = 2*scipy.stats.distributions.t.cdf(-abs(t),n-m)
+
+    if phred:
+      p   = p.clip(1e-99,1)
+      p   = (-10*np.log10(p)).astype(int).clip(0,99)
+
+    return p
+
+  def r2(self):
+    ss_t  = np.var(self.y,ddof=1)
+    r2    = 1 - self.ss/ss_t
+    return r2
 
   def score_test(self,parameters=None,indices=None):
     return LinearScoreTest(self,parameters=parameters,indices=indices)
