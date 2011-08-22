@@ -18,7 +18,7 @@ __all__ = ['list_reader', 'map_reader', 'table_reader', 'table_writer',
            'resolve_column_headers', 'resolve_column_header', 'table_columns']
 
 
-TABLE_FORMATS = set(['xls','csv','dta','stata','db','sqlite'])
+TABLE_FORMATS = set(['xls','xlsx','csv','dta','stata','db','sqlite'])
 
 
 def _literal_list(filename):
@@ -873,6 +873,9 @@ def table_reader(filename,want_header=False,extra_args=None,**kwargs):
   if format in ('xls','excel'):
     from glu.lib.fileutils.formats.excel import table_reader_excel
     rows = table_reader_excel(name, extra_args=args)
+  elif format in ('xlsx','excel2007','excel2010'):
+    from glu.lib.fileutils.formats.xlsx import table_reader_xlsx
+    rows = table_reader_xlsx(name, extra_args=args)
   elif format in ('delimited','tsv','csv'):
     from glu.lib.fileutils.formats.delimited import table_reader_delimited
     rows = table_reader_delimited(name, extra_args=args)
@@ -1101,6 +1104,9 @@ def table_writer(filename,extra_args=None,**kwargs):
   if format in ('xls','excel'):
     from glu.lib.fileutils.formats.excel import ExcelWriter
     writer = ExcelWriter(name, extra_args=args)
+  elif format in ('xlsx','excel2007','excel2010'):
+    from glu.lib.fileutils.formats.xlsx import XLSXWriter
+    writer = XLSXWriter(name, extra_args=args)
   elif format in ('sqlite','db'):
     from glu.lib.fileutils.formats.sqlite import SQLiteWriter
     writer = SQLiteWriter(name, extra_args=args)
