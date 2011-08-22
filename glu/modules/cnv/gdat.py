@@ -389,7 +389,11 @@ class GDATIndex(object):
       gdat = self.gdats.get(filename)
 
       if gdat is None:
-        self.gdats[filename] = gdat = GDATFile(filename)
+        try:
+          self.gdats[filename] = gdat = GDATFile(filename)
+        except:
+          sys.stderr.write('[ERROR] Cannot open GDAT file: %s\n' % filename)
+          raise
 
       yield gdat,index
 

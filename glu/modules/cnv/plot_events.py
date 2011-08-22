@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __gluindex__  = True
 __abstract__  = 'Plot intensity and allelic ratio data from indexed GDAT files'
 __copyright__ = 'Copyright (c) 2011, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
@@ -17,9 +19,136 @@ from   operator             import attrgetter
 from   collections          import namedtuple
 
 from   glu.lib.fileutils    import table_reader, cook_table, table_options
+from   glu.lib.recordtype   import recordtype
 
 from   glu.modules.cnv.gdat import GDATIndex, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot import plot_chromosome
+
+
+Event = recordtype('Event', 'chrom start stop mask')
+
+
+def fit_gmm1(components,x):
+  from scikits.learn.mixture   import GMM, DPGMM, VBGMM
+
+  x = np.asanyarray(x).reshape(-1,1)
+  #gmm_baf = VBGMM(components,verbose=True,min_covar=0.01)
+  gmm_baf = GMM(components)
+  gmm_baf.fit(x)
+
+  mu    = np.array(gmm_baf.means,  dtype=float).reshape(-1)
+  order = mu.argsort()
+  mu    = mu[order]
+  sd    = np.array(gmm_baf.covars,  dtype=float).reshape(-1)[order]**0.5
+  ws    = np.array(gmm_baf.weights, dtype=float).reshape(-1)[order]
+  logL  = gmm_baf.score(x)
+
+  return logL,mu,sd,ws
+
+
+def fit_gmm2(k,x):
+  from   glu.modules.cnv.gmm     import gaussian_mixture
+
+  w  = np.ones(k)/k
+  mu = np.array([ i/(k-1) for i in range(k) ], dtype=float)
+  sd = np.array([0.01]+[0.05]*(k-2)+[0.01], dtype=float)
+
+  logL,w,mu,sd = gaussian_mixture(k,x, w=w, mu=mu, sd=sd, min_w=0.05, min_sd=0.005)
+
+  return logL,mu,sd,w
+
+
+def fit_gmm3(k,x,wnoise=0.02):
+  import mixture
+
+  k -= 2
+
+  dataset = mixture.DataSet()
+  dataset.fromArray(x)
+
+  hom_a   = mixture.NormalDistribution(0,0.05)
+  hom_b   = mixture.NormalDistribution(1,0.05)
+
+  hom_a.min_sigma = 0.005
+  hom_b.min_sigma = 0.005
+
+  noise   = mixture.UniformDistribution(0,1)
+
+  hets    = [ mixture.NormalDistribution( (i+1)/(k+1), 0.05) for i in range(k) ]
+  for het in hets:
+    het.min_sigma = 0.03
+
+  dists   = [hom_a]+hets+[hom_b]
+  homw    = 0.25 if k else (0.50-wnoise/2)
+  weights = [homw]+[(0.5-wnoise)/k if k else 0]*k+[homw]
+
+  if wnoise>0:
+    dists.append(noise)
+    weights.append(wnoise)
+
+  mix = mixture.MixtureModel(len(dists), weights, dists)
+
+  post,logL = mix.EM(dataset, 100, delta=0.001, silent=True)
+
+  w     = np.array(mix.pi,                                                       dtype=float)
+  mu    = np.array([hom_a.mu   ] + [het.mu    for het in hets] + [hom_b.mu    ], dtype=float)
+  sd    = np.array([hom_a.sigma] + [het.sigma for het in hets] + [hom_b.sigma ], dtype=float)
+
+  order = mu.argsort()
+  mu    = mu[order]
+  sd    = sd[order]
+  w     =  w[order]
+
+  if 0:
+    print '  %d band component mixture: logL=%f' % (k+2,logL)
+    print '      AIC: %.2f' % (4*(k+2)-2*logL)
+    print '    MEANS:',mu
+    print '       SD:',sd
+    print '  WEIGHTS:',w
+    print
+
+  return logL,mu,sd,w
+
+
+def fit_gmm_baf(baf,max_baf=4):
+  #mask = (baf>0)&(baf<1)
+
+  mask = np.isfinite(baf)
+
+  if mask.sum()<100:
+    return None
+
+  baf  = baf[mask]
+
+  import time
+
+  t0        = time.time()
+  fits      = [ fit_gmm3(c,baf) for c in range(2,max_baf+1) ]
+  AIC       = np.array([ (20*c-2*f[0]) for c,f in enumerate(fits,2) ], dtype=float)
+  best      = AIC.argmin()
+
+  logL,mu,sd,ws = fits[best]
+  c             = best+2
+
+  if 0:
+    print '        TIME: %.2f s' % (time.time()-t0)
+    print '  COMPONENTS:',c
+    print '        logL:',logL
+    print '         AIC:',2*(c-logL)
+    print '       MEANS:',mu
+    print '          SD:',sd
+    print '     WEIGHTS:',ws
+    print
+
+  return c,mu,sd,ws
+
+
+def norm_chromosome(chrom):
+  if chrom.startswith('chr'):
+    chrom = chrom[3:]
+  if chrom.upper()=='MT':
+    chrom = 'M'
+  return chrom
 
 
 def get_assay_normal_mask(lrr,chrom_indices,events,options):
@@ -27,11 +156,7 @@ def get_assay_normal_mask(lrr,chrom_indices,events,options):
 
   if options.chromid and options.segstart and options.segstop:
     for chrom,chrom_events in groupby(events,key=attrgetter(options.chromid)):
-      if chrom.startswith('chr'):
-        chrom = chrom[3:]
-      if chrom.upper()=='MT':
-        chrom = 'M'
-
+      chrom        = norm_chromosome(chrom)
       pos,index    = chrom_indices[chrom]
 
       for i,event in enumerate(events):
@@ -57,6 +182,35 @@ def get_chrom_normal_mask(pos,events,options):
   return normal_mask
 
 
+def build_chromosome_masks(pos, baf, lrr, mask=None, events=None, chromid=None, segstart=None, segstop=None):
+  if mask is not None:
+    valid_mask  = np.isfinite(lrr)&mask
+  else:
+    valid_mask  = mask
+
+  normal_mask   =  valid_mask.copy()
+  abnormal_mask = np.zeros_like(normal_mask,dtype=bool)
+
+  eventrecs     = []
+
+  for i,event in enumerate(events or []):
+    chrom          = getattr(event,chromid)
+    chrom          = norm_chromosome(chrom)
+    start          = int(getattr(event,segstart))
+    stop           = int(getattr(event,segstop ))
+
+    event_mask     = pos >= start-1
+    event_mask    &= pos <= stop
+    event_mask    &= valid_mask
+
+    normal_mask   &= ~event_mask
+    abnormal_mask |=  event_mask
+
+    eventrecs.append( Event(chrom,start,stop,event_mask) )
+
+  return normal_mask,abnormal_mask,eventrecs
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -76,10 +230,10 @@ def option_parser():
                                       help='Assay ID column name (default=ASSAY_ID)')
   parser.add_argument('--chromid',    metavar='COLUMN',  default='CHROMOSOME',
                                       help='Chromosome column name (default=CHROMOSOME)')
-  parser.add_argument('--segstart',   metavar='COLUMN', default='SEGSTART',
-                                      help='Segment start index column name (default=SEGSTART)')
-  parser.add_argument('--segstop',    metavar='COLUMN', default='SEGSTOP',
-                                      help='Segment stop index column name (default=SEGSTOP)')
+  parser.add_argument('--segstart',   metavar='COLUMN', default='SEG_START',
+                                      help='Segment start index column name (default=SEG_START)')
+  parser.add_argument('--segstop',    metavar='COLUMN', default='SEG_STOP',
+                                      help='Segment stop index column name (default=SEG_STOP)')
   table_options(parser)
 
   return parser
@@ -145,17 +299,13 @@ def main():
         lrr_adj         = gc_correct(lrr, gcdesign, gcmask&normal_mask,minval=-3,maxval=3)
 
       for chrom,chrom_events in groupby(assay_events,key=attrgetter(options.chromid)):
-        if chrom.startswith('chr'):
-          chrom = chrom[3:]
-
+        chrom        = norm_chromosome(chrom)
         chrom_events = list(chrom_events)
         pos,index    = chrom_indices[chrom]
 
         chrom_genos  = genos[index]
         chrom_baf    = baf[index]
         chrom_lrr    = None
-
-        normal       = get_chrom_normal_mask(pos, chrom_events, options)
 
         if gccorrect:
           chrom_lrr  = lrr_adj[index]
@@ -168,15 +318,30 @@ def main():
           chrom_lrr  = lrr[index]
           valid      = (chrom_lrr>=-2)&(chrom_lrr<=2)
 
-        normal       =   normal &valid
-        abnormal     = (~normal)&valid
+        (normal_mask,
+         abnormal_mask,
+         eventrecs)  = build_chromosome_masks(pos, chrom_baf, chrom_lrr, mask=valid, events=chrom_events,
+                                              chromid=options.chromid, segstart=options.segstart,
+                                              segstop=options.segstop)
 
-        print '  chr%-3s Normal: LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
-                    (chrom,chrom_lrr[normal].mean(),1.96*chrom_lrr[normal].std(),
-                           chrom_baf[normal].mean(),1.96*chrom_baf[normal].std())
-        print '       Abnormal: LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
-                          (chrom_lrr[abnormal].mean(),1.96*chrom_lrr[abnormal].std(),
-                           chrom_baf[abnormal].mean(),1.96*chrom_baf[abnormal].std())
+        lrr_normal   = chrom_lrr[normal_mask]
+        baf_normal   = chrom_baf[normal_mask]
+
+        lrr_abnormal = chrom_lrr[abnormal_mask]
+        baf_abnormal = chrom_baf[abnormal_mask]
+
+        print '  chr%-3s Normal: probes=%5d LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
+                    (chrom,len(lrr_normal),
+                           lrr_normal.mean(),1.96*lrr_normal.std(),
+                           baf_normal.mean(),1.96*baf_normal.std())
+
+        print '       Abnormal: probes=%5d LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
+                          (len(lrr_abnormal),
+                           lrr_abnormal.mean(),1.96*lrr_abnormal.std(),
+                           baf_abnormal.mean(),1.96*baf_abnormal.std())
+
+        baf_gmm_normal   = fit_gmm_baf(baf_normal,  max_baf=3)
+        baf_gmm_abnormal = fit_gmm_baf(baf_abnormal,max_baf=4)
 
         variables = chrom_events[0]._asdict()
         variables.update(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom)
@@ -185,8 +350,9 @@ def main():
         plotname = '%s/%s' % (options.outdir,plotname)
         title    = options.title.format(**variables)
 
-        plot_chromosome(plotname, pos[valid], chrom_lrr[valid], chrom_baf[valid], genos=chrom_genos[valid],
-                        title=title, events=chrom_events, startattr=options.segstart, stopattr=options.segstop)
+        plot_chromosome(plotname, pos, chrom_lrr, chrom_baf, normal_mask, abnormal_mask,
+                        baf_gmm_normal, baf_gmm_abnormal,
+                        genos=chrom_genos, title=title, events=eventrecs)
 
 
 if __name__=='__main__':
