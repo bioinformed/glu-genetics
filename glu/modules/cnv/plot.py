@@ -1,24 +1,20 @@
 from __future__ import division
 
-import time
-
 import numpy as np
 
 import matplotlib.pyplot   as plt
 import matplotlib          as mpl
 import matplotlib.gridspec as gridspec
 
-from   mpl_toolkits.axes_grid1 import make_axes_locatable
 from   matplotlib.ticker       import NullFormatter
 
 from   scipy.stats             import gaussian_kde
-
 
 from   glu.lib.recordtype      import recordtype
 
 
 def plot_baf_bars(seg_hist,c,mu,sd):
-  colors = ['yellow'] + ['lightgreen']*(c-2) + ['yellow']
+  colors = ['lightgreen']*c
 
   for i in range(c):
     left  = mu[i]-sd[i]
@@ -28,25 +24,24 @@ def plot_baf_bars(seg_hist,c,mu,sd):
     peak.set_clip_box(seg_hist.bbox)
     peak.set_alpha(0.5)
     seg_hist.add_patch(peak)
-    if i and i+1!=c:
-      seg_hist.axhline(y=mu[i]*4-2, color='black', zorder=100)
+    seg_hist.axhline(y=mu[i]*4-2, color='black', zorder=100)
 
 
-def plot_hist(hist,bins,lrr,baf,gmm):
+def plot_hist(hist,bins,lrr,baf,gmm=None):
   nullfmt  = NullFormatter()
   hist.xaxis.set_major_formatter(nullfmt)
   hist.yaxis.set_major_formatter(nullfmt)
 
-  mask = (baf>0)&(baf<1)
-  baf  = baf[mask]
+  if lrr is not None and len(lrr)>100:
+    hist.hist(lrr,  bins=bins, color='black', label='LRR',
+                    normed=True, orientation='horizontal', histtype='step')
+
+  if baf is None or lrr is None:
+    return
 
   if gmm is not None:
     c,mu,sd,ws = gmm
     plot_baf_bars(hist,c,mu,sd)
-
-  if len(lrr)>100:
-    hist.hist(lrr,  bins=bins, color='black', label='LRR',
-                    normed=True, orientation='horizontal', histtype='step')
 
   mask = (baf>0.01)&(baf<0.99)
   if mask.sum()>100:
@@ -55,17 +50,25 @@ def plot_hist(hist,bins,lrr,baf,gmm):
                     normed=True, orientation='horizontal', histtype='step')
 
 
-def plot_chromosome(filename, pos, lrr, baf, normal_mask, abnormal_mask, 
-                              baf_gmm_normal, baf_gmm_abnormal,
-                              genos=None, title=None, events=None):
+def plot_chromosome(filename, pos, lrr, baf, genos=None, title=None, events=None):
+  valid           = np.isfinite(lrr)
+  lrr             = lrr[valid]
+  baf             = baf[valid]
+  normal_lrr      = lrr
+  normal_baf      = baf
+  pos             = pos[valid]/1000000.
+  genos           = genos[valid] if genos is not None else None
 
-  valid         = normal_mask|abnormal_mask
-  lrr           = lrr[valid]
-  baf           = baf[valid]
-  pos           = pos[valid]/1000000.
-  normal_mask   = normal_mask[valid]
-  abnormal_mask = abnormal_mask[valid]
-  genos         = genos[valid] if genos is not None else None
+  if events:
+    event_mask    = np.zeros_like(lrr,dtype=bool)
+
+    for i,event in enumerate(events):
+      start       = event.start / 1000000
+      stop        = event.stop  / 1000000
+      event_mask |= (pos>=start)&(pos<=stop)
+
+    normal_lrr = normal_lrr[~event_mask]
+    normal_baf = normal_baf[~event_mask]
 
   np.set_printoptions(linewidth=120,precision=2,suppress=True)
   np.seterr(all='ignore')
@@ -81,7 +84,10 @@ def plot_chromosome(filename, pos, lrr, baf, normal_mask, abnormal_mask,
 
   fig.subplots_adjust(left=0.0001, right=0.9999, wspace=0.0001)
 
-  gs = gridspec.GridSpec(2,6,width_ratios=[2.5,20,2.25,2,0.1,2],height_ratios=[1,19])
+  histograms = (len(normal_lrr)>0) + len(events or [])
+  widths = [2.5,20,2.25,2]+[0.1,2]*(histograms-1)
+  nsub   = 4+2*(histograms-1)
+  gs = gridspec.GridSpec(2,nsub,width_ratios=widths,height_ratios=[1,19])
 
   main = plt.subplot(gs[1,1])
   main.axis( [pos.min(),pos.max(),-2,2] )
@@ -115,7 +121,7 @@ def plot_chromosome(filename, pos, lrr, baf, normal_mask, abnormal_mask,
     tl.set_color('red')
 
   binwidth = 0.02
-  bins     = np.arange(-2, 2., binwidth)
+  bins     = np.arange(-2, 2, binwidth)
 
   if events:
     evsegs = plt.subplot(gs[0,1])
@@ -129,10 +135,8 @@ def plot_chromosome(filename, pos, lrr, baf, normal_mask, abnormal_mask,
       stop  = event.stop  / 1000000
       mid   = (event.start+event.stop)/2.0
 
-      mask  = event.mask[valid]
-
-      if mask.sum()>1:
-        lrr_mean  = lrr[mask].mean()
+      if event.lrr is not None and len(event.lrr):
+        lrr_mean  = event.lrr.mean()
         lrr_bmean = (lrr_mean+2)/4
 
         sec.plot([start,stop],[lrr_bmean,lrr_bmean],
@@ -145,16 +149,24 @@ def plot_chromosome(filename, pos, lrr, baf, normal_mask, abnormal_mask,
       evsegs.annotate('%d' % i, xy=(mid,0), xycoords='data',
                                 xytext=(1,0), horizontalalignment='center')
 
-  norm_hist = plt.subplot(gs[1,3])
-  norm_hist.set_xlabel('Norm')
-  norm_hist.set_ylim(main.get_ylim())
-  plot_hist(norm_hist,bins,lrr[normal_mask],baf[normal_mask],baf_gmm_normal)
 
-  if events:
-    seg_hist = plt.subplot(gs[1,5])
+  h = 3
+  if len(normal_lrr):
+    norm_hist = plt.subplot(gs[1,h])
+    h        += 2
+
+    norm_hist.set_xlabel('Norm')
+    norm_hist.set_ylim(main.get_ylim())
+    plot_hist(norm_hist,bins,normal_lrr,normal_baf)
+
+  for i,event in enumerate(events):
+    seg_hist  = plt.subplot(gs[1,h])
+    h        += 2
+
     seg_hist.set_ylim(main.get_ylim())
-    seg_hist.set_xlabel('Events')
-    plot_hist(seg_hist,bins,lrr[abnormal_mask],baf[abnormal_mask],baf_gmm_abnormal)
+    seg_hist.set_xlabel('Seg%d' % (i+1))
+
+    plot_hist(seg_hist,bins,event.lrr,event.baf,event.baf_model)
 
   plt.show()
   plt.savefig(filename)

@@ -12,20 +12,21 @@ __revision__  = '$Id$'
 import os
 
 import numpy as np
+import scipy.stats
 
-from   itertools            import groupby
-from   operator             import attrgetter
+from   itertools                 import groupby
+from   operator                  import attrgetter
 
-from   collections          import namedtuple
+from   collections               import namedtuple
 
-from   glu.lib.fileutils    import table_reader, cook_table, table_options
-from   glu.lib.recordtype   import recordtype
+from   glu.lib.fileutils         import table_reader, table_writer, cook_table, table_options
+from   glu.lib.recordtype        import recordtype
 
-from   glu.modules.cnv.gdat import GDATIndex, get_gcmodel, gc_correct
-from   glu.modules.cnv.plot import plot_chromosome
+from   glu.modules.cnv.gdat      import GDATIndex, get_gcmodel, gc_correct
+from   glu.modules.cnv.plot      import plot_chromosome
+from   glu.modules.cnv.normalize import quantile
 
-
-Event = recordtype('Event', 'chrom start stop mask')
+Event = recordtype('Event', 'chrom start stop fields lrr baf baf_model state pmosaic')
 
 
 def fit_gmm1(components,x):
@@ -100,6 +101,51 @@ def fit_gmm3(k,x,wnoise=0.02):
   w     =  w[order]
 
   if 0:
+    print '  %d band component mixture: logL=%f' % (k,logL)
+    print '      AIC: %.2f' % (4*(k+2)-2*logL)
+    print '    MEANS:',mu
+    print '       SD:',sd
+    print '  WEIGHTS:',w
+    print
+
+  return logL,mu,sd,w
+
+
+def fit_gmm4(k,x,wnoise=0.02):
+  import mixture
+
+  dataset = mixture.DataSet()
+  dataset.fromArray(x)
+
+  if k==0:
+    wnoise = 1
+
+  noise   = mixture.UniformDistribution(0,1)
+  hets    = [ mixture.NormalDistribution( (i+1)/(k+1), 0.05) for i in range(k) ]
+  for het in hets:
+    het.min_sigma = 0.03
+
+  dists   = hets[:]
+  weights = [(1-wnoise)/k if k else 0]*k
+
+  if wnoise>0:
+    dists.append(noise)
+    weights.append(wnoise)
+
+  mix = mixture.MixtureModel(len(dists), weights, dists)
+
+  post,logL = mix.EM(dataset, 100, delta=0.001, silent=True)
+
+  w     = np.array(mix.pi,                      dtype=float)
+  mu    = np.array([het.mu    for het in hets], dtype=float)
+  sd    = np.array([het.sigma for het in hets], dtype=float)
+
+  order = mu.argsort()
+  mu    = mu[order]
+  sd    = sd[order]
+  w     =  w[order]
+
+  if 0:
     print '  %d band component mixture: logL=%f' % (k+2,logL)
     print '      AIC: %.2f' % (4*(k+2)-2*logL)
     print '    MEANS:',mu
@@ -110,7 +156,7 @@ def fit_gmm3(k,x,wnoise=0.02):
   return logL,mu,sd,w
 
 
-def fit_gmm_baf(baf,max_baf=4):
+def fit_gmm_baf(baf,max_baf=2):
   #mask = (baf>0)&(baf<1)
 
   mask = np.isfinite(baf)
@@ -123,12 +169,12 @@ def fit_gmm_baf(baf,max_baf=4):
   import time
 
   t0        = time.time()
-  fits      = [ fit_gmm3(c,baf) for c in range(2,max_baf+1) ]
-  AIC       = np.array([ (20*c-2*f[0]) for c,f in enumerate(fits,2) ], dtype=float)
+  fits      = [ fit_gmm4(c,baf) for c in range(0,max_baf+1) ]
+  AIC       = np.array([ (20*c-2*f[0]) for c,f in enumerate(fits) ], dtype=float)
   best      = AIC.argmin()
 
   logL,mu,sd,ws = fits[best]
-  c             = best+2
+  c             = best #+2
 
   if 0:
     print '        TIME: %.2f s' % (time.time()-t0)
@@ -148,11 +194,12 @@ def norm_chromosome(chrom):
     chrom = chrom[3:]
   if chrom.upper()=='MT':
     chrom = 'M'
+
   return chrom
 
 
-def get_assay_normal_mask(lrr,chrom_indices,events,options):
-  normal_mask = np.ones_like(lrr,dtype=bool)
+def build_normal_mask(s,chrom_indices,events,options):
+  normal_mask = np.ones(s,dtype=bool)
 
   if options.chromid and options.segstart and options.segstop:
     for chrom,chrom_events in groupby(events,key=attrgetter(options.chromid)):
@@ -169,17 +216,31 @@ def get_assay_normal_mask(lrr,chrom_indices,events,options):
   return normal_mask
 
 
-def get_chrom_normal_mask(pos,events,options):
-  normal_mask = np.ones_like(pos,dtype=bool)
+def build_events(lrr, baf, chrom_indices, valid_mask, events, options):
+  eventrecs       = []
 
   if options.chromid and options.segstart and options.segstop:
-    for i,event in enumerate(events):
-      start        = int(getattr(event,options.segstart))
-      stop         = int(getattr(event,options.segstop ))
-      event_mask   = (pos>=start)&(pos<=stop)
-      normal_mask &= ~event_mask
+    for i,event in enumerate(events or []):
+      chrom       = getattr(event,options.chromid)
+      chrom       = norm_chromosome(chrom)
+      pos,indices = chrom_indices[chrom]
+      start       = int(getattr(event,options.segstart))
+      stop        = int(getattr(event,options.segstop ))
 
-  return normal_mask
+      event_mask  = valid_mask[indices]
+      event_mask &= pos >= start-1
+      event_mask &= pos <= stop
+
+      if event_mask.sum()>10:
+        event_lrr   = lrr[indices][event_mask]
+        event_baf   = baf[indices][event_mask]
+      else:
+        event_lrr   = None
+        event_baf   = None
+
+      eventrecs.append( Event(chrom,start,stop,event,event_lrr,event_baf,None,None,None) )
+
+  return eventrecs
 
 
 def build_chromosome_masks(pos, baf, lrr, mask=None, events=None, chromid=None, segstart=None, segstop=None):
@@ -206,9 +267,152 @@ def build_chromosome_masks(pos, baf, lrr, mask=None, events=None, chromid=None, 
     normal_mask   &= ~event_mask
     abnormal_mask |=  event_mask
 
-    eventrecs.append( Event(chrom,start,stop,event_mask) )
+    eventrecs.append( Event(chrom,start,stop,event_mask,None,None) )
 
   return normal_mask,abnormal_mask,eventrecs
+
+
+def valid_autosome_mask(s,chrom_indices):
+  missing      = [np.array([], dtype=int)]*2
+  chr6_pos,\
+  chr6_indices = chrom_indices['6']
+  hla          = chr6_indices[(chr6_pos>26000000)&(chr6_pos<34000000)]
+  chrX         = chrom_indices.get('X', missing)[1]
+  chrY         = chrom_indices.get('Y', missing)[1]
+  chrXY        = chrom_indices.get('XY',missing)[1]
+  chrM         = chrom_indices.get('M', missing)[1]
+
+  valid        = np.ones(s, dtype=bool)
+  valid[hla ]  = False
+  valid[chrX]  = False
+  valid[chrY]  = False
+  valid[chrXY] = False
+  valid[chrM]  = False
+
+  return valid
+
+
+def mirror_baf_distribution(baf,genos,mask,trim=0.20,threshold=0.0001,maxsize=100000):
+  aa_mask       = genos=='AA'
+  aa_mask      &= mask
+  aa_mask      &= baf>threshold
+
+  bb_mask       = genos=='BB'
+  bb_mask      &= mask
+  bb_mask      &= baf<(1-threshold)
+
+  aa_baf        = baf[aa_mask]
+  bb_baf        = baf[bb_mask]
+
+  aa_baf.sort()
+  bb_baf.sort()
+
+  aa_limit      = int(len(aa_baf)*(1-trim))
+  bb_limit      = int(len(bb_baf)*   trim )
+
+  print 'AA: Extracting %d elements, threshold value=%f' % (aa_limit,aa_baf[aa_limit])
+  print 'BB: Extracting %d elements, threshold value=%f' % (bb_limit,bb_baf[bb_limit])
+
+  aa_baf        =  aa_baf[:aa_limit]
+  bb_baf        =  bb_baf[bb_limit:]
+
+  aa_baf_max    = aa_baf.max()
+  bb_baf_min    = bb_baf.min()
+
+  aa_baf        =   -aa_baf
+  bb_baf        =  2-bb_baf
+
+  np.random.shuffle(aa_baf)
+  np.random.shuffle(bb_baf)
+
+  if maxsize:
+    aa_baf      = aa_baf[:maxsize]
+    bb_baf      = bb_baf[:maxsize]
+
+  return aa_baf,aa_baf_max,bb_baf,bb_baf_min
+
+
+def augment_event_baf(baf,aa_baf,aa_baf_max,bb_baf,bb_baf_min):
+  baf_mask = (baf>0)&(baf<1)
+  aa_count = ((baf<aa_baf_max)&baf_mask).sum()
+  bb_count = ((baf>bb_baf_min)&baf_mask).sum()
+  baf_aug = np.concatenate( (baf[baf_mask],aa_baf[:aa_count],bb_baf[:bb_count]) )
+  print '  Adding BAF values: AA<%f = %d, BB>%f = %d.  Size %d -> %d' % (aa_baf_max,aa_count,bb_baf_min,bb_count,len(baf),len(baf_aug))
+
+  return baf_aug
+
+
+def strip_event_baf(baf,aa_baf_max,bb_baf_min):
+  baf_mask = (baf>aa_baf_max)&(baf<bb_baf_min)
+  baf_aug  = baf[baf_mask]
+  return baf_aug
+
+
+def infer_mosaic_state(event,sd_threshold=0.25):
+  if event.lrr is None:
+    return
+
+  lrr_mean  = event.lrr.mean()
+  lrr_sd    = event.lrr.std(ddof=1)
+
+  snr       = abs(lrr_mean)/lrr_sd
+
+  if snr>sd_threshold:
+    if event.lrr.mean()<0:
+      event.state = 'LOSS'
+    else:
+      event.state = 'GAIN'
+  else:
+    event.state   = 'NEUTRAL'
+
+  if not event.baf_model:
+    return
+
+  c,mu,sd,ws = event.baf_model
+
+  if c==2:
+    if event.state=='GAIN':
+      event.pmosaic = min(1,3*(mu[1]-mu[0]))
+    else:
+      event.pmosaic =          mu[1]-mu[0]
+  elif event.state!='GAIN' and c<2:
+    event.pmosaic = 1
+
+
+def update_event_fields(event):
+  fields          = event.fields
+  fields.Probes   = len(event.lrr)
+  fields.STATE    = event.state
+  fields.PMosaic  = '%d' % event.pmosaic if event.pmosaic is not None else ''
+  fields.LRR_mean = '%.3f' % event.lrr.mean()
+  fields.LRR_sd   = '%.3f' % event.lrr.std(ddof=1)
+
+  if not event.baf_model:
+    fields.BAF_BANDS = ''
+    fields.BAF_means = ''
+    fields.BAF_sds   = ''
+  else:
+    c,mu,sd,ws = event.baf_model
+
+    if not c:
+      fields.BAF_BANDS = 0
+      fields.BAF_means = ''
+      fields.BAF_sds   = ''
+    else:
+      fields.BAF_BANDS = c
+      fields.BAF_means = ','.join('%.3f' % m for m in mu)
+      fields.BAF_sds   = ','.join('%.3f' % s for s in sd)
+
+
+def t_test(mu1,sd1,n1,mu2,sd2,n2):
+  ss1   = sd1**2 / n1
+  ss2   = sd2**2 / n2
+  ssp   = ss1 + ss2
+  t     = (mu1 - mu2) / ssp**0.5
+  df    = ssp**2 // (ss1**2/(n1-1) + ss2**2/(n2-1))
+  p     = 2*scipy.stats.distributions.t.cdf(-abs(t),df)
+
+  return t,df,p
 
 
 def option_parser():
@@ -222,6 +426,7 @@ def option_parser():
   parser.add_argument('--gcmodel',    metavar='GCM', help='GC model file to use')
   parser.add_argument('--gcmodeldir', metavar='DIR', help='GC models directory')
   parser.add_argument('--outdir',     metavar='DIR', help='Plot output directory', default='.')
+  parser.add_argument('--outevents',  metavar='FILE', help='Output annotated events')
   parser.add_argument('--template',   metavar='VAL', default='{GDAT}_{ASSAY}_chr{CHROMOSOME}.png',
                                       help='Plot name template (default={GDAT}_{ASSAY}_chr{CHROMOSOME}.png)')
   parser.add_argument('--title',      metavar='VAL', default='Intensity plot of {GDAT}:{ASSAY} chr{CHROMOSOME}',
@@ -249,13 +454,25 @@ def main():
   gcmodels  = {}
   chip_indices = {}
 
+  add_fields = ['Probes','STATE','PMosaic','LRR_mean','LRR_sd','BAF_BANDS','BAF_means','BAF_sds']
+
   events    = table_reader(options.events)
   events    = cook_table(events,options)
+
   header    = next(events)
-  Event     = namedtuple('Event', header)._make
-  events    = [ Event(e) for e in events ]
+  extra     = [ h for h in add_fields if h not in header ]
+  header   += extra
+  blanks    = ['']*len(extra)
+
+  Event     = recordtype('Event', header)._make
+  events    = [ Event(e+blanks) for e in events ]
 
   events.sort(key=attrgetter(options.assayid,options.chromid))
+
+  out       = table_writer(options.outevents) if options.outevents else None
+
+  if out:
+    out.writerow(header)
 
   for assay,assay_events in groupby(events,key=attrgetter(options.assayid)):
     assay_events = list(assay_events)
@@ -267,26 +484,33 @@ def main():
       continue
 
     for gdat,offset in locations:
-      gdatname      = '_'.join(os.path.splitext(os.path.basename(gdat.filename))[0].split('_')[:2])
-      manifest      = gdat.attrs['ManifestName'].replace('.bpm','')
+      gdatname        = '_'.join(os.path.splitext(os.path.basename(gdat.filename))[0].split('_')[:2])
+      manifest        = gdat.attrs['ManifestName'].replace('.bpm','')
 
-      chrom_indices = chip_indices.get(manifest)
+      chrom_indices,\
+      autosome_mask   = chip_indices.get(manifest, (None,None))
 
       if chrom_indices is None:
         print 'Loading mapping information for %s...' % manifest
-        chrom_indices = chip_indices[manifest] = gdat.chromosome_index
+        chrom_indices = gdat.chromosome_index
+        autosome_mask = valid_autosome_mask(gdat.snp_count,chrom_indices)
 
-      print 'GDAT:',gdatname,assay
+        chip_indices[manifest] = chrom_indices,autosome_mask
+
+      print 'GDAT:ASSAY =',gdatname,assay
 
       assay_id,genos,lrr,baf = gdat.cnv_data(offset)
-      normal_mask  = get_assay_normal_mask(lrr,chrom_indices,assay_events,options)
-      mask         = normal_mask&np.isfinite(lrr)&(lrr>=-2)&(lrr<=2)
+      normal_mask            = build_normal_mask(len(lrr),chrom_indices,assay_events,options)
+      valid_mask             = (lrr>=-2)&(lrr<=2)
+      valid_mask            &= autosome_mask
 
-      if not mask.sum():
+      base_mask              = normal_mask&valid_mask
+
+      if not base_mask.sum():
         print '  ASSAY %s DOES NOT CONTAIN VALID LRR/BAF data' % assay
         continue
 
-      lrr         -= lrr[mask].mean()
+      lrr -= lrr[base_mask].mean()
 
       if gccorrect:
         gcmodel  = gcmodels.get(manifest)
@@ -296,63 +520,59 @@ def main():
           gcmodels[manifest] = gcmodel = get_gcmodel(filename,chrom_indices)
 
         gcdesign,gcmask = gcmodel
-        lrr_adj         = gc_correct(lrr, gcdesign, gcmask&normal_mask,minval=-3,maxval=3)
+        lrr             = gc_correct(lrr, gcdesign, gcmask&valid_mask)
 
-      for chrom,chrom_events in groupby(assay_events,key=attrgetter(options.chromid)):
+      normal_lrr    = lrr[base_mask]
+      normal_lrr_sd = normal_lrr.std(ddof=1)
+      print '  ALL    Normal: probes=%7d LRR=%6.3f +- %.3f' % (len(normal_lrr),normal_lrr.mean(),
+                                                                          1.96*normal_lrr_sd)
+
+      aa_baf,aa_baf_max,\
+      bb_baf,bb_baf_min = mirror_baf_distribution(baf,genos,base_mask)
+
+      eventrecs = build_events(lrr, baf, chrom_indices, valid_mask, assay_events, options)
+      eventrecs.sort(key=attrgetter('chrom'))
+
+      for i,event in enumerate(eventrecs):
+        if event.lrr is None:
+          print '  EVENT %02d: Skipped... no valid probes.' % (i+1)
+          continue
+
+        event_baf = strip_event_baf(event.baf,aa_baf_max,bb_baf_min)
+        #event_baf = augment_event_baf(event.baf,aa_baf,aa_baf_max,bb_baf,bb_baf_min)
+        event.baf_model = fit_gmm_baf(event_baf,max_baf=2)
+
+        infer_mosaic_state(event)
+        update_event_fields(event)
+        out.writerow(event.fields)
+
+        print '  EVENT %2d: chr%-3s probes=%d LRR=%6.3f +- %.3f STATE=%s %%Mosaic=%s' \
+                    % (i+1, event.chrom,len(event.lrr),event.lrr.mean(),1.96*event.lrr.std(ddof=1),
+                            event.state, (int(100*event.pmosaic) if event.pmosaic is not None else '?'))
+
+      print
+
+      for chrom,chrom_events in groupby(eventrecs,key=attrgetter('chrom')):
         chrom        = norm_chromosome(chrom)
         chrom_events = list(chrom_events)
         pos,index    = chrom_indices[chrom]
 
+        #chrom_valid  = valid_mask[index]
+        #chrom_normal = normal_mask[index]
         chrom_genos  = genos[index]
         chrom_baf    = baf[index]
-        chrom_lrr    = None
+        chrom_lrr    = lrr[index]
 
-        if gccorrect:
-          chrom_lrr  = lrr_adj[index]
-          valid      = (chrom_lrr>=-2)&(chrom_lrr<=2)
-
-          if valid.sum()<100:
-            chrom_lrr = None
-
-        if chrom_lrr is None:
-          chrom_lrr  = lrr[index]
-          valid      = (chrom_lrr>=-2)&(chrom_lrr<=2)
-
-        (normal_mask,
-         abnormal_mask,
-         eventrecs)  = build_chromosome_masks(pos, chrom_baf, chrom_lrr, mask=valid, events=chrom_events,
-                                              chromid=options.chromid, segstart=options.segstart,
-                                              segstop=options.segstop)
-
-        lrr_normal   = chrom_lrr[normal_mask]
-        baf_normal   = chrom_baf[normal_mask]
-
-        lrr_abnormal = chrom_lrr[abnormal_mask]
-        baf_abnormal = chrom_baf[abnormal_mask]
-
-        print '  chr%-3s Normal: probes=%5d LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
-                    (chrom,len(lrr_normal),
-                           lrr_normal.mean(),1.96*lrr_normal.std(),
-                           baf_normal.mean(),1.96*baf_normal.std())
-
-        print '       Abnormal: probes=%5d LRR=%6.3f += %.3f, BAF=%.2f +- %.2f' %  \
-                          (len(lrr_abnormal),
-                           lrr_abnormal.mean(),1.96*lrr_abnormal.std(),
-                           baf_abnormal.mean(),1.96*baf_abnormal.std())
-
-        baf_gmm_normal   = fit_gmm_baf(baf_normal,  max_baf=3)
-        baf_gmm_abnormal = fit_gmm_baf(baf_abnormal,max_baf=4)
-
-        variables = chrom_events[0]._asdict()
-        variables.update(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom)
+        states    = ','.join('%s:%s%%' % (e.state,int(100*e.pmosaic) if e.pmosaic else '?') for e in chrom_events)
+        variables = chrom_events[0].fields._asdict()
+        variables.update(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom,STATES=states)
 
         plotname = options.template.format(**variables)
         plotname = '%s/%s' % (options.outdir,plotname)
         title    = options.title.format(**variables)
 
-        plot_chromosome(plotname, pos, chrom_lrr, chrom_baf, normal_mask, abnormal_mask,
-                        baf_gmm_normal, baf_gmm_abnormal,
-                        genos=chrom_genos, title=title, events=eventrecs)
+        plot_chromosome(plotname, pos, chrom_lrr, chrom_baf, genos=chrom_genos,
+                        title=title, events=chrom_events)
 
 
 if __name__=='__main__':
