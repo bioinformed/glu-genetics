@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import division
+
 __abstract__  = 'miscellaneous statistical functions'
 __copyright__ = 'Copyright (c) 2007-2009, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
@@ -96,6 +98,62 @@ def quantile(data, k, presorted=False):
     q = (1-f)*data[w] + f*data[w+1]
 
   return q
+
+
+def wilson_score_interval(x,n,alpha=0.05):
+  '''
+  wilson_score_interval(x,n,alpha=0.05) -> frequency, lower limit, upper limit
+
+  Compute the binomial proportion confidence interval for a proportion x/n
+  for power alpha or, equivalently, a confidence interval of 1-alpha.
+
+  The Wilson interval is an improvement (the actual coverage probability is
+  closer to the nominal value) over the normal approximation interval and
+  was first developed by Edwin Bidwell Wilson (1927).
+
+  For more information, see:
+
+    http://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval
+
+    Wilson, E. B. (1927). "Probable inference, the law of succession, and
+    statistical inference".  Journal of the American Statistical Association
+    22: 209–212.  JSTOR 2276774.
+
+    Agresti, Alan; Coull, Brent A. (1998). "Approximate is better than
+    'exact' for interval estimation of binomial proportions".  The American
+    Statistician 52: 119–126.  doi:10.2307/2685469.  JSTOR 2685469.
+    MR1628435.
+
+  >>> wilson_score_interval(0,40)
+  (0.0, 0.0, 0.08762160119728668)
+  >>> wilson_score_interval(1,40)
+  (0.025, 0.0012823323596887644, 0.12881368963474096)
+  >>> wilson_score_interval(39,40)
+  (0.975, 0.87118631036525906, 0.9987176676403112)
+  >>> wilson_score_interval(40,40)
+  (1.0, 0.91237839880271343, 1.0)
+  '''
+  import scipy.stats
+  from   math import log
+
+  p = x/n
+  z = -scipy.stats.distributions.norm.ppf(alpha/2)
+
+  if x==1:
+    p_lower =   - log(1-alpha)/n
+  else:
+    p_lower = (p + z*z/n/2 - z*( (p*(1-p) + z*z/4/n)/n )**0.5)/(1+z*z/n)
+
+  if x==n-1:
+    p_upper = 1 + log(1-alpha)/n
+  else:
+    p_upper = (p + z*z/n/2 + z*( (p*(1-p) + z*z/4/n)/n )**0.5)/(1+z*z/n)
+
+
+  p_lower = max(0.,p_lower)
+  p_upper = min(1.,p_upper)
+
+  return p,p_lower,p_upper
 
 
 def _test():
