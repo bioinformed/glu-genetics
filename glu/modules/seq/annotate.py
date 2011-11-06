@@ -8,7 +8,6 @@ __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of 
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
-import time
 import sys
 
 from   operator                     import itemgetter
@@ -20,9 +19,11 @@ from   Bio.Seq                      import Seq
 from   Bio.Data.CodonTable          import TranslationError
 
 from   glu.lib.utils                import gcdisabled
-from   glu.lib.fileutils            import table_writer, table_reader
+from   glu.lib.fileutils            import table_writer, table_reader, autofile, hyphen
 from   glu.lib.progressbar          import progress_loop
+from   glu.lib.recordtype           import recordtype
 
+from   glu.lib.seqlib.cgfvariants   import CGFVariants
 from   glu.lib.seqlib.edits         import reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
@@ -30,12 +31,13 @@ from   glu.lib.genedb               import open_genedb
 from   glu.lib.genedb.queries       import query_snps_by_location, query_cytoband_by_location
 
 
-Gene = namedtuple('Gene', 'id name symbol geneid mRNA protein canonical chrom strand txStart txEnd '
-                          'cdsStart cdsEnd exonCount exonStarts exonEnds')
-
-SNP  = namedtuple('SNP',  'name chrom start end strand refAllele alleles vclass func weight')
-
-GeneFeature = namedtuple('GeneFeature', 'chrom start end cds_index exon_num type')
+GeneRecord   = namedtuple('GeneRecord',   'id name symbol geneid mRNA protein canonical chrom strand '
+                                          'txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds')
+SNPRecord    = namedtuple('SNPRecord',    'name chrom start end strand refAllele alleles vclass func weight')
+GeneFeature  = namedtuple('GeneFeature',  'chrom start end cds_index exon_num type')
+GeneEvidence = recordtype('GeneEvidence', 'chrom cytoband ref_start ref_end intersect gene details '
+                                          'func_class func_type ref_nuc var_nuc ref_aa var_aa')
+VCFRecord    = recordtype('VCFRecord',    'chrom start end names ref var qual filter info format genos')
 
 
 def decode_gene(gene):
@@ -103,15 +105,14 @@ def decode_gene(gene):
 def get_transcripts(con):
   cur = con.cursor()
   cur.execute('SELECT * FROM GENE;')
-  return imap(Gene._make, iter(cur))
+  return imap(GeneRecord._make, iter(cur))
 
 
 def get_snps(con):
   cur = con.cursor()
-  #cur.execute('SELECT * FROM SNP WHERE func<>"";')
   cur.execute('SELECT * FROM SNP;')
 
-  make  = SNP._make
+  make  = SNPRecord._make
   strcache    = {}
   allelecache = {}
   funccache   = {}
@@ -156,7 +157,7 @@ def get_snps(con):
 def get_snps_interval(con, chrom, ref_start, ref_end):
   snps = query_snps_by_location(con, chrom, ref_start, ref_end)
 
-  make = SNP._make
+  make = SNPRecord._make
   for row in snps:
     # name chrom start end strand refAllele alleles vclass func weight
     row    = list(row)
@@ -201,28 +202,24 @@ class VariantAnnotator(object):
     key = gene.id
 
     try:
-      result = gene_cache.pop(key)
+      parts = gene_cache.pop(key)
     except KeyError:
-      gene_parts = list(decode_gene(gene))
+      partlist = list(decode_gene(gene))
 
-      features = IntervalTree()
-      for feature in gene_parts:
-        features.insert(feature.start,feature.end,feature)
+      parts = IntervalTree()
+      for part in partlist:
+        parts.insert(part.start,part.end,part)
 
-      result = gene_parts,features
-
-      if len(gene_cache)>=200:
+      if len(gene_cache)>=300:
         gene_cache.popitem(0)
 
     # Add result to end of LRU
-    gene_cache[key] = result
+    gene_cache[key] = parts
 
-    return result
+    return parts
 
 
   def classify(self, chrom, ref_start, ref_end, variant, nsonly=False):
-    #print chrom,ref_start,ref_end,variant
-
     variant = variant.replace('-','')
 
     ref_nuc = self.reference.fetch(chrom,ref_start,ref_end).upper()
@@ -249,25 +246,26 @@ class VariantAnnotator(object):
           three_prime.add(gene)
 
       for gene in five_prime:
-        evidence.append( ["5' of gene",gene.symbol,gene.mRNA,'','',
-                          ref_nuc,var_nuc,'',''] )
+        evidence.append( ["5' of gene",gene,'','','',ref_nuc,var_nuc,'',''] )
 
       for gene in three_prime:
-        evidence.append( ["3' of gene",gene.symbol,gene.mRNA,'','',
-                          ref_nuc,var_nuc,'',''] )
+        evidence.append( ["3' of gene",gene,'','','',ref_nuc,var_nuc,'',''] )
 
     if not evidence:
       evidence.append( ['intergenic','','','','',ref_nuc,var_nuc,'',''] )
 
     evidence = group_evidence(evidence)
-    dbsnp    = self.get_dbsnp(chrom, ref_start, ref_end, ref_nuc, var_nuc)
-    evidence = [ e+dbsnp for e in evidence ]
-
     cytoband = query_cytoband_by_location(self.con, chrom, ref_start)
     cytoband = ','.join(c[0] for c in cytoband)
-
     context  = [ chrom,cytoband,ref_start,ref_end ]
-    evidence = [ context+e for e in evidence ]
+
+    if 0: # evidence:
+      values = context+evidence[0]
+      for f,v in zip(GeneEvidence.__slots__,values):
+        print '%15s = %s' % (f,v)
+      print
+
+    evidence = [ GeneEvidence._make(context+e) for e in evidence ]
 
     return evidence
 
@@ -275,14 +273,13 @@ class VariantAnnotator(object):
   def classify_feature(self, gene, ref_start, ref_end, ref_nuc, var_nuc):
     #print gene.name,gene.symbol,gene.strand,gene.txStart,gene.txEnd,gene.exonCount,gene.accession
 
-    gene_parts,features = self.decode_gene(gene)
+    gene_parts = self.decode_gene(gene)
 
     intersect = defaultdict(list)
-    for inter in features.find(ref_start, ref_end):
-      intersect[inter.value.type].append(inter.value)
+    for part in gene_parts.find_values(ref_start, ref_end):
+      intersect[part.type].append(part)
 
     evidence = []
-    accession = gene.protein or gene.mRNA
 
     parts    = set(intersect)
     mut_type = set()
@@ -292,8 +289,7 @@ class VariantAnnotator(object):
     else:
       left,right = "3'","5'"
 
-    for splice in features.find(ref_start-10,ref_end+10):
-      splice = splice.value
+    for splice in gene_parts.find_values(ref_start-10,ref_end+10):
       if splice.type=='CDS' or 'UTR' in splice.type:
         if 0<splice.start-ref_end<=10:
           mut_type.add('POSSIBLE %s INTRONIC SPLICE VARIANT' % left)
@@ -308,18 +304,17 @@ class VariantAnnotator(object):
                                        ref_start, ref_end, ref_nuc, var_nuc)
       evidence.append(e)
     elif len(intersect['CDS'])>=1:
-      evidence.append([parts,gene.symbol,accession,
-                       'NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'',''])
+      evidence.append([parts,gene,'','NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'',''])
     else:
-      evidence.append([parts,gene.symbol,accession,
-                       '',mut_type,ref_nuc,var_nuc,'',''])
+      evidence.append([parts,gene,'','',mut_type,ref_nuc,var_nuc,'',''])
 
     return evidence
 
 
   def classify_exonic_variant(self, gene, gene_parts, cds, ref_start, ref_end, ref_nuc, var_nuc):
-    accession = gene.mRNA or gene.protein
-    result = ['CDS',gene.symbol,'%s:exon%d:strand=%s' % (accession,cds.exon_num,gene.strand)]
+    result = ['CDS',gene,'mRNA=%s:protein=%s:exon=%d:strand=%s' % \
+                         (gene.mRNA,gene.protein,cds.exon_num,gene.strand)]
+
     exon_start = ref_start - cds.start
     exon_end   = ref_end   - cds.start
 
@@ -356,14 +351,14 @@ class VariantAnnotator(object):
 
     ref_var_start = 0
     ref_cds_seq   = []
-    for chrom,start,end,cds_index,exon_num,label in gene_parts:
-      if label=='CDS':
-        seq = Seq(self.reference.fetch(chrom,start,end))
+    for part in gene_parts:
+      if part.type=='CDS':
+        seq = Seq(self.reference.fetch(part.chrom,part.start,part.end))
         #assert len(seq)==(end-start)
         ref_cds_seq.append(seq)
-        if cds_index<cds.cds_index:
+        if part.cds_index<cds.cds_index:
           ref_var_start += len(seq)
-        elif cds_index==cds.cds_index:
+        elif part.cds_index==cds.cds_index:
           ref_var_start += exon_start
 
     #assert ref_nuc==str(ref_cds_seq[cds.cds_index][exon_start:exon_end]).upper()
@@ -467,7 +462,6 @@ class VariantAnnotator(object):
 
   def get_dbsnp(self, chrom, ref_start, ref_end, ref_nuc, var_nuc):
     snps     = list(get_snps_interval(self.con, chrom, ref_start, ref_end))
-
     var_comp = str(Seq(var_nuc).complement())
     var      = set([var_nuc,var_comp])
 
@@ -485,7 +479,196 @@ class VariantAnnotator(object):
       else:
         inexact.add(snp.name)
 
-    return [ ','.join(sorted(exact)), ','.join(sorted(inexact)) ]
+    return sorted(exact), sorted(inexact)
+
+
+class VCFReader(object):
+  def __init__(self, filename, hyphen=None):
+    self.data = data    = table_reader(filename,hyphen=sys.stdin)
+
+    self.metadata_order = metadata_order = []
+    self.metadata       = metadata       = defaultdict(list)
+    self.header         = None
+    self.samples        = None
+
+    for row in data:
+      if not row:
+        continue
+      elif row[0].startswith('##'):
+        meta,value = row[0].split('=',1)
+        meta = meta[2:]
+
+        if meta not in metadata:
+          metadata_order.append(meta)
+
+        metadata[meta].append(row)
+
+      elif row[0].startswith('#'):
+        self.header = header = list(row)
+        header[0]   = header[0][1:]
+
+        self.samples = [ (i,s.split('.')[0]) for i,s in enumerate(header[9:]) ]
+        break
+      else:
+        raise ValueError('Invalid VCF file detected')
+
+
+  def __iter__(self):
+    strcache    = {}
+    def intern(x,strcache=strcache.setdefault): return strcache(x,x)
+
+    for row in self.data:
+      chrom      = intern(row[0])
+      end        = int(row[1])
+      start      = end-1
+      names      = row[2].split(',') if row[2]!='.' else []
+      ref        = intern(row[3])
+      var        = [ intern(v) for v in row[4].split(',') ]
+      qual       = row[5]
+      filter     = [ intern(f) for f in row[6].split(';') ] if row[6]!='.' else []
+      info       = row[7].split(';')
+      format     = intern(row[8])
+      genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
+
+      yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
+
+
+def load_kaviar(filename):
+  kaviar = {}
+  for row in table_reader(filename):
+    chrom = row[0]
+    if not chrom.startswith('chr'):
+      chrom = 'chr'+chrom
+    loc = int(row[1])
+
+    for allelestuff in row[2:]:
+      parts = allelestuff.split(':',1)
+      if len(parts)!=2:
+        continue
+      allele,stuff = parts
+      if allele=='rsids':
+        continue
+      stuff = stuff.strip().replace(', ',',')
+      if not stuff.startswith('reference'):
+        kaviar[chrom,loc,allele] = stuff
+
+  return kaviar
+
+
+def update_vcf_annotation(v, vs, cv, kaviar, options):
+  if vs:
+    # FIXME: Order genes and evidence consistently
+    evidence   = list(vs.classify(v.chrom, v.start, v.end, v.var[0], nsonly=False))
+    #v.names   = sorted(set(str(v) for e in evidence for v in e.varid_exact)|set(v.names))
+    genes      = sorted(set(e.gene.symbol for e in evidence if e.gene and e.gene.symbol))
+    geneids    = sorted(set(e.gene.geneid for e in evidence if e.gene and e.gene.geneid))
+    location   = sorted(set(e.intersect   for e in evidence if e.intersect))
+    function   = sorted(set(e.func_class or e.func_type  for e in evidence if e.func_class or e.func_type))
+    nsevidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e.func_class ]
+    nsinfo     = [ '%s:%s:%s->%s' % (e.gene.symbol,e.details,e.ref_aa,e.var_aa)
+                   for e in nsevidence ]
+    if not genes:
+      v.filter.append('NonGenic')
+    elif not nsevidence:
+      v.filter.append('Synonymous')
+
+    new_info = ['GENE_NAME=%s'             % (','.join(genes   )),
+                'GENE_ID=%s'               % (','.join(str(g) for g in geneids)),
+                'GENE_LOCATION=%s'         % (','.join(location)),
+                'GENE_FUNCTION=%s'         % (','.join(function)),
+                'GENE_FUNCTION_DETAILS=%s' % (','.join(nsinfo  )) ]
+
+  if cv:
+    cvinfo  = cv.score_and_classify(v.chrom,v.start,v.end,[v.ref,v.var[0]])
+    if cvinfo.exact_vars:
+      v.names = sorted(set(v.replace('dbsnp:','rs') for v in cvinfo.exact_vars)|set(v.names))
+    inexact = ','.join(sorted(set(cvinfo.inexact_vars))) if cvinfo.inexact_vars else ''
+
+    new_info.append('COMMON_SCORE=%.2f' % cvinfo.common_score)
+    new_info.append('FUNCTION_SCORE=%d' % cvinfo.function_score)
+    new_info.append('INEXACT_VARIANTS=%s' % inexact)
+
+    if cvinfo.common_score>options.commonscore:
+      v.filter.append('Common')
+
+  if options.kaviar:
+    kaviarkey = (v.chrom,v.start,v.var[0])
+    if kaviarkey in kaviar:
+      new_info.append('KAVIAR=%s' % kaviar[kaviarkey].replace(';',','))
+      v.filter.append('Kaviar')
+    else:
+      new_info.append('KAVIAR=')
+
+  if 'tgp' in v.names:
+    v.names.remove('tgp')
+    v.filter.append('1000G')
+
+  if './.' in v.genos:
+    filter.append('PartiallyCalled')
+
+  # Remove any old fields that have been replaced by a new field
+  new_info_fields = set(f.split('=',1)[0] for f in new_info)
+  v.info          = new_info+[ f for f in v.info if f.split('=',1)[0] not in new_info_fields ]
+
+  if len(v.filter)>1 and 'PASS' in v.filter:
+    v.filter.remove('PASS')
+
+  return v
+
+
+def annotate_vcf(options):
+  vs       = VariantAnnotator(options.genedb, options.reference)
+  vcf      = VCFReader(options.variants,sys.stdin)
+  cv       = CGFVariants(options.cgfvariants, options.reference) if options.cgfvariants else None
+  out      = autofile(hyphen(options.output,sys.stdout),'w')
+  kaviar   = load_kaviar(options.kaviar) if options.kaviar else None
+
+  metadata = vcf.metadata
+  metadata['FILTER'].append(['##FILTER=<PartiallyCalled,Description="Variant is not called for one or more samples">'])
+  metadata['FILTER'].append(['##FILTER=<NonGenic,Description="Variant not in or near a gene">'])
+  metadata['FILTER'].append(['##FILTER=<Synonymous,Description="Variant does not alter an amino-acid">'])
+
+  if cv and options.commonscore:
+    metadata['FILTER'].append(['##FILTER=<Common,Description="Variant is likely common with common score>%f">' % options.commonscore])
+    metadata['FILTER'].append(['##FILTER=<1000G,Description="Variant was reported by 1000 Genomes project">'])
+
+  if options.kaviar:
+    metadata['FILTER'].append(['##FILTER=<Kaviar,Description="Variant appears in the Kaviar database">'])
+
+  #metadata['FILTER'].append(['##FILTER=<NotDominant,Description="Variant does not fit dominant heritibility model">'])
+  #metadata['FILTER'].append(['##FILTER=<NotRecessive,Description="Variant does not fit recessive heritibility model">'])
+
+  metadata['INFO'].append(['##INFO=<ID=GENE_NAME,Number=.,Type=String,Description="Name of gene(s) containing variant">'])
+  metadata['INFO'].append(['##INFO=<ID=GENE_ID,Number=.,Type=String,Description="Entrez/LocusLink gene identifiers of genes containing variant">'])
+  metadata['INFO'].append(['##INFO=<ID=GENE_LOCATION,Number=.,Type=String,Description="Location of variant in gene(s)">'])
+  metadata['INFO'].append(['##INFO=<ID=GENE_FUNCTION,Number=.,Type=String,Description="Functional classification of variant for each gene and transcript">'])
+  metadata['INFO'].append(['##INFO=<ID=GENE_FUNCTION_DETAILS,Number=.,Type=String,Description="Functional details of variant for each gene and transcript">'])
+
+  if cv:
+    metadata['INFO'].append(['##INFO=<ID=COMMON_SCORE,Number=1,Type=Float,Description="Common score: maximum allele frequency in any population for rarest allele">'])
+    metadata['INFO'].append(['##INFO=<ID=FUNCTION_SCORE,Number=1,Type=Int,Description="Function score: reported as functional variant in OMIM, dbSNP, or COSMIC">'])
+    metadata['INFO'].append(['##INFO=<ID=INEXACT_VARIANTS,Number=.,Type=String,Description="Inexact variant matche">'])
+
+  if options.kaviar:
+    metadata['INFO'].append(['##INFO=<ID=KAVIAR,Number=.,Type=String,Description="Samples or datasets from Kaviar in which variant was found">'])
+
+  for meta in vcf.metadata_order:
+    for m in metadata[meta]:
+      out.write('\t'.join(m))
+      out.write('\n')
+
+  out.write('#%s\n' % ('\t'.join(vcf.header)))
+
+  for v in vcf:
+    update_vcf_annotation(v, vs, cv, kaviar, options)
+
+    # FORMAT: chrom start end names ref var filter info format genos
+    row = [ v.chrom, str(v.end), ','.join(v.names) or '.', v.ref, ','.join(v.var), v.qual,
+                                 ';'.join(sorted(v.filter)) or '.',
+                                 ';'.join(v.info)] + [ ':'.join(g) for g in v.genos ]
+
+    out.write('\t'.join(row))
+    out.write('\n')
 
 
 def option_parser():
@@ -495,10 +678,18 @@ def option_parser():
 
   parser.add_argument('variants', help='Input variant file')
 
+  parser.add_argument('-f', '--format',   metavar='NAME', default='GLU',
+                      help='File format (VCF, GLU)')
   parser.add_argument('-g', '--genedb',   metavar='NAME',
                       help='Genedb genome annotation database name or file')
   parser.add_argument('-r', '--reference',   metavar='NAME', required=True,
                       help='Reference genome sequence (FASTA + FAI files)')
+  parser.add_argument('--cgfvariants',   metavar='NAME',
+                      help='CGFvariant database annotation')
+  parser.add_argument('--commonscore', metavar='T', type=float, default=0.05,
+                      help='Annotate all variants with common score > T')
+  parser.add_argument('--kaviar',   metavar='NAME',
+                        help='Kaviar annotation (optional)')
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output variant file')
   return parser
@@ -507,151 +698,14 @@ def option_parser():
 def main():
   parser  = option_parser()
   options = parser.parse_args()
+  format  = options.format.upper()
 
-  vs = VariantAnnotator(options.genedb, options.reference)
-
-  if 0:
-    print vs.classify('chr1',1110293,1110294,'A')
-    print vs.classify('chr1',960530,960532,'')
-    print vs.classify('chr1',968624,968625,'A')
-    print vs.classify('chr1',1839388,1839389,'G')
-    print vs.classify('chr1',1840513,1840522,'')
-    print vs.classify('chr1',11651480,11651481,'A')
-    print vs.classify('chr17',38449841,38449842,'')
-    print vs.classify('chr10',51219559,51219560,'')
-    print vs.classify('chr10',123347961,123347962,'')
-    print vs.classify('chr1',12830291,12830295,'CTTGG')
-    print vs.classify('chr1',12842477,12842478,'T')
-    print vs.classify('chr1',12842478,12842478,'TAA')
-    print vs.classify('chr1',12862238,12862239,'CA')
-    print vs.classify('chr4',106375635,106375636,'T')
-    print vs.classify('chr4',106376408,106376410,'GGA')
-    print vs.classify('chr8', 31616810,31616820,'')
-    print vs.classify('chr8', 31615810,31615820,'')
-    print vs.classify('chr8', 32743315,32743317,'')
-
-    return
-
-  if 0:
-    sys.stderr.write('Loading SNPs...\n')
-    snps = get_snps('out/genedb_hg18_snp130.db')
-
-    out = table_writer(sys.stdout)
-    for snp in snps:
-      alleles = set(snp.alleles)
-      alleles.discard(snp.refAllele)
-      if len(alleles)==1:
-        var_nuc  = next(iter(alleles))
-        func     = ','.join(sorted(snp.func))
-        evidence = vs.classify(snp.chrom,snp.start,snp.end,var_nuc)
-        if not evidence:
-          evidence.append(['UNKNOWN'])
-
-        for row in evidence:
-          out.writerow([snp.name,func]+row)
-
-  if 0:
-    from merge_diffs import load_diffs, VARIANT_HEADER
-    filename = sys.argv[1]
-    variants = load_diffs(filename)
-    header   = list(VARIANT_HEADER)
-    extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
-                'REF_NUC_NEW','VAR_NUC_NEW','REF_AA_NEW','VAR_AA_NEW', 'dbSNP_exact','dbSNP_inexact']
-
-    keep     = itemgetter(3,4,5,6,7,10,11,12,13)
-
-    out      = table_writer(sys.stdout)
-    out.writerow(header + list(keep(extra)))
-
-    stats = defaultdict(int)
-
-    for v in variants:
-      evidence = list(vs.classify(v.chrom, v.start, v.end, v.var_nuc))
-
-      newbler_ns = bool(v.ref_aa and (v.ref_aa!=v.var_aa or len(v.ref_nuc)!=len(v.var_nuc)))
-      glu_ns     = 'NON-SYNONYMOUS' in [ e[6] for e in evidence ]
-      if glu_ns:
-        evidence = [ e for e in evidence if e[6]=='NON-SYNONYMOUS' ]
-
-      newbler_dbsnp = bool(v.known)
-      glu_dbsnp     = any(1 for e in evidence if e[12])
-
-      #stats[newbler_dbsnp,glu_dbsnp] += 1
-      #if newbler_dbsnp!=glu_dbsnp:
-      for e in evidence:
-        out.writerow(list(v)+list(keep(e)))
-
-    #print >> sys.stderr,'Newbler_NS,GLU_NS,count'
-    #for key in sorted(stats):
-    #  print >> sys.stderr,key,stats[key]
-
-  if 0:
-    filename = options.variants
-    variants = table_reader(filename)
-    header   = next(variants)
-    extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
-                'REF_NUC_NEW','VAR_NUC_NEW','REF_AA_NEW','VAR_AA_NEW', 'dbSNP_exact','dbSNP_inexact']
-    out      = table_writer(options.output)
-    out.writerow(header + extra[3:])
-
-    stats = defaultdict(int)
-
-    for v in variants:
-      evidence = list(vs.classify(v[0], int(v[1]), int(v[2]), v[7]))
-      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[6] ] or [[]]
-
-      for e in evidence:
-        out.writerow(v+e[3:])
-  if 0:
-    filename = options.variants
-    variants = table_reader(filename)
-    header   = next(variants)
-    extra    = ['CHROM','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS','FUNC_TYPE',
-                'REF_NUC_NEW','VAR_NUC_NEW','REF_AA_NEW','VAR_AA_NEW', 'dbSNP_exact','dbSNP_inexact']
-    out      = table_writer(options.output)
-    out.writerow(header + extra[3:])
-
-    stats = defaultdict(int)
-
-    for v in variants:
-      evidence = list(vs.classify(v[0], int(v[1]), int(v[2]), v[7]))
-      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[6] ] or [[]]
-
-      for e in evidence:
-        out.writerow(v+e[3:])
-
-  if 0:
-    filename = options.variants
-    variants = table_reader(filename,hyphen=sys.stdin)
-    header   = next(variants)
-    out      = table_writer(options.output,hyphen=sys.stdout)
-
-
-    header    = header+['CHROM','CYTOBAND','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS',
-                 'FUNC_TYPE','REF_NUC','VAR_NUC','REF_AA','VAR_AA', 'dbSNP_exact','dbSNP_inexact']
-    out.writerow(header)
-
-    for row in variants:
-      if not row or row[0].startswith('#'):
-        continue
-
-      chrom = row[0]
-      start = int(row[1])
-      end   = int(row[2])
-      ref   = row[3]
-      var   = row[4].split(',')[0]
-
-      evidence = list(vs.classify(chrom, start, end, var, nsonly=True))
-      evidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e[7] ]
-
-      for e in evidence:
-        out.writerow(row+e)
-
-  if 1:  # *** VCF, SNPs only ***
+  if format=='GLU':
+    vs = VariantAnnotator(options.genedb, options.reference)
+    cv = CGFVariants(options.cgfvariants, options.reference) if options.cgfvariants else None
     filename = options.variants
     variants = table_reader(filename,hyphen=sys.stdin)
     out      = table_writer(options.output,hyphen=sys.stdout)
-
 
     header    = ['CHROM','CYTOBAND','REF_START','REF_END','INTERSECT','SYMBOL','ACCESSION','FUNC_CLASS',
                  'FUNC_TYPE','REF_NUC','VAR_NUC','REF_AA','VAR_AA', 'dbSNP_exact','dbSNP_inexact']
@@ -664,7 +718,7 @@ def main():
       chrom = row[0]
       end   = int(row[1])
       start = end-1
-      ref   = row[3]
+      #ref  = row[3]
       var   = row[4].split(',')[0]
 
       evidence = list(vs.classify(chrom, start, end, var, nsonly=True))
@@ -673,22 +727,7 @@ def main():
       for e in evidence:
         out.writerow(e)
 
-
-if __name__=='__main__':
-  if 1:
-    main()
+  elif format=='VCF':  # *** VCF, SNPs only ***
+    annotate_vcf(options)
   else:
-    try:
-      import cProfile as profile
-    except ImportError:
-      import profile
-    import pstats
-
-    prof = profile.Profile()
-    try:
-      prof.runcall(main)
-    finally:
-      stats = pstats.Stats(prof)
-      stats.strip_dirs()
-      stats.sort_stats('time', 'calls')
-      stats.print_stats(25)
+    raise ValueError('Unknown or Unsupported format specified: %s' % options.format)
