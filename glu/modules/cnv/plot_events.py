@@ -14,6 +14,7 @@ import os
 import numpy as np
 import scipy.stats
 
+from   math                      import sqrt, fabs
 from   itertools                 import groupby
 from   operator                  import attrgetter
 
@@ -198,6 +199,16 @@ def norm_chromosome(chrom):
   return chrom
 
 
+def norm_position(p):
+  if p is None:
+    return None
+  p = p.replace(',','')
+  try:
+    return int(p)
+  except ValueError:
+    return None
+
+
 def build_normal_mask(s,chrom_indices,events,options):
   normal_mask = np.ones(s,dtype=bool)
 
@@ -207,11 +218,20 @@ def build_normal_mask(s,chrom_indices,events,options):
       pos,index    = chrom_indices[chrom]
 
       for i,event in enumerate(events):
-        start      = int(getattr(event,options.segstart))
-        stop       = int(getattr(event,options.segstop ))
-        event_mask = (pos>=start)&(pos<stop)
+        start      = norm_position(getattr(event,options.segstart,None))
+        stop       = norm_position(getattr(event,options.segstop, None))
 
-        normal_mask[index] &= ~event_mask
+        if start is None or stop is None:
+          normal_mask[index] = False
+        else:
+          event_mask = (pos>=start)&(pos<stop)
+          normal_mask[index] &= ~event_mask
+
+  elif options.chromid:
+    for chrom,chrom_events in groupby(events,key=attrgetter(options.chromid)):
+      chrom              = norm_chromosome(chrom)
+      pos,index          = chrom_indices[chrom]
+      normal_mask[index] = False
 
   return normal_mask
 
@@ -219,19 +239,24 @@ def build_normal_mask(s,chrom_indices,events,options):
 def build_events(lrr, baf, chrom_indices, valid_mask, events, options):
   eventrecs       = []
 
-  if options.chromid and options.segstart and options.segstop:
+  if options.chromid :
     for i,event in enumerate(events or []):
-      chrom       = getattr(event,options.chromid)
-      chrom       = norm_chromosome(chrom)
-      pos,indices = chrom_indices[chrom]
-      start       = int(getattr(event,options.segstart))
-      stop        = int(getattr(event,options.segstop ))
+      chrom         = getattr(event,options.chromid)
+      chrom         = norm_chromosome(chrom)
+      pos,indices   = chrom_indices[chrom]
+      event_mask    = None
+      start,stop    = None,None
 
-      event_mask  = valid_mask[indices]
-      event_mask &= pos >= start-1
-      event_mask &= pos <= stop
+      if options.segstart and options.segstop:
+        start       = norm_position(getattr(event,options.segstart,None))
+        stop        = norm_position(getattr(event,options.segstop, None))
 
-      if event_mask.sum()>10:
+        if start is not None and stop is not None:
+          event_mask  = valid_mask[indices]
+          event_mask &= pos >= start-1
+          event_mask &= pos <= stop
+
+      if event_mask is not None and event_mask.sum()>10:
         event_lrr   = lrr[indices][event_mask]
         event_baf   = baf[indices][event_mask]
       else:
@@ -241,35 +266,6 @@ def build_events(lrr, baf, chrom_indices, valid_mask, events, options):
       eventrecs.append( Event(chrom,start,stop,event,event_lrr,event_baf,None,None,None) )
 
   return eventrecs
-
-
-def build_chromosome_masks(pos, baf, lrr, mask=None, events=None, chromid=None, segstart=None, segstop=None):
-  if mask is not None:
-    valid_mask  = np.isfinite(lrr)&mask
-  else:
-    valid_mask  = mask
-
-  normal_mask   =  valid_mask.copy()
-  abnormal_mask = np.zeros_like(normal_mask,dtype=bool)
-
-  eventrecs     = []
-
-  for i,event in enumerate(events or []):
-    chrom          = getattr(event,chromid)
-    chrom          = norm_chromosome(chrom)
-    start          = int(getattr(event,segstart))
-    stop           = int(getattr(event,segstop ))
-
-    event_mask     = pos >= start-1
-    event_mask    &= pos <= stop
-    event_mask    &= valid_mask
-
-    normal_mask   &= ~event_mask
-    abnormal_mask |=  event_mask
-
-    eventrecs.append( Event(chrom,start,stop,event_mask,None,None) )
-
-  return normal_mask,abnormal_mask,eventrecs
 
 
 def valid_autosome_mask(s,chrom_indices):
@@ -348,6 +344,15 @@ def strip_event_baf(baf,aa_baf_max,bb_baf_min):
   return baf_aug
 
 
+def point_distance(a, b, c):
+  t  = b[0]-a[0], b[1]-a[1]          # Vector ab
+  dd = sqrt(t[0]**2+t[1]**2)         # Length of ab
+  t  = t[0]/dd, t[1]/dd              # unit vector of ab
+  n  = -t[1], t[0]                   # normal unit vector to ab
+  ac = c[0]-a[0], c[1]-a[1]          # vector ac
+  return fabs(ac[0]*n[0]+ac[1]*n[1]) # Projection of ac to n (the minimum distance)
+
+
 def infer_mosaic_state(event,sd_threshold=0.25):
   if event.lrr is None:
     return
@@ -355,35 +360,53 @@ def infer_mosaic_state(event,sd_threshold=0.25):
   lrr_mean  = event.lrr.mean()
   lrr_sd    = event.lrr.std(ddof=1)
 
-  snr       = abs(lrr_mean)/lrr_sd
+  if event.baf_model and event.baf_model[0]==2:
+    c,mu,sd,ws = event.baf_model
+    d   = mu[1]-mu[0]
 
-  if snr>sd_threshold:
-    if event.lrr.mean()<0:
-      event.state = 'LOSS'
+    p_neutral = d
+    p_gain    = 2*d/(1-d)
+    p_loss    = 2*d/(1+d)
+
+    zero         = (0.0, 0.00)
+    pure_neutral = (1.0, 0.00)
+    pure_gain    = (1.0, 0.2682)
+    pure_loss    = (1.0,-0.3427)
+
+    d_neutral = point_distance(zero, pure_neutral, (p_neutral,lrr_mean))
+    d_gain    = point_distance(zero, pure_gain,    (p_gain,   lrr_mean))
+    d_loss    = point_distance(zero, pure_loss,    (p_loss,   lrr_mean))
+
+    d_min     = min(d_neutral,d_gain,d_loss)
+
+    if d_min==d_neutral:
+      state = 'NEUTRAL'
+      p     = p_neutral
+    elif d_min==d_loss:
+      state = 'LOSS'
+      p     = p_loss
     else:
-      event.state = 'GAIN'
+      state = 'GAIN'
+      p     = p_gain
+
+    event.state   = state
+    event.pmosaic = max(0,min(1.,p))
   else:
-    event.state   = 'NEUTRAL'
-
-  if not event.baf_model:
-    return
-
-  c,mu,sd,ws = event.baf_model
-
-  if c==2:
-    if event.state=='GAIN':
-      event.pmosaic = min(1,3*(mu[1]-mu[0]))
+    snr = abs(lrr_mean)/lrr_sd
+    if snr>sd_threshold:
+      if event.lrr.mean()<0:
+        event.state = 'LOSS'
+      else:
+        event.state = 'GAIN'
     else:
-      event.pmosaic =          mu[1]-mu[0]
-  elif event.state!='GAIN' and c<2:
-    event.pmosaic = 1
+      event.state   = 'NEUTRAL'
 
 
 def update_event_fields(event):
   fields          = event.fields
   fields.Probes   = len(event.lrr)
   fields.STATE    = event.state
-  fields.PMosaic  = '%d' % event.pmosaic if event.pmosaic is not None else ''
+  fields.PMosaic  = '%.5f' % event.pmosaic if event.pmosaic is not None else ''
   fields.LRR_mean = '%.3f' % event.lrr.mean()
   fields.LRR_sd   = '%.3f' % event.lrr.std(ddof=1)
 
@@ -477,7 +500,7 @@ def main():
   for assay,assay_events in groupby(events,key=attrgetter(options.assayid)):
     assay_events = list(assay_events)
 
-    locations  = indexfile.get(assay)
+    locations  = list(indexfile.get(assay))
 
     if not locations:
       print 'ASSAY %s not found' % assay
@@ -544,11 +567,13 @@ def main():
 
         infer_mosaic_state(event)
         update_event_fields(event)
-        out.writerow(event.fields)
+
+        if out:
+          out.writerow(event.fields)
 
         print '  EVENT %2d: chr%-3s probes=%d LRR=%6.3f +- %.3f STATE=%s %%Mosaic=%s' \
                     % (i+1, event.chrom,len(event.lrr),event.lrr.mean(),1.96*event.lrr.std(ddof=1),
-                            event.state, (int(100*event.pmosaic) if event.pmosaic is not None else '?'))
+                            event.state, ('%.2f' % (100*event.pmosaic) if event.pmosaic is not None else '?'))
 
       print
 

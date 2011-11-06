@@ -1,5 +1,7 @@
 from __future__ import division
 
+import sys
+
 import numpy as np
 
 import matplotlib.pyplot   as plt
@@ -52,6 +54,11 @@ def plot_hist(hist,bins,lrr,baf,gmm=None):
 
 def plot_chromosome(filename, pos, lrr, baf, genos=None, title=None, events=None):
   valid           = np.isfinite(lrr)
+
+  if not valid.sum():
+    print >> sys.stderr, 'WARNING: No data.  Did not create plot %s.' % filename
+    return
+
   lrr             = lrr[valid]
   baf             = baf[valid]
   normal_lrr      = lrr
@@ -63,9 +70,10 @@ def plot_chromosome(filename, pos, lrr, baf, genos=None, title=None, events=None
     event_mask    = np.zeros_like(lrr,dtype=bool)
 
     for i,event in enumerate(events):
-      start       = event.start / 1000000
-      stop        = event.stop  / 1000000
-      event_mask |= (pos>=start)&(pos<=stop)
+      if event.start is not None and event.stop is not None:
+        start       = event.start / 1000000
+        stop        = event.stop  / 1000000
+        event_mask |= (pos>=start)&(pos<=stop)
 
     normal_lrr = normal_lrr[~event_mask]
     normal_baf = normal_baf[~event_mask]
@@ -131,6 +139,9 @@ def plot_chromosome(filename, pos, lrr, baf, genos=None, title=None, events=None
     evsegs.yaxis.set_major_formatter(nullfmt)
 
     for i,event in enumerate(events):
+      if event.start is None or event.stop is None:
+        continue
+
       start = event.start / 1000000
       stop  = event.stop  / 1000000
       mid   = (event.start+event.stop)/2.0
@@ -159,7 +170,7 @@ def plot_chromosome(filename, pos, lrr, baf, genos=None, title=None, events=None
     norm_hist.set_ylim(main.get_ylim())
     plot_hist(norm_hist,bins,normal_lrr,normal_baf)
 
-  for i,event in enumerate(events):
+  for i,event in enumerate(events or []):
     seg_hist  = plt.subplot(gs[1,h])
     h        += 2
 

@@ -74,7 +74,7 @@ class GDATFile(object):
     if compressed_filename(filename):
       raise ValueError('Binary genotype files must not have a compressed extension')
 
-    if mode not in ('r','r+'):
+    if mode not in ('r','r+','a'):
       raise ValueError('Unsupported GDAT file mode: %s' % mode)
 
     self.gdat          = h5py.File(filename,mode)
@@ -139,7 +139,7 @@ class GDATFile(object):
 
     return index
 
-  def cnv_data(self,index):
+  def cnv_data(self, index, raw=False):
     if isinstance(index,str):
       index = self.sample_index[index]
 
@@ -149,7 +149,7 @@ class GDATFile(object):
     gdat       = self.gdat
     genos      = gdat['Genotype']
 
-    if 'LRR_QN' in gdat:
+    if not raw and 'LRR_QN' in gdat:
       lrr      = gdat['LRR_QN']
       baf      = gdat['BAF_QN']
     else:
@@ -168,14 +168,14 @@ class GDATFile(object):
 
     return sample,genos[index],sample_lrr,sample_baf
 
-  def cnv_iter(self,transform=None):
+  def cnv_iter(self,transform=None, raw=False):
     gdat       = self.gdat
     snps       = self.snps
     samples    = self.samples
 
     genos      = gdat['Genotype']
 
-    if 'LRR_QN' in gdat:
+    if not raw and 'LRR_QN' in gdat:
       lrr      = gdat['LRR_QN']
       baf      = gdat['BAF_QN']
     else:

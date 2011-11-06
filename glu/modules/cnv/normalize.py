@@ -183,7 +183,7 @@ def compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB):
 
   rex2    = r_BB - r_AB
   rex2   *= mAB_BB
-  rex2   += +r_AB
+  rex2   += r_AB
 
   baf1    = mAA_AB / 2
   baf2    = mAB_BB
