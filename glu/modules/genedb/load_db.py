@@ -490,6 +490,8 @@ def get_cytobands(cytofile):
 
     if chrom.startswith('chr'):
       chrom = chrom[3:]
+    if chrom.upper()=='MT':
+      chrom = 'M'
 
     name  = chrom + band
 
