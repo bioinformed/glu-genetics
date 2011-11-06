@@ -156,6 +156,71 @@ def wilson_score_interval(x,n,alpha=0.05):
   return p,p_lower,p_upper
 
 
+def jeffreys_interval(x,n,alpha=0.05):
+  '''
+  jeffreys_interval(x,n,alpha=0.05) -> frequency, lower limit, upper limit
+
+  Compute the binomial proportion confidence interval for a proportion x/n
+  for power alpha or, equivalently, a confidence interval of 1-alpha.
+
+  The 'Jeffreys interval' is the Bayesian credible interval obtained when
+  using the non-informative Jeffreys prior for the binomial proportion p.
+  The Jeffreys prior for this problem is a Beta distribution with parameters
+  (1/2, 1/2).  After observing x successes in n trials, the posterior
+  distribution for p is a Beta distribution with parameters (x + 1/2, n – x
+  + 1/2).
+
+  When x ≠ 0 and x ≠ n, the Jeffreys interval is taken to be the 100(1 – α)%
+  equal-tailed posterior probability interval, i.e.  the α/2 and 1 – α/2
+  quantiles of a Beta distribution with parameters (x + 1/2, n – x + 1/2).
+  In order to avoid the coverage probability tending to zero when p → 0 or
+  1, when x = 0 the upper limit is calculated as before but the lower limit
+  is set to 0, and when x = n the lower limit is calculated as before but
+  the upper limit is set to 1.
+
+  For more information, see:
+
+    http://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval
+
+    Brown, Lawrence D.; Cai, T. Tony; DasGupta, Anirban (2001). "Interval
+    Estimation for a Binomial Proportion".  Statistical Science 16 (2):
+    101–133.
+
+  >>> jeffreys_interval(0,40)
+  (0.0, 0.0, 0.060497975214079638)
+  >>> jeffreys_interval(1,40)
+  (0.025, 0.0012823323596887644, 0.1109493804784687)
+  >>> jeffreys_interval(39,40)
+  (0.975, 0.8890506195215313, 0.9987176676403112)
+  >>> jeffreys_interval(40,40)
+  (1.0, 0.93950202478592038, 1.0)
+  '''
+  import scipy.stats
+  from   math import log
+
+  p    = x/n
+  beta = scipy.stats.distributions.beta(x+0.5,n-x+0.5)
+
+  if x==0:
+    p_lower = 0.0
+  elif x==1:
+    p_lower =   - log(1-alpha)/n
+  else:
+    p_lower = beta.ppf(  alpha/2)
+
+  if x==n:
+    p_upper = 1.0
+  elif x==n-1:
+    p_upper = 1 + log(1-alpha)/n
+  else:
+    p_upper = beta.ppf(1-alpha/2)
+
+  p_lower = max(0.,p_lower)
+  p_upper = min(1.,p_upper)
+
+  return p,p_lower,p_upper
+
+
 def _test():
   import doctest
   return doctest.testmod()
