@@ -4,7 +4,7 @@ preserves all information about the intervals (unlike bitset projection methods)
 
 :Authors: James Taylor (james@jamestaylor.org),
           Ian Schenk (ian.schenck@gmail.com),
-          Brent Pederson (bpederse@gmail.com)
+          Brent Pedersen (bpederse@gmail.com)
 '''
 
 # Historical note:
@@ -17,13 +17,14 @@ preserves all information about the intervals (unlike bitset projection methods)
 #    handle half-open intervals strictly, to maintain sort order, and to
 #    implement the same interface as the original Intersecter.
 
+#cython: cdivision=True
+
+from    libc.stdlib   cimport rand, RAND_MAX
+from    libc.math     cimport ceil, log
+from    libc.limits   cimport INT_MIN, INT_MAX
+
 import operator
 
-cdef extern from 'stdlib.h':
-  int ceil(float f)
-  float log(float f)
-  int RAND_MAX
-  int rand()
 
 cdef inline int imax2(int a, int b):
   if b > a:
@@ -55,7 +56,7 @@ cdef inline int imin2(int a, int b):
 
 cdef float nlog = -1.0/log(0.5)
 
-cdef class IntervalNode:
+cdef class IntervalNode(object):
   '''
   A single node of an `IntervalTree`.
 
@@ -70,15 +71,15 @@ cdef class IntervalNode:
 
   property left:
     def __get__(self):
-      return self.cleft if self.cleft is not EmptyNode else None
+      return <object>self.cleft if self.cleft is not EmptyNode else None
 
   property right:
     def __get__(self):
-      return self.cright if self.cright is not EmptyNode else None
+      return <object>self.cright if self.cright is not EmptyNode else None
 
   property root:
     def __get__(self):
-      return self.croot if self.croot is not EmptyNode else None
+      return <object>self.croot if self.croot is not EmptyNode else None
 
   def __repr__(self):
     if self.value is not None:
@@ -162,7 +163,7 @@ cdef class IntervalNode:
       self.minend   = imin2(self.end,   self.cleft.minend  )
       self.minstart = imin2(self.start, self.cleft.minstart)
 
-  def intersect(self, int start, int end, sort=True):
+  def intersect(self, int start, int end):
     '''
     given a start and a end, return a list of features
     falling within that range
@@ -223,7 +224,19 @@ cdef class IntervalNode:
     if self.cright is not EmptyNode:
       self.cright._seek_right(position, results, n, max_dist)
 
-  cpdef before(self, position, int n=0, int max_dist=0):
+  cpdef min(self):
+    '''
+    find smallest interval coordinate
+    '''
+    return self.minstart
+
+  cpdef max(self):
+    '''
+    find largest interval coordinate
+    '''
+    return self.maxend
+
+  cpdef before(self, position, int n=0, int max_dist=0, sort=True):
     '''
     find n features with a start > than `position`
     f: a Interval object (or anything with an `end` attribute)
@@ -237,12 +250,15 @@ cdef class IntervalNode:
       return results
 
     r = results
-    r.sort(key=operator.attrgetter('end','start'), reverse=True)
-    if n:
-      r=r[:n]
+
+    if n or sort:
+      r.sort(key=operator.attrgetter('end','start'), reverse=True)
+      if n:
+        r=r[:n]
+
     return r
 
-  cpdef after(self, position, int n=0, int max_dist=0):
+  cpdef after(self, position, int n=0, int max_dist=0, sort=True):
     '''
     find n features with a end < than position
     f: a Interval object (or anything with a `start` attribute)
@@ -256,9 +272,12 @@ cdef class IntervalNode:
       return results
 
     r = results
-    r.sort(key=operator.attrgetter('start','end'))
-    if n:
-      r=r[:n]
+
+    if n or sort:
+      r.sort(key=operator.attrgetter('start','end'))
+      if n:
+        r=r[:n]
+
     return r
 
   def traverse(self, func):
@@ -281,7 +300,7 @@ cdef class IntervalTree:
   Usage
   =====
 
-  Create an empry IntervalTree
+  Create an empty IntervalTree
 
   >>> from intervaltree import IntervalTree
   >>> itree = IntervalTree()
@@ -315,6 +334,9 @@ cdef class IntervalTree:
   def __cinit__(self):
     root = None
 
+  def __iter__(self):
+    return iter(self.find_values())
+
   # ---- Position based interfaces -----------------------------------------
 
   def insert(self, int start, int end, object value=None):
@@ -326,7 +348,7 @@ cdef class IntervalTree:
     else:
       self.root = IntervalNode(start, end, value)
 
-  def find(self, start, end):
+  def find(self, start=INT_MIN, end=INT_MAX):
     '''
     Return a sorted list of all intervals overlapping [start,end).
     '''
@@ -334,10 +356,18 @@ cdef class IntervalTree:
       return []
     return self.root.intersect(start, end)
 
+  def find_values(self, start=INT_MIN, end=INT_MAX):
+    '''
+    Return a sorted list of all intervals overlapping [start,end).
+    '''
+    if self.root is None:
+      return []
+    return [ r.value for r in self.root.intersect(start, end) ]
+
   def before(self, position, num_intervals=0, max_dist=0):
     '''
     Find `num_intervals` intervals that lie before `position` and are no
-    further than `max_dist` positions aways
+    further than `max_dist` positions away
     '''
     if self.root is None:
       return []
@@ -346,7 +376,7 @@ cdef class IntervalTree:
   def after(self, position, num_intervals=0, max_dist=0):
     '''
     Find `num_intervals` intervals that lie after `position` and are no
-    further than `max_dist` positions aways
+    further than `max_dist` positions away
     '''
     if self.root is None:
       return []
