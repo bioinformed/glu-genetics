@@ -17,15 +17,15 @@ VariantKey = namedtuple('VariantKey', 'chromosome start stop source')
 
 class CGFVariants(object):
   def __init__(self, cgfvariant, reference_fasta):
-    self.vars      = pysam.Tabixfile(cgfvariant)
+    self.vars      = pysam.Tabixfile(cgfvariant,cache_size=128*1024*1024)
     self.reference = pysam.Fastafile(reference_fasta)
 
   def query_variants(self, chromosome, start, stop):
     if chromosome.startswith('chr'):
       chromosome = chromosome[3:]
 
-    chrmap    = {'X':23,'Y':24,'MT':25,'M':25}
-    score     = self.vars.fetch(chrmap.get(chromosome,chromosome), start, stop)
+    chrmap = {'X':23,'Y':24,'MT':25,'M':25}
+    score  = self.vars.fetch(chrmap.get(chromosome,chromosome), start, stop)
 
     for s in score:
       chrom,vstart,vstop,allele,common_score,function_score,source = s.split('\t')
@@ -34,7 +34,6 @@ class CGFVariants(object):
       yield VarRecord(chrom, int(vstart), int(vstop), allele,
                              float(common_score), int(function_score),
                              source)
-
 
   def build_variants_lookup(self, chromosome, start, stop):
     vdict = defaultdict(list)
@@ -46,12 +45,10 @@ class CGFVariants(object):
 
     return vdict
 
-
   def get_refseq(self, chromosome, start, stop):
     if not chromosome.startswith('chr'):
       chromosome='chr'+chromosome
     return self.reference.fetch(chromosome, start, stop).upper()
-
 
   def score_and_classify(self, chromosome, start, stop, geno):
     geno           = [ g.strip().upper() for g in geno ]
