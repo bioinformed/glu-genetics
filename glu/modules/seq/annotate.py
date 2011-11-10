@@ -151,7 +151,7 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
         if maf>options.commonscore:
           v.filter.append('KaviarCommon')
       else:
-        new_info.append('KAVIAR_MAF=')
+        new_info.append('KAVIAR_MAF=0')
 
       new_info.append('KAVIAR_NAMES=%s' % ','.join(ktext))
 
