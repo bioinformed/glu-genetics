@@ -102,6 +102,7 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     # FIXME: Order genes and evidence consistently
     evidence   = list(vs.classify(v.chrom, v.start, v.end, v.var[0], nsonly=False))
     #v.names   = sorted(set(str(v) for e in evidence for v in e.varid_exact)|set(v.names))
+    cytoband   = sorted(set(e.cytoband    for e in evidence if e.cytoband))
     genes      = sorted(set(e.gene.symbol for e in evidence if e.gene and e.gene.symbol))
     geneids    = sorted(set(e.gene.geneid for e in evidence if e.gene and e.gene.geneid))
     location   = sorted(set(e.intersect   for e in evidence if e.intersect))
@@ -114,7 +115,8 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     elif not nsevidence:
       v.filter.append('Synonymous')
 
-    new_info = ['GENE_NAME=%s'             % (','.join(genes   )),
+    new_info = ['CYTOBAND=%s'              % (','.join(cytoband)),
+                'GENE_NAME=%s'             % (','.join(genes   )),
                 'GENE_ID=%s'               % (','.join(str(g) for g in geneids)),
                 'GENE_LOCATION=%s'         % (','.join(location)),
                 'GENE_FUNCTION=%s'         % (','.join(function)),
@@ -222,6 +224,7 @@ def annotate_vcf(options):
   #metadata['FILTER'].append(['##FILTER=<NotDominant,Description="Variant does not fit dominant heritibility model">'])
   #metadata['FILTER'].append(['##FILTER=<NotRecessive,Description="Variant does not fit recessive heritibility model">'])
 
+  metadata['INFO'].append(['##INFO=<ID=CYTOBAND,Number=.,Type=String,Description="Name of cytoband(s) containing variant">'])
   metadata['INFO'].append(['##INFO=<ID=GENE_NAME,Number=.,Type=String,Description="Name of gene(s) containing variant">'])
   metadata['INFO'].append(['##INFO=<ID=GENE_ID,Number=.,Type=String,Description="Entrez/LocusLink gene identifiers of genes containing variant">'])
   metadata['INFO'].append(['##INFO=<ID=GENE_LOCATION,Number=.,Type=String,Description="Location of variant in gene(s)">'])
