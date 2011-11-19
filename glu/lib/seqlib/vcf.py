@@ -30,19 +30,22 @@ class VCFReader(object):
       if not row:
         continue
       elif row[0].startswith('##'):
+        if len(row)!=1:
+          raise ValueError('Invalid VCF header line')
+
         meta,value = row[0].split('=',1)
         meta = meta[2:]
 
         if meta not in metadata:
           metadata_order.append(meta)
 
-        metadata[meta].append(row)
+        metadata[meta].append(row[0])
 
       elif row[0].startswith('#'):
         self.header = header = list(row)
         header[0]   = header[0][1:]
 
-        self.samples = [ s.split('.')[0] for i,s in enumerate(header[9:]) ]
+        self.samples = [ s.split('.')[0] for s in header[9:] ]
         break
       else:
         raise ValueError('Invalid VCF file detected')
@@ -66,5 +69,3 @@ class VCFReader(object):
       genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
 
       yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
-
-
