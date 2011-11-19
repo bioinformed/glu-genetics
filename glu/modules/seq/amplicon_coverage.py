@@ -37,11 +37,11 @@ def get_read_group(align):
 
 
 def target_overlap(aligns,references,reference,targets,options):
-  contigs    = set()
-  minoverlap = options.minoverlap
-  minreadlen = options.minreadlen
-  nulltarget = sys.maxint,sys.maxint
-  min_foverlap = 0.50
+  contigs     = set()
+  minoverlap  = options.minoverlap
+  minreadlen  = options.minreadlen
+  minfoverlap = options.minfoverlap
+  nulltarget  = sys.maxint,sys.maxint
 
   for tid,contig_aligns in groupby(aligns, attrgetter('tid')):
     rname = references[tid] if tid>=0 else 'unaligned'
@@ -98,25 +98,30 @@ def target_overlap(aligns,references,reference,targets,options):
         foverlap    = overlap_len/target_len
 
         # Determine if the degree of overlap is sufficient
-        if foverlap>min_foverlap:
-          ref = reference.fetch(rname,align.pos,align.aend).upper()
+        if foverlap<minfoverlap:
+          continue
 
-          #print overlap_len,foverlap,target_name,get_read_group(align)
-          overlap.append( (foverlap,target_name) )
+        if overlap_len<minoverlap:
+          continue
 
-          if 0:
-            print align.qname
+        ref = reference.fetch(rname,align.pos,align.aend).upper()
 
-            a1,a2 = cigar_alignment(ref,align.seq,align.cigar)
+        #print overlap_len,foverlap,target_name,get_read_group(align)
+        overlap.append( (foverlap,target_name) )
 
-            # Flip alignments if read was originally on the reverse strand
-            if align.is_reverse:
-              a1 = a1[::-1]
-              a2 = a2[::-1]
+        if 0:
+          print align.qname
 
-            #a1,a2 = cigar_alignment(ref,align.query,cigar)
-            print '   ref: %s' % a1
-            print '  read: %s' % a2
+          a1,a2 = cigar_alignment(ref,align.seq,align.cigar)
+
+          # Flip alignments if read was originally on the reverse strand
+          if align.is_reverse:
+            a1 = a1[::-1]
+            a2 = a2[::-1]
+
+          #a1,a2 = cigar_alignment(ref,align.query,cigar)
+          print '   ref: %s' % a1
+          print '  read: %s' % a2
 
       if overlap:
         overlap.sort()
@@ -140,6 +145,8 @@ def option_parser():
                       help='Reference genome sequence (FASTA + FAI files)')
   parser.add_argument('--minoverlap', metavar='N', type=int, default=1,
                     help='Minimum alignment overlap with any target (default=1)')
+  parser.add_argument('--minfoverlap', metavar='P', type=float, default=0,
+                    help='Minimum fraction of target overlapping with alignment (default=0)')
   parser.add_argument('--setreadgroup', type=str, metavar='RGNAME',
                     help='Set all reads to specified read group name')
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
