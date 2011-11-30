@@ -7,8 +7,8 @@ from   operator           import itemgetter
 from   itertools          import groupby
 from   collections        import namedtuple
 
-from   glu.lib.utils      import unique
-from   glu.lib.fileutils  import autofile
+from   glu.lib.utils      import unique, is_str
+from   glu.lib.fileutils  import autofile, hyphen
 from   glu.lib.recordtype import recordtype
 
 
@@ -19,7 +19,7 @@ def tryint(s):
     return s
 
 
-def cga_base_reader(filename):
+def cga_base_reader(filename,hyfile=None,**kwargs):
   '''
   #ASSEMBLY_ID    GS00325-DNA_G01_37_1100-ASM
   #COSMIC COSMIC v48
@@ -38,8 +38,9 @@ def cga_base_reader(filename):
   teinAcc symbol  orientation     component       componentIndex  hasCodingRegion impact  nucleotidePos   proteinPosannotationRefSequence    sampleSequence  genomeRefSequence       pfam
   '''
 
-  cgafile = csv.reader(autofile(filename),dialect='excel-tab')
+  cgafile = csv.reader(hyphen(autofile(filename),hyfile),dialect='excel-tab')
 
+  extra = kwargs.get('extra',None)
   attrs = {}
   header = None
 
@@ -58,15 +59,25 @@ def cga_base_reader(filename):
   if not header:
     raise ValueError('Unable to determine CGA header in file %s' % filename)
 
-  Row     = recordtype('CGARow', header)
-  slen    = len(header)
+  slen = len(header)
 
-  records = (Row._make(row[:slen]) for row in cgafile)
+  if extra:
+    if is_str(extra):
+      extra = [extra]
+    header.extend(extra)
+
+  Row = recordtype('CGARow', header)
+
+  if extra:
+    e = [None]*len(extra)
+    records = (Row._make(row+e) for row in cgafile)
+  else:
+    records = (Row._make(row)   for row in cgafile)
 
   return attrs,header,records
 
 
-def cga_coverage_reader(records):
+def cga_coverage_reader(records,**kwargs):
   '''
   ['chromosome', 'position', 'uniqueSequenceCoverage', 'weightSumSequenceCoverage', 'gcCorrectedCvg', 'avgNormalizedCoverage']
   CGARow(chromosome='chr1', position='60000', uniqueSequenceCoverage='3.744', weightSumSequenceCoverage='60.316', gcCorrectedCvg='63.508', avgNormalizedCoverage='54.6')
@@ -86,7 +97,7 @@ def cga_coverage_reader(records):
     yield rec
 
 
-def cga_dbsnpvar_reader(records):
+def cga_dbsnpvar_reader(records,**kwargs):
   '''
   TYPE=DBSNP-TO-CGI
   >dbSnpId alleles chromosome begin end reference found exactMatch loci zygosity
@@ -127,7 +138,7 @@ def cga_dbsnpvar_reader(records):
     yield rec
 
 
-def cga_cnvsegments_reader(records):
+def cga_cnvsegments_reader(records,**kwargs):
   '''
   >chr    begin   end     avgNormalizedCvg        relativeCvg     calledPloidy    calledCNVType   ploidyScore     CNVTypeScore    overlappingGene knownCNV        repeats
   chr1    10000   177417  59.0    1.09    N       hypervariable   0       0
@@ -149,7 +160,7 @@ def cga_cnvsegments_reader(records):
     yield rec
 
 
-def cga_tumor_cnvsegments_reader(records):
+def cga_tumor_cnvsegments_reader(records,**kwargs):
   '''
   >chr    begin   end     avgNormalizedCvg        relativeCvg     calledLevel     calledCNVType   levelScore
   CNVTypeScore
@@ -174,7 +185,7 @@ def cga_tumor_cnvsegments_reader(records):
     yield rec
 
 
-def cga_junctions_reader(records):
+def cga_junctions_reader(records,**kwargs):
   '''
   >Id LeftChr  LeftPosition  LeftStrand  LeftLength
       RightChr RightPosition RightStrand RightLength
@@ -201,7 +212,7 @@ def cga_junctions_reader(records):
     yield rec
 
 
-def cga_mastervar_reader(records):
+def cga_mastervar_reader(records,**kwargs):
   '''
   CGARow(locus='1', ploidy='2', chromosome='chr1', begin='0', end='10000', zygosity='no-call', varType='no-ref',
          reference='=', allele1Seq='?', allele2Seq='?', allele1Score='', allele2Score='', allele1HapLink='',
@@ -240,7 +251,12 @@ def cga_mastervar_reader(records):
 
     return records or None
 
+  skip_ref = kwargs.get('skip_ref',False)
+
   for record in records:
+    if skip_ref and (v.zygosity=='no-call' or v.varType=='ref'):
+      continue
+
     record.locus                    = int(record.locus)
     record.ploidy                   = int(record.ploidy)
     record.chromosome               = cache_str(record.chromosome,record.chromosome)
@@ -281,8 +297,107 @@ def cga_mastervar_reader(records):
     yield record
 
 
+def cga_mastervar_reader_v2(records,**kwargs):
+  '''
+  CGARow(locus='1', ploidy='2', chromosome='chr1', begin='0', end='10000', zygosity='no-call', varType='no-ref',
+         reference='=', allele1Seq='?', allele2Seq='?', allele1Score='', allele2Score='', allele1HapLink='',
+         allele2HapLink='', xRef='', evidenceIntervalId='', allele1ReadCount='', allele2ReadCount='',
+         referenceAlleleReadCount='', totalReadCount='', allele1Gene='', allele2Gene='', pfam='',
+         miRBaseId='', repeatMasker='', segDupOverlap='', relativeCoverage='', calledPloidy='')
 
-def cga_gene_reader(records):
+  for TUMORS:
+    locus ploidy chromosome begin end zygosity varType reference allele1Seq
+    allele2Seq allele1Score allele2Score allele1HapLink allele2HapLink xRef
+    evidenceIntervalId allele1Re adCount allele2ReadCount
+    referenceAlleleReadCount totalReadCount allele1Gene allele2Gene pfam
+    miRBaseId repeatMasker segDupOverlap relativeCoverage
+  '''
+  generecord = recordtype('GeneRecord', 'geneId mrnaAcc symbol component impact')
+
+  str_cache = {'':None}
+  cache_str = str_cache.setdefault
+
+  def parseGene(genetext):
+    if not genetext:
+      return None
+
+    records = []
+
+    for g in genetext.split(';'):
+      gene = generecord._make(g.split(':'))
+
+      gene.geneId    = int(gene.geneId)
+      gene.mrnaAcc   = gene.mrnaAcc or None
+      gene.symbol    = gene.symbol or None
+      gene.component = cache_str(gene.component,gene.component)
+      gene.impact    = cache_str(gene.impact,gene.impact)
+
+      records.append(gene)
+
+    return records or None
+
+  missing = ('','N')
+  skip_ref = kwargs.get('skip_ref',False)
+
+  for record in records:
+    if skip_ref and (v.zygosity=='no-call' or v.varType=='ref'):
+      continue
+
+    record.locus                    = int(record.locus)
+    record.ploidy                   = int(record.ploidy)
+    record.chromosome               = cache_str(record.chromosome,record.chromosome)
+    record.begin                    = int(record.begin)
+    record.end                      = int(record.end)
+    record.zygosity                 = cache_str(record.zygosity,record.zygosity)
+    record.varType                  = cache_str(record.varType,record.varType)
+    record.reference                = cache_str(record.reference,record.reference)
+    record.allele1Seq               = cache_str(record.allele1Seq,record.allele1Seq)
+    record.allele2Seq               = cache_str(record.allele2Seq,record.allele2Seq)
+    record.allele1VarScoreVAF       = int(record.allele1VarScoreVAF) if record.allele1VarScoreVAF else None
+    record.allele1VarScoreEAF       = int(record.allele1VarScoreEAF) if record.allele1VarScoreEAF else None
+    record.allele2VarScoreVAF       = int(record.allele2VarScoreVAF) if record.allele2VarScoreVAF else None
+    record.allele2VarScoreEAF       = int(record.allele2VarScoreEAF) if record.allele2VarScoreEAF else None
+    record.allele1HapLink           = record.allele1HapLink or None
+    record.allele2HapLink           = record.allele2HapLink or None
+    record.allele1XRef              = record.allele1XRef or None
+    record.allele2XRef              = record.allele2XRef or None
+    record.evidenceIntervalId       = int(record.evidenceIntervalId) if record.evidenceIntervalId else None
+    record.allele1ReadCount         = int(record.allele1ReadCount) if record.allele1ReadCount else None
+    record.allele2ReadCount         = int(record.allele2ReadCount) if record.allele2ReadCount else None
+    record.referenceAlleleReadCount = int(record.referenceAlleleReadCount) if record.referenceAlleleReadCount else None
+    record.totalReadCount           = int(record.totalReadCount) if record.totalReadCount else None
+    record.pfam                     = record.pfam or None
+    record.miRBaseId                = record.miRBaseId or None
+    record.repeatMasker             = record.repeatMasker or None
+    record.segDupOverlap            = record.segDupOverlap or None
+    record.relativeCoverageDiploid  = float(record.relativeCoverageDiploid) if record.relativeCoverageDiploid not in missing else None
+    record.relativeCoverageNondiploid = float(record.relativeCoverageNondiploid) if record.relativeCoverageNondiploid not in missing else None
+    record.calledPloidy             = int(record.calledPloidy) if record.calledPloidy not in missing else None
+    record.calledLevel              = float(record.calledLevel) if record.calledLevel not in missing else None
+
+    if record.allele1Gene==record.allele2Gene:
+      record.allele1Gene = record.allele2Gene = parseGene(record.allele1Gene)
+    else:
+      record.allele1Gene            = parseGene(record.allele1Gene)
+      record.allele2Gene            = parseGene(record.allele2Gene)
+
+    if (record.allele1Seq != record.reference == record.allele2Seq) or \
+       (record.allele2Seq and not record.allele1Seq):
+      record.allele1Seq,record.allele2Seq                 = record.allele2Seq,record.allele1Seq
+      record.allele1ReadCount,record.allele2ReadCount     = record.allele2ReadCount,record.allele1ReadCount
+      record.allele1VarScoreVAF,record.allele2VarScoreVAF = record.allele2VarScoreVAF,record.allele1VarScoreVAF
+      record.allele1VarScoreEAF,record.allele2VarScoreEAF = record.allele2VarScoreEAF,record.allele1VarScoreEAF
+      record.allele1HapLink,record.allele2HapLink         = record.allele2HapLink,record.allele1HapLink
+      record.allele1XRef,record.allele2XRef               = record.allele2XRef,record.allele1XRef
+      record.allele1Gene,record.allele2Gene               = record.allele2Gene,record.allele1Gene
+
+    # 653635:NR_024540.1:WASH5P:INTRON:UNKNOWN-INC
+
+    yield record
+
+
+
+def cga_gene_reader(records,**kwargs):
   Variant = namedtuple('Variant', 'index locus chromosome begin end reference varType geneId '
                                   'mrnaAcc proteinAcc symbol orientation component componentIndex '
                                   'hasCodingRegion impact nucleotidePos proteinPos annotationRefSequence '
@@ -382,30 +497,34 @@ def is_functional(v):
   return v.impact not in (None,'NO-CHANGE','COMPATIBLE')
 
 
-def cga_reader(filename):
-  attrs,header,records = cga_base_reader(filename)
+def cga_reader(filename,hyphen=None,**kwargs):
+  attrs,header,records = cga_base_reader(filename,hyphen,**kwargs)
 
-  type = attrs.get('TYPE')
+  version = attrs.get('SOFTWARE_VERSION')
+  v2      = version.startswith('2.')
+  type    = attrs.get('TYPE')
 
   if type=='DEPTH-OF-COVERAGE':
-    records = cga_coverage_reader(records)
+    records = cga_coverage_reader(records,**kwargs)
   elif type=='VAR-OLPL':
-    records = cga_mastervar_reader(records)
+    if v2:
+      records = cga_mastervar_reader_v2(records,**kwargs)
+    else:
+      records = cga_mastervar_reader(records,**kwargs)
   elif type=='CNV-SEGMENTS':
-    records = cga_cnvsegments_reader(records)
+    records = cga_cnvsegments_reader(records,**kwargs)
   elif type=='TUMOR-CNV-SEGMENTS':
-    records = cga_tumor_cnvsegments_reader(records)
+    records = cga_tumor_cnvsegments_reader(records,**kwargs)
   elif type=='JUNCTIONS':
-    records = cga_junctions_reader(records)
+    records = cga_junctions_reader(records,**kwargs)
   elif type=='DBSNP-TO-CGI':
-    records = cga_dbsnpvar_reader(records)
+    records = cga_dbsnpvar_reader(records,**kwargs)
   elif type=='GENE-ANNOTATION':
-    records = cga_gene_reader(records)
+    records = cga_gene_reader(records,**kwargs)
   else:
-    print attrs
     raise ValueError('Unknown CGA type: %s' % type)
 
-  return records
+  return attrs,header,records
 
 
 def main():
