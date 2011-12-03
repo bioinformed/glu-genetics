@@ -334,13 +334,13 @@ def cga_mastervar_reader_v2(records,**kwargs):
 
       records.append(gene)
 
-    return records or None
+    return records
 
   missing = ('','N')
   skip_ref = kwargs.get('skip_ref',False)
 
   for record in records:
-    if skip_ref and (v.zygosity=='no-call' or v.varType=='ref'):
+    if skip_ref and (record.zygosity=='no-call' or record.varType=='ref'):
       continue
 
     record.locus                    = int(record.locus)
