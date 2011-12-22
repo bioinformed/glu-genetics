@@ -59,7 +59,7 @@ def query_variants(filename,genedb,genes=None,regions=None,
 
   vars     = pysam.Tabixfile(filename)
 
-  queries    = []
+  queries  = []
 
   for gene in genes or []:
     g = query_gene_by_name(genedb,gene)
@@ -71,33 +71,39 @@ def query_variants(filename,genedb,genes=None,regions=None,
   if not queries:
     queries.append( ('','') )
 
-  includeind   = as_set(includeind)
-  excludeind   = as_set(excludeind)
-  filterind    = includeind is not None or excludeind is not None
+  includeind      = as_set(includeind)
+  excludeind      = as_set(excludeind)
+  filterind       = includeind is not None or excludeind is not None
 
-  includeknown = as_set(includeknown)
-  excludeknown = as_set(excludeknown)
-  filterknown  = includeknown is not None or excludeknown is not None
+  includeknown    = as_set(includeknown)
+  excludeknown    = as_set(excludeknown)
+  filterknown     = includeknown is not None or excludeknown is not None
 
-  includecomp  = as_set(includecomponent)
-  excludecomp  = as_set(excludecomponent)
-  filtercomp   = includecomp is not None or excludecomp is not None
+  includecomp     = as_set(includecomponent)
+  excludecomp     = as_set(excludecomponent)
+  filtercomp      = includecomp is not None or excludecomp is not None
 
-  includeimpact  = as_set(includeimpact)
-  excludeimpact  = as_set(excludeimpact)
-  filterimpact   = includeimpact is not None or excludeimpact is not None
+  includeimpact   = as_set(includeimpact)
+  excludeimpact   = as_set(excludeimpact)
+  filterimpact    = includeimpact is not None or excludeimpact is not None
+
+  filter_function = filtercomp or filterimpact
 
   # CHROMOSOME      BEGIN   END     REFERENCE       ALLELES XREFS   GENES   COMPONENTS      IMPACTS INDIVIDUALS     GENOTYPES
+  # CHROMOSOME      BEGIN   END     REFERENCE       ALLELES XREFS   FUNCTION        INDIVIDUALS     GENOTYPES
+  # FUNCTION = SYMBOL:COMPONENT|IMPACT
+
   xref_idx = header.index('XREFS')
-  comp_idx = header.index('COMPONENTS')
-  imp_idx  = header.index('IMPACTS')
-  ind_idx  = header.index('INDIVIDUALS')
+  func_idx = header.index('FUNCTION')
 
   yield ['REGION']+header
 
   for rname,region in queries:
     for var in vars.fetch(region=region):
       var = var.rstrip().split('\t')
+
+      if var[0]=='CHROMOSOME':
+        continue
 
       if filterind:
         inds = var[ind_idx].split(',')
@@ -113,19 +119,22 @@ def query_variants(filename,genedb,genes=None,regions=None,
         if excludeknown is not None and excludeknown.issuperset(xrefs):
           continue
 
-      if filtercomp:
-        comps = var[comp_idx].split(',')
-        if includecomp is not None and includecomp.isdisjoint(comps):
-          continue
-        if excludecomp is not None and excludecomp.issuperset(comps):
-          continue
+      if filter_function:
+        funcs = [ f.split(':') for funcs in var[func_idx].split(',') for f in funcs.split(';') if f ]
 
-      if filterimpact:
-        impacts = var[imp_idx].split(',')
-        if includeimpact is not None and includeimpact.isdisjoint(impacts):
-          continue
-        if excludeimpact is not None and excludeimpact.issuperset(impacts):
-          continue
+        if filtercomp:
+          comps = [ f[1] for f in funcs ]
+          if includecomp is not None and includecomp.isdisjoint(comps):
+            continue
+          if excludecomp is not None and excludecomp.issuperset(comps):
+            continue
+
+        if filterimpact:
+          impacts = [ f[2] for f in funcs ]
+          if includeimpact is not None and includeimpact.isdisjoint(impacts):
+            continue
+          if excludeimpact is not None and excludeimpact.issuperset(impacts):
+            continue
 
       yield rname,var
 
