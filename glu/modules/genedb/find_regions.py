@@ -120,7 +120,7 @@ def resolve_feature(con,feature,options):
   if not found:
     feature = 'UNKNOWN'
 
-  bands = ','.join(b[0] for b in query_cytobands_by_location(con,chrom,start,end))
+  bands = query_cytobands_by_location(con,chrom,start,end)[0]
 
   return name,chrom,bands,strand,start,end,upbases,downbases,upsnps,downsnps,feature
 

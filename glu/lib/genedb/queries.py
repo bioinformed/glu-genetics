@@ -6,7 +6,9 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-from glu.lib.utils import namedtuple
+import re
+
+from   glu.lib.utils import namedtuple
 
 
 CANONICAL_TRANSCRIPT = 1
@@ -16,6 +18,8 @@ CANONICAL_ALL        = CANONICAL_TRANSCRIPT|CANONICAL_CHROMOSOME|CANONICAL_ASSEM
 
 KGENOME_CHRMAP       = dict( (i,i) for i in range(1,23) )
 KGENOME_CHRMAP.update({23:'X',24:'Y',25:'M'})
+
+cyto_re = re.compile('(\d+|X|Y)(?:([p|q])(?:(\d+)(.\d+)?)?)?$')
 
 
 def query_genes_by_name(con, gene, canonical=None, mapped=None):
@@ -122,6 +126,35 @@ def query_genes_by_location(con,chrom,start,end):
   return cur.fetchall()
 
 
+
+def split_cytoband(band):
+  m = cyto_re.match(str(band))
+  return m.groups() if m is not None else None
+
+
+def cytoband_name(bands):
+  if len(bands)==1:
+    return bands[0][0]
+
+  bands = [ split_cytoband(b[0]) for b in bands if b ]
+
+  if not bands:
+    return ''
+
+  ref   = bands[0]
+  match = 0
+
+  for i in range(4):
+    if not all(b[i] is not None and b[i]==ref[i] for b in bands):
+      break
+    match = i+1
+
+  if not match:
+    return ''
+
+  return ''.join(ref[:match])
+
+
 def query_cytoband_by_location(con,chrom,loc):
   sql = '''
   SELECT   band,start,stop,color
@@ -130,11 +163,16 @@ def query_cytoband_by_location(con,chrom,loc):
     AND    ? BETWEEN start AND stop
   ORDER BY chrom,MIN(start,stop);
   '''
+  if chrom is None:
+    return []
   if chrom.startswith('chr'):
     chrom = chrom[3:]
   cur = con.cursor()
   cur.execute(sql, (chrom, loc))
-  return cur.fetchall()
+
+  bands = cur.fetchall()
+
+  return cytoband_name(bands),bands
 
 
 def query_cytobands_by_location(con,chrom,start,end):
@@ -145,11 +183,16 @@ def query_cytobands_by_location(con,chrom,start,end):
     AND    start<? AND stop>?
   ORDER BY chrom,start,stop;
   '''
+  if chrom is None:
+    return []
   if chrom.startswith('chr'):
     chrom = chrom[3:]
   cur = con.cursor()
   cur.execute(sql, (chrom,end,start))
-  return cur.fetchall()
+
+  bands = cur.fetchall()
+
+  return cytoband_name(bands),bands
 
 
 def query_cytoband_by_name(con,name):

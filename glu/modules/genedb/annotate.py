@@ -75,11 +75,11 @@ def annotate(con,header,rows,options):
       info = ['Multiple mappings','','']
     else:
       name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight = results[0]
-      near = query_gene_neighborhood(con,chrom,start,end,up,dn)
-      cytoband = query_cytoband_by_location(con,chrom,start)
+      near     = query_gene_neighborhood(con,chrom,start,end,up,dn)
+      cytoband = query_cytoband_by_location(con,chrom,start)[0]
 
       info = [chrom,
-              ','.join(c[0] for c in cytoband),
+              cytoband,
               start+1, end,
               ','.join(n[0] for n in near),
               func]
