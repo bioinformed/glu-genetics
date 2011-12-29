@@ -55,7 +55,8 @@ def flatten_vcf(options):
   header = ( ['CHROM','LOCATION','IDS','REF','VAR','QUAL']
            + [ f.upper() for f in filters ]
            + [ i.upper() for i in info   ]
-           + samples )
+           + samples
+           + [ '%s_depth' % s for s in samples ] )
 
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(header)
@@ -75,7 +76,8 @@ def flatten_vcf(options):
     row = ( [ v.chrom, str(v.end), ','.join(v.names), v.ref, ','.join(v.var), v.qual ]
           + [ 'Y' if f in v.filter else '' for f in filters ]
           + [ infomap.get(i,'') for i in info ]
-          + [ g[0] for g in v.genos ] )
+          + [ g[0] for g in v.genos ]
+          + [ '/'.join(g[1].split(',')) if len(g)>1 else '' for g in v.genos ] )
 
     out.writerow(row)
 
