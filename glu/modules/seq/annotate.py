@@ -104,8 +104,13 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
   new_info = []
 
   if vs:
+    #a = vs.annotate(v.chrom, v.start, v.end, v.reference, v.var[0])
+    #a = vs.annotate(v.chrom, v.start, v.end, v.var)
+    #print '!!!',a
+    #return v
+
     # FIXME: Order genes and evidence consistently
-    evidence   = list(vs.classify(v.chrom, v.start, v.end, v.var[0], nsonly=False))
+    evidence   = list(vs.annotate(v.chrom, v.start, v.end, v.var[0], nsonly=False))
     #v.names   = sorted(set(str(v) for e in evidence for v in e.varid_exact)|set(v.names))
     cytoband   = sorted(set(e.cytoband    for e in evidence if e.cytoband))
     genes      = sorted(set(e.gene.symbol for e in evidence if e.gene and e.gene.symbol))

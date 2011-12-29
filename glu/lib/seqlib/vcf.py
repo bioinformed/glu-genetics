@@ -57,10 +57,10 @@ class VCFReader(object):
 
     for row in self.data:
       chrom      = intern(row[0])
-      end        = int(row[1])
-      start      = end-1
+      start      = int(row[1])-1
       names      = row[2].split(',') if row[2]!='.' else []
       ref        = intern(row[3])
+      end        = start+len(ref)
       var        = [ intern(v) for v in row[4].split(',') ]
       qual       = row[5]
       filter     = [ intern(f) for f in row[6].split(';') ] if row[6]!='.' else []

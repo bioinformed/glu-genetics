@@ -213,7 +213,7 @@ class VariantAnnotator(object):
     return parts
 
 
-  def classify(self, chrom, ref_start, ref_end, variant, nsonly=False):
+  def annotate(self, chrom, ref_start, ref_end, variant, nsonly=False):
     variant = variant.replace('-','')
 
     ref_nuc = self.reference.fetch(chrom,ref_start,ref_end).upper()
@@ -249,8 +249,7 @@ class VariantAnnotator(object):
       evidence.append( ['intergenic','','','','',ref_nuc,var_nuc,'',''] )
 
     evidence = group_evidence(evidence)
-    cytoband = query_cytoband_by_location(self.con, chrom, ref_start)
-    cytoband = ','.join(c[0] for c in cytoband)
+    cytoband = query_cytoband_by_location(self.con, chrom, ref_start)[0]
     context  = [ chrom,cytoband,ref_start,ref_end ]
 
     if 0: # evidence:
