@@ -46,9 +46,12 @@ def mastervar_variants(filename):
   name = os.path.basename(filename)
   name = name.split('.')[0]
 
-  for v in records:
-    v.individual = name
-    yield v
+  def _records():
+    for v in records:
+      v.individual = name
+      yield v
+
+  return name,_records()
 
 
 def function_records(gene):
@@ -61,36 +64,10 @@ def function_records(gene):
     return ';'.join(unique('%s:%s:%s' % (g.symbol,g.component,IMPACT_MAP.get(g.impact,g.impact)) for g in gene))
 
 
-def option_parser():
-  from glu.lib.glu_argparse import GLUArgumentParser
+def merge_sparse(loci):
+  yield ['CHROMOSOME','BEGIN','END','REFERENCE','ALLELES','XREFS','FUNCTION','INDIVIDUALS','GENOTYPES']
 
-  parser = GLUArgumentParser(description=__abstract__)
-
-  parser.add_argument('variants', nargs='+', help='Input variant files')
-
-  parser.add_argument('-o', '--output', metavar='FILE', default='-',
-                    help='Output variant file')
-  return parser
-
-
-def main():
-  parser     = option_parser()
-  options    = parser.parse_args()
-
-  refmap     = dict( (r,i) for i,r in enumerate(CHROMOSOMES) )
-  variants   = [ mastervar_variants(f) for f in options.variants ]
-
-  def mergekey(v):
-    return refmap[v.chromosome],v.begin,v.end
-
-  variants   = imerge(variants, key=mergekey)
-
-  out        = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(['CHROMOSOME','BEGIN','END','REFERENCE','ALLELES','XREFS','FUNCTION','INDIVIDUALS','GENOTYPES'])
-
-  keyfunc   = attrgetter('chromosome','begin','end')
-
-  for (chromosome,begin,end),locus in groupby(variants,keyfunc):
+  for (chromosome,begin,end),locus in loci:
     locus        = list(locus)
     exemplar     = locus[0]
     allelemap    = dict( [(exemplar.reference or '',0), ('?','?'), ('=','=')] )
@@ -118,13 +95,104 @@ def main():
       individuals.append(var.individual)
       genotypes.append('%s/%s' % (allelemap[a1],allelemap[a2]))
 
-    out.writerow( [chromosome,begin,end,
-                   exemplar.reference,
-                   ','.join(alleles),
-                   ','.join(xrefs),
-                   ','.join(function),
-                   ','.join(individuals),
-                   ','.join(genotypes)] )
+  yield [chromosome,begin,end,
+                    exemplar.reference,
+                    ','.join(alleles),
+                    ','.join(xrefs),
+                    ','.join(function),
+                    ','.join(individuals),
+                    ','.join(genotypes)]
+
+
+def merge_dense(loci,names):
+  yield ['CHROMOSOME','BEGIN','END','REFERENCE','ALLELES','XREFS','FUNCTION'] + names
+
+  n      = len(names)
+  indmap = dict( (s,i) for i,s in enumerate(names) )
+
+  for (chromosome,begin,end),locus in loci:
+    locus        = list(locus)
+    exemplar     = locus[0]
+    allelemap    = dict( [(exemplar.reference or '',0), ('?','?'), ('=','=')] )
+    alleles      = []
+    xrefs        = []
+    function     = []
+    genotypes    = ['0/0']*n
+
+    for var in locus:
+      a1,a2 = var.allele1Seq or '',var.allele2Seq or ''
+
+      if a1 not in allelemap:
+        alleles.append(a1)
+        allelemap[a1] = len(alleles)
+        function.append(function_records(var.allele1Gene))
+        xrefs.append(var.allele1XRef if var.allele1XRef else '')
+
+      if a2 not in allelemap:
+        alleles.append(a2)
+        allelemap[a2] = len(alleles)
+        function.append(function_records(var.allele2Gene))
+        xrefs.append(var.allele2XRef if var.allele2XRef else '')
+
+      genotypes[ indmap[var.individual] ] = '%s/%s' % (allelemap[a1],allelemap[a2])
+
+    yield [chromosome,begin,end,
+                      exemplar.reference,
+                      ','.join(alleles),
+                      ','.join(xrefs),
+                      ','.join(function)] + genotypes
+
+
+def option_parser():
+  from glu.lib.glu_argparse import GLUArgumentParser
+
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('variants', nargs='+', help='Input variant files')
+
+  parser.add_argument('-F', '--outformat', metavar='FORMAT', default='dense',
+                      help='Output format: sparse or dense (default)')
+  parser.add_argument('-o', '--output', metavar='FILE', default='-',
+                    help='Output variant file')
+  return parser
+
+
+def main():
+  parser     = option_parser()
+  options    = parser.parse_args()
+
+  refmap     = dict( (r,i) for i,r in enumerate(CHROMOSOMES) )
+  variants   = []
+  names      = []
+
+  for filename in options.variants:
+    name,vars = mastervar_variants(filename)
+    names.append(name)
+    variants.append(vars)
+
+  names.sort()
+
+  def mergekey(v):
+    return refmap[v.chromosome],v.begin,v.end
+
+  variants   = imerge(variants, key=mergekey)
+
+  out        = table_writer(options.output,hyphen=sys.stdout)
+
+  keyfunc    = attrgetter('chromosome','begin','end')
+  loci       = groupby(variants,keyfunc)
+
+  outformat  = options.outformat.lower()
+  if outformat=='dense':
+    rows = merge_dense(loci,names)
+  elif outformat=='sparse':
+    rows = merge_sparse(loci)
+  else:
+    raise ValueError('Unknown output format: %s' % outformat)
+
+  for row in rows:
+    out.writerow(row)
+
 
 
 if __name__=='__main__':
