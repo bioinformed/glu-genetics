@@ -195,12 +195,22 @@ Prerequisites for using GLU:
 
 GLU requires the following free and open source packages:
 
- * Python   2.5.2 or newer from http://www.python.org/
- * NumPy    1.1.0 or newer from http://numpy.scipy.org/
- * SciPy    0.6.0 or newer from http://www.scipy.org/
- * PyTables 2.0.4 or newer from http://www.pytables.org/
- * SQLite   3.5.9 or newer from http://www.sqlite.org/
- * Ply      2.5   or newer from http://www.dabeaz.com/ply/
+ * Python     2.7.2           from http://www.python.org/
+ * setuptools 0.6c11 or newer http://pypi.python.org/pypi/setuptools
+ * NumPy      1.1.0  or newer from http://numpy.scipy.org/
+ * SciPy      0.9.0  or newer from http://www.scipy.org/
+ * numexpr    1.4.2  or newer from http://code.google.com/p/numexpr/
+ * PyTables   2.0.4  or newer from http://www.pytables.org/
+ * SQLite     3.5.9  or newer from http://www.sqlite.org/
+ * Ply        2.5    or newer from http://www.dabeaz.com/ply/
+ * h5py       2.0    or newer from http://code.google.com/p/h5py/
+ * pysam      0.5    or newer from http://code.google.com/p/pysam/
+ * BioPython  1.58   or newer from http://biopython.org/wiki/Main_Page
+ * matplotlib 1.0.1  or newer from http://matplotlib.sourceforge.net/
+ * Cython     0.15   or newer from http://cython.org/
+ * xlrd       0.7.1  or newer from http://pypi.python.org/pypi/xlrd
+ * xlwt       0.7.2  or newer from http://pypi.python.org/pypi/xlwt
+ * cvxopt     1.1.1  or newer from http://abel.ee.ucla.edu/cvxopt/
 
 Prerequisites of the prerequisites:
 
@@ -220,9 +230,9 @@ Prerequisites of the prerequisites:
 
    For more information on installing NumPy and SciPy see http://www.scipy.org/Installing_SciPy
 
- * In addition, PyTables is based on the HDF5 standard and requires:
+ * In addition, PyTables and h5py allows access to files based on the HDF5 standard and requires:
 
-   - HDF5 1.8.1 or newer from http://hdfgroup.org/HDF5/
+   - HDF5 1.8.3 or newer from http://hdfgroup.org/HDF5/
 
 To build and install GLU, run::
 
