@@ -254,7 +254,7 @@ def cga_mastervar_reader(records,**kwargs):
   skip_ref = kwargs.get('skip_ref',False)
 
   for record in records:
-    if skip_ref and (v.zygosity=='no-call' or v.varType=='ref'):
+    if skip_ref and (record.zygosity=='no-call' or record.varType=='ref'):
       continue
 
     record.locus                    = int(record.locus)
@@ -371,9 +371,12 @@ def cga_mastervar_reader_v2(records,**kwargs):
     record.repeatMasker             = record.repeatMasker or None
     record.segDupOverlap            = record.segDupOverlap or None
     record.relativeCoverageDiploid  = float(record.relativeCoverageDiploid) if record.relativeCoverageDiploid not in missing else None
-    record.relativeCoverageNondiploid = float(record.relativeCoverageNondiploid) if record.relativeCoverageNondiploid not in missing else None
     record.calledPloidy             = int(record.calledPloidy) if record.calledPloidy not in missing else None
-    record.calledLevel              = float(record.calledLevel) if record.calledLevel not in missing else None
+
+    if hasattr(record,'relativeCoverageNondiploid'):
+      record.relativeCoverageNondiploid = float(record.relativeCoverageNondiploid) if record.relativeCoverageNondiploid not in missing else None
+    if hasattr(record,'calledLevel'):
+      record.calledLevel            = float(record.calledLevel) if record.calledLevel not in missing else None
 
     if record.allele1Gene==record.allele2Gene:
       record.allele1Gene = record.allele2Gene = parseGene(record.allele1Gene)
@@ -500,7 +503,11 @@ def is_functional(v):
 def cga_reader(filename,hyphen=None,**kwargs):
   attrs,header,records = cga_base_reader(filename,hyphen,**kwargs)
 
-  version = attrs.get('SOFTWARE_VERSION')
+  version = attrs.get('FORMAT_VERSION')
+
+  if version is None:
+    version = attrs.get('SOFTWARE_VERSION')
+
   v2      = version.startswith('2.')
   type    = attrs.get('TYPE')
 
