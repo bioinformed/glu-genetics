@@ -13,12 +13,12 @@ import sys
 
 from   collections           import deque
 from   operator              import attrgetter, itemgetter
-from   itertools             import groupby, imap
+from   itertools             import groupby, imap, izip
 
 import pysam
 
 from   glu.lib.utils         import consume
-from   glu.lib.fileutils     import autofile, hyphen, list_reader
+from   glu.lib.fileutils     import autofile, hyphen, list_reader, table_writer
 from   glu.lib.progressbar   import progress_loop
 
 from   glu.lib.seqlib.bed    import read_features
@@ -58,6 +58,18 @@ def set_readgroup(groupname,header,aligns):
       yield align
 
   return _set_readgroup()
+
+
+def contig_stats(aligns,references,filename):
+  stats = [0]*len(references)
+  for align in aligns:
+    stats[align.tid] += 1
+    yield align
+
+  out = table_writer(filename,hyphen=sys.stderr)
+  out.writerow(['CONTIG','COUNT'])
+  for ref,n in izip(references,stats):
+    out.writerow( [ref,n] )
 
 
 def simple_filter(aligns,controls,stats,options):
@@ -452,6 +464,8 @@ def option_parser():
                     help='Output BAM file')
   parser.add_argument('-O', '--sumout', metavar='FILE', default='-',
                     help='Summary output file')
+  parser.add_argument('--contigstats', metavar='FILE',
+                    help='Contig statistics')
 
   return parser
 
@@ -497,6 +511,9 @@ def main():
   aligns = filter_alignments(aligns, options.includealign, options.excludealign)
 
   stats  = FilterStats()
+
+  if options.contigstats:
+    aligns  = contig_stats(aligns,references,options.contigstats)
 
   if options.targets:
     targets = read_features(options.targets)
