@@ -90,22 +90,17 @@ def main():
   seen     = set()
   needle   = set(list_reader(options.needles))
 
-  if options.haystack:
-    haystack = set(list_reader(options.haystack))-exclude
-    indirect = haystack-needle
-
-    if options.indirect:
-      haystack = indirect
-
-    include = needle|haystack
-
-  else:
-    include = haystack = None
-
-  direct = needle if options.indirect else set()
-
   # ldsubset=needle
   ldpairs = generate_ldpairs(options, {}, set(), None, needle)
+
+  # FIXME: Obtain default haystack from ldpairs
+  if options.haystack:
+    haystack = set(list_reader(options.haystack))-exclude
+
+    if options.indirect:
+      haystack = haystack-needle
+  else:
+    direct = needle if options.indirect else set()
 
   heappushpop    = heapq.heappushpop
   heappush       = heapq.heappush
@@ -115,18 +110,34 @@ def main():
   def update_surrogates(lname,surrogate,r2):
     surrogates = best_surrogate[lname]
 
-    if not maxsurrogates or len(surrogates)<maxsurrogates:
-      heappush(surrogates, (r2,surrogate) )
-    elif r2>surrogates[0][0]:
-      heappushpop(surrogates, (r2,surrogate) )
+    # FIXME: very expensive 2-tuple creation to add priorities.  May be
+    # better to devise a fixed point encoding and use least-significant bits
+    # for priority
+    if lname==surrogate:
+      priority = r2,2
+    elif surrogate in needle:
+      priority = r2,1
+    else:
+      priority = r2,0
 
+    if not maxsurrogates or len(surrogates)<maxsurrogates:
+      heappush(surrogates, (priority,surrogate) )
+    elif priority>surrogates[0][0]:
+      heappushpop(surrogates, (priority,surrogate) )
+
+  # FIXME: this loop is duplicated only because haystack-direct is not
+  #        always available?  LD calculation typically requires
+  #        pre-materialization, so the universal haystack should always be
+  #        known, though perhaps not accessible outside the internal
+  #        tagzilla code?
   if haystack is None:
     for pairs in ldpairs:
       for lname1,lname2,r2,dprime in pairs:
-        found = None
+        # FIXME: May be able to add to lname1==lname2 branch and reduce to single set op
         seen.add(lname1)
         seen.add(lname2)
 
+        # FIXME: should be able to use lname1 is lname2?
         if lname1==lname2:
           if lname1 in needle and lname1 not in direct:
             update_surrogates(lname1,lname1,r2)
@@ -138,10 +149,11 @@ def main():
   else:
     for pairs in ldpairs:
       for lname1,lname2,r2,dprime in pairs:
-        found = None
+        # FIXME: May be able to add to lname1==lname2 branch and reduce to single set op
         seen.add(lname1)
         seen.add(lname2)
 
+        # FIXME: should be able to use lname1 is lname2?
         if lname1==lname2:
           if lname1 in needle and lname1 in haystack:
             update_surrogates(lname1,lname1,r2)
@@ -154,6 +166,8 @@ def main():
   outfile = table_writer(options.output, hyphen=sys.stdout)
   outfile.writerow(['LNAME','RANK','SURROGATE','RSQUARED','REASON'])
 
+  priorities = ['AUGMENT','PANEL','SELF']
+
   for lname in sorted(needle):
     surrogates = best_surrogate.get(lname)
 
@@ -162,9 +176,8 @@ def main():
       outfile.writerow([lname,'','','',reason])
     else:
       surrogates.sort(reverse=True)
-      for i,(r2,sname) in enumerate(surrogates):
-        reason = 'DIRECT' if sname in needle else 'INDIRECT'
-        outfile.writerow([lname,i+1,sname,sfloat(r2),reason])
+      for i,((r2,prior),sname) in enumerate(surrogates):
+        outfile.writerow([lname,i+1,sname,sfloat(r2),priorities[prior]])
 
 
 if __name__ == '__main__':
