@@ -13,7 +13,7 @@ import sys
 from   operator                     import itemgetter
 
 from   glu.lib.utils                import unique
-from   glu.lib.fileutils            import table_writer, table_reader, list_reader, autofile, hyphen
+from   glu.lib.fileutils            import list_reader, autofile, hyphen
 from   glu.lib.progressbar          import progress_loop
 
 
@@ -100,6 +100,10 @@ class OrderedReader(object):
       return None
 
 
+def aa_change(e):
+  return '%s->%s' % (e.ref_aa,e.var_aa) if e.ref_aa or e.var_aa else ''
+
+
 def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
   new_info = []
 
@@ -116,14 +120,17 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     genes      = sorted(set(e.gene.symbol for e in evidence if e.gene and e.gene.symbol))
     geneids    = sorted(set(e.gene.geneid for e in evidence if e.gene and e.gene.geneid))
     location   = sorted(set(e.intersect   for e in evidence if e.intersect))
-    function   = sorted(set(e.func_type or e.func_class  for e in evidence if e.func_type or e.func_class))
-    nsevidence = [ e for e in evidence if 'NON-SYNONYMOUS' in e.func_class ]
-    nsinfo     = [ '%s:%s:%s:%s->%s' % (e.gene.symbol,e.func_type,e.details,e.ref_aa,e.var_aa)
-                   for e in nsevidence ]
+    function   = sorted(set(e.func_type or e.func_class  for e in evidence if e.func))
+    nsevidence = [ e for e in evidence if e.func ]
+    nsinfo     = ( '%s:%s:%s:%s' % (e.gene.symbol,e.func_type,e.details,aa_change(e))
+                   for e in nsevidence )
+    nsinfo     = list(unique(nsinfo))
+
     if not genes:
-      v.filter.append('NonGenic')
-    elif not nsevidence:
-      v.filter.append('Synonymous')
+      v.filter.append('Intergenic')
+
+    if not nsevidence:
+      v.filter.append('NotPredictedFunctional')
 
     if cytoband:
       new_info.append('CYTOBAND=%s' % (','.join(cytoband)))
@@ -224,8 +231,8 @@ def annotate_vcf(options):
 
   metadata = vcf.metadata
   metadata['FILTER'].append('##FILTER=<ID=PartiallyCalled,Description="Variant is not called for one or more samples">')
-  metadata['FILTER'].append('##FILTER=<ID=NonGenic,Description="Variant not in or near a gene">')
-  metadata['FILTER'].append('##FILTER=<ID=Synonymous,Description="Variant does not alter an amino-acid">')
+  metadata['FILTER'].append('##FILTER=<ID=Intergenic,Description="Variant not in or near a gene">')
+  metadata['FILTER'].append('##FILTER=<ID=NotPredictedFunctional,Description="Variant is not predicted to alter a protein">')
 
   if cv:
     metadata['FILTER'].append('##FILTER=<ID=Common,Description="Variant is likely common with common score>%f">' % options.commonscore)
@@ -274,9 +281,20 @@ def annotate_vcf(options):
     update_vcf_annotation(v, vs, cv, kaviar, refvars, options)
 
     # FORMAT: chrom start end names ref var filter info format genos
-    row = [ v.chrom, str(v.end), ','.join(v.names) or '.', v.ref, ','.join(v.var), v.qual,
-                                 ';'.join(sorted(v.filter)) or '.',
-                                 ';'.join(v.info), v.format ] + [ ':'.join(g) for g in v.genos ]
+    pos = v.start+1
+    ref = v.ref
+    var = v.var
+
+    # VCF codes indels with an extra left reference base
+    if not v.ref or '' in v.var:
+      pos -= 1
+      r    = vs.reference.fetch(v.chrom,pos-1,pos).upper()
+      ref  = r+ref
+      var  = [ r+a for a in var ]
+
+    row = [ v.chrom, str(pos), ','.join(v.names) or '.', ref, ','.join(var), v.qual,
+                               ';'.join(sorted(v.filter)) or '.',
+                               ';'.join(v.info), v.format ] + [ ':'.join(g) for g in v.genos ]
 
     out.write('\t'.join(row))
     out.write('\n')
@@ -367,6 +385,7 @@ def annotate_mastervar(options):
       for g in geneinfo[1:]:
         print '                ',g
     print
+
 
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser

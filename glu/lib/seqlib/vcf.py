@@ -68,4 +68,11 @@ class VCFReader(object):
       format     = intern(row[8])
       genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
 
+      # VCF codes indels with an extra left reference base, which we strip
+      r          = ref[0]
+      if all(a.startswith(r) for a in var):
+        start   += 1
+        ref      = intern(ref[1:])
+        var      = [ intern(v[1:]) for v in var ]
+
       yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)

@@ -6,6 +6,7 @@ __abstract__  = 'Annotate genomic coordinates and nucleotide variation'
 __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
+import re
 import sys
 
 from   operator                     import itemgetter
@@ -24,15 +25,19 @@ from   glu.lib.seqlib.edits         import reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
 from   glu.lib.genedb               import open_genedb
-from   glu.lib.genedb.queries       import query_snps_by_location, query_cytoband_by_location
+from   glu.lib.genedb.queries       import query_snps_by_location
 
 
+cyto_re = re.compile('(\d+|X|Y)(?:([p|q])(?:(\d+)(.\d+)?)?)?$')
+
+
+BandRecord   = namedtuple('BandRecord',   'name chrom start end color')
 GeneRecord   = namedtuple('GeneRecord',   'id name symbol geneid mRNA protein canonical chrom strand '
                                           'txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds')
 SNPRecord    = namedtuple('SNPRecord',    'name chrom start end strand refAllele alleles vclass func weight')
 GeneFeature  = namedtuple('GeneFeature',  'chrom start end cds_index exon_num type')
 GeneEvidence = recordtype('GeneEvidence', 'chrom cytoband ref_start ref_end intersect gene details '
-                                          'func_class func_type ref_nuc var_nuc ref_aa var_aa')
+                                          'func func_class func_type ref_nuc var_nuc ref_aa var_aa')
 
 def decode_gene(gene):
   # Decode CDS boundaries and exon start and end coordinates
@@ -100,6 +105,42 @@ def get_transcripts(con):
   cur = con.cursor()
   cur.execute('SELECT * FROM GENE;')
   return imap(GeneRecord._make, iter(cur))
+
+
+def get_cytobands(con):
+  cur = con.cursor()
+  cur.execute('SELECT band,"chr"||chrom,start,stop,color FROM cytoband;')
+  return imap(BandRecord._make, iter(cur))
+
+
+def split_cytoband(band):
+  m = cyto_re.match(str(band))
+  return m.groups() if m is not None else None
+
+
+def cytoband_name(bands):
+  if not bands:
+    return '?'
+  elif len(bands)==1:
+    return bands[0].name
+
+  bands = [ split_cytoband(b.name) for b in bands if b ]
+
+  if not bands:
+    return '?'
+
+  ref   = bands[0]
+  match = 0
+
+  for i in range(4):
+    if not all(b[i] is not None and b[i]==ref[i] for b in bands):
+      break
+    match = i+1
+
+  if not match:
+    return '?'
+
+  return ''.join(ref[:match])
 
 
 def get_snps(con):
@@ -181,6 +222,10 @@ class VariantAnnotator(object):
     self.con        = open_genedb(gene_db)
     self.gene_cache = OrderedDict()
 
+    self.band_map = band_map = defaultdict(IntervalTree)
+    for band in get_cytobands(self.con):
+      band_map[band.chrom].insert(band.start,band.end,band)
+
     trans = get_transcripts(self.con)
     trans = progress_loop(trans, label='Loading transcripts: ', units='transcripts')
 
@@ -223,9 +268,9 @@ class VariantAnnotator(object):
     for feature in self.feature_map[chrom].find(ref_start, ref_end):
       evidence.extend( self.classify_feature(feature.value, ref_start, ref_end, ref_nuc, var_nuc) )
 
-    ns = any('NON-SYNONYMOUS' in e[3] for e in evidence)
-    if nsonly and not ns:
-      return []
+    #ns = any('NON-SYNONYMOUS' in e[3] for e in evidence)
+    #if nsonly and not ns:
+    #  return []
 
     # If not in a gene, check to see if there are any genes nearby
     if not evidence:
@@ -240,23 +285,25 @@ class VariantAnnotator(object):
           three_prime.add(gene)
 
       for gene in five_prime:
-        evidence.append( ["5' of gene",gene,'','','',ref_nuc,var_nuc,'',''] )
+        evidence.append( ["5' of gene",gene,'',False,'','',ref_nuc,var_nuc,'',''] )
 
       for gene in three_prime:
-        evidence.append( ["3' of gene",gene,'','','',ref_nuc,var_nuc,'',''] )
+        evidence.append( ["3' of gene",gene,'',False,'','',ref_nuc,var_nuc,'',''] )
 
     if not evidence:
-      evidence.append( ['intergenic','','','','',ref_nuc,var_nuc,'',''] )
+      evidence.append( ['intergenic','','',False,'','',ref_nuc,var_nuc,'',''] )
 
     evidence = group_evidence(evidence)
-    cytoband = query_cytoband_by_location(self.con, chrom, ref_start)[0]
+    cytoband = cytoband_name(self.band_map[chrom].find_values(ref_start,ref_end))
     context  = [ chrom,cytoband,ref_start,ref_end ]
 
     if 0: # evidence:
-      values = context+evidence[0]
-      for f,v in zip(GeneEvidence.__slots__,values):
-        print '%15s = %s' % (f,v)
       print
+      for e in evidence:
+        values = context+e
+        for f,v in zip(GeneEvidence.__slots__,values):
+          print '%15s = %s' % (f,v)
+        print
 
     evidence = [ GeneEvidence._make(context+e) for e in evidence ]
 
@@ -264,8 +311,6 @@ class VariantAnnotator(object):
 
 
   def classify_feature(self, gene, ref_start, ref_end, ref_nuc, var_nuc):
-    #print gene.name,gene.symbol,gene.strand,gene.txStart,gene.txEnd,gene.exonCount,gene.accession
-
     gene_parts = self.decode_gene(gene)
 
     intersect = defaultdict(list)
@@ -296,10 +341,16 @@ class VariantAnnotator(object):
       e = self.classify_exonic_variant(gene, gene_parts, intersect['CDS'][0],
                                        ref_start, ref_end, ref_nuc, var_nuc)
       evidence.append(e)
-    elif len(intersect['CDS'])>=1:
-      evidence.append([parts,gene,'','NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'',''])
+    elif len(intersect['CDS']):
+      evidence.append([parts,gene,'',True,'NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'',''])
+    elif mut_type:
+      evidence.append([parts,gene,'',True,'PREDICTED-DISRUPT-TRANSCRIPT',mut_type,ref_nuc,var_nuc,'',''])
+    elif len(intersect["5' UTR"])+len(intersect["3' UTR"]):
+      evidence.append([parts,gene,'',False,'UNKNOWN-UTR',mut_type,ref_nuc,var_nuc,'',''])
+    elif len(intersect['intron']):
+      evidence.append([parts,gene,'',False,'UNKNOWN-INTRONIC',mut_type,ref_nuc,var_nuc,'',''])
     else:
-      evidence.append([parts,gene,'','',mut_type,ref_nuc,var_nuc,'',''])
+      evidence.append([parts,gene,'',False,'UNKNOWN-INTERGENIC',mut_type,ref_nuc,var_nuc,'',''])
 
     return evidence
 
@@ -319,7 +370,7 @@ class VariantAnnotator(object):
     #assert len(ref_nuc)==(ref_end-ref_start)
 
     if ref_nuc==var_nuc:
-      result += ['SYNONYMOUS','FALSE POSITIVE',ref_nuc,var_nuc,'','']
+      result += [False,'SYNONYMOUS','REFERENCE',ref_nuc,var_nuc,'','']
       return result
 
     ref_frame = len(ref_nuc)%3
@@ -339,9 +390,10 @@ class VariantAnnotator(object):
     if ref_frame!=var_frame:
       mut_type.append('FRAMESHIFT')
       mut_type = ','.join(sorted(mut_type))
-      result += ['NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'','']
+      result += [True,'NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'','']
       return result
 
+    # FIXME: Request 100 bases beyond end of transcription
     ref_var_start = 0
     ref_cds_seq   = []
     for part in gene_parts:
@@ -386,7 +438,7 @@ class VariantAnnotator(object):
     except TranslationError:
       mut_type.append('INVALID TRANSLATION')
       mut_type = ','.join(sorted(mut_type))
-      result += ['PRESUMED NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,'','']
+      result += [True,'PRESUMED NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,'','']
       return result
 
     ref_aa,var_aa,aa_position = reduce_match(str(ref_cds_aa),str(var_cds_aa))
@@ -406,7 +458,7 @@ class VariantAnnotator(object):
       assert len(ref_aa)
 
       result[-1] += ':aa=%d' % (aa_position+1)
-      result += ['SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(ref_aa)]
+      result += [False,'SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(ref_aa)]
       return result
 
     # Classify non-synonymous change by comparing AA sequences
@@ -448,7 +500,7 @@ class VariantAnnotator(object):
 
     mut_type = ','.join(sorted(mut_type))
     result[-1] += ':aa=%d' % (aa_position+1)
-    result += ['NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(var_aa)]
+    result     += [True,'NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(var_aa)]
 
     return result
 
