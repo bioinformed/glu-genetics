@@ -126,7 +126,6 @@ def query_genes_by_location(con,chrom,start,end):
   return cur.fetchall()
 
 
-
 def split_cytoband(band):
   m = cyto_re.match(str(band))
   return m.groups() if m is not None else None
@@ -164,7 +163,7 @@ def query_cytoband_by_location(con,chrom,loc):
   ORDER BY chrom,MIN(start,stop);
   '''
   if chrom is None:
-    return []
+    return '',[]
   if chrom.startswith('chr'):
     chrom = chrom[3:]
   cur = con.cursor()
@@ -184,7 +183,7 @@ def query_cytobands_by_location(con,chrom,start,end):
   ORDER BY chrom,start,stop;
   '''
   if chrom is None:
-    return []
+    return '',[]
   if chrom.startswith('chr'):
     chrom = chrom[3:]
   cur = con.cursor()
