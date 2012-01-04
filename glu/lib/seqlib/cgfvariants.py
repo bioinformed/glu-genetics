@@ -14,6 +14,8 @@ VarInfo    = namedtuple('VarInfo',   'exact_vars inexact_vars common_score funct
 VarRecord  = recordtype('VarRecord', 'chromosome start stop allele common_score function_score source')
 VariantKey = namedtuple('VariantKey', 'chromosome start stop source')
 
+goFlyAKite = VarInfo( (), (), 0, 0)
+
 
 class CGFVariants(object):
   def __init__(self, cgfvariant, reference_fasta):
@@ -31,7 +33,7 @@ class CGFVariants(object):
       chrom,vstart,vstop,allele,common_score,function_score,source = s.split('\t')
       source = [ s.strip() for s in source.split(',') ]
 
-      yield VarRecord(chrom, int(vstart), int(vstop), allele,
+      yield VarRecord(chrom, int(vstart), int(vstop), allele.replace('-',''),
                              float(common_score), int(function_score),
                              source)
 
@@ -51,9 +53,13 @@ class CGFVariants(object):
     return self.reference.fetch(chromosome, start, stop).upper()
 
   def score_and_classify(self, chromosome, start, stop, geno):
-    geno           = [ g.strip().upper() for g in geno ]
-    qref           = self.get_refseq(chromosome, start, stop)
     vdata          = self.build_variants_lookup(chromosome, start, stop)
+
+    if not vdata:
+      return goFlyAKite
+
+    geno           = [ g.strip().upper() for g in geno ]
+    qref           = self.get_refseq(chromosome, start, stop) if start!=stop else ''
     qvar_alleles   = set(a for a in geno if a!=qref)
 
     exact_vars     = []
