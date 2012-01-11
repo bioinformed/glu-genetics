@@ -59,8 +59,6 @@ def cga_base_reader(filename,hyfile=None,**kwargs):
   if not header:
     raise ValueError('Unable to determine CGA header in file %s' % filename)
 
-  slen = len(header)
-
   if extra:
     if is_str(extra):
       extra = [extra]
@@ -336,12 +334,22 @@ def cga_mastervar_reader_v2(records,**kwargs):
 
     return records
 
-  missing = ('','N')
+  missing  = ('','N')
   skip_ref = kwargs.get('skip_ref',False)
+  skip_lq  = kwargs.get('skip_lq',False)
 
   for record in records:
     if skip_ref and (record.zygosity=='no-call' or record.varType=='ref'):
       continue
+
+    if skip_lq and skip_ref:
+      if record.allele1Seq==record.reference and record.allele1VarQuality=='VQHIGH' \
+                                             and record.allele2VarQuality=='VQLOW':
+        continue
+
+      if record.allele2Seq==record.reference and record.allele2VarQuality=='VQHIGH' \
+                                             and record.allele1VarQuality=='VQLOW':
+        continue
 
     record.locus                    = int(record.locus)
     record.ploidy                   = int(record.ploidy)
@@ -354,9 +362,11 @@ def cga_mastervar_reader_v2(records,**kwargs):
     record.allele1Seq               = cache_str(record.allele1Seq,record.allele1Seq)
     record.allele2Seq               = cache_str(record.allele2Seq,record.allele2Seq)
     record.allele1VarScoreVAF       = int(record.allele1VarScoreVAF) if record.allele1VarScoreVAF else None
-    record.allele1VarScoreEAF       = int(record.allele1VarScoreEAF) if record.allele1VarScoreEAF else None
     record.allele2VarScoreVAF       = int(record.allele2VarScoreVAF) if record.allele2VarScoreVAF else None
+    record.allele1VarScoreEAF       = int(record.allele1VarScoreEAF) if record.allele1VarScoreEAF else None
     record.allele2VarScoreEAF       = int(record.allele2VarScoreEAF) if record.allele2VarScoreEAF else None
+    record.allele1VarQuality        = cache_str(record.allele1VarQuality)
+    record.allele2VarQuality        = cache_str(record.allele2VarQuality)
     record.allele1HapLink           = record.allele1HapLink or None
     record.allele2HapLink           = record.allele2HapLink or None
     record.allele1XRef              = record.allele1XRef or None
@@ -366,9 +376,9 @@ def cga_mastervar_reader_v2(records,**kwargs):
     record.allele2ReadCount         = int(record.allele2ReadCount) if record.allele2ReadCount else None
     record.referenceAlleleReadCount = int(record.referenceAlleleReadCount) if record.referenceAlleleReadCount else None
     record.totalReadCount           = int(record.totalReadCount) if record.totalReadCount else None
-    record.pfam                     = record.pfam or None
-    record.miRBaseId                = record.miRBaseId or None
-    record.repeatMasker             = record.repeatMasker or None
+    record.pfam                     = record.pfam          or None
+    record.miRBaseId                = record.miRBaseId     or None
+    record.repeatMasker             = record.repeatMasker  or None
     record.segDupOverlap            = record.segDupOverlap or None
     record.relativeCoverageDiploid  = float(record.relativeCoverageDiploid) if record.relativeCoverageDiploid not in missing else None
     record.calledPloidy             = int(record.calledPloidy) if record.calledPloidy not in missing else None
@@ -394,10 +404,18 @@ def cga_mastervar_reader_v2(records,**kwargs):
       record.allele1XRef,record.allele2XRef               = record.allele2XRef,record.allele1XRef
       record.allele1Gene,record.allele2Gene               = record.allele2Gene,record.allele1Gene
 
+    if skip_lq:
+      if record.allele1VarQuality=='VQLOW':
+        record.allele1Seq  ='?'
+        record.allele1Gene = None
+
+      if record.allele2VarQuality=='VQLOW':
+        record.allele2Seq  ='?'
+        record.allele2Gene = None
+
     # 653635:NR_024540.1:WASH5P:INTRON:UNKNOWN-INC
 
     yield record
-
 
 
 def cga_gene_reader(records,**kwargs):
