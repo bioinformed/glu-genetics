@@ -420,27 +420,37 @@ class GDATIndex(object):
     self.con.commit()
 
 
-def get_gcmodel(filename,chrom_indices=None,extra_terms=0):
+def get_gcmodel(filename,chrom_indices,chrom_means=False,ploidy=True,extra_terms=0):
   gcdata     = h5py.File(filename,'r')
 
   try:
     gc       = gcdata['GC'][:].T
-    gcmeans  = gc.sum(axis=1)
-    gc      -= gcmeans.reshape(-1,1)
+
+    #small    = np.array([5,6,7,8,14,15,16,17],dtype=int)
+    #gc       = gc[:,small]
+
+    gcmask   = np.isfinite(gc.sum(axis=1))
+    gcmeans  = gc[gcmask].mean(axis=0)
+    gc      -= gcmeans.reshape(1,-1)
     n        = len(gc)
 
-    if chrom_indices is None:
-      means  = np.ones((n,1+extra_terms), dtype=float)
+    if not chrom_means:
+      means  = np.ones((n,1+ploidy+extra_terms), dtype=float)
     else:
-      m      = len(CHROM_LIST)+extra_terms
+      m      = ploidy+len(CHROM_LIST)+extra_terms
       means  = np.zeros((n,m), dtype=float)
       for i,chrom in enumerate(CHROM_LIST):
         if chrom in chrom_indices:
-          pos,index      = chrom_indices[chrom]
-          means[index,i] = 1
+          pos,index = chrom_indices[chrom]
+          means[index,i+ploidy] = 1
+
+    if ploidy:
+      col = 0 if chrom_means else 1
+      for chrom in chrom_indices:
+        pos,index = chrom_indices[chrom]
+        means[index,col] = 1 if chrom.upper() in ('X','Y','M','MT') else 2
 
     gcdesign = np.hstack( [means,gc] )
-    gcmask   = np.isfinite(gcdesign.sum(axis=1))
 
     return gcdesign,gcmask
 

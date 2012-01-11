@@ -245,14 +245,15 @@ def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='line
   valid       &= np.isfinite(x+y)
   valid       &= dmask
 
+  j            = 1
   if rmodel=='linear':
-    design[:,1]= x
-    design[:,2]= y
+    design[:,j+0]= x
+    design[:,j+1]= y
   elif rmodel=='quadratic':
-    design[:,1]= x
-    design[:,2]= x*x
-    design[:,3]= y
-    design[:,4]= y*y
+    design[:,j+0]= x
+    design[:,j+1]= x*x
+    design[:,j+2]= y
+    design[:,j+3]= y*y
   else:
     raise ValueError('Invalid intensity correction model')
 
@@ -283,7 +284,7 @@ def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='line
 
   lm.fit()
 
-  #print '  R correct: r2=%.2f, p=%s' % (lm.r2(),lm.p_values(phred=True))
+  print '  .. intensity correction: R2=%.2f, p=%s' % (lm.r2(),lm.p_values(phred=True))
 
   r            = np.empty_like(x)
   r.fill(np.nan)
@@ -301,14 +302,18 @@ def option_parser():
 
   parser.add_argument('gdat',                         help='Input GDAT file')
 
+  parser.add_argument('--prenorm',    metavar='NAME', default='quantile', choices=['none','quantile'],
+                         help='Intensity pre-normalization: none or quantile (default)')
   parser.add_argument('--rmodel',     metavar='NAME', default='quadratic', choices=['linear','quadratic'],
                          help='Intensity correction model: linear or quadratic (default)')
   parser.add_argument('--gcmodel',    metavar='GCM',  help='GC model file to use')
   parser.add_argument('--gcmodeldir', metavar='DIR',  help='GC models directory')
-  parser.add_argument('--maxmissing', metavar='RATE', default=0.02, type=float,
-                         help='Maximum missing rate for assays to estimate cluster centers (default=0.02)')
-  parser.add_argument('--minqual',    metavar='QUANTILE', default=0.10, type=float,
-                         help='Minimum genotype quality score (GC) quantile (default=0.10)')
+  parser.add_argument('--maxmissing', metavar='RATE', default=0.05, type=float,
+                         help='Maximum missing rate for assays to estimate cluster centers (default=0.05)')
+  parser.add_argument('--minqual',    metavar='N', default=0.01, type=float,
+                         help='Minimum genotype quality score (GC) (default=0.01)')
+  parser.add_argument('--minqqual',    metavar='Q', default=0, type=float,
+                         help='Minimum genotype quality score (GC) quantile (default=0, disabled)')
   parser.add_argument('-P', '--progress', action='store_true',
                          help='Show analysis progress bar, if possible')
 
@@ -331,7 +336,7 @@ def main():
   gdat      = GDATFile(options.gdat,'r+')
   n         = gdat.sample_count
   s         = gdat.snp_count
-  qnorm     = True
+  qnorm     = options.prenorm=='quantile'
 
   create_gdat_qn(gdat,s,n)
 
@@ -340,7 +345,7 @@ def main():
     print 'Loading GC/CpG model for %s...' % manifest
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
 
-    design,dmask = get_gcmodel(filename, extra_terms=extra_terms)
+    design,dmask = get_gcmodel(filename, gdat.chromosome_index, ploidy=False, extra_terms=extra_terms)
   else:
     design  = np.ones( (s,1+extra_terms), dtype=float )
     dmask   = design[:,0]==1
@@ -348,6 +353,7 @@ def main():
   X         = gdat['X']
   Y         = gdat['Y']
   GC        = gdat['GC']
+  samples   = gdat['Samples']
   genotypes = gdat['Genotype']
 
   print 'SNPs=%d, samples=%d' % (s,n)
@@ -369,16 +375,16 @@ def main():
 
   skipped     = 0
 
-  pass1 = enumerate(parallel_gdat_iter(X,Y,genotypes,GC))
+  pass1 = enumerate(parallel_gdat_iter(samples,X,Y,genotypes,GC))
 
   if options.progress:
     pass1 = progress_loop(pass1, length=n, units='samples', label='PASS 1: ')
 
-  for i,(x,y,genos,gqual) in pass1:
+  for i,(sample,x,y,genos,gqual) in pass1:
     if not options.progress:
-      print '  Sample %5d / %d' % (i+1,n)
+      print '  Sample %5d / %d: %s' % (i+1,n,sample)
 
-    min_qual  = quantile(gqual,options.minqual)
+    min_qual  = min(options.minqual,quantile(gqual,options.minqqual) if options.minqqual>0 else 0.)
 
     qmask     = gqual>=min_qual
     qmask    &= dmask
@@ -406,11 +412,6 @@ def main():
   finalize_centers(r_AB,t_AB,n_AB)
   finalize_centers(r_BB,t_BB,n_BB)
 
-  if skipped:
-    print '  Skipped %d samples (%.2f%%) for missing rate > %.2f%%' % (skipped,skipped/n*100,options.maxmissing*100)
-
-  print 'PASS 2: Updating LRR and BAF...'
-
   bad         = t_AA>=t_AB
   bad        |= t_AB>=t_BB
   bad        |= t_AA>=t_BB
@@ -419,24 +420,29 @@ def main():
   t_AB[bad]   = np.nan
   t_BB[bad]   = np.nan
 
-  LRR_QN = BatchTableWriter(gdat['LRR_QN'])
-  BAF_QN = BatchTableWriter(gdat['BAF_QN'])
+  print '  ... skipped %d samples (%.2f%%) for missing rate > %.2f%%' % (skipped,skipped/n*100,options.maxmissing*100)
+  print '  ... removing %d loci with nonsensical allelic ratio (theta)' % bad.sum()
 
-  pass2 = enumerate(parallel_gdat_iter(X,Y,genotypes))
+  print 'PASS 2: Updating LRR and BAF...'
+
+  LRR_QN      = BatchTableWriter(gdat['LRR_QN'])
+  BAF_QN      = BatchTableWriter(gdat['BAF_QN'])
+
+  pass2       = enumerate(parallel_gdat_iter(samples,X,Y,genotypes))
 
   if options.progress:
-    pass2 = progress_loop(pass2, length=n, units='samples', label='PASS 2: ')
+    pass2     = progress_loop(pass2, length=n, units='samples', label='PASS 2: ')
 
-  for i,(x,y,genos) in pass2:
+  for i,(sample,x,y,genos) in pass2:
     if not options.progress:
-      print '  Sample %5d / %d' % (i+1,n)
+      print '  Sample %5d / %d: %s' % (i+1,n,sample)
 
     if qnorm:
       x,y     = quantile_normalize(x,y,max_threshold=1.5)
 
     t         = (2/np.pi)*np.arctan2(y,x)
 
-    r         = regress_intensity(x,y,design,dmask,genos,r_AA,r_AB,r_BB,rmodel=options.rmodel,thin=11)
+    r         = regress_intensity(x,y,design,dmask,genos,r_AA,r_AB,r_BB,rmodel=options.rmodel,thin=7)
 
     lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
 

@@ -32,7 +32,7 @@ def option_parser():
 
   parser.add_argument('gdat',         help='Input GDAT file')
 
-  parser.add_argument('--signal',     metavar='TYPE', default='norm',
+  parser.add_argument('--signal',     metavar='TYPE', default='norm', choices=['norm','raw'],
                                       help='LRR/BAF signal processing: raw or norm (default)')
   parser.add_argument('--chromosomes',metavar='CHRS', default='',
                                       help='Comma separated list of chromosomes to plot (blank for all)')
@@ -89,6 +89,7 @@ def main():
       pos,index    = chrom_index[chrom]
       chrom_baf    = baf[index]
       chrom_lrr    = None
+      chrom_genos  = genos[index]
 
       if gccorrect:
         chrom_lrr = lrr_adj[index]
@@ -101,9 +102,13 @@ def main():
         chrom_lrr = lrr[index]
         mask      = np.isfinite(chrom_lrr)&np.isfinite(chrom_baf)&(chrom_lrr>=-2)&(chrom_lrr<=2)
 
-      print '  chr%-3s LRR=%6.3f +/ %.3f, BAF=%.2f +/ %.2f' %  \
+      hets    = (chrom_genos=='AB')&mask
+      het_baf = chrom_baf[hets]
+
+      print '  chr%-3s LRR=%6.3f +- %.3f, BAF=%.2f +- %.2f BAF_AB=%.2f +- %.2f' %  \
                   (chrom,chrom_lrr[mask].mean(),1.96*chrom_lrr[mask].std(),
-                         chrom_baf[mask].mean(),1.96*chrom_baf[mask].std())
+                         chrom_baf[mask].mean(),1.96*chrom_baf[mask].std(),
+                         het_baf.mean(),1.96*het_baf.std())
 
       variables = dict(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom)
 

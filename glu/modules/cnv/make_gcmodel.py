@@ -113,7 +113,9 @@ def main():
 
   assert n==m*2
 
-  gcmodel = create_gcmodel(options.output, n, s)
+  gcmodel               = create_gcmodel(options.output, n, s)
+  gcmodel['Terms'][:]   = terms
+  gcdata                = gcmodel['GC']
 
   attrs = gcmodel.attrs
   attrs['GLU_FORMAT']   = 'gcm'
@@ -123,12 +125,9 @@ def main():
   attrs['SNPCount']     = s
   attrs['TermCount']    = n
 
-  gcmodel['Terms'][:] = terms
-  gcdata = gcmodel['GC']
-
   for chrom,chrom_snps in groupby(allsnps, itemgetter(1)):
     try:
-      seq = reference.fetch('chr'+chrom)
+      seq = reference.fetch('chr'+chrom).upper()
     except IndexError:
       sys.stderr.write('Skipping region: %s\n' % chrom)
       continue
@@ -162,7 +161,8 @@ def main():
 
     for i,winsize in enumerate(windows):
       sys.stderr.write(' %d' % winsize)
-      win = pick_cpg_window(seq,winsize,positions)
+
+      win          = pick_cpg_window(seq,winsize,positions)
 
       gc           = gcdata[i]
       gc[indices]  = win[:,0]
