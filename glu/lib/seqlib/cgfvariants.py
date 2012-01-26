@@ -52,14 +52,15 @@ class CGFVariants(object):
       chromosome='chr'+chromosome
     return self.reference.fetch(chromosome, start, stop).upper()
 
-  def score_and_classify(self, chromosome, start, stop, geno):
+  def score_and_classify(self, chromosome, start, stop, geno, qref=None):
     vdata          = self.build_variants_lookup(chromosome, start, stop)
 
     if not vdata:
       return goFlyAKite
 
     geno           = [ g.strip().upper() for g in geno ]
-    qref           = self.get_refseq(chromosome, start, stop) if start!=stop else ''
+    if qref is None:
+      qref         = self.get_refseq(chromosome, start, stop) if start!=stop else ''
     qvar_alleles   = set(a for a in geno if a!=qref)
 
     exact_vars     = []
