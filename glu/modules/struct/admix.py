@@ -15,10 +15,11 @@ import numpy as np
 
 from   itertools                 import izip
 
-from   glu.lib.fileutils         import table_writer
+from   glu.lib.fileutils         import table_writer, table_reader
 from   glu.lib.progressbar       import progress_loop
 from   glu.lib.genolib           import load_genostream, geno_options
-from   glu.lib.genolib.genoarray import genotype_count_matrix, genotype_indices
+from   glu.lib.genolib.genoarray import genotype_count_matrix, genotype_indices, build_model, \
+                                        GenotypeRepresentationError
 
 
 # Set absolute and relative tolerances for solutions
@@ -412,7 +413,7 @@ def compute_frequencies(freq_model,sample_count,models,geno_counts):
   return geno_freqs
 
 
-def load(options):
+def load_from_genos(options):
   # Load samples to test
   sys.stderr.write('Loading %s...\n' % options.test_genotypes)
   test = load_genostream(options.test_genotypes,format=options.informat,genorepr=options.ingenorepr,
@@ -456,6 +457,97 @@ def load(options):
   pops = np.array(pops, dtype=float)
 
   return test,pops
+
+
+RC={'A':'T','C':'G','T':'A','G':'C'}
+
+
+def load_from_freqs(options):
+  # Load samples to test
+  sys.stderr.write('Loading %s...\n' % options.test_genotypes)
+  test = load_genostream(options.test_genotypes,format=options.informat,genorepr=options.ingenorepr,
+                         genome=options.loci,phenome=options.pedigree,transform=options,
+                         hyphen=sys.stdin).as_sdat()
+
+  # Initialize masks
+  locusmap = dict( (l,i) for i,l in enumerate(test.loci) )
+
+  # Load source populations, align loci, and compute frequencies
+  pops = []
+  sys.stderr.write('Loading %s...\n' % options.pop_genotypes[0])
+  fdata = table_reader(options.pop_genotypes[0],want_header=True)
+
+  header = next(fdata)
+  pops   = header[2:]
+
+  print '!!! pops=',pops
+  print '!!! starting with %d loci' % len(locusmap)
+
+  n      = len(pops)
+
+  seen    = set()
+  freqmap = {}
+  for row in fdata:
+    lname = row[0]
+
+    if lname not in locusmap:
+      continue
+
+    if lname in seen:
+      freqmap.pop(lname,None)
+      continue
+
+    seen.add(lname)
+
+    alleles = tuple(row[1].split(','))
+
+    if len(alleles)!=2:
+      continue
+
+    model = test.models[ locusmap[lname ] ]
+
+    if alleles not in model:
+      try:
+        model = build_model(alleles,base=model)
+      except GenotypeRepresentationError:
+        alleles = RC[alleles[0]],RC[alleles[1]]
+        if alleles not in model:
+          try:
+            model = build_model(alleles,base=model)
+          except GenotypeRepresentationError:
+            print '!!! incompatible model: alleles=%s, model=%s' % (alleles,model.alleles[1:])
+            continue
+
+    freqmap[lname] = freqs = np.zeros( (n,4), dtype=float )
+
+    q   = np.clip(np.array(row[2:],dtype=float),0.005,1-0.005)
+    p   = 1-q
+
+    a,b = alleles
+    aa  = model[a,a].index
+    ab  = model[a,b].index
+    bb  = model[b,b].index
+
+    freqs[:,aa] =   p*p
+    freqs[:,ab] = 2*p*q
+    freqs[:,bb] =   q*q
+
+  # Perform final mask of individual data
+  loci = [ l for l in test.loci if l in freqmap ]
+
+  print '!!! found %d loci' % len(freqmap)
+
+  test = test.transformed(includeloci=loci)
+
+  locusmap  = dict( (l,i) for i,l in enumerate(loci) )
+  pop_freqs = np.zeros( (n,len(loci),4), dtype=float)
+
+  for i,lname in enumerate(loci):
+    pop_freqs[:,i,:] = freqmap.pop(lname)
+
+  print '!!! found %d loci' % len(loci)
+
+  return test,pop_freqs
 
 
 def build_labels(options):
@@ -510,7 +602,11 @@ def main():
   options   = parser.parse_args()
 
   labels    = build_labels(options)
-  test,pops = load(options)
+
+  if len(options.pop_genotypes)>1:
+    test,pops = load_from_genotypes(options)
+  else:
+    test,pops = load_from_freqs(options)
 
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(['SAMPLE']+labels+['IMPUTED_ANCESTRY'])

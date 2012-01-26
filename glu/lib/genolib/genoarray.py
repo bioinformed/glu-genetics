@@ -1626,7 +1626,7 @@ class ModelBuilder(object):
         if len(genotypes) >= len(base.genotypes):
           return base
 
-      alleles          = list(alleles or []) + base.alleles[1:]
+      alleles          = base.alleles[1:] + list(alleles or [])
       genotypes        = [ g.alleles() for g in base.genotypes[1:] ] + list(genotypes or [])
       max_alleles      = base.max_alleles
       allow_hemizygote = base.allow_hemizygote
