@@ -6,6 +6,7 @@ __abstract__  = 'Variant Call Format parser'
 __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
+import csv
 import sys
 
 from   collections                  import defaultdict
@@ -18,7 +19,10 @@ VCFRecord = recordtype('VCFRecord',    'chrom start end names ref var qual filte
 
 
 class VCFReader(object):
-  def __init__(self, filename, hyphen=None):
+  def __init__(self, filename, hyphen=None, field_size_limit=1024*1024):
+    if csv.field_size_limit()<field_size_limit:
+      csv.field_size_limit(field_size_limit)
+
     self.data = data    = table_reader(filename,hyphen=sys.stdin)
 
     self.metadata_order = metadata_order = []
