@@ -11,14 +11,16 @@ __revision__  = '$Id$'
 
 import os
 
-from   math                 import modf
+from   math                      import modf
 
 import numpy as np
 
-from   glu.lib.glm          import Linear
-from   glu.lib.progressbar  import progress_loop
+from   glu.lib.glm               import Linear
+from   glu.lib.progressbar       import progress_loop
 
-from   glu.modules.cnv.gdat import GDATFile, BatchTableWriter, parallel_gdat_iter, create_gdat_qn, get_gcmodel
+from   glu.modules.cnv.gdat      import GDATFile, BatchTableWriter, parallel_gdat_iter, create_gdat_qn, get_gcmodel
+
+from   glu.lib.genolib.transform import _intersect_options, _union_options
 
 
 def boxcox(x,l=0,d=0,base=None):
@@ -271,20 +273,55 @@ def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='line
     r[~dmask]  = np.nan
     return r
 
-  if thin and n/thin<minpoints:
-    thin       = n//minpoints
-
   r_geno       = r_geno[valid].reshape(-1,1)
   design_valid = design[valid]
 
   if thin:
-    lm = Linear(r_geno[::thin], design_valid[::thin])
-  else:
-    lm = Linear(r_geno, design_valid)
+    if n/thin<minpoints:
+      thin     = n//minpoints
 
+    r_geno_fit = r_geno[::thin]
+    design_fit = design_valid[::thin]
+  else:
+    r_geno_fit = r_geno
+    design_fit = design_valid
+
+  #design_fit0  = design_fit[:,:5]
+  #small        = np.array([0,1,2,3,4,10,11,12,13,19,20,21,22])
+  #design_fit1  = design_fit[:,small]
+  #small        = np.array([0,1,2,3,4,9,10,11,12,13,18,19,20,21,22])
+  #design_fit2  = design_fit[:,small]
+
+  #lm0 = Linear(r_geno_fit, design_fit0)
+  #lm1 = Linear(r_geno_fit, design_fit1)
+  #lm2 = Linear(r_geno_fit, design_fit2)
+  lm  = Linear(r_geno_fit, design_fit)
+
+  #lm0.fit()
+  #lm1.fit()
+  #lm2.fit()
   lm.fit()
 
-  print '  .. intensity correction: R2=%.2f, p=%s' % (lm.r2(),lm.p_values(phred=True))
+  #k0     = design_fit0.shape[1]-5
+  #k1     = design_fit1.shape[1]-5
+  #k2     = design_fit2.shape[1]-5
+  #k      = design_fit.shape[1]-5
+
+  #aic18  = 2*k - 2*(lm.L - lm0.L)
+  #r2gc18 = 1 - lm.ss/lm0.ss
+
+  #aic8   = 2*k1 - 2*(lm1.L - lm0.L)
+  #r2gc8  = 1 - lm1.ss/lm0.ss
+
+  #aic10  = 2*k2 - 2*(lm2.L - lm0.L)
+  #r2gc10 = 1 - lm2.ss/lm0.ss
+
+  #print '  ..   H0: k=%2d R2=%.2f, p=%s' % (k0,lm0.r2(), lm0.p_values(phred=True))
+  #print '  ..  GC8: k=%2d R2=%.2f, p=%s' % (k1,lm1.r2(), lm1.p_values(phred=True))
+  #print '  .. GC10: k=%2d R2=%.2f, p=%s' % (k2,lm2.r2(), lm2.p_values(phred=True))
+  #print '  .. GC18: k=%2d R2=%.2f, p=%s' % (k,  lm.r2(),  lm.p_values(phred=True))
+  #print '  .. R2gc8=%.3f, AIC8=%.2f, R2gc10=%.3f, AIC10=%.2f, R2gc18=%.3f, AIC18=%.2f' \
+  #     % (r2gc8,aic8,r2gc10,aic10,r2gc18,aic18)
 
   r            = np.empty_like(x)
   r.fill(np.nan)
@@ -302,6 +339,10 @@ def option_parser():
 
   parser.add_argument('gdat',                         help='Input GDAT file')
 
+  parser.add_argument('--includemodel', metavar='FILE', action='append',
+                    help='List of samples to use to recalibrate model')
+  parser.add_argument('--excludemodel', metavar='FILE', action='append',
+                    help='List of samples not to use to recalibrate model')
   parser.add_argument('--prenorm',    metavar='NAME', default='quantile', choices=['none','quantile'],
                          help='Intensity pre-normalization: none or quantile (default)')
   parser.add_argument('--rmodel',     metavar='NAME', default='quadratic', choices=['linear','quadratic'],
@@ -363,6 +404,9 @@ def main():
 
   print 'PASS 1: Re-estimate cluster centers...'
 
+  include = _intersect_options(options.includemodel or [])
+  exclude = _union_options(options.excludemodel or [])
+
   n_AA        = np.zeros(s, dtype=int  )
   r_AA        = np.zeros(s, dtype=float)
   t_AA        = np.zeros(s, dtype=float)
@@ -373,7 +417,8 @@ def main():
   r_BB        = np.zeros(s, dtype=float)
   t_BB        = np.zeros(s, dtype=float)
 
-  skipped     = 0
+  skipped_missing = 0
+  skipped_exclude = 0
 
   pass1 = enumerate(parallel_gdat_iter(samples,X,Y,genotypes,GC))
 
@@ -382,7 +427,17 @@ def main():
 
   for i,(sample,x,y,genos,gqual) in pass1:
     if not options.progress:
-      print '  Sample %5d / %d: %s' % (i+1,n,sample)
+      print '  Sample %5d / %d: %s.  ' % (i+1,n,sample),
+
+    if include is not None and sample not in include:
+      print 'Skip.  Excluded.'
+      skipped_exclude += 1
+      continue
+
+    if exclude is not None and sample in exclude:
+      print 'Skip.  Excluded.'
+      skipped_exclude += 1
+      continue
 
     min_qual  = min(options.minqual,quantile(gqual,options.minqqual) if options.minqqual>0 else 0.)
 
@@ -393,8 +448,11 @@ def main():
 
     if missing > options.maxmissing:
       #print '  ... skipping due to missing rate %.2f%% > %.2f%%' % (missing*100,options.maxmissing*100)
-      skipped += 1
+      print 'Skip.  Missing rate %.2f%% > %.2f%%.' % (missing*100,options.maxmissing*100)
+      skipped_missing += 1
       continue
+
+    print
 
     if qnorm:
       x,y     = quantile_normalize(x,y,max_threshold=1.5)
@@ -420,7 +478,8 @@ def main():
   t_AB[bad]   = np.nan
   t_BB[bad]   = np.nan
 
-  print '  ... skipped %d samples (%.2f%%) for missing rate > %.2f%%' % (skipped,skipped/n*100,options.maxmissing*100)
+  print '  ... skipped %d samples (%.2f%%) due to model exclusion' % (skipped_exclude,skipped_exclude/n*100)
+  print '  ... skipped %d samples (%.2f%%) for missing rate > %.2f%%' % (skipped_missing,skipped_missing/n*100,options.maxmissing*100)
   print '  ... removing %d loci with nonsensical allelic ratio (theta)' % bad.sum()
 
   print 'PASS 2: Updating LRR and BAF...'
@@ -445,6 +504,9 @@ def main():
     r         = regress_intensity(x,y,design,dmask,genos,r_AA,r_AB,r_BB,rmodel=options.rmodel,thin=7)
 
     lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
+
+    mask      = np.isfinite(lrr)&np.isfinite(baf)
+    print '  ... sigmaLRR=%.2f, sigmaBAFhet=%.3f' % (lrr[mask].std(),baf[mask&(genos=='AB')].std())
 
     LRR_QN.write(lrr)
     BAF_QN.write(baf)
