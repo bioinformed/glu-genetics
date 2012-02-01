@@ -15,7 +15,7 @@ __all__ = ['as_set','is_str','tally','ilen','pair_generator','percent','xenumera
 import gc
 
 from   collections      import deque
-from   itertools        import izip, count, chain, islice, repeat
+from   itertools        import izip, count, chain, islice, repeat, imap
 
 import glu.lib.pycompat
 from   glu.lib.pycompat import *
@@ -475,7 +475,177 @@ def izip_exact(*iterables):
   return izip(*[first] + rest)
 
 
-def parallel_coordinate_iterator(sequences, keyfunc):
+class OrderError(ValueError): pass
+
+
+def sort_almost_sorted(sequence,key=None,windowsize=1000,stable=True):
+  '''
+  sort_almost_sorted(sequence,key=None,windowsize=1000)
+
+  Sorts an almost sorted sequence of items provided that all misordered
+  items are within windowsize elements of the correct location in the final
+  sequence.  Returns a generator that yields the correctly sorted sequence
+  or raises OrderError if the correct sequence cannot be constructed with
+  the given window size.
+
+  If a key function is provided or the stable argument is True, then the
+  resulting sort order is stable, with items returned in proper sort order
+  and equal keys returned in the same relative order.  Otherwise, the
+  resulting ordering is not guaranteed to be stable.
+
+  Test window sizes:
+
+    >>> list(sort_almost_sorted([1,2,4,5,3],windowsize=3))
+    [1, 2, 3, 4, 5]
+
+    >>> list(sort_almost_sorted([1,2,5,6,4],windowsize=1))
+    Traceback (most recent call last):
+         ...
+    OrderError: Misordered keys beyond window size
+
+    >>> list(sort_almost_sorted([2,3,4,5,6,7,9,10,1],windowsize=10))
+    [1, 2, 3, 4, 5, 6, 7, 9, 10]
+
+    >>> list(sort_almost_sorted([2,3,4,5,6,7,9,10,1],windowsize=8))
+    Traceback (most recent call last):
+    ...
+    OrderError: Misordered keys beyond window size
+
+  Test stability:
+
+    # key=int(x), so all keys will compare equal and values are not in the
+    # natural ordering.
+    >>> list(sort_almost_sorted([1.7,1.5,1.6,1.4], key=lambda x: int(x)))
+    [1.7, 1.5, 1.6, 1.4]
+
+  Test key function:
+
+    >>> list(sort_almost_sorted([1,2,3,4], key=lambda x: -x))
+    [4, 3, 2, 1]
+  '''
+  from operator import itemgetter
+
+  # Key sorts are always stable, since we already pay the price for a
+  # decorated sequence.
+  if key is not None:
+    decorated = ( (key(item),i,item) for i,item in enumerate(sequence) )
+    ordered   = _sort_almost_sorted(decorated,windowsize)
+    return imap(itemgetter(2),ordered)
+
+  # Otherwise, use a similar method as above to ensure stability
+  elif stable:
+    decorated = ( (item,i) for i,item in enumerate(sequence) )
+    ordered   = _sort_almost_sorted(decorated,windowsize)
+    return imap(itemgetter(0),ordered)
+
+  # Unstable, undecorated sort
+  else:
+    return _sort_almost_sorted(sequence,windowsize)
+
+
+def _sort_almost_sorted(sequence,windowsize):
+  '''
+  Internal function.  See sort_almost_sorted
+  '''
+  from heapq import heapify, heapreplace, heappop
+
+  # STAGE 1: Fill initial window and heapify
+  it   = iter(sequence)
+  heap = list(islice(it,windowsize))
+
+  # Establish invariant len(heap)>0
+  if not heap:
+    return
+
+  heapify(heap)
+
+  # STAGE 2: Slide window until end of sequence
+  last = heap[0]
+
+  # Loop invariant:
+  #   len(heap)==c, where c is a constant 0 < c <= windowsize
+  for item in it:
+    item = heapreplace(heap, item)
+
+    if item<last:
+      raise OrderError('Misordered keys beyond window size')
+
+    last = item
+
+    yield item
+
+  # STAGE 3: Check transition from sliding window phase to
+  #          draining window phase
+
+  # Invariant: len(heap)>0
+  item = heappop(heap)
+
+  # Must check, since the newly pushed item could still be less than last
+  if item<last:
+    raise OrderError('Misordered keys beyond window size')
+
+  last = item
+
+  yield item
+
+  # STAGE 4: Drain window, no need to check sort order of remaining elements
+  #          since remaining elements must be within windowsize distance
+  while heap:
+    yield heappop(heap)
+
+
+def check_sorted(sequence,key=None):
+  '''
+  check_sorted(sequence,key=None) -> sequence
+
+  Returns a generator that yields all elements of sequence, provided that
+  the elements are sorted in non-descending order.  Otherwise an OrderError
+  exception is raised.
+
+  >>> list(check_sorted([1,2,3]))
+  [1, 2, 3]
+
+  >>> list(check_sorted([3,2,1]))
+  Traceback (most recent call last):
+       ...
+  OrderError: Invalid sort order
+
+  >>> list(check_sorted([1.7,1.5,1.6,1.4], key=lambda x: int(x)))
+  [1.7, 1.5, 1.6, 1.4]
+  '''
+  it = iter(sequence)
+
+  try:
+    last = next(it)
+  except StopIteration:
+    return
+
+  if key is None:
+    yield last
+
+    for item in it:
+      if item<last:
+        raise OrderError('Invalid sort order')
+
+      last = item
+
+      yield item
+  else:
+    yield last
+    last = key(last)
+
+    for item in it:
+      current = key(item)
+
+      if current<last:
+        raise OrderError('Invalid sort order')
+
+      last = current
+
+      yield item
+
+
+def parallel_coordinate_iterator(sequences, key):
   '''
   Iterate over several ordered sequences and return a list of values at each
   distinct key value.
@@ -503,11 +673,11 @@ def parallel_coordinate_iterator(sequences, keyfunc):
   # Must be a function or else i will be unbound across sequences and will
   # vary with outer iteration
   def _decorate(seq,index):
-    return ((keyfunc(x),index,x) for x in seq)
+    return ((key(x),index,x) for x in seq)
 
   iters = [ _decorate(s,i) for i,s in enumerate(sequences) ]
 
-  for key,items in groupby(merge(*iters),itemgetter(0)):
+  for _,items in groupby(merge(*iters),itemgetter(0)):
     row = [None]*n
 
     for k,i,value in items:
