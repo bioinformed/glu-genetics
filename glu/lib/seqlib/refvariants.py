@@ -15,7 +15,7 @@ class ReferenceVariants(object):
 
   def get(self, chromosome, start, stop, var):
     var     = set(var)
-    records = self.vars.fetch(chromosome, start, stop)
+    records = self.vars.fetch(chromosome, start, stop+1)
 
     i = set()
     o = set()

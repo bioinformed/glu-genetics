@@ -27,7 +27,7 @@ class CGFVariants(object):
       chromosome = chromosome[3:]
 
     chrmap = {'X':23,'Y':24,'MT':25,'M':25}
-    score  = self.vars.fetch(chrmap.get(chromosome,chromosome), start, stop)
+    score  = self.vars.fetch(chrmap.get(chromosome,chromosome), start, stop+1)
 
     for s in score:
       chrom,vstart,vstop,allele,common_score,function_score,source = s.split('\t')
