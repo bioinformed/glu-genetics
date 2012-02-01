@@ -29,7 +29,7 @@ cdef class gc_window:
     self.start  = 0
     self.end    = 0
     self.half   = (win+1)//2
-    self.win = win
+    self.win    = win
     self.gc     = 0
     self.valid  = 0
     self.state  = 0
@@ -156,18 +156,13 @@ cdef class cpg_window:
 
   def __next__(self):
     cdef char  base, last
-    cdef float cpg_norm
 
     if self.state>2:
       raise StopIteration
 
     #print self.state,self.start,self.end,self.seq[self.start:self.end],self.gc
-    pgc  = self.gc/self.valid if self.valid else 0.
+    pgc  = self.gc / self.valid    if self.valid else 0.
     pcpg = self.cpg/(self.valid/2) if self.valid else 0.
-
-    #cpg_norm = self.cpg/(pcpg/self.valid/2) if self.gc and self.valid else 0.
-    #if cpg_norm>1:
-    #  cpg_norm = 1.0
 
     if self.state==0:
       # Remove trailing base if window shifts
