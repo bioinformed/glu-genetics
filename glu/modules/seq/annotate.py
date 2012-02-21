@@ -154,12 +154,15 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     cvinfo  = cv.score_and_classify(v.chrom,v.start,v.end,[v.ref,v.var[0]])
     if cvinfo.exact_vars:
       v.names = sorted(set(v.replace('dbsnp:','rs') for v in cvinfo.exact_vars)|set(v.names))
-    inexact = ','.join(sorted(set(cvinfo.inexact_vars))) if cvinfo.inexact_vars else ''
 
     new_info.append('COMMON_SCORE=%.2f' % cvinfo.common_score)
-    new_info.append('FUNCTION_SCORE=%d' % cvinfo.function_score)
 
-    if inexact:
+    if cvinfo.function_info:
+      function_info = ','.join(cvinfo.function_info)
+      new_info.append('FUNCTION_INFO=%s' % function_info)
+
+    if cvinfo.inexact_vars:
+      inexact = ','.join(sorted(set(cvinfo.inexact_vars)))
       new_info.append('INEXACT_VARIANTS=%s' % inexact)
 
     if cvinfo.common_score>options.commonscore:
@@ -201,8 +204,11 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     v.names.remove('tgp')
     v.filter.append('1000G')
 
-  if './.' in v.genos:
-    filter.append('PartiallyCalled')
+  if any(g[0]=='./.' for g in v.genos):
+    v.filter.append('PartiallyCalled')
+
+  if not v.ref or v.var==['']:
+    v.filter.append('Indel')
 
   # Remove any old fields that have been replaced by a new field
   new_info_fields = set(f.split('=',1)[0] for f in new_info)
@@ -231,6 +237,7 @@ def annotate_vcf(options):
 
   metadata = vcf.metadata
   metadata['FILTER'].append('##FILTER=<ID=PartiallyCalled,Description="Variant is not called for one or more samples">')
+  metadata['FILTER'].append('##FILTER=<ID=Indel,Description="Variant is an insertion or deletion">')
   metadata['FILTER'].append('##FILTER=<ID=Intergenic,Description="Variant not in or near a gene">')
   metadata['FILTER'].append('##FILTER=<ID=NotPredictedFunctional,Description="Variant is not predicted to alter a protein">')
 
@@ -257,8 +264,8 @@ def annotate_vcf(options):
 
   if cv:
     metadata['INFO'].append('##INFO=<ID=COMMON_SCORE,Number=1,Type=Float,Description="Common score: maximum allele frequency in any population for rarest allele">')
-    metadata['INFO'].append('##INFO=<ID=FUNCTION_SCORE,Number=1,Type=Int,Description="Function score: reported as functional variant in OMIM, dbSNP, or COSMIC">')
-    metadata['INFO'].append('##INFO=<ID=INEXACT_VARIANTS,Number=.,Type=String,Description="Inexact variant matche">')
+    metadata['INFO'].append('##INFO=<ID=FUNCTION_INFO,Number=.,Type=String,Description="Annotated as function by OMIM, dbSNP, or COSMIC">')
+    metadata['INFO'].append('##INFO=<ID=INEXACT_VARIANTS,Number=.,Type=String,Description="Observed variant matches inexactly: it has different alleles or overlaps observed">')
 
   if kaviar:
     metadata['INFO'].append('##INFO=<ID=KAVIAR_MAF,Number=1,Type=Float,Description="Minor allele frequency accourding to Kaviar database">')
