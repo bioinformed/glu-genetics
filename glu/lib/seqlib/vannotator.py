@@ -39,6 +39,31 @@ GeneFeature  = namedtuple('GeneFeature',  'chrom start end cds_index exon_num ty
 GeneEvidence = recordtype('GeneEvidence', 'chrom cytoband ref_start ref_end intersect gene details '
                                           'func func_class func_type ref_nuc var_nuc ref_aa var_aa')
 
+
+def find_all(s, ss):
+  start = 0
+  n = len(ss)
+  while True:
+    start = s.find(ss, start)
+    if start == -1: return
+    yield start
+    start += n
+
+
+def common_suffix(s1,s2):
+  min_len = min(len(s1), len(s2) )
+  suffix  = []
+
+  for c1,c2 in izip(reversed(s1),reversed(s2)):
+    if c1==c2:
+      suffix.append(c1)
+    else:
+      break
+
+  suffix.reverse()
+  return ''.join(suffix)
+
+
 def decode_gene(gene):
   # Decode CDS boundaries and exon start and end coordinates
   cds_start = int(gene.cdsStart)
@@ -373,8 +398,9 @@ class VariantAnnotator(object):
       result += [False,'SYNONYMOUS','REFERENCE',ref_nuc,var_nuc,'','']
       return result
 
-    ref_frame = len(ref_nuc)%3
-    var_frame = len(var_nuc)%3
+    ref_frame  = len(ref_nuc)%3
+    var_frame  = len(var_nuc)%3
+    frameshift = (len(ref_nuc)-len(var_nuc))%3
 
     if 0:
       print '  REF_FRAME: %d' % ref_frame
@@ -463,22 +489,23 @@ class VariantAnnotator(object):
 
     # Classify non-synonymous change by comparing AA sequences
 
-    ref_stop = ref_aa.find('*')
-    var_stop = var_aa.find('*')
+    # Make sure ref protein doesn't appear to have spurious stops
+
+    r = ref_cds_aa.rstrip('*')
+    v = var_cds_aa.rstrip('*')
+
+    ref_stop = r.find('*')
+    var_stop = v.find('*')
 
     if ref_stop==-1:
-      ref_stop = len(ref_aa)
-    if var_stop==-1:
-      var_stop = len(var_aa)
+      if var_stop!=-1 and not v.startswith(r):
+        mut_type.append('PREMATURE STOP')
+      elif ref_cds_aa[-1]=='*' and var_cds_aa[-1]!='*':
+        mut_type.append('LOSS OF STOP')
 
-    if var_stop<ref_stop:
-      mut_type.append('PREMATURE STOP')
-    elif var_stop>ref_stop:
-      mut_type.append('LOSS OF STOP')
-
-    if len(ref_aa)==len(var_aa):
+    if len(r)==len(v):
       mut_type.append('SUBSTITUTION')
-    elif len(ref_aa)>len(var_aa):
+    elif len(r)>len(v):
       mut_type.append('DELETION')
     else:
       mut_type.append('INSERTION')
