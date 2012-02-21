@@ -34,7 +34,7 @@ def query_genes_by_name(con, gene, canonical=1, mapped=None):
   conditions = ['g.name = a.name']
 
   if canonical is not None:
-    conditions.append('g.canonical & %d' % canonical)
+    #conditions.append('g.canonical & %d' % canonical)
     conditions.append("g.chrom NOT LIKE '%!_%' ESCAPE '!'")
 
   if mapped:
