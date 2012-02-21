@@ -22,7 +22,7 @@ KGENOME_CHRMAP.update({23:'X',24:'Y',25:'M'})
 cyto_re = re.compile('(\d+|X|Y)(?:([p|q])(?:(\d+)(.\d+)?)?)?$')
 
 
-def query_genes_by_name(con, gene, canonical=1, mapped=None):
+def query_genes_by_name(con, gene, canonical_contig=True, canonical_transcript=None, mapped=None):
   sql = '''
   SELECT   a.Alias,g.symbol,g.chrom,MIN(g.txStart) as start,MAX(g.txEnd) as end,g.strand,"GENE"
   FROM     alias a, gene g
@@ -33,8 +33,10 @@ def query_genes_by_name(con, gene, canonical=1, mapped=None):
 
   conditions = ['g.name = a.name']
 
-  if canonical is not None:
-    #conditions.append('g.canonical & %d' % canonical)
+  if canonical_transcript is not None:
+    conditions.append('g.canonical & %d' % canonical)
+
+  if canonical_contig:
     conditions.append("g.chrom NOT LIKE '%!_%' ESCAPE '!'")
 
   if mapped:
@@ -66,14 +68,16 @@ def query_genes_by_name(con, gene, canonical=1, mapped=None):
   return genes
 
 
-def query_gene_by_name(con,gene,canonical=None,mapped=None):
-  genes = query_genes_by_name(con,gene)
+def query_gene_by_name(con,gene,canonical_contig=True,canonical_transcript=None,mapped=None):
+  genes = query_genes_by_name(con,gene,canonical_contig=canonical_contig,
+                                       canonical_transcript=canonical_transcript,
+                                       mapped=mapped)
 
   if not genes:
     raise KeyError('Cannot find gene "%s"' % gene)
   elif len(genes) > 1:
-
     raise KeyError('Gene not unique "%s"' % gene)
+
   return genes[0]
 
 
