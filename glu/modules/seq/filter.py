@@ -13,15 +13,16 @@ import sys
 
 from   collections           import deque
 from   operator              import attrgetter, itemgetter
-from   itertools             import groupby, imap, izip
+from   itertools             import groupby, imap, izip, count
 
 import pysam
 
 from   glu.lib.utils         import consume
-from   glu.lib.fileutils     import autofile, hyphen, list_reader, table_writer
+from   glu.lib.fileutils     import autofile, hyphen, list_reader, table_writer, table_reader
 from   glu.lib.progressbar   import progress_loop
 
 from   glu.lib.seqlib.bed    import read_features
+from   glu.lib.seqlib.cigar  import fix_cigar_bam, cigar_bam_str
 from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 
 
@@ -43,21 +44,55 @@ def set_readgroup(groupname,header,aligns):
     rg = ('RG',groupname)
 
     for align in aligns:
-      tags = align.tags or []
+      tags = align.tags
 
-      try:
-        names,values = zip(*tags)
-        idx = names.index('RG')
-        tags[idx] = rg
+      if tags:
+        align.tags = tags = [ (k,v) for k,v in tags if k[0]!='X' ]
+      
+      if tags is None:
+        align.tags = [rg]
+      elif not tags:
+        align.tags.append(rg)
+      else:
+        for i,(name,value) in enumerate(tags):
+          if name=='RG':
+            tags[i] = rg
+            break
+        else:
+          tags.append(rg)
 
-      except ValueError:
-        tags.append(rg)
+        align.tags = tags
 
-      align.tags = tags
+      #tags = align.tags or []
+      #
+      #try:
+      #  names,values = zip(*tags)
+      #  idx = names.index('RG')
+      #  tags[idx] = rg
+      #
+      #except ValueError:
+      #  tags.append(rg)
+      #
+      #align.tags = tags
 
       yield align
 
   return _set_readgroup()
+
+
+from   glu.lib.seqlib.edits         import reduce_match
+
+def fix_cigar_indels(aligns):
+  for align in aligns:
+    if align.tid>=0:
+      #before = align.cigar
+      align.cigar = fix_cigar_bam(align.cigar)
+      #if align.cigar is not before:
+      #  print 'BEFORE:',cigar_bam_str(before)
+      #  print 'AFTER: ',cigar_bam_str(align.cigar)
+      #  print
+
+    yield align
 
 
 def contig_stats(aligns,references,filename):
@@ -75,6 +110,7 @@ def contig_stats(aligns,references,filename):
 def simple_filter(aligns,controls,stats,options):
   minreadlen = options.minreadlen
 
+  keep = options.action=='keep'
   fail = options.action=='fail'
 
   reads_ONTARGET   = 0
@@ -100,7 +136,9 @@ def simple_filter(aligns,controls,stats,options):
           bases_UNALIGNED       += rlen
           lengs_UNALIGNED[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = 1
             yield align
 
@@ -112,7 +150,9 @@ def simple_filter(aligns,controls,stats,options):
           bases_CONTROL       += rlen
           lengs_CONTROL[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = 1
             yield align
 
@@ -125,7 +165,9 @@ def simple_filter(aligns,controls,stats,options):
             bases_TOOSHORT       += rlen
             lengs_TOOSHORT[rlen] += 1
 
-            if fail:
+            if keep:
+              yield align
+            elif fail:
               align.is_qcfail = 1
               yield align
 
@@ -154,6 +196,7 @@ def target_filter(aligns,references,targets,controls,stats,options):
   minreadlen = options.minreadlen
   nulltarget = sys.maxint,sys.maxint
 
+  keep = options.action=='keep'
   fail = options.action=='fail'
 
   reads_ONTARGET   = 0
@@ -191,7 +234,9 @@ def target_filter(aligns,references,targets,controls,stats,options):
           bases_UNALIGNED       += rlen
           lengs_UNALIGNED[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = True
             yield align
 
@@ -205,7 +250,9 @@ def target_filter(aligns,references,targets,controls,stats,options):
           bases_CONTROL       += rlen
           lengs_CONTROL[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = True
             yield align
 
@@ -222,7 +269,9 @@ def target_filter(aligns,references,targets,controls,stats,options):
           bases_TOOSHORT       += rlen
           lengs_TOOSHORT[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = True
             yield align
 
@@ -236,7 +285,9 @@ def target_filter(aligns,references,targets,controls,stats,options):
           bases_OFFTARGET       += rlen
           lengs_OFFTARGET[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = True
             yield align
 
@@ -279,7 +330,9 @@ def target_filter(aligns,references,targets,controls,stats,options):
           bases_OFFTARGET       += rlen
           lengs_OFFTARGET[rlen] += 1
 
-          if fail:
+          if keep:
+            yield align
+          elif fail:
             align.is_qcfail = True
             yield align
 
@@ -306,6 +359,7 @@ def target_filter_generic(aligns,references,targets,stats,options):
   minoverlap = options.minoverlap
 
   fail  = options.action=='fail'
+  keep  = options.action=='keep'
   reads = stats.reads
   bases = stats.bases
 
@@ -328,7 +382,9 @@ def target_filter_generic(aligns,references,targets,stats,options):
         reads[UNALIGNED] += 1
         bases[UNALIGNED] += align.rlen
 
-        if fail:
+        if keep:
+          yield align
+        elif fail:
           align.is_qcfail = True
           yield align
 
@@ -341,7 +397,9 @@ def target_filter_generic(aligns,references,targets,stats,options):
         reads[TOOSHORT] += 1
         bases[TOOSHORT] += rlen
 
-        if fail:
+        if keep:
+          yield align
+        elif fail:
           align.is_qcfail = True
           yield align
 
@@ -358,7 +416,9 @@ def target_filter_generic(aligns,references,targets,stats,options):
         reads[OFFTARGET] += 1
         bases[OFFTARGET] += rlen
 
-        if fail:
+        if keep:
+          yield align
+        elif fail:
           align.is_qcfail = True
           yield align
       else:
@@ -371,7 +431,7 @@ class FilterStats(object):
   def __init__(self):
     self.reads   = [0]*STATUS_COUNT
     self.bases   = [0]*STATUS_COUNT
-    self.lengths = [ [0]*6000 for i in range(STATUS_COUNT) ]
+    self.lengths = [ [0]*10000 for i in range(STATUS_COUNT) ]
 
 
 def sink_file(outbam,aligns):
@@ -435,6 +495,60 @@ def merge_bams(samfiles):
   return samfiles,header,references,lengths,aligns
 
 
+def load_contig_remap(filename):
+  remap = {}
+  data  = table_reader(filename, columns=['SRC_CONTIG','DST_CONTIG','SRC_OFFSET','DST_LEN'],want_header=False)
+
+  for src,dst,src_offset,dst_len in data:
+    src_offset = int(src_offset or 0)
+    dst_len    = int(dst_len)
+
+    if src!=dst or offset:
+      remap[src] = dst,src_offset,dst_len
+
+  return remap
+
+
+def remap_contigs(header, references, lengths, alignments, remap):
+  src_remapped = set(r for r in references if r in remap)
+  dst_remapped = [ remap[r] for r in sorted(src_remapped) ]
+
+  tidmap           = {}
+  new_references   = []
+  new_lengths      = []
+  new_sq           = []
+  new_header       = header.copy()
+  new_header['SQ'] = new_sq
+
+  for i,src_ref,src_len in izip(count(),references,lengths):
+    j = len(new_references)
+
+    if src_ref not in remap:
+      new_references.append(src_ref)
+      new_lengths.append(src_len)
+      tidmap[i] = j,0
+      new_sq.append( {'SN':src_ref, 'LN':src_len} )
+    else:
+      dst_ref,src_offset,dst_len = remap[src_ref]
+
+      new_references.append(dst_ref)
+      new_lengths.append(dst_len)
+      new_sq.append( {'SN':dst_ref, 'LN':dst_len} )
+
+      tidmap[i] = j,src_offset
+
+  def _alignments():
+    for align in alignments:
+      if align.tid>=0:
+        new_tid,offset = tidmap[align.tid]
+        align.tid      = new_tid
+        align.pos     += offset
+
+      yield align
+
+  return new_header,new_references,new_lengths,_alignments()
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -456,10 +570,17 @@ def option_parser():
                     help='Minimum alignment overlap with any target (default=1)')
 
   parser.add_argument('--action', metavar='X', default='fail',
-                    help='Action to perform on failing alignments (drop or fail, default=fail)')
+                    help='Action to perform on failing alignments (keep, drop or fail, default=fail)')
 
   parser.add_argument('--setreadgroup', type=str, metavar='RGNAME',
                     help='Set all reads to specified read group name')
+
+  parser.add_argument('--fixindels', action='store_true',
+                    help='Fix insertions adjacent to deletions and set them to mismatches.')
+
+  parser.add_argument('--remapcontig', metavar='FILE',
+                    help='Remap contigs from original to new contigs with an offset location')
+
   parser.add_argument('-o', '--output', metavar='FILE',
                     help='Output BAM file')
   parser.add_argument('-O', '--sumout', metavar='FILE', default='-',
@@ -476,7 +597,7 @@ def main():
 
   options.action = options.action.lower()
 
-  if options.action not in ('drop','fail'):
+  if options.action not in ('drop','fail','keep'):
     raise ValueError('Invalid filter action selected')
 
   samfiles = []
@@ -501,13 +622,17 @@ def main():
     lengths    = merger.lengths
     aligns     = iter(merger)
 
+  if options.remapcontig:
+    remap = load_contig_remap(options.remapcontig)
+    header,references,lengths,aligns = remap_contigs(header, references, lengths, aligns, remap)
+
   controls = set()
   if options.controls:
     rmap     = dict( (contig,tid) for tid,contig in enumerate(references) )
     controls = set(rmap.get(c) for c in set(list_reader(options.controls)))
     controls.discard(None)
 
-  aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
+  #aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
   aligns = filter_alignments(aligns, options.includealign, options.excludealign)
 
   stats  = FilterStats()
@@ -527,6 +652,9 @@ def main():
     if options.output:
       if options.setreadgroup:
         aligns = set_readgroup(options.setreadgroup,header,aligns)
+
+      if options.fixindels:
+        aligns = fix_cigar_indels(aligns)
 
       flags  = 'wb' if options.output.endswith('.bam') else 'wh'
 
@@ -554,7 +682,7 @@ def main():
   total_reads = sum(reads)
   total_bases = sum(bases)
 
-  sumout = autofile(hyphen(options.sumout, sys.stdout),'w')
+  sumout = autofile(hyphen(options.sumout, sys.stderr),'w')
 
   if complete:
     sumout.write('Alignment summary:\n')
