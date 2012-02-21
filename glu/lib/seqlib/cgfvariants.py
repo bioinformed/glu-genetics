@@ -10,7 +10,7 @@ import pysam
 from   glu.lib.recordtype   import recordtype
 
 
-VarInfo    = namedtuple('VarInfo',   'exact_vars inexact_vars common_score function_score')
+VarInfo    = namedtuple('VarInfo',   'exact_vars inexact_vars common_score function_info')
 VarRecord  = recordtype('VarRecord', 'chromosome start stop allele common_score function_score source')
 VariantKey = namedtuple('VariantKey', 'chromosome start stop source')
 
@@ -91,4 +91,11 @@ class CGFVariants(object):
     inexact_vars = sorted(set(inexact_vars))
     common_score = min(common_score.values()) if common_score else 0
 
-    return VarInfo(exact_vars,inexact_vars,common_score,function_score)
+    functions = []
+    if function_score:
+      if function_score&0x01: functions.append('cosmic')
+      if function_score&0x02: functions.append('lsdb')
+      if function_score&0x04: functions.append('other')
+      if function_score&0x08: functions.append('omim')
+
+    return VarInfo(exact_vars,inexact_vars,common_score,functions)
