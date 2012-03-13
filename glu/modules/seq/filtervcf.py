@@ -14,8 +14,6 @@ import sys
 
 from   collections                  import defaultdict
 
-from   pysam                        import Fastafile
-
 from   glu.lib.fileutils            import table_writer, table_reader, autofile, hyphen, map_reader
 from   glu.lib.progressbar          import progress_loop
 
