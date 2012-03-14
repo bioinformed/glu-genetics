@@ -70,7 +70,11 @@ class VCFReader(object):
       filter     = [ intern(f) for f in row[6].split(';') ] if row[6]!='.' else []
       info       = row[7].split(';')
       format     = intern(row[8])
-      genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
+
+      if ':' in format:
+        genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
+      else:
+        genos      = [ [g]          for g in row[9:] ] if len(row)>9 else None
 
       # VCF codes indels with an extra left reference base, which we strip
       r          = ref[0]

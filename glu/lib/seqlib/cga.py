@@ -38,7 +38,9 @@ def cga_base_reader(filename,hyfile=None,**kwargs):
   teinAcc symbol  orientation     component       componentIndex  hasCodingRegion impact  nucleotidePos   proteinPosannotationRefSequence    sampleSequence  genomeRefSequence       pfam
   '''
 
-  cgafile = csv.reader(hyphen(autofile(filename),hyfile),dialect='excel-tab')
+  bufsize = kwargs.get('bufsize',-1)
+
+  cgafile = csv.reader(hyphen(autofile(filename,bufsize=bufsize),hyfile),dialect='excel-tab')
 
   extra = kwargs.get('extra',None)
   attrs = {}
@@ -68,9 +70,9 @@ def cga_base_reader(filename,hyfile=None,**kwargs):
 
   if extra:
     e = [None]*len(extra)
-    records = (Row._make(row+e) for row in cgafile)
+    records = (Row(*(row+e)) for row in cgafile)
   else:
-    records = (Row._make(row)   for row in cgafile)
+    records = (Row(*row)     for row in cgafile)
 
   return attrs,header,records
 
@@ -86,7 +88,11 @@ def cga_coverage_reader(records,**kwargs):
 
   for rec in records:
     rec.chromosome                = cache_str(rec.chromosome,rec.chromosome)
-    rec.position                  = int(rec.position)
+    if hasattr(rec,'position'):
+      rec.position                = int(rec.position)
+    else:
+      rec.begin                   = int(rec.begin)
+      rec.end                     = int(rec.end)
     rec.uniqueSequenceCoverage    = float(rec.uniqueSequenceCoverage)
     rec.weightSumSequenceCoverage = float(rec.weightSumSequenceCoverage)
     rec.gcCorrectedCvg            = float(rec.gcCorrectedCvg)
@@ -237,11 +243,11 @@ def cga_mastervar_reader(records,**kwargs):
     records = []
 
     for g in genetext.split(';'):
-      gene = generecord._make(g.split(':'))
+      gene = generecord(*g.split(':'))
 
       gene.geneId    = int(gene.geneId)
       gene.mrnaAcc   = gene.mrnaAcc or None
-      gene.symbol    = gene.symbol or None
+      gene.symbol    = gene.symbol  or None
       gene.component = cache_str(gene.component,gene.component)
       gene.impact    = cache_str(gene.impact,gene.impact)
 
@@ -315,6 +321,10 @@ def cga_mastervar_reader_v2(records,**kwargs):
   str_cache = {'':None}
   cache_str = str_cache.setdefault
 
+  skip_ref      = kwargs.get('skip_ref',False)
+  skip_lq       = kwargs.get('skip_lq',False)
+  cache_strings = kwargs.get('cache_strings',False)
+
   def parseGene(genetext):
     if not genetext:
       return None
@@ -322,21 +332,21 @@ def cga_mastervar_reader_v2(records,**kwargs):
     records = []
 
     for g in genetext.split(';'):
-      gene = generecord._make(g.split(':'))
+      gene = generecord(*g.split(':'))
 
       gene.geneId    = int(gene.geneId)
       gene.mrnaAcc   = gene.mrnaAcc or None
-      gene.symbol    = gene.symbol or None
-      gene.component = cache_str(gene.component,gene.component)
-      gene.impact    = cache_str(gene.impact,gene.impact)
+      gene.symbol    = gene.symbol  or None
+
+      if cache_strings:
+        gene.component = cache_str(gene.component,gene.component)
+        gene.impact    = cache_str(gene.impact,gene.impact)
 
       records.append(gene)
 
     return records
 
-  missing  = ('','N')
-  skip_ref = kwargs.get('skip_ref',False)
-  skip_lq  = kwargs.get('skip_lq',False)
+  missing = ('','N')
 
   for record in records:
     if skip_ref and (record.zygosity=='no-call' or record.varType=='ref'):
@@ -353,38 +363,41 @@ def cga_mastervar_reader_v2(records,**kwargs):
 
     record.locus                    = int(record.locus)
     record.ploidy                   = int(record.ploidy)
-    record.chromosome               = cache_str(record.chromosome,record.chromosome)
     record.begin                    = int(record.begin)
     record.end                      = int(record.end)
-    record.zygosity                 = cache_str(record.zygosity,record.zygosity)
-    record.varType                  = cache_str(record.varType,record.varType)
-    record.reference                = cache_str(record.reference,record.reference)
-    record.allele1Seq               = cache_str(record.allele1Seq,record.allele1Seq)
-    record.allele2Seq               = cache_str(record.allele2Seq,record.allele2Seq)
     record.allele1VarScoreVAF       = int(record.allele1VarScoreVAF) if record.allele1VarScoreVAF else None
     record.allele2VarScoreVAF       = int(record.allele2VarScoreVAF) if record.allele2VarScoreVAF else None
     record.allele1VarScoreEAF       = int(record.allele1VarScoreEAF) if record.allele1VarScoreEAF else None
     record.allele2VarScoreEAF       = int(record.allele2VarScoreEAF) if record.allele2VarScoreEAF else None
-    record.allele1VarQuality        = cache_str(record.allele1VarQuality)
-    record.allele2VarQuality        = cache_str(record.allele2VarQuality)
     record.allele1HapLink           = record.allele1HapLink or None
     record.allele2HapLink           = record.allele2HapLink or None
-    record.allele1XRef              = record.allele1XRef or None
-    record.allele2XRef              = record.allele2XRef or None
+    record.allele1XRef              = record.allele1XRef    or None
+    record.allele2XRef              = record.allele2XRef    or None
     record.evidenceIntervalId       = int(record.evidenceIntervalId) if record.evidenceIntervalId else None
     record.allele1ReadCount         = int(record.allele1ReadCount) if record.allele1ReadCount else None
     record.allele2ReadCount         = int(record.allele2ReadCount) if record.allele2ReadCount else None
     record.referenceAlleleReadCount = int(record.referenceAlleleReadCount) if record.referenceAlleleReadCount else None
     record.totalReadCount           = int(record.totalReadCount) if record.totalReadCount else None
-    record.pfam                     = record.pfam          or None
-    record.miRBaseId                = record.miRBaseId     or None
-    record.repeatMasker             = record.repeatMasker  or None
-    record.segDupOverlap            = record.segDupOverlap or None
+    record.pfam                     = record.pfam           or None
+    record.miRBaseId                = record.miRBaseId      or None
+    record.repeatMasker             = record.repeatMasker   or None
+    record.segDupOverlap            = record.segDupOverlap  or None
     record.relativeCoverageDiploid  = float(record.relativeCoverageDiploid) if record.relativeCoverageDiploid not in missing else None
     record.calledPloidy             = int(record.calledPloidy) if record.calledPloidy not in missing else None
 
+    if cache_strings:
+      record.chromosome               = cache_str(record.chromosome,record.chromosome)
+      record.zygosity                 = cache_str(record.zygosity,record.zygosity)
+      record.varType                  = cache_str(record.varType,record.varType)
+      record.reference                = cache_str(record.reference,record.reference)
+      record.allele1Seq               = cache_str(record.allele1Seq,record.allele1Seq)
+      record.allele2Seq               = cache_str(record.allele2Seq,record.allele2Seq)
+      record.allele1VarQuality        = cache_str(record.allele1VarQuality,record.allele1VarQuality)
+      record.allele2VarQuality        = cache_str(record.allele2VarQuality,record.allele2VarQuality)
+
     if hasattr(record,'relativeCoverageNondiploid'):
       record.relativeCoverageNondiploid = float(record.relativeCoverageNondiploid) if record.relativeCoverageNondiploid not in missing else None
+
     if hasattr(record,'calledLevel'):
       record.calledLevel            = float(record.calledLevel) if record.calledLevel not in missing else None
 

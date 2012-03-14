@@ -137,7 +137,7 @@ def compressed_filename(filename):
   return COMPRESSED_SUFFIXES.get(ext,'')
 
 
-def autofile(filename, mode='r'):
+def autofile(filename, mode='r', bufsize=-1):
   '''
   Return a file object in the correct compressed format as specified, which
   is ready to read from or write to
@@ -161,16 +161,16 @@ def autofile(filename, mode='r'):
     f = file(filename, mode)
   elif comp == 'gzip':
     try:
-      f = spawn_compressor(os.environ.get('GLU_GZIP','gzip'), filename, mode)
+      f = spawn_compressor(os.environ.get('GLU_GZIP','gzip'), filename, mode, bufsize=bufsize)
     except _autofile_errors:
       import gzip
       f = gzip.GzipFile(filename, mode)
   elif comp == 'bzip2':
     try:
-      f = spawn_compressor(os.environ.get('GLU_BZIP2','bzip2'), filename, mode)
+      f = spawn_compressor(os.environ.get('GLU_BZIP2','bzip2'), filename, mode, bufsize=bufsize)
     except _autofile_errors:
       import bz2
-      f = bz2.BZ2File(filename, mode)
+      f = bz2.BZ2File(filename, mode, buffering=max(0,bufsize))
 
   return f
 

@@ -130,7 +130,7 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
       v.filter.append('Intergenic')
 
     if not nsevidence:
-      v.filter.append('NotPredictedFunctional')
+      v.filter.append('NPF')
 
     if cytoband:
       new_info.append('CYTOBAND=%s' % (','.join(cytoband)))
@@ -155,7 +155,8 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     if cvinfo.exact_vars:
       v.names = sorted(set(v.replace('dbsnp:','rs') for v in cvinfo.exact_vars)|set(v.names))
 
-    new_info.append('COMMON_SCORE=%.2f' % cvinfo.common_score)
+    if cvinfo.exact_vars or cvinfo.common_score>0:
+      new_info.append('COMMON_SCORE=%.2f' % cvinfo.common_score)
 
     if cvinfo.function_info:
       function_info = ','.join(cvinfo.function_info)
@@ -186,26 +187,27 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
 
       new_info.append('KAVIAR_NAMES=%s' % ','.join(ktext))
 
-  ingroup,outgroup = refvars.get(v.chrom,v.start,v.end,v.var) if refvars else ([],[])
+  if refvars:
+    ingroup,outgroup = refvars.get(v.chrom,v.start,v.end,v.var) if refvars else ([],[])
 
-  new_info.append('REFVAR_INGROUP_COUNT=%d'  % len(ingroup))
-  new_info.append('REFVAR_OUTGROUP_COUNT=%d' % len(outgroup))
+    new_info.append('REFVAR_INGROUP_COUNT=%d'  % len(ingroup))
+    new_info.append('REFVAR_OUTGROUP_COUNT=%d' % len(outgroup))
 
-  if ingroup:
-    ingroup  = ','.join(ingroup)
-    new_info.append('REFVAR_INGROUP_NAMES=%s'  % ingroup)
+    if ingroup:
+      ingroup  = ','.join(ingroup)
+      new_info.append('REFVAR_INGROUP_NAMES=%s'  % ingroup)
 
-  if outgroup:
-    outgroup = ','.join(outgroup)
-    new_info.append('REFVAR_OUTGROUP_NAMES=%s' % outgroup)
-    v.filter.append('RefVar')
+    if outgroup:
+      outgroup = ','.join(outgroup)
+      new_info.append('REFVAR_OUTGROUP_NAMES=%s' % outgroup)
+      v.filter.append('RefVar')
 
   if 'tgp' in v.names:
     v.names.remove('tgp')
     v.filter.append('1000G')
 
-  if any(g[0]=='./.' for g in v.genos):
-    v.filter.append('PartiallyCalled')
+  #if any(g[0]=='./.' for g in v.genos):
+  #  v.filter.append('PartiallyCalled')
 
   if not v.ref or v.var==['']:
     v.filter.append('Indel')
@@ -239,7 +241,7 @@ def annotate_vcf(options):
   metadata['FILTER'].append('##FILTER=<ID=PartiallyCalled,Description="Variant is not called for one or more samples">')
   metadata['FILTER'].append('##FILTER=<ID=Indel,Description="Variant is an insertion or deletion">')
   metadata['FILTER'].append('##FILTER=<ID=Intergenic,Description="Variant not in or near a gene">')
-  metadata['FILTER'].append('##FILTER=<ID=NotPredictedFunctional,Description="Variant is not predicted to alter a protein">')
+  metadata['FILTER'].append('##FILTER=<ID=NPF,Description="Variant is not predicted to alter a protein">')
 
   if cv:
     metadata['FILTER'].append('##FILTER=<ID=Common,Description="Variant is likely common with common score>%f">' % options.commonscore)
