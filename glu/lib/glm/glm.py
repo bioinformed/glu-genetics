@@ -291,9 +291,17 @@ def linear_least_squares(a, b, weights=None, sqrtweights=False, cond=None):
     b1 = b2
 
   if gelss.module_name.startswith('flapack'):
-    lwork = calc_lwork.gelss(gelss.prefix,m,n,nrhs)[1]
-    v,x,s,rank,info = gelss(a1, b1, cond=cond, lwork=lwork,
-                            overwrite_a=0, overwrite_b=0)
+    try:
+      work = gelss(a1, b1, lwork=-1)[4]
+      lwork = work[0].real.astype(np.int)
+      v,x,s,rank,work,info = gelss(a1, b1, cond=cond, lwork=lwork,
+                                           overwrite_a=0, overwrite_b=0)
+
+    # There has to be a better way to do this...
+    except Exception, e:
+      lwork = calc_lwork.gelss(gelss.prefix,m,n,nrhs)[1]
+      v,x,s,rank,info = gelss(a1, b1, cond=cond, lwork=lwork,
+                              overwrite_a=0, overwrite_b=0)
   else:
     raise NotImplementedError('gelss not available from %s' % gelss.module_name)
 
@@ -1125,7 +1133,7 @@ class GLogit(object):
   >>> print 'lr test=%.6f df=%d' % g.lr_test().test()
   lr test=18.218406 df=6
   '''
-  def __init__(self, y, X, ref=None, vars=None, add_mean=False, max_iterations=50):
+  def __init__(self, y, X, ref=None, vars=None, add_mean=False, max_iterations=100):
     y = np.asarray(y,dtype=int)
     X = np.asarray(X,dtype=float)
 
