@@ -25,9 +25,7 @@ from   glu.lib.seqlib.kaviar        import kaviar_reader
 from   glu.lib.seqlib.refvariants   import ReferenceVariants
 
 
-def flatten_vcf(options):
-  vcf      = VCFReader(options.variants,sys.stdin)
-
+def flatten_vcf(vcf,records=None):
   filters  = []
   info     = []
   samples  = vcf.samples or []
@@ -58,10 +56,12 @@ def flatten_vcf(options):
            + samples
            + [ '%s_depth' % s for s in samples ] )
 
-  out = table_writer(options.output,hyphen=sys.stdout)
-  out.writerow(header)
+  yield header
 
-  for v in vcf:
+  if records is None:
+    records = iter(vcf)
+
+  for v in records:
     # FORMAT: chrom start end names ref var filter info format genos
 
     infomap = {}
@@ -79,7 +79,7 @@ def flatten_vcf(options):
           + [ g[0] for g in v.genos ]
           + [ '/'.join(g[1].split(',')) if len(g)>1 else '' for g in v.genos ] )
 
-    out.writerow(row)
+    yield row
 
 
 def option_parser():
@@ -98,4 +98,8 @@ def main():
   parser  = option_parser()
   options = parser.parse_args()
 
-  flatten_vcf(options)
+  vcf      = VCFReader(options.variants,sys.stdin)
+  results  = flatten_vcf(vcf)
+
+  out      = table_writer(options.output,hyphen=sys.stdout)
+  out.writerows(results)
