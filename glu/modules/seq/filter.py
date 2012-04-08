@@ -41,40 +41,8 @@ def set_readgroup(groupname,header,aligns):
 
   # Return a nested generator, since header update must occur immediately
   def _set_readgroup():
-    rg = ('RG',groupname)
-
     for align in aligns:
-      tags = align.tags
-
-      if tags:
-        align.tags = tags = [ (k,v) for k,v in tags if k[0]!='X' ]
-      
-      if tags is None:
-        align.tags = [rg]
-      elif not tags:
-        align.tags.append(rg)
-      else:
-        for i,(name,value) in enumerate(tags):
-          if name=='RG':
-            tags[i] = rg
-            break
-        else:
-          tags.append(rg)
-
-        align.tags = tags
-
-      #tags = align.tags or []
-      #
-      #try:
-      #  names,values = zip(*tags)
-      #  idx = names.index('RG')
-      #  tags[idx] = rg
-      #
-      #except ValueError:
-      #  tags.append(rg)
-      #
-      #align.tags = tags
-
+      align.set_opt('RG',groupname)
       yield align
 
   return _set_readgroup()
@@ -587,6 +555,8 @@ def option_parser():
                     help='Summary output file')
   parser.add_argument('--contigstats', metavar='FILE',
                     help='Contig statistics')
+  parser.add_argument('-P', '--progress', action='store_true',
+                    help='Show analysis progress bar, if possible')
 
   return parser
 
@@ -632,7 +602,9 @@ def main():
     controls = set(rmap.get(c) for c in set(list_reader(options.controls)))
     controls.discard(None)
 
-  #aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
+  if options.progress:
+    aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
+
   aligns = filter_alignments(aligns, options.includealign, options.excludealign)
 
   stats  = FilterStats()
