@@ -547,7 +547,7 @@ def _sort_almost_sorted(sequence,windowsize):
   '''
   Internal function.  See sort_almost_sorted
   '''
-  from heapq import heapify, heapreplace, heappop
+  from heapq import heapify, heappushpop, heappop
 
   # STAGE 1: Fill initial window and heapify
   it   = iter(sequence)
@@ -562,10 +562,11 @@ def _sort_almost_sorted(sequence,windowsize):
   # STAGE 2: Slide window until end of sequence
   last = heap[0]
 
-  # Loop invariant:
+  # Loop invariants:
   #   len(heap)==c, where c is a constant 0 < c <= windowsize
+  #   all(e>=last for e in heap)
   for item in it:
-    item = heapreplace(heap, item)
+    item = heappushpop(heap, item)
 
     if item<last:
       raise OrderError('Misordered keys beyond window size')
@@ -574,43 +575,32 @@ def _sort_almost_sorted(sequence,windowsize):
 
     yield item
 
-  # STAGE 3: Check transition from sliding window phase to
-  #          draining window phase
+  # Release reference to last item, since it is no longer needed
+  del last
 
-  # Invariant: len(heap)>0
-  item = heappop(heap)
-
-  # Must check, since the newly pushed item could still be less than last
-  if item<last:
-    raise OrderError('Misordered keys beyond window size')
-
-  last = item
-
-  yield item
-
-  # STAGE 4: Drain window, no need to check sort order of remaining elements
+  # STAGE 3: Drain window, no need to check sort order of remaining elements
   #          since remaining elements must be within windowsize distance
   while heap:
     yield heappop(heap)
 
 
-def check_sorted(sequence,key=None):
+def check_sorted_iter(sequence,key=None):
   '''
-  check_sorted(sequence,key=None) -> sequence
+  check_sorted_iter(sequence,key=None) -> sequence
 
   Returns a generator that yields all elements of sequence, provided that
   the elements are sorted in non-descending order.  Otherwise an OrderError
   exception is raised.
 
-  >>> list(check_sorted([1,2,3]))
+  >>> list(check_sorted_iter([1,2,3]))
   [1, 2, 3]
 
-  >>> list(check_sorted([3,2,1]))
+  >>> list(check_sorted_iter([3,2,1]))
   Traceback (most recent call last):
        ...
   OrderError: Invalid sort order
 
-  >>> list(check_sorted([1.7,1.5,1.6,1.4], key=lambda x: int(x)))
+  >>> list(check_sorted_iter([1.7,1.5,1.6,1.4], key=lambda x: int(x)))
   [1.7, 1.5, 1.6, 1.4]
   '''
   it = iter(sequence)
