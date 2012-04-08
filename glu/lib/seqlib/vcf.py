@@ -9,9 +9,11 @@ __license__   = 'See GLU license for terms by running: glu license'
 import csv
 import sys
 
-from   collections                  import defaultdict
+from   collections                  import defaultdict, OrderedDict
 
-from   glu.lib.fileutils            import table_reader
+import pysam
+
+from   glu.lib.fileutils            import table_reader, autofile, hyphen
 from   glu.lib.recordtype           import recordtype
 
 
@@ -25,8 +27,7 @@ class VCFReader(object):
 
     self.data = data    = table_reader(filename,hyphen=sys.stdin)
 
-    self.metadata_order = metadata_order = []
-    self.metadata       = metadata       = defaultdict(list)
+    self.metadata       = metadata       = OrderedDict()
     self.header         = None
     self.samples        = None
 
@@ -41,7 +42,7 @@ class VCFReader(object):
         meta = meta[2:]
 
         if meta not in metadata:
-          metadata_order.append(meta)
+          metadata[meta] = []
 
         metadata[meta].append(row[0])
 
@@ -62,7 +63,7 @@ class VCFReader(object):
     for row in self.data:
       chrom      = intern(row[0])
       start      = int(row[1])-1
-      names      = row[2].split(',') if row[2]!='.' else []
+      names      = row[2].split(';') if row[2]!='.' else []
       ref        = intern(row[3])
       end        = start+len(ref)
       var        = [ intern(v) for v in row[4].split(',') ]
@@ -84,3 +85,44 @@ class VCFReader(object):
         var      = [ intern(v[1:]) for v in var ]
 
       yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
+
+
+class VCFWriter(object):
+  def __init__(self, filename, metadata, names, reference):
+    self.reference = pysam.Fastafile(reference)
+    self.out = out = autofile(hyphen(filename,sys.stdout),'w')
+
+    for meta in metadata:
+      for m in metadata[meta]:
+        out.write(m)
+        out.write('\n')
+
+    out.write('\t'.join(['#CHROM','POS','ID','REF','ALT','QUAL','FILTER','INFO','FORMAT']+names))
+    out.write('\n')
+
+  def write_locus(self, vcfvar):
+    # FORMAT: chrom start end names ref var filter info format genos
+    pos = vcfvar.start+1
+    ref = vcfvar.ref
+    var = vcfvar.var
+
+    # VCF codes indels with an extra left reference base
+    if not vcfvar.ref or '' in vcfvar.var:
+      pos -= 1
+      r    = self.reference.fetch(vcfvar.chrom,pos-1,pos).upper()
+      ref  = r+ref
+      var  = [ r+a for a in var ]
+
+    row = [ vcfvar.chrom,
+            str(pos),
+            ';'.join(vcfvar.names) or '.',
+            ref,
+            ','.join(var),
+            vcfvar.qual,
+            ';'.join(sorted(vcfvar.filter)) or '.',
+            ';'.join(vcfvar.info),
+            vcfvar.format ] + [ ':'.join(g) for g in vcfvar.genos ]
+
+    out = self.out
+    out.write('\t'.join(map(str,row)))
+    out.write('\n')

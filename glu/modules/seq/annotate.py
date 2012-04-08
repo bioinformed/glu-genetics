@@ -16,8 +16,9 @@ from   glu.lib.utils                import unique
 from   glu.lib.fileutils            import list_reader, autofile, hyphen
 from   glu.lib.progressbar          import progress_loop
 
+from   glu.lib.genedb.queries       import query_segdups, query_repeats
 
-from   glu.lib.seqlib.vcf           import VCFReader
+from   glu.lib.seqlib.vcf           import VCFReader, VCFWriter
 from   glu.lib.seqlib.cga           import cga_reader
 from   glu.lib.seqlib.vannotator    import VariantAnnotator
 from   glu.lib.seqlib.cgfvariants   import CGFVariants
@@ -126,6 +127,12 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
                    for e in nsevidence )
     nsinfo     = list(unique(nsinfo))
 
+    segdups    = query_segdups(vs.con, v.chrom, v.start, v.end)
+    repeats    = query_repeats(vs.con, v.chrom, v.start, v.end)
+
+    while 'PASS' in v.filter:
+      v.filter.remove('PASS')
+
     if not genes:
       v.filter.append('Intergenic')
 
@@ -149,6 +156,20 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
 
     if nsinfo:
       new_info.append('GENE_FUNCTION_DETAILS=%s' % (','.join(nsinfo  )))
+
+    if segdups:
+      segdup_info = ('%s:%s-%s:%.2f' % (s.other_chrom,s.other_start,s.other_stop,s.matchFraction*100) for s in segdups)
+      segdup_info = ','.join(segdup_info)
+      v.filter.append('SegDup')
+      new_info.append('SEGDUP_COUNT=%d' % len(segdups))
+      new_info.append('SEGDUP_INFO=%s' % segdup_info)
+
+    if repeats:
+      repeat_info = ('%s:%s:%s' % (r.repeatName,r.repeatClass,r.repeatFamily) for r in repeats)
+      repeat_info = ','.join(repeat_info)
+      v.filter.append('Repeat')
+      new_info.append('REPEAT_COUNT=%d' % len(repeats))
+      new_info.append('REPEAT_INFO=%s' % repeat_info)
 
   if cv:
     cvinfo  = cv.score_and_classify(v.chrom,v.start,v.end,[v.ref,v.var[0]])
@@ -216,8 +237,7 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
   new_info_fields = set(f.split('=',1)[0] for f in new_info)
   v.info          = new_info+[ f for f in v.info if f.split('=',1)[0] not in new_info_fields ]
 
-  if len(v.filter)>1 and 'PASS' in v.filter:
-    v.filter.remove('PASS')
+  v.filter = v.filter or ['PASS']
 
   return v
 
@@ -226,7 +246,6 @@ def annotate_vcf(options):
   vs       = VariantAnnotator(options.genedb, options.reference)
   vcf      = VCFReader(options.variants,sys.stdin)
   cv       = CGFVariants(options.cgfvariants, options.reference) if options.cgfvariants else None
-  out      = autofile(hyphen(options.output,sys.stdout),'w')
 
   if options.kaviar:
     references = list_reader(options.reference+'.fai')
@@ -238,10 +257,16 @@ def annotate_vcf(options):
   refvars  = ReferenceVariants(options.refvars,options.refingroup) if options.refvars else None
 
   metadata = vcf.metadata
+
+  metadata.setdefault('FILTER',[])
+  metadata.setdefault('INFO',[])
+
   metadata['FILTER'].append('##FILTER=<ID=PartiallyCalled,Description="Variant is not called for one or more samples">')
   metadata['FILTER'].append('##FILTER=<ID=Indel,Description="Variant is an insertion or deletion">')
   metadata['FILTER'].append('##FILTER=<ID=Intergenic,Description="Variant not in or near a gene">')
   metadata['FILTER'].append('##FILTER=<ID=NPF,Description="Variant is not predicted to alter a protein">')
+  metadata['FILTER'].append('##FILTER=<ID=SegDup,Description="Variant occurs in a segmentally duplicated region">')
+  metadata['FILTER'].append('##FILTER=<ID=Repeat,Description="Variant occurs in a repetitive or low-complexity region">')
 
   if cv:
     metadata['FILTER'].append('##FILTER=<ID=Common,Description="Variant is likely common with common score>%f">' % options.commonscore)
@@ -263,6 +288,10 @@ def annotate_vcf(options):
   metadata['INFO'].append('##INFO=<ID=GENE_LOCATION,Number=.,Type=String,Description="Location of variant in gene(s)">')
   metadata['INFO'].append('##INFO=<ID=GENE_FUNCTION,Number=.,Type=String,Description="Functional classification of variant for each gene and transcript">')
   metadata['INFO'].append('##INFO=<ID=GENE_FUNCTION_DETAILS,Number=.,Type=String,Description="Functional details of variant for each gene and transcript">')
+  metadata['INFO'].append('##INFO=<ID=SEGDUP_COUNT,Number=1,Type=Integer,Description="Number of segmental duplications that overlap variant locus">')
+  metadata['INFO'].append('##INFO=<ID=SEGDUP_INFO,Number=.,Type=String,Description="Details of segmental duplications that overlap variant locus">')
+  metadata['INFO'].append('##INFO=<ID=REPEAT_COUNT,Number=1,Type=Integer,Description="Number of repetitive or low complexity elements that overlap variant locus">')
+  metadata['INFO'].append('##INFO=<ID=REPEAT_INFO,Number=.,Type=String,Description="Details of repetitive or low complexity elements that overlap variant locus">')
 
   if cv:
     metadata['INFO'].append('##INFO=<ID=COMMON_SCORE,Number=1,Type=Float,Description="Common score: maximum allele frequency in any population for rarest allele">')
@@ -279,34 +308,12 @@ def annotate_vcf(options):
     metadata['INFO'].append('##INFO=<ID=REFVAR_INGROUP_NAMES,Number=.,Type=String,Description="Intra-group samples in which Variant is present">')
     metadata['INFO'].append('##INFO=<ID=REFVAR_OUTGROUP_NAMES,Number=.,Type=String,Description="Extra-group samples in which Variant is present">')
 
-  for meta in vcf.metadata_order:
-    for m in metadata[meta]:
-      out.write(m)
-      out.write('\n')
-
-  out.write('#%s\n' % ('\t'.join(vcf.header)))
+  out = VCFWriter(options.output, metadata, vcf.samples, options.reference)
 
   for v in vcf:
     update_vcf_annotation(v, vs, cv, kaviar, refvars, options)
 
-    # FORMAT: chrom start end names ref var filter info format genos
-    pos = v.start+1
-    ref = v.ref
-    var = v.var
-
-    # VCF codes indels with an extra left reference base
-    if not v.ref or '' in v.var:
-      pos -= 1
-      r    = vs.reference.fetch(v.chrom,pos-1,pos).upper()
-      ref  = r+ref
-      var  = [ r+a for a in var ]
-
-    row = [ v.chrom, str(pos), ','.join(v.names) or '.', ref, ','.join(var), v.qual,
-                               ';'.join(sorted(v.filter)) or '.',
-                               ';'.join(v.info), v.format ] + [ ':'.join(g) for g in v.genos ]
-
-    out.write('\t'.join(row))
-    out.write('\n')
+    out.write_locus(v)
 
 
 def valid_allele(a):

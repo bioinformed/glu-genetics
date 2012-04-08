@@ -25,7 +25,6 @@ from   glu.lib.seqlib.edits         import reduce_match
 from   glu.lib.seqlib.intervaltree  import IntervalTree
 
 from   glu.lib.genedb               import open_genedb
-from   glu.lib.genedb.queries       import query_snps_by_location
 
 
 cyto_re = re.compile('(\d+|X|Y)(?:([p|q])(?:(\d+)(.\d+)?)?)?$')
@@ -33,8 +32,9 @@ cyto_re = re.compile('(\d+|X|Y)(?:([p|q])(?:(\d+)(.\d+)?)?)?$')
 
 BandRecord   = namedtuple('BandRecord',   'name chrom start end color')
 GeneRecord   = namedtuple('GeneRecord',   'id name symbol geneid mRNA protein canonical chrom strand '
-                                          'txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds')
-SNPRecord    = namedtuple('SNPRecord',    'name chrom start end strand refAllele alleles vclass func weight')
+                                          'txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds '
+                                          'category isRefSeq startcomplete endComplete nonsenseMediatedDecay '
+                                          'strangeSplice atacIntrons selenocysteine')
 GeneFeature  = namedtuple('GeneFeature',  'chrom start end cds_index exon_num type')
 GeneEvidence = recordtype('GeneEvidence', 'chrom cytoband ref_start ref_end intersect gene details '
                                           'func func_class func_type ref_nuc var_nuc ref_aa var_aa')
@@ -85,6 +85,9 @@ def decode_gene(gene):
     exon_nums     = xrange(len(starts),0,-1)
     left,right    = "3' UTR","5' UTR"
     intron_offset = 0
+
+  if gene.category=='noncoding' or cds_start==cds_end:
+    left = right = 'UTR'
 
   last = gene.txStart
   cds_index = 0
@@ -166,65 +169,6 @@ def cytoband_name(bands):
     return '?'
 
   return ''.join(ref[:match])
-
-
-def get_snps(con):
-  cur = con.cursor()
-  cur.execute('SELECT * FROM SNP;')
-
-  make  = SNPRecord._make
-  strcache    = {}
-  allelecache = {}
-  funccache   = {}
-
-  def intern(x,strcache=strcache.setdefault): return strcache(x,x)
-
-  empty = ()
-
-  for row in cur:
-    # name chrom start end strand refAllele alleles vclass func weight
-    row    = list(row)
-    row[1] = intern(row[1])
-    row[4] = intern(row[4])
-    row[5] = intern(row[5]) if len(row[5])<4 else row[5]
-
-    alleles = allelecache.get(row[6])
-    if alleles is not None:
-      row[6] = alleles
-    else:
-      alleles = [a.replace('-','') for a in row[6].split('/')]
-      if max(len(a) for a in alleles)>3:
-        alleles = tuple(intern(a) if len(a)<3 else a for a in alleles)
-        row[6]  = alleles
-      else:
-        alleles = tuple(intern(a) for a in alleles)
-        row[6]  = allelecache[row[6]] = alleles
-
-    row[7]  = intern(row[7])
-
-    func = funccache.get(row[8] or '')
-    if func is not None:
-      row[8] = func
-    else:
-      func = tuple(intern(f) for f in row[8].split(',')) if row[8] else empty
-      row[8] = funccache[row[8]] = func
-
-    row[9]  = int(row[9])
-
-    yield make(row)
-
-
-def get_snps_interval(con, chrom, ref_start, ref_end):
-  snps = query_snps_by_location(con, chrom, ref_start, ref_end)
-
-  make = SNPRecord._make
-  for row in snps:
-    # name chrom start end strand refAllele alleles vclass func weight
-    row    = list(row)
-    row[4] = row[4].replace('-','')
-    row[5] = set(a.replace('-','') for a in row[5].split('/'))
-    row[7] = set(row[7].split(',')) if row[7] else set()
-    yield make(row)
 
 
 def group_evidence(orig):
@@ -347,17 +291,10 @@ class VariantAnnotator(object):
     parts    = set(intersect)
     mut_type = set()
 
-    if gene.strand=='+':
-      left,right = "5'","3'"
-    else:
-      left,right = "3'","5'"
-
     for splice in gene_parts.find_values(ref_start-10,ref_end+10):
       if splice.type=='CDS' or 'UTR' in splice.type:
-        if 0<splice.start-ref_end<=10:
-          mut_type.add('POSSIBLE %s INTRONIC SPLICE VARIANT' % left)
-        if 0<ref_start-splice.end<=10:
-          mut_type.add('POSSIBLE %s INTRONIC SPLICE VARIANT' % right)
+        if (0<splice.start-ref_end<=10) or (0<ref_start-splice.end<=10):
+          mut_type.add('POSSIBLE INTRONIC SPLICE VARIANT')
 
     parts    = ','.join(sorted(parts))
     mut_type = ','.join(sorted(mut_type))
@@ -530,25 +467,3 @@ class VariantAnnotator(object):
     result     += [True,'NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(var_aa)]
 
     return result
-
-
-  def get_dbsnp(self, chrom, ref_start, ref_end, ref_nuc, var_nuc):
-    snps     = list(get_snps_interval(self.con, chrom, ref_start, ref_end))
-    var_comp = str(Seq(var_nuc).complement())
-    var      = set([var_nuc,var_comp])
-
-    exact    = set()
-    inexact  = set()
-
-    for snp in snps:
-      alleles = set(str(snp.alleles).split('/'))
-      match   = (snp.start==ref_start and snp.end==ref_end and var&alleles)
-      #print snp.name,snp.start,ref_start,snp.end,ref_end,snp.refAllele,ref_nuc,var,alleles,var&alleles,match
-      #print snp.name,snp.start==ref_start,snp.end==ref_end,snp.refAllele,ref_nuc,
-
-      if match:
-        exact.add(snp.name)
-      else:
-        inexact.add(snp.name)
-
-    return sorted(exact), sorted(inexact)

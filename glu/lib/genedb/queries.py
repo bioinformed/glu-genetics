@@ -8,8 +8,7 @@ __revision__  = '$Id$'
 
 import re
 
-from   glu.lib.utils import namedtuple
-
+from   glu.lib.recordtype import recordtype
 
 CANONICAL_TRANSCRIPT = 1
 CANONICAL_CHROMOSOME = 1<<1
@@ -20,6 +19,11 @@ KGENOME_CHRMAP       = dict( (i,i) for i in range(1,23) )
 KGENOME_CHRMAP.update({23:'X',24:'Y',25:'M'})
 
 cyto_re = re.compile('(\d+|X|Y)(?:([p|q])(?:(\d+)(.\d+)?)?)?$')
+
+
+GeneRecord   = recordtype('GeneRecord',   'alias symbol chrom txStart txEnd strand featureType')
+SegDupRecord = recordtype('SegDupRecord', 'chrom start stop strand other_chrom other_start other_stop matchFraction')
+RepeatRecord = recordtype('RepeatRecord', 'chrom start stop strand repeatName repeatClass repeatFamily')
 
 
 def query_genes_by_name(con, gene, canonical_contig=True, canonical_transcript=None, mapped=None):
@@ -64,6 +68,8 @@ def query_genes_by_name(con, gene, canonical_contig=True, canonical_transcript=N
     new_genes = [ g for g in genes if g[1].upper()==gene.upper() ]
     if new_genes:
       genes = new_genes
+
+  genes = [ GeneRecord(*g) for g in genes ]
 
   return genes
 
@@ -142,7 +148,8 @@ def query_genes_by_location(con,chrom,start,end):
 
   cur = con.cursor()
   cur.execute(sql, (chrom, end, start))
-  return cur.fetchall()
+
+  return [ GeneRecord(*g) for g in cur.fetchall() ]
 
 
 def split_cytoband(band):
@@ -353,3 +360,42 @@ def query_snps_by_location(con,chrom,start,end):
 
   cur.execute(sql,(chrom,end,start))
   return cur.fetchall()
+
+
+def query_segdups(con,chrom,start,end):
+  sql = '''
+  SELECT   chrom,start,stop,strand,other_chrom,other_start,other_stop,match_fraction
+  FROM     SEGDUP
+  WHERE    chrom = ?
+    AND    id in (SELECT id
+                  FROM   segdup_index
+                  WHERE  start < ?
+                    AND  stop  > ?)
+  ORDER BY start,stop,other_chrom,other_start,other_stop;
+  '''
+  if chrom.startswith('chr'):
+    chrom = chrom[3:]
+
+  cur = con.cursor()
+  cur.execute(sql,(chrom,end,start))
+  return [ SegDupRecord(*d) for d in cur ]
+
+
+def query_repeats(con,chrom,start,end):
+  sql = '''
+  SELECT   chrom,start,stop,strand,name,class,family
+  FROM     RMSK
+  WHERE    id in (SELECT id
+                  FROM   rmsk_index
+                  WHERE  chrom  = ?
+                    AND  chrom1 = ?
+                    AND  start < ?
+                    AND  stop  > ?)
+  ORDER BY start,stop;
+  '''
+  if chrom.startswith('chr'):
+    chrom = chrom[3:]
+
+  cur = con.cursor()
+  cur.execute(sql,(chrom,chrom,end,start))
+  return [ RepeatRecord(*r) for r in cur ]
