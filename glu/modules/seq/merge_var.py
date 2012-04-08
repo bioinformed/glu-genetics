@@ -84,13 +84,13 @@ def merge_sparse(loci):
         alleles.append(a1)
         allelemap[a1] = len(alleles)
         function.append(function_records(var.allele1Gene))
-        xrefs.append(var.allele1XRef if var.allele1XRef else '')
+        xrefs.append(var.allele1XRef or '')
 
       if a2 not in allelemap:
         alleles.append(a2)
         allelemap[a2] = len(alleles)
         function.append(function_records(var.allele2Gene))
-        xrefs.append(var.allele2XRef if var.allele2XRef else '')
+        xrefs.append(var.allele2XRef or '')
 
       individuals.append(var.individual)
       genotypes.append('%s/%s' % (allelemap[a1],allelemap[a2]))
@@ -126,13 +126,13 @@ def merge_dense(loci,names):
         alleles.append(a1)
         allelemap[a1] = len(alleles)
         function.append(function_records(var.allele1Gene))
-        xrefs.append(var.allele1XRef if var.allele1XRef else '')
+        xrefs.append(var.allele1XRef or '')
 
       if a2 not in allelemap:
         alleles.append(a2)
         allelemap[a2] = len(alleles)
         function.append(function_records(var.allele2Gene))
-        xrefs.append(var.allele2XRef if var.allele2XRef else '')
+        xrefs.append(var.allele2XRef or '')
 
       genotypes[ indmap[var.individual] ] = '%s/%s' % (allelemap[a1],allelemap[a2])
 
@@ -192,7 +192,6 @@ def main():
 
   for row in rows:
     out.writerow(row)
-
 
 
 if __name__=='__main__':
