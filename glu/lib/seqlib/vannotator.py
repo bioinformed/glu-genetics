@@ -76,14 +76,14 @@ def decode_gene(gene):
     # increasing order and is bordered by the 5' UTR to the "left" and 3'
     # UTR to the "right" in genome orientation.
     exon_nums     = count(1)
-    left,right    = "5' UTR","3' UTR"
+    left,right    = 'UTR5','UTR3'
     intron_offset = -1
   else:
     # Otherwise, genes transcribed on the reverse genomic strand are
     # numbered in increasing order and is bordered by the 3' UTR to the
     # "left" and 5' UTR to the "right" in genome orientation.
     exon_nums     = xrange(len(starts),0,-1)
-    left,right    = "3' UTR","5' UTR"
+    left,right    = 'UTR3','UTR5'
     intron_offset = 0
 
   if gene.category=='noncoding' or cds_start==cds_end:
@@ -202,6 +202,12 @@ class VariantAnnotator(object):
     for gene in trans:
       feature_map[gene.chrom].insert(gene.txStart,gene.txEnd,gene)
 
+      if 0: # DEBUG
+        parts = self.decode_gene(gene)
+        for part in parts:
+          if part.type not in ('intron','UTR5','UTR3') and '_' not in part.chrom:
+            print '\t'.join(map(str,[part.chrom,part.start,part.end,gene.symbol]))
+
     sys.stderr.write('Loading complete.\n')
 
 
@@ -291,9 +297,9 @@ class VariantAnnotator(object):
     parts    = set(intersect)
     mut_type = set()
 
-    for splice in gene_parts.find_values(ref_start-10,ref_end+10):
+    for splice in gene_parts.find_values(ref_start-5,ref_end+5):
       if splice.type=='CDS' or 'UTR' in splice.type:
-        if (0<splice.start-ref_end<=10) or (0<ref_start-splice.end<=10):
+        if (0<splice.start-ref_end<=5) or (0<ref_start-splice.end<=5):
           mut_type.add('POSSIBLE INTRONIC SPLICE VARIANT')
 
     parts    = ','.join(sorted(parts))
@@ -307,7 +313,7 @@ class VariantAnnotator(object):
       evidence.append([parts,gene,'',True,'NON-SYNONYMOUS',mut_type,ref_nuc,var_nuc,'',''])
     elif mut_type:
       evidence.append([parts,gene,'',True,'PREDICTED-DISRUPT-TRANSCRIPT',mut_type,ref_nuc,var_nuc,'',''])
-    elif len(intersect["5' UTR"])+len(intersect["3' UTR"]):
+    elif len(intersect['UTR5'])+len(intersect['UTR3']):
       evidence.append([parts,gene,'',False,'UNKNOWN-UTR',mut_type,ref_nuc,var_nuc,'',''])
     elif len(intersect['intron']):
       evidence.append([parts,gene,'',False,'UNKNOWN-INTRONIC',mut_type,ref_nuc,var_nuc,'',''])
