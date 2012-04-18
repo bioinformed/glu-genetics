@@ -101,11 +101,23 @@ class OrderedReader(object):
       return None
 
 
+def make_infomap(info):
+  infomap = {}
+  for inf in info:
+    if '=' in inf:
+      key,value = inf.split('=',1)
+    else:
+      key,value = inf,''
+
+    infomap[key] = value
+  return infomap
+
+
 def aa_change(e):
   return '%s->%s' % (e.ref_aa,e.var_aa) if e.ref_aa or e.var_aa else ''
 
 
-def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
+def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, options):
   new_info = []
 
   if vs:
@@ -158,7 +170,7 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
       new_info.append('GENE_FUNCTION_DETAILS=%s' % (','.join(nsinfo  )))
 
     if segdups:
-      segdup_info = ('%s:%s-%s:%.2f' % (s.other_chrom,s.other_start,s.other_stop,s.matchFraction*100) for s in segdups)
+      segdup_info = ('chr%s:%s-%s:%.2f' % (s.other_chrom,s.other_start,s.other_stop,s.matchFraction*100) for s in segdups)
       segdup_info = ','.join(segdup_info)
       v.filter.append('SegDup')
       new_info.append('SEGDUP_COUNT=%d' % len(segdups))
@@ -189,6 +201,42 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
 
     if cvinfo.common_score>options.commonscore:
       v.filter.append('Common')
+
+  if esp:
+    chrom = v.chrom
+    vars  = set(v.var)
+    if chrom.startswith('chr'):
+      chrom = chrom[3:]
+
+    try:
+      esp_info = esp.fetch(chrom,v.start,v.end)
+      esp_info = [ e for e in esp_info if e.start==v.start and e.end==v.end and vars.intersection(e.var) ]
+    except ValueError:
+      esp_info = None
+
+    if esp_info:
+      gtc = maf_ea = maf_aa = 0
+
+      for einfo in esp_info:
+        infomap  = make_infomap(einfo.info)
+        if 'MAF' in infomap:
+          mafs     = map(float,infomap['MAF'].split(','))
+          maf_ea   = max(maf_ea,mafs[0]/100)
+          maf_aa   = max(maf_aa,mafs[1]/100)
+
+        if 'GTC' in infomap:
+          gtcs     = map(int,infomap['GTC'].split(','))
+          gtc      = max(gtc,gtcs[0]+gtcs[1])
+
+      maf = max(maf_ea,maf_aa)
+
+      v.filter.append('ESP')
+      if maf>options.commonscore:
+        v.filter.append('ESPCommon')
+
+      new_info.append('ESP_COUNT=%d' % gtc)
+      new_info.append('ESP_MAF_EA=%.4f' % maf_ea)
+      new_info.append('ESP_MAF_AA=%.4f' % maf_aa)
 
   if kaviar:
     kinfo = kaviar.get(v.chrom,v.start) or []
@@ -227,9 +275,6 @@ def update_vcf_annotation(v, vs, cv, kaviar, refvars, options):
     v.names.remove('tgp')
     v.filter.append('1000G')
 
-  #if any(g[0]=='./.' for g in v.genos):
-  #  v.filter.append('PartiallyCalled')
-
   if not v.ref or v.var==['']:
     v.filter.append('Indel')
 
@@ -246,6 +291,7 @@ def annotate_vcf(options):
   vs       = VariantAnnotator(options.genedb, options.reference)
   vcf      = VCFReader(options.variants,sys.stdin)
   cv       = CGFVariants(options.cgfvariants, options.reference) if options.cgfvariants else None
+  esp      = VCFReader(options.esp) if options.esp else None
 
   if options.kaviar:
     references = list_reader(options.reference+'.fai')
@@ -268,20 +314,6 @@ def annotate_vcf(options):
   metadata['FILTER'].append('##FILTER=<ID=SegDup,Description="Variant occurs in a segmentally duplicated region">')
   metadata['FILTER'].append('##FILTER=<ID=Repeat,Description="Variant occurs in a repetitive or low-complexity region">')
 
-  if cv:
-    metadata['FILTER'].append('##FILTER=<ID=Common,Description="Variant is likely common with common score>%f">' % options.commonscore)
-    metadata['FILTER'].append('##FILTER=<ID=1000G,Description="Variant was reported by 1000 Genomes project">')
-
-  if kaviar:
-    metadata['FILTER'].append('##FILTER=<ID=KaviarCommon,Description="Variant appears in the Kaviar database and appears to be common with MAF>%f">' % options.commonscore)
-    metadata['FILTER'].append('##FILTER=<ID=Kaviar,Description="Variant appears in the Kaviar database">')
-
-  if refvars:
-    metadata['FILTER'].append('##FILTER=<ID=RefVar,Description="Variant appears in the local reference variant list">')
-
-  #metadata['FILTER'].append('##FILTER=<ID=NotDominant,Description="Variant does not fit dominant heritibility model">')
-  #metadata['FILTER'].append('##FILTER=<ID=NotRecessive,Description="Variant does not fit recessive heritibility model">')
-
   metadata['INFO'].append('##INFO=<ID=CYTOBAND,Number=.,Type=String,Description="Name of cytoband(s) containing variant">')
   metadata['INFO'].append('##INFO=<ID=GENE_NAME,Number=.,Type=String,Description="Name of gene(s) containing variant">')
   metadata['INFO'].append('##INFO=<ID=GENE_ID,Number=.,Type=String,Description="Entrez/LocusLink gene identifiers of genes containing variant">')
@@ -294,24 +326,36 @@ def annotate_vcf(options):
   metadata['INFO'].append('##INFO=<ID=REPEAT_INFO,Number=.,Type=String,Description="Details of repetitive or low complexity elements that overlap variant locus">')
 
   if cv:
-    metadata['INFO'].append('##INFO=<ID=COMMON_SCORE,Number=1,Type=Float,Description="Common score: maximum allele frequency in any population for rarest allele">')
-    metadata['INFO'].append('##INFO=<ID=FUNCTION_INFO,Number=.,Type=String,Description="Annotated as function by OMIM, dbSNP, or COSMIC">')
-    metadata['INFO'].append('##INFO=<ID=INEXACT_VARIANTS,Number=.,Type=String,Description="Observed variant matches inexactly: it has different alleles or overlaps observed">')
+    metadata['FILTER'].append('##FILTER=<ID=Common,Description="Variant is likely common with common score>%f">' % options.commonscore)
+    metadata['FILTER'].append('##FILTER=<ID=1000G,Description="Variant was reported by 1000 Genomes project">')
+    metadata['INFO'  ].append('##INFO=<ID=COMMON_SCORE,Number=1,Type=Float,Description="Common score: maximum allele frequency in any population for rarest allele">')
+    metadata['INFO'  ].append('##INFO=<ID=FUNCTION_INFO,Number=.,Type=String,Description="Annotated as function by OMIM, dbSNP, or COSMIC">')
+    metadata['INFO'  ].append('##INFO=<ID=INEXACT_VARIANTS,Number=.,Type=String,Description="Observed variant matches inexactly: it has different alleles or overlaps observed">')
+
+  if esp:
+    metadata['FILTER'].append('##FILTER=<ID=ESP,Description="Variant appears in the UW ESP database">')
+    metadata['FILTER'].append('##FILTER=<ID=ESPCommon,Description="Variant appears in the UW ESP database and appears to be common with MAF>%f">' % options.commonscore)
+    metadata['INFO'  ].append('##INFO=<ID=ESP_COUNT,Number=1,Type=Integer,Description="Count of individuals with one or more variant alleles in UW ESP database">')
+    metadata['INFO'  ].append('##INFO=<ID=ESP_MAF_EA,Number=1,Type=Float,Description="Minor allele frequency in European-Americans according to UW ESP database">')
+    metadata['INFO'  ].append('##INFO=<ID=ESP_MAF_AA,Number=1,Type=Float,Description="Minor allele frequency in African-Americans according to UW ESP database">')
 
   if kaviar:
-    metadata['INFO'].append('##INFO=<ID=KAVIAR_MAF,Number=1,Type=Float,Description="Minor allele frequency accourding to Kaviar database">')
-    metadata['INFO'].append('##INFO=<ID=KAVIAR_NAMES,Number=.,Type=String,Description="Samples or datasets from Kaviar in which variant was found">')
+    metadata['FILTER'].append('##FILTER=<ID=Kaviar,Description="Variant appears in the Kaviar database">')
+    metadata['FILTER'].append('##FILTER=<ID=KaviarCommon,Description="Variant appears in the Kaviar database and appears to be common with MAF>%f">' % options.commonscore)
+    metadata['INFO'  ].append('##INFO=<ID=KAVIAR_MAF,Number=1,Type=Float,Description="Minor allele frequency according to Kaviar database">')
+    metadata['INFO'  ].append('##INFO=<ID=KAVIAR_NAMES,Number=.,Type=String,Description="Samples or datasets from Kaviar in which variant was found">')
 
   if refvars:
-    metadata['INFO'].append('##INFO=<ID=REFVAR_INGROUP_COUNT,Number=1,Type=Integer,Description="Count of times variant is present in intra-group samples">')
-    metadata['INFO'].append('##INFO=<ID=REFVAR_OUTGROUP_COUNT,Number=1,Type=Integer,Description="Count of times variant is present in extra-group samples">')
-    metadata['INFO'].append('##INFO=<ID=REFVAR_INGROUP_NAMES,Number=.,Type=String,Description="Intra-group samples in which Variant is present">')
-    metadata['INFO'].append('##INFO=<ID=REFVAR_OUTGROUP_NAMES,Number=.,Type=String,Description="Extra-group samples in which Variant is present">')
+    metadata['FILTER'].append('##FILTER=<ID=RefVar,Description="Variant appears in the local reference variant list">')
+    metadata['INFO'  ].append('##INFO=<ID=REFVAR_INGROUP_COUNT,Number=1,Type=Integer,Description="Count of times variant is present in intra-group samples">')
+    metadata['INFO'  ].append('##INFO=<ID=REFVAR_OUTGROUP_COUNT,Number=1,Type=Integer,Description="Count of times variant is present in extra-group samples">')
+    metadata['INFO'  ].append('##INFO=<ID=REFVAR_INGROUP_NAMES,Number=.,Type=String,Description="Intra-group samples in which Variant is present">')
+    metadata['INFO'  ].append('##INFO=<ID=REFVAR_OUTGROUP_NAMES,Number=.,Type=String,Description="Extra-group samples in which Variant is present">')
 
   out = VCFWriter(options.output, metadata, vcf.samples, options.reference)
 
   for v in vcf:
-    update_vcf_annotation(v, vs, cv, kaviar, refvars, options)
+    update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, options)
 
     out.write_locus(v)
 
@@ -420,6 +464,8 @@ def option_parser():
                       help='CGFvariant database annotation')
   parser.add_argument('--commonscore', metavar='T', type=float, default=0.05,
                       help='Annotate all variants with common score > T')
+  parser.add_argument('--esp',   metavar='NAME',
+                        help='UW Exome Sequencing Project (ESP) annotation (optional)')
   parser.add_argument('--kaviar',   metavar='NAME',
                         help='Kaviar annotation (optional)')
   parser.add_argument('--refvars',   metavar='NAME',
