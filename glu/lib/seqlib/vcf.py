@@ -20,11 +20,53 @@ from   glu.lib.recordtype           import recordtype
 VCFRecord = recordtype('VCFRecord',    'chrom start end names ref var qual filter info format genos')
 
 
+strcache    = {}
+def _intern(x,strcache=strcache.setdefault): return strcache(x,x)
+
+
+def _encode_vcf_records(rows):
+  for row in rows:
+    chrom      = _intern(row[0])
+    start      = int(row[1])-1
+    names      = row[2].split(';') if row[2]!='.' else []
+    ref        = _intern(row[3])
+    end        = start+len(ref)
+    var        = [ _intern(v) for v in row[4].split(',') ]
+    qual       = row[5]
+    filter     = [ _intern(f) for f in row[6].split(';') ] if row[6]!='.' else []
+    info       = row[7].split(';') if row[7]!='.' else []
+
+    n          = len(row)
+    if n>8:
+      format     = _intern(row[8])
+
+      if n>9:
+        if ':' in format:
+          genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
+        else:
+          genos      = [ [g]          for g in row[9:] ] if len(row)>9 else None
+      else:
+        genos = None
+    else:
+      format = genos = None
+
+    # VCF codes indels with an extra left reference base, which we strip
+    r          = ref[0]
+    if all(a.startswith(r) for a in var):
+      start   += 1
+      ref      = _intern(ref[1:])
+      var      = [ _intern(v[1:]) for v in var ]
+
+    yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
+
+
 class VCFReader(object):
   def __init__(self, filename, hyphen=None, field_size_limit=1024*1024):
     if csv.field_size_limit()<field_size_limit:
       csv.field_size_limit(field_size_limit)
 
+    self.filename       = filename
+    self.tabixfile      = None
     self.data = data    = table_reader(filename,hyphen=sys.stdin)
 
     self.metadata       = metadata       = OrderedDict()
@@ -57,34 +99,17 @@ class VCFReader(object):
 
 
   def __iter__(self):
-    strcache    = {}
-    def intern(x,strcache=strcache.setdefault): return strcache(x,x)
+    return _encode_vcf_records(self.data)
 
-    for row in self.data:
-      chrom      = intern(row[0])
-      start      = int(row[1])-1
-      names      = row[2].split(';') if row[2]!='.' else []
-      ref        = intern(row[3])
-      end        = start+len(ref)
-      var        = [ intern(v) for v in row[4].split(',') ]
-      qual       = row[5]
-      filter     = [ intern(f) for f in row[6].split(';') ] if row[6]!='.' else []
-      info       = row[7].split(';')
-      format     = intern(row[8])
+  def fetch(self, chromosome, start, stop):
+    tabixfile = self.tabixfile
 
-      if ':' in format:
-        genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
-      else:
-        genos      = [ [g]          for g in row[9:] ] if len(row)>9 else None
+    if tabixfile is None:
+      self.tabixfile = tabixfile = pysam.Tabixfile(self.filename,cache_size=128*1024*1024)
 
-      # VCF codes indels with an extra left reference base, which we strip
-      r          = ref[0]
-      if all(a.startswith(r) for a in var):
-        start   += 1
-        ref      = intern(ref[1:])
-        var      = [ intern(v[1:]) for v in var ]
+    records = [ r.split('\t') for r in tabixfile.fetch(chromosome, start, stop) ]
 
-      yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
+    return _encode_vcf_records(records)
 
 
 class VCFWriter(object):
