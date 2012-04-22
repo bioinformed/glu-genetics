@@ -205,7 +205,7 @@ class VariantAnnotator(object):
       if 0: # DEBUG
         parts = self.decode_gene(gene)
         for part in parts:
-          if part.type not in ('intron','UTR5','UTR3') and '_' not in part.chrom:
+          if part.type not in ('intron','UTR5','UTR3','UTR') and '_' not in part.chrom:
             print '\t'.join(map(str,[part.chrom,part.start,part.end,gene.symbol]))
 
     sys.stderr.write('Loading complete.\n')
@@ -424,7 +424,7 @@ class VariantAnnotator(object):
       ref_frame   = ref_cds[codon_start:codon_end]
       ref_aa      = ref_frame.translate()
 
-      assert len(ref_aa)
+      #assert len(ref_aa)
 
       result[-1] += ':aa=%d' % (aa_position+1)
       result += [False,'SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,str(ref_aa),str(ref_aa)]
