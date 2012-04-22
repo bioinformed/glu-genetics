@@ -90,61 +90,38 @@ def query_gene_by_name(con,gene,canonical_contig=True,canonical_transcript=None,
 def query_gene_neighborhood(con,chrom,start,end,up,dn):
   cur = con.cursor()
 
-  if 'rtree' not in con.filename:
-    sql = '''
-    SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
-    FROM     gene
-    WHERE    chrom  = ?
-      AND  ((strand = '+' AND txStart<? AND txEnd>?)
-         OR (strand = '-' AND txStart<? AND txEnd>?))
-    GROUP BY symbol
-    ORDER BY chrom,start,end,symbol,canonical DESC
-    '''
-    cur.execute(sql, (chrom,end+dn,start-up,end+up,start-dn))
-  else:
-    sql = '''
-    SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
-    FROM     gene
-    WHERE    chrom  = ?
-      AND    id in (SELECT id
-                    FROM   gene_index
-                    WHERE  txStart < ?
-                      AND  txEnd   > ?)
-      AND  ((strand = '+' AND txStart<? AND txEnd>?)
-         OR (strand = '-' AND txStart<? AND txEnd>?))
-    GROUP BY symbol
-    ORDER BY chrom,start,end,symbol,canonical DESC
-    '''
-    d = max(dn,up)
-    cur.execute(sql, (chrom,end+d,start-d,end+dn,start-up,end+up,start-dn))
+  sql = '''
+  SELECT   symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand
+  FROM     gene
+  WHERE    chrom  = ?
+    AND    id in (SELECT id
+                  FROM   gene_index
+                  WHERE  txStart < ?
+                    AND  txEnd   > ?)
+    AND  ((strand = '+' AND txStart<? AND txEnd>?)
+       OR (strand = '-' AND txStart<? AND txEnd>?))
+  GROUP BY symbol
+  ORDER BY chrom,start,end,symbol,canonical DESC
+  '''
+  d = max(dn,up)
+  cur.execute(sql, (chrom,end+d,start-d,end+dn,start-up,end+up,start-dn))
 
   return cur.fetchall()
 
 
 def query_genes_by_location(con,chrom,start,end):
-  if 'rtree' not in con.filename:
-    sql = '''
-    SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
-    SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
-    FROM     gene
-    WHERE    chrom = ?
-      AND    txStart<? AND txEnd>?
-    GROUP BY symbol
-    ORDER BY chrom,start,end,symbol,canonical DESC
-    '''
-  else:
-    sql = '''
-    SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
-    SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
-    FROM     gene
-    WHERE    chrom = ?
-      AND    id in (SELECT id
-                    FROM   gene_index
-                    WHERE  txStart < ?
-                      AND  txEnd   > ?)
-    GROUP BY symbol
-    ORDER BY chrom,start,end,symbol,canonical DESC
-    '''
+  sql = '''
+  SELECT   symbol as alias,symbol,chrom,MIN(txStart) as start,MAX(txEnd) as end,strand,"GENE"
+  SELECT   symbol,symbol,chrom,MIN(txStart) as start, MAX(txEnd) as end,strand
+  FROM     gene
+  WHERE    chrom = ?
+    AND    id in (SELECT id
+                  FROM   gene_index
+                  WHERE  txStart < ?
+                    AND  txEnd   > ?)
+  GROUP BY symbol
+  ORDER BY chrom,start,end,symbol,canonical DESC
+  '''
 
   cur = con.cursor()
   cur.execute(sql, (chrom, end, start))
@@ -337,26 +314,16 @@ def query_snp_by_name(con,name,canonical=True):
 def query_snps_by_location(con,chrom,start,end):
   cur = con.cursor()
 
-  if 'rtree' not in con.filename:
-    sql = '''
-    SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
-    FROM     snp
-    WHERE    chrom = ?
-      AND    start < ?
-      AND    end   > ?
-    ORDER BY start,name;
-    '''
-  else:
-    sql = '''
-    SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
-    FROM     snp
-    WHERE    chrom = ?
-      AND    id in (SELECT id
-                    FROM   snp_index
-                    WHERE  start < ?
-                      AND  end   > ?)
-    ORDER BY start,name;
-    '''
+  sql = '''
+  SELECT   name,chrom,start,end,strand,refAllele,alleles,vclass,func,weight
+  FROM     snp
+  WHERE    chrom = ?
+    AND    id in (SELECT id
+                  FROM   snp_index
+                  WHERE  start < ?
+                    AND  end   > ?)
+  ORDER BY start,name;
+  '''
 
   cur.execute(sql,(chrom,end,start))
   return cur.fetchall()
