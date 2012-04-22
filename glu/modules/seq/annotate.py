@@ -12,6 +12,8 @@ import sys
 
 from   operator                     import itemgetter
 
+import pysam
+
 from   glu.lib.utils                import unique
 from   glu.lib.fileutils            import list_reader, autofile, hyphen
 from   glu.lib.progressbar          import progress_loop
@@ -113,11 +115,28 @@ def make_infomap(info):
   return infomap
 
 
+def polyphen2_code(c):
+  if c=='?':
+    return '.'
+  elif len(c)==1:
+    return c
+  elif 'D' in c:
+    return'D'
+  elif 'd' in c:
+    return'd'
+  elif '?' in c:
+    return'.'
+  elif 'b' in c:
+    return'b'
+  else:
+    return'.'
+
+
 def aa_change(e):
   return '%s->%s' % (e.ref_aa,e.var_aa) if e.ref_aa or e.var_aa else ''
 
 
-def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, options):
+def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options):
   new_info = []
 
   if vs:
@@ -256,6 +275,7 @@ def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, options):
 
       new_info.append('KAVIAR_NAMES=%s' % ','.join(ktext))
 
+
   if refvars:
     ingroup,outgroup = refvars.get(v.chrom,v.start,v.end,v.var) if refvars else ([],[])
 
@@ -270,6 +290,43 @@ def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, options):
       outgroup = ','.join(outgroup)
       new_info.append('REFVAR_OUTGROUP_NAMES=%s' % outgroup)
       v.filter.append('RefVar')
+
+  if vs and polyphen2 and v.end-v.start==1 and 'CDS' in location:
+    pmap  = {'A':0,'C':1,'G':2,'T':3}
+
+    try:
+      pvars = [ p.rstrip().split('\t') for p in polyphen2.fetch(v.chrom,v.start,v.end) ]
+    except ValueError:
+      pvars = None
+
+    if pvars:
+      hdivs = []
+      hvars = []
+
+      for a in v.var:
+        if a in pmap:
+          i = pmap[a]
+
+          hdiv = hvar = ''
+          for p in pvars:
+            hdiv += p[3][i]
+            hvar += p[4][i]
+
+          hdiv = polyphen2_code(hdiv)
+          hvar = polyphen2_code(hvar)
+        else:
+          hdiv = '.'
+          hvar = '.'
+
+        assert hdiv!='r' and hvar!='r'
+
+        hdivs.append(hdiv)
+        hvars.append(hvar)
+
+      if hdivs.count('.')!=len(hdivs):
+        new_info.append('POLYPHEN2_HDIV=%s' % (','.join(hdivs)))
+      if hvars.count('.')!=len(hvars):
+        new_info.append('POLYPHEN2_HVAR=%s' % (','.join(hvars)))
 
   if 'tgp' in v.names:
     v.names.remove('tgp')
@@ -292,6 +349,7 @@ def annotate_vcf(options):
   vcf      = VCFReader(options.variants,sys.stdin)
   cv       = CGFVariants(options.cgfvariants, options.reference) if options.cgfvariants else None
   esp      = VCFReader(options.esp) if options.esp else None
+  polyphen2= pysam.Tabixfile(options.polyphen2) if options.polyphen2 else None
 
   if options.kaviar:
     references = list_reader(options.reference+'.fai')
@@ -352,10 +410,14 @@ def annotate_vcf(options):
     metadata['INFO'  ].append('##INFO=<ID=REFVAR_INGROUP_NAMES,Number=.,Type=String,Description="Intra-group samples in which Variant is present">')
     metadata['INFO'  ].append('##INFO=<ID=REFVAR_OUTGROUP_NAMES,Number=.,Type=String,Description="Extra-group samples in which Variant is present">')
 
+  if polyphen2:
+    metadata['INFO'  ].append('##INFO=<ID=POLYPHEN2_HDIV,Number=.,Type=String,Description="Polyphen2 HDIV prediction code for each variant SNV allele (b=benign, d=possibly damaging, D=probably damaging, .=unknown)">')
+    metadata['INFO'  ].append('##INFO=<ID=POLYPHEN2_HVAR,Number=.,Type=String,Description="Polyphen2 HVAR prediction code for each variant SNV allele (b=benign, d=possibly damaging, D=probably damaging, .=unknown)">')
+
   out = VCFWriter(options.output, metadata, vcf.samples, options.reference)
 
   for v in vcf:
-    update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, options)
+    update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options)
 
     out.write_locus(v)
 
@@ -454,8 +516,8 @@ def option_parser():
 
   parser.add_argument('variants', help='Input variant file')
 
-  parser.add_argument('-f', '--format',   metavar='NAME', default='GLU',
-                      help='File format (VCF, GLU)')
+  parser.add_argument('-f', '--format',   metavar='NAME', default='VCF',
+                      help='File format (VCF)')
   parser.add_argument('-g', '--genedb',   metavar='NAME',
                       help='Genedb genome annotation database name or file')
   parser.add_argument('-r', '--reference',   metavar='NAME', required=True,
@@ -470,6 +532,8 @@ def option_parser():
                         help='Kaviar annotation (optional)')
   parser.add_argument('--refvars',   metavar='NAME',
                         help='Reference variant list')
+  parser.add_argument('--polyphen2',   metavar='NAME',
+                        help='Polyphen2 exome annotation (optional)')
   parser.add_argument('--refingroup',   metavar='NAME',
                         help='List of subjects defined to be intra-group reference variants')
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
