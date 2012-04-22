@@ -280,7 +280,10 @@ def output_target_coverage(targets, target_coverage, options):
   target_dict = {}
   for target_contig,ctargets in targets.iteritems():
     for target_start,target_end,target_name in ctargets:
-      target_dict[target_contig,target_name] = target_start,target_end
+      if (target_contig,target_name) in target_dict:
+        target_dict[target_contig,target_name] = '',''
+      else:
+        target_dict[target_contig,target_name] = target_start,target_end
 
   out = table_writer(options.targetout)
 
