@@ -41,7 +41,7 @@ def merge_features(features):
 
 
 
-def read_features(filename,merge=True):
+def read_features(filename,merge=True,pad=0):
   features = defaultdict(list)
 
   if not filename:
@@ -63,7 +63,17 @@ def read_features(filename,merge=True):
     else:
       name = next(generic_names)
 
-    features[contig].append( (int(start),int(end),name) )
+    start = int(start)
+    end   = int(end)
+
+    if start>end:
+      start,end = end,start
+
+    if pad:
+      start -= pad
+      end   -= pad
+
+    features[contig].append( (start,end,name) )
 
   for contig in features:
     if merge:

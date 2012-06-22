@@ -530,6 +530,8 @@ def option_parser():
                     help='Minimum read length filter')
   parser.add_argument('--targets', metavar='BED',
                     help='Single track BED file containing all targeted intervals')
+  parser.add_argument('--padtargets', metavar='N', default=0,
+                    help='Pad each target with N base pairs up- and down-stream (default=0)')
   parser.add_argument('--controls', metavar='CONTIGS',
                     help='List of control contigs to allow those aligned '
                           'reads to be counted seperately from other aligned reads '
@@ -613,7 +615,7 @@ def main():
     aligns  = contig_stats(aligns,references,options.contigstats)
 
   if options.targets:
-    targets = read_features(options.targets)
+    targets = read_features(options.targets,merge=True,pad=options.padtargets)
     aligns  = target_filter(aligns,references,targets,controls,stats,options)
   else:
     aligns  = simple_filter(aligns,controls,stats,options)
