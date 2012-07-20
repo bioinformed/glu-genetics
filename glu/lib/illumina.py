@@ -286,6 +286,9 @@ class IlluminaManifest(object):
 
         norm_ids[snpnum-1] = norm_id = norm_id + 100*assay_type_id + 1
 
+        if chromosome=='0':
+          chromosome = ''
+
         yield ManifestRow(ilmnid,name,design_strand,alleles,assay_type_id,norm_id,
                           addressA_id,alleleA_probe_sequence,addressB_id,alleleB_probe_sequence,
                           genome_version,chromosome,mapinfo,ploidy,species,
@@ -421,7 +424,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     gstrand = assay[assayid_idx].split('_')[-2]
 
     if targetstrand in ('real_forward','real_reverse'):
-      gstrand = assay[gstrand_idx] or 'U'
+      gstrand = gstrandmap.get(assay[gstrand_idx]) or 'U'
 
     if chr.startswith('chr'):
       chr = chr[3:]
@@ -560,23 +563,23 @@ def manifest_snps(filename):
   manifest    = iter(manifest)
   header      = manifest.next()
   name_idx    = find_index(header,['Name'])
-  chr_idx     = find_index(header,['Chr'])
+  chrom_idx   = find_index(header,['Chr'])
   loc_idx     = find_index(header,['MapInfo'])
 
   for assay in manifest:
     lname   = assay[name_idx]
-    chr     = assay[chr_idx] or None
+    chrom   = assay[chrom_idx] or None
     loc     = assay[loc_idx]
 
-    if chr.startswith('chr'):
-      chr = chr[3:]
-    if chr=='Mt':
-      chr='M'
+    if chrom and chrom.startswith('chr'):
+      chrom = chrom[3:]
+    if chrom=='Mt':
+      chrom='M'
 
     if loc:
       loc = int(loc)
 
-    yield lname,chr,loc
+    yield lname,chrom,loc
 
 
 def read_Illumina_IDAT(filename):
