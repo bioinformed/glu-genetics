@@ -24,7 +24,7 @@ strcache    = {}
 def _intern(x,strcache=strcache.setdefault): return strcache(x,x)
 
 
-def _encode_vcf_records(rows):
+def _encode_vcf_records(rows,normalize_indels=True):
   for row in rows:
     chrom      = _intern(row[0])
     start      = int(row[1])-1
@@ -51,27 +51,29 @@ def _encode_vcf_records(rows):
       format = genos = None
 
     # VCF codes indels with an extra left reference base, which we strip
-    r          = ref[0]
-    if all(a.startswith(r) for a in var):
-      start   += 1
-      ref      = _intern(ref[1:])
-      var      = [ _intern(v[1:]) for v in var ]
+    if normalize_indels:
+      r          = ref[0]
+      if all(a.startswith(r) for a in var):
+        start   += 1
+        ref      = _intern(ref[1:])
+        var      = [ _intern(v[1:]) for v in var ]
 
     yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
 
 
 class VCFReader(object):
-  def __init__(self, filename, hyphen=None, field_size_limit=1024*1024):
+  def __init__(self, filename, hyphen=None, normalize_indels=True, field_size_limit=1024*1024):
     if csv.field_size_limit()<field_size_limit:
       csv.field_size_limit(field_size_limit)
 
-    self.filename       = filename
-    self.tabixfile      = None
-    self.data = data    = table_reader(filename,hyphen=sys.stdin)
+    self.filename         = filename
+    self.normalize_indels = normalize_indels
+    self.tabixfile        = None
+    self.data = data      = table_reader(filename,hyphen=sys.stdin)
 
-    self.metadata       = metadata       = OrderedDict()
-    self.header         = None
-    self.samples        = None
+    self.metadata         = metadata       = OrderedDict()
+    self.header           = None
+    self.samples          = None
 
     for row in data:
       if not row:
@@ -99,7 +101,7 @@ class VCFReader(object):
 
 
   def __iter__(self):
-    return _encode_vcf_records(self.data)
+    return _encode_vcf_records(self.data,self.normalize_indels)
 
   def fetch(self, chromosome, start, stop):
     tabixfile = self.tabixfile
@@ -109,12 +111,12 @@ class VCFReader(object):
 
     records = [ r.split('\t') for r in tabixfile.fetch(chromosome, start, stop) ]
 
-    return _encode_vcf_records(records)
+    return _encode_vcf_records(records,self.normalize_indels)
 
 
 class VCFWriter(object):
-  def __init__(self, filename, metadata, names, reference):
-    self.reference = pysam.Fastafile(reference)
+  def __init__(self, filename, metadata, names, reference=None):
+    self.reference = pysam.Fastafile(reference) if reference is not None else None
     self.out = out = autofile(hyphen(filename,sys.stdout),'w')
 
     for meta in metadata:
@@ -133,6 +135,9 @@ class VCFWriter(object):
 
     # VCF codes indels with an extra left reference base
     if not vcfvar.ref or '' in vcfvar.var:
+      if self.reference is None:
+        raise RuntimeError('Reference sequence required to write VCF indel loci')
+
       pos -= 1
       r    = self.reference.fetch(vcfvar.chrom,pos-1,pos).upper()
       ref  = r+ref
@@ -148,6 +153,12 @@ class VCFWriter(object):
             ';'.join(vcfvar.info),
             vcfvar.format ] + [ ':'.join(g) for g in vcfvar.genos ]
 
-    out = self.out
-    out.write('\t'.join(map(str,row)))
+    out  = self.out
+
+    text = '\t'.join(map(str,row))
+
+    if ' ' in text:
+      text = text.replace(' ','_')
+
+    out.write(text)
     out.write('\n')
