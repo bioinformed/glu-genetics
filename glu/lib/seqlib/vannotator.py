@@ -260,10 +260,10 @@ class VariantAnnotator(object):
           three_prime.add(gene)
 
       for gene in five_prime:
-        evidence.append( ["5' of gene",gene,'',False,'','',ref_nuc,var_nuc,'',''] )
+        evidence.append( ['UPSTREAM_GENE',gene,'',False,'','',ref_nuc,var_nuc,'',''] )
 
       for gene in three_prime:
-        evidence.append( ["3' of gene",gene,'',False,'','',ref_nuc,var_nuc,'',''] )
+        evidence.append( ['DOWNSTREAM_GENE',gene,'',False,'','',ref_nuc,var_nuc,'',''] )
 
     if not evidence:
       evidence.append( ['intergenic','','',False,'','',ref_nuc,var_nuc,'',''] )
@@ -300,7 +300,7 @@ class VariantAnnotator(object):
     for splice in gene_parts.find_values(ref_start-5,ref_end+5):
       if splice.type=='CDS' or 'UTR' in splice.type:
         if (0<splice.start-ref_end<=5) or (0<ref_start-splice.end<=5):
-          mut_type.add('POSSIBLE INTRONIC SPLICE VARIANT')
+          mut_type.add('POSSIBLE_INTRONIC_SPLICE_VARIANT')
 
     parts    = ','.join(sorted(parts))
     mut_type = ','.join(sorted(mut_type))
@@ -352,9 +352,9 @@ class VariantAnnotator(object):
     mut_type = []
 
     if exon_start<5:
-      mut_type.append("POSSIBLE 5' EXONIC SPLICE VARIANT")
+      mut_type.append('POSSIBLE-SPLICE5')
     if cds.end-exon_end<5:
-      mut_type.append("POSSIBLE 3' EXONIC SPLICE VARIANT")
+      mut_type.append('POSSIBLE-SPLICE3')
 
     if ref_frame!=var_frame:
       mut_type.append('FRAMESHIFT')
@@ -405,9 +405,9 @@ class VariantAnnotator(object):
       ref_cds_aa = ref_cds.translate()
       var_cds_aa = var_cds.translate()
     except TranslationError:
-      mut_type.append('INVALID TRANSLATION')
+      mut_type.append('INVALID_TRANSLATION')
       mut_type = ','.join(sorted(mut_type))
-      result += [True,'PRESUMED NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,'','']
+      result += [True,'PRESUMED_NON-SYNONYMOUS',mut_type,ref_cds_nuc,var_cds_nuc,'','']
       return result
 
     ref_aa,var_aa,aa_position = reduce_match(str(ref_cds_aa),str(var_cds_aa))
@@ -442,9 +442,9 @@ class VariantAnnotator(object):
 
     if ref_stop==-1:
       if var_stop!=-1 and not v.startswith(r):
-        mut_type.append('PREMATURE STOP')
+        mut_type.append('PREMATURE_STOP')
       elif ref_cds_aa[-1]=='*' and var_cds_aa[-1]!='*':
-        mut_type.append('LOSS OF STOP')
+        mut_type.append('LOSS_OF_STOP')
 
     if len(r)==len(v):
       mut_type.append('SUBSTITUTION')
