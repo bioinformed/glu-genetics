@@ -12,82 +12,122 @@ __revision__  = '$Id$'
 import time
 import sys
 
-from   collections                  import defaultdict
-
-from   glu.lib.fileutils            import table_writer, table_reader, autofile, hyphen, map_reader
+from   glu.lib.fileutils            import table_reader
 from   glu.lib.progressbar          import progress_loop
 
-from   glu.lib.seqlib.edits         import reduce_match
-from   glu.lib.seqlib.intervaltree  import IntervalTree
+from   glu.lib.seqlib.vcf           import VCFReader, VCFWriter
 
 
 def build_segmodel(model,samples,phenofile=None):
-  phenomap = None
+  constraintmap = {}
+
   if phenofile:
     phenos = table_reader(options.phenos)
-    phenomap = {}
     for row in phenos:
       if len(row)>1 and row[0] and row[1]:
         sample           = row[0]
         constraint       = row[1]
         cost             = int(row[2] or 1) if len(row)>2 else 1
-        phenomap[sample] = constraint,cost
+        score            = int(row[3] or 0) if len(row)>3 else 0
+        constraintmap[sample] = constraint,cost,score
 
-  segmodel   = []
+  segmodel = []
+  maxcost  = 1
+  minscore = 0
 
   if model:
-    if phenomap is None:
-      phenomap = {}
-      for sample in samples:
-        code = sample[-1]
-        if code in 'ACU':
-          phenomap[sample] = code
+    phenomap = {}
+    for sample in samples:
+      code = sample[-1]
+      if code in 'ACU':
+        phenomap[sample] = code
 
-    if model=='rec':
-      cost = 1
+    if model=='aff2':
+      cost     = 0
+      score    = 0.99
+      minscore = 1
+      for sample,code in phenomap.items():
+        if code in 'AC':
+          constraintmap[sample] = 'VAR',cost,score
+
+    elif model=='rec':
+      cost  = 1
+      score = 0
       for sample,code in phenomap.items():
         if code=='A':
-          phenomap[sample] = 'HOM',cost
+          constraintmap[sample] = 'HOM',cost,score
         elif code=='C':
-          phenomap[sample] = 'VAR',cost
+          constraintmap[sample] = 'VAR',cost,score
         elif code=='U':
-          phenomap[sample] = 'REF',cost
+          constraintmap[sample] = 'REF',cost,score
 
     else:
-      cost = 1 if model!='domm1' else 0.999999
+      cost  = 1 if model!='domm1' else 0.999999
+      score = 0
 
       for sample,code in phenomap.items():
         if code in 'AC':
-          phenomap[sample] = 'VAR',cost
+          constraintmap[sample] = 'VAR',cost,score
         elif code=='U':
-          phenomap[sample] = 'REF',1
+          constraintmap[sample] = 'REF',1,score
 
-    segmodel = [ (i,)+phenomap[s] for i,s in enumerate(samples) if s in phenomap ]
+    segmodel = [ (i,)+constraintmap[s] for i,s in enumerate(samples) if s in constraintmap ]
 
-  return segmodel
+  return maxcost,minscore,segmodel
 
 
-def check_segmodel(segmodel,genos,maxfail=1):
-  fail = 0
-  for i,constraint,cost in segmodel:
+def check_segmodel(segmodel,genos):
+  maxcost,minscore,constraints = segmodel
+  cost = score = 0
+
+  for i,constraint,c_cost,c_score in constraints:
     g = genos[i]
-    if constraint=='VAR' and g not in ('0/1','1/0','1/1'):
-      fail += cost
-    elif constraint=='HOM' and g!='1/1':
-      fail += cost
-    elif constraint=='HET' and g not in ('0/1','1/0'):
-      fail += cost
-    elif constraint=='REF' and g!='0/0':
-      fail += cost
-    elif constraint=='NOTREF' and g=='0/0':
-      fail += cost
-    elif constraint=='MISS' and g!='./.':
-      fail += cost
 
-    if fail>=maxfail:
+    if g=='.':
+      a=b='.'
+    else:
+      a,b = g.split('/')
+
+    if constraint=='VAR':
+      match = a not in '0.' or b not in '0.'
+    elif constraint=='HOM':
+      match = a==b and a not in '0.'
+    elif constraint=='HET':
+      match = a!=b and a not in '0.' and b not in '0.'
+    elif constraint=='REF':
+      match = a==b=='0'
+    elif constraint=='NOTREF':
+      match = a not in '.0' and b not in '.0'
+    elif constraint=='MISS':
+      match = a==b=='.'
+    elif constraint=='NOTMISS':
+      match = a!='.' and b!='.'
+    else:
+      raise ValueError('Unknown constraint: %s' % constraint)
+
+    if match:
+      score += c_score
+    else:
+      cost  += c_cost
+
+    if cost>=maxcost:
       return False
 
-  return True
+  return score>=minscore
+
+
+def build_infomap(v):
+  infomap = {}
+  for inf in v.info:
+    if '=' in inf:
+      key,value = inf.split('=',1)
+    else:
+      key,value = inf,''
+
+    infomap[key] = value
+
+  return infomap
+
 
 
 def option_parser():
@@ -111,6 +151,9 @@ def option_parser():
                       help='Mapping from individual ID to phenotype state')
   parser.add_argument('--model',   metavar='NAME', default='',
                       help='Segregation model (dom,rec)')
+  parser.add_argument('--maxrefvar', metavar='RATE', type=int, default=0,
+                      help='Maximum number of variant outgroup samples (unlimited=0, default)')
+
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output variant file')
   return parser
@@ -121,9 +164,21 @@ def main():
   options = parser.parse_args()
 
   filename = options.variants
-  variants = table_reader(filename,hyphen=sys.stdin)
-  out      = autofile(hyphen(options.output,sys.stdout),'w')
+  vcf      = VCFReader(options.variants,hyphen=sys.stdin,normalize_indels=False)
+  out      = VCFWriter(options.output, vcf.metadata, vcf.samples)
   model    = options.model.lower() if not options.phenos else 'custom'
+  segmodel = build_segmodel(model,vcf.samples,options.phenos)
+
+  if segmodel[2]:
+    print
+    print '-'*80
+    print 'MAX COST  =',segmodel[0]
+    print 'MIN SCORE =',segmodel[1]
+    print 'GENETIC MODEL CONSTRAINTS:'
+    for i,code,cost,score in segmodel[2]:
+      print '  %s: %s (cost=%f, score=%f)' % (vcf.samples[i],code,cost,score)
+    print '-'*80
+    print
 
   includefilter = set()
   for opts in options.includefilter or []:
@@ -133,74 +188,31 @@ def main():
   for opts in options.excludefilter or []:
     excludefilter |= set(o.strip().upper() for o in opts.split(','))
 
-  for row in variants:
-    if not row or row[0].startswith('##'):
-      out.write('\t'.join(row))
-      out.write('\n')
+  for v in vcf:
+    if options.includeid and not v.names:
       continue
 
-    elif row[0].startswith('#'):
-      out.write('\t'.join(row))
-      out.write('\n')
-      header = list(row)
-      header[0] = header[0][1:]
-
-      samples    = [ s.split('.')[0] for s in header[9:] ]
-      segmodel   = build_segmodel(model,samples,options.phenos)
-
-      if segmodel:
-        print
-        print '-'*80
-        print 'GENETIC MODEL CONSTRAINTS:'
-        for i,code,cost in segmodel:
-          print '  %s: %s (cost=%f)' % (samples[i],code,cost)
-        print '-'*80
-        print
-
+    if options.excludeid and v.names:
       continue
-
-    chrom = row[0]
-    end   = int(row[1])
-    start = end-1
-    names = row[2]
-
-    if names=='.':
-      names = []
-    else:
-      names = names.split(',')
-
-    if options.includeid and not names:
-      continue
-
-    if options.excludeid and names:
-      continue
-
-    ref   = row[3]
-    var   = row[4].split(',')[0]
-
-    filter = row[6]
-
-    if filter=='.':
-      filter = []
-    else:
-      filter = filter.split(';')
 
     if includefilter or excludefilter:
-      normfilter = set(f.upper() for f in filter)
+      normfilter = set(f.upper() for f in v.filter)
       if includefilter and len(normfilter&includefilter)!=len(includefilter):
         continue
 
       if excludefilter and (normfilter&excludefilter):
         continue
 
-    info = row[7].split(';')
-    genos = [ g.split(':')[0] for g in row[9:] ]
+    if options.maxrefvar>0:
+      info = build_infomap(v)
+      if int(info.get('REFVAR_OUTGROUP_COUNT',0))>options.maxrefvar:
+        continue
 
+    genos = [ g[0] for g in v.genos ]
     if not check_segmodel(segmodel,genos):
       continue
 
-    out.write('\t'.join(row))
-    out.write('\n')
+    out.write_locus(v)
 
 
 if __name__=='__main__':
