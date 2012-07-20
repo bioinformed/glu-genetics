@@ -15,8 +15,9 @@ from   operator                     import itemgetter
 import pysam
 
 from   glu.lib.utils                import unique
-from   glu.lib.fileutils            import list_reader, autofile, hyphen
+from   glu.lib.fileutils            import list_reader, autofile, hyphen, table_reader, table_writer
 from   glu.lib.progressbar          import progress_loop
+from   glu.lib.recordtype           import recordtype
 
 from   glu.lib.genedb.queries       import query_segdups, query_repeats
 
@@ -259,7 +260,7 @@ def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options):
 
   if kaviar:
     kinfo = kaviar.get(v.chrom,v.start) or []
-    ktext = [ stuff.replace(';',',') for chrom,loc,mallele,maf,allele,stuff in kinfo if allele in v.var ]
+    ktext = [ stuff.replace(';',',').replace(' ','_') for chrom,loc,mallele,maf,allele,stuff in kinfo if allele in v.var ]
 
     if ktext:
       v.filter.append('Kaviar')
@@ -365,7 +366,6 @@ def annotate_vcf(options):
   metadata.setdefault('FILTER',[])
   metadata.setdefault('INFO',[])
 
-  metadata['FILTER'].append('##FILTER=<ID=PartiallyCalled,Description="Variant is not called for one or more samples">')
   metadata['FILTER'].append('##FILTER=<ID=Indel,Description="Variant is an insertion or deletion">')
   metadata['FILTER'].append('##FILTER=<ID=Intergenic,Description="Variant not in or near a gene">')
   metadata['FILTER'].append('##FILTER=<ID=NPF,Description="Variant is not predicted to alter a protein">')
@@ -420,6 +420,296 @@ def annotate_vcf(options):
     update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options)
 
     out.write_locus(v)
+
+
+def update_ion_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options):
+  new_info = []
+
+  if vs:
+    # FIXME: Order genes and evidence consistently
+    evidence   = list(vs.annotate(v.chrom, v.start, v.end, v.var, nsonly=False))
+    #v.names   = sorted(set(str(v) for e in evidence for v in e.varid_exact)|set(v.names))
+    cytoband   = sorted(set(e.cytoband    for e in evidence if e.cytoband))
+    genes      = sorted(set(e.gene.symbol for e in evidence if e.gene and e.gene.symbol))
+    geneids    = sorted(set(e.gene.geneid for e in evidence if e.gene and e.gene.geneid))
+    location   = sorted(set(e.intersect   for e in evidence if e.intersect))
+    function   = sorted(set(e.func_type or e.func_class  for e in evidence if e.func))
+    nsevidence = [ e for e in evidence if e.func ]
+    nsinfo     = ( '%s:%s:%s:%s' % (e.gene.symbol,e.func_type,e.details,aa_change(e))
+                   for e in nsevidence )
+    nsinfo     = list(unique(nsinfo))
+
+    segdups    = query_segdups(vs.con, v.chrom, v.start, v.end)
+    repeats    = query_repeats(vs.con, v.chrom, v.start, v.end)
+
+    if not genes:
+      v.Intergenic = 'Y'
+
+    if not nsevidence:
+      v.NPF = 'Y'
+
+    if cytoband:
+      v.CYTOBAND = ','.join(cytoband)
+
+    if genes:
+      v.GENE_NAME = ','.join(genes)
+
+    if geneids:
+      v.GENE_ID = ','.join(str(g) for g in geneids)
+
+    if location:
+      v.GENE_LOCATION = ','.join(location)
+
+    if function:
+      v.GENE_FUNCTION = ','.join(function)
+
+    if nsinfo:
+      v.GENE_FUNCTION_DETAILS = ','.join(nsinfo)
+
+    if segdups:
+      segdup_info = ('chr%s:%s-%s:%.2f' % (s.other_chrom,s.other_start,s.other_stop,s.matchFraction*100) for s in segdups)
+
+      v.SegDup = 'Y'
+      v.SEGDUP_COUNT = len(segdups)
+      v.SEGDUP_INFO  = ','.join(segdup_info)
+
+    if repeats:
+      repeat_info = ('%s:%s:%s' % (r.repeatName,r.repeatClass,r.repeatFamily) for r in repeats)
+
+      v.Repeat = 'Y'
+      v.REPEAT_COUNT = len(repeats)
+      v.REPEAT_INFO  = ','.join(repeat_info)
+
+  if cv:
+    cvinfo  = cv.score_and_classify(v.chrom,v.start,v.end,[v.ref,v.var])
+
+    if cvinfo.exact_vars:
+      if 'tgp' in cvinfo.exact_vars:
+        v.TGP = 'Y'
+
+      vars = set(v.replace('dbsnp:','rs') for v in cvinfo.exact_vars)
+      vars.discard('tgp')
+
+      v.VAR_NAME = ','.join(sorted(vars))
+
+    if cvinfo.exact_vars or cvinfo.common_score>0:
+      v.COMMON_SCORE = '%.2f' % cvinfo.common_score
+
+    if cvinfo.function_info:
+      v.FUNCTION_INFO = ','.join(cvinfo.function_info)
+
+    if cvinfo.inexact_vars:
+      v.INEXACT_VARIANTS = ','.join(sorted(set(cvinfo.inexact_vars)))
+
+    if cvinfo.common_score>options.commonscore:
+      v.Common = 'Y'
+
+  if esp:
+    chrom = v.chrom
+    vars  = set(v.var)
+    if chrom.startswith('chr'):
+      chrom = chrom[3:]
+
+    try:
+      esp_info = esp.fetch(chrom,v.start,v.end)
+      esp_info = [ e for e in esp_info if e.start==v.start and e.end==v.end and vars.intersection(e.var) ]
+    except ValueError:
+      esp_info = None
+
+    if esp_info:
+      gtc = maf_ea = maf_aa = 0
+
+      for einfo in esp_info:
+        infomap  = make_infomap(einfo.info)
+        if 'MAF' in infomap:
+          mafs     = map(float,infomap['MAF'].split(','))
+          maf_ea   = max(maf_ea,mafs[0]/100)
+          maf_aa   = max(maf_aa,mafs[1]/100)
+
+        if 'GTC' in infomap:
+          gtcs     = map(int,infomap['GTC'].split(','))
+          gtc      = max(gtc,gtcs[0]+gtcs[1])
+
+      maf = max(maf_ea,maf_aa)
+
+      v.ESP = 'Y'
+      if maf>options.commonscore:
+        v.ESPCommon = 'Y'
+
+      v.ESP_COUNT  = gtc
+      v.ESP_MAF_EA = '%.4f' % maf_ea
+      v.ESP_MAF_AA = '%.4f' % maf_aa
+
+  if kaviar:
+    kinfo = kaviar.get(v.chrom,v.start) or []
+    ktext = [ stuff.replace(';',',').replace(' ','_') for chrom,loc,mallele,maf,allele,stuff in kinfo if allele in v.var ]
+
+    if ktext:
+      v.Kaviar = 'Y'
+
+      mallele = kinfo[0][2]
+      maf     = kinfo[0][3]
+
+      if mallele and mallele in v.var:
+        v.KAVIAR_MAF = '%.2f' % maf
+
+        if maf>options.commonscore:
+          v.KaviarCommon = 'Y'
+
+      v.KAVIAR_NAMES = ','.join(ktext)
+
+
+  if refvars:
+    ingroup,outgroup = refvars.get(v.chrom,v.start,v.end,v.var) if refvars else ([],[])
+
+    v.REFVAR_INGROUP_COUNT  = len(ingroup)
+    v.REFVAR_OUTGROUP_COUNT = len(outgroup)
+
+    if ingroup:
+      v.REFVAR_INGROUP_NAMES = ','.join(ingroup)
+
+    if outgroup:
+      v.RefVar = 'Y'
+      v.REFVAR_OUTGROUP_NAMES = ','.join(outgroup)
+
+  if vs and polyphen2 and v.end-v.start==1 and 'CDS' in location:
+    pmap  = {'A':0,'C':1,'G':2,'T':3}
+
+    try:
+      pvars = [ p.rstrip().split('\t') for p in polyphen2.fetch(v.chrom,v.start,v.end) ]
+    except ValueError:
+      pvars = None
+
+    if pvars:
+      hdivs = []
+      hvars = []
+
+      for a in [v.var]:
+        if a in pmap:
+          i = pmap[a]
+
+          hdiv = hvar = ''
+          for p in pvars:
+            hdiv += p[3][i]
+            hvar += p[4][i]
+
+          hdiv = polyphen2_code(hdiv)
+          hvar = polyphen2_code(hvar)
+        else:
+          hdiv = '.'
+          hvar = '.'
+
+        #assert hdiv!='r' and hvar!='r'
+
+        hdivs.append(hdiv)
+        hvars.append(hvar)
+
+      if hdivs.count('.')!=len(hdivs):
+        v.POLYPHEN2_HDIV = ','.join(hdivs)
+      if hvars.count('.')!=len(hvars):
+        v.POLYPHEN2_HVAR = ','.join(hvars)
+
+
+  if not v.ref or not v.var:
+    v.Indel = 'Y'
+
+  return v
+
+
+def annotate_ion(options):
+  vars     = table_reader(options.variants,sys.stdin)
+  header   = next(vars)
+
+  fields  = ['Chrom','Position','Ref','Variant']
+
+  try:
+    indices = [ header.index(f) for f in fields ]
+  except ValueError:
+    missing = ', '.join(f for f in fields if f not in header)
+    raise ValueError('Invalid IonTorrent Variant file. Missing headers: %s' % missing)
+
+  var_fields = itemgetter(*indices)
+
+  vs       = VariantAnnotator(options.genedb, options.reference)
+  cv       = CGFVariants(options.cgfvariants, options.reference) if options.cgfvariants else None
+  esp      = VCFReader(options.esp) if options.esp else None
+  polyphen2= pysam.Tabixfile(options.polyphen2) if options.polyphen2 else None
+
+  if options.kaviar:
+    references = list_reader(options.reference+'.fai')
+    kaviar     = kaviar_reader(options.kaviar)
+    kaviar     = OrderedReader(kaviar, references)
+  else:
+    kaviar     = None
+
+  refvars  = ReferenceVariants(options.refvars,options.refingroup) if options.refvars else None
+
+  filters = ['Indel','Intergenic','NPF','SegDup','Repeat']
+  info    = ['VAR_NAME','CYTOBAND','GENE_NAME','GENE_ID','GENE_LOCATION','GENE_FUNCTION',
+             'GENE_FUNCTION_DETAILS','SEGDUP_COUNT','SEGDUP_INFO','REPEAT_COUNT','REPEAT_INFO']
+
+  if cv:
+    filters += ['Common','TGP']
+    info    += ['COMMON_SCORE','FUNCTION_INFO','INEXACT_VARIANTS']
+
+
+  if esp:
+    filters += ['ESP', 'ESPCommon']
+    info    += ['ESP_COUNT','ESP_MAF_EA','ESP_MAF_AA']
+
+  if kaviar:
+    filters += ['Kaviar','KaviarCommon']
+    info    += ['KAVIAR_MAF','KAVIAR_NAMES']
+
+  if refvars:
+    filters += ['RefVar']
+    info    += ['REFVAR_INGROUP_COUNT','REFVAR_OUTGROUP_COUNT','REFVAR_INGROUP_NAMES','REFVAR_OUTGROUP_NAMES']
+
+  if polyphen2:
+    info    += ['POLYPHEN2_HDIV','POLYPHEN2_HVAR']
+
+  new_fields  = set(filters+info)
+  keep_fields = itemgetter( *(i for i,h in enumerate(header) if h and h not in new_fields ) )
+
+  new_fields  = filters+info
+  blanks      = ['']*len(new_fields)
+  keep_header = list(keep_fields(header))
+  keep_len    = len(keep_header)
+  new_header  = keep_header+filters+info
+  Var         = recordtype('Var', ['chrom','start','end','ref','var']+filters+info)
+  out         = table_writer(options.output,hyphen=sys.stdout)
+
+  out.writerow(new_header)
+
+
+  for rec in vars:
+    chrom,pos,ref,var = var_fields(rec)
+
+    pos   = int(pos)
+    start = pos-1
+    end   = pos
+
+    # Fix indels encoded in the absurd VCF-like manner
+    if ref and var and ref[0]==var[0]:
+      ref    = ref[1:]
+      var    = var[1:]
+      start += 1
+      end   += 1
+
+      rec[indices[1]] = pos+1
+      rec[indices[2]] = ref
+      rec[indices[3]] = var
+
+    v = Var( *([chrom,start,end,ref,var]+blanks) )
+    update_ion_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options)
+
+    new_rec = list(keep_fields(rec))
+    if len(new_rec)<keep_len:
+      new_rec += ['']*(keep_len-len(new_rec))
+
+    new_rec += list(v[5:])
+
+    out.writerow(new_rec)
 
 
 def valid_allele(a):
@@ -517,7 +807,7 @@ def option_parser():
   parser.add_argument('variants', help='Input variant file')
 
   parser.add_argument('-f', '--format',   metavar='NAME', default='VCF',
-                      help='File format (VCF)')
+                      help='File format (VCF, ION)')
   parser.add_argument('-g', '--genedb',   metavar='NAME',
                       help='Genedb genome annotation database name or file')
   parser.add_argument('-r', '--reference',   metavar='NAME', required=True,
@@ -546,8 +836,10 @@ def main():
   options = parser.parse_args()
   format  = options.format.upper()
 
-  if format=='VCF':  # *** VCF, SNPs only ***
+  if format=='VCF':  # *** VCF ***
     annotate_vcf(options)
+  if format=='ION':
+    annotate_ion(options)
   elif format=='MASTERVAR':
     annotate_mastervar(options)
   else:
