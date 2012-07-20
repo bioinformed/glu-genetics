@@ -52,9 +52,21 @@ def main():
   ex_known = np.zeros(n, dtype=int)
   ge_known = np.zeros(n, dtype=int)
 
-  variant_genos = set(['1/0','0/1','1/1'])
+  # Bloody double negatives
+  not_variant = set(['.','0','0/0','./0','0/.','./.'])
+
+  bad = set(['SegDup','Repeat'])
 
   for v in vcf:
+    #if bad.intersection(v.filter):
+    #  continue
+
+    #if 'SegDup' in v.filter or 'Repeat' in v.filter:
+    #  continue
+
+    #if 'SegDup' not in v.filter and 'Repeat' not in v.filter:
+    #  continue
+
     #if float(v.qual)<30:
     #  continue
 
@@ -66,7 +78,7 @@ def main():
     #if missing.sum()>n/2:
     #  continue
 
-    variant = np.fromiter( (g[0] in variant_genos for g in v.genos), dtype=bool, count=n )
+    variant = np.fromiter( (g[0] not in not_variant for g in v.genos), dtype=bool, count=n )
 
     if not variant.sum():
       continue
@@ -80,7 +92,7 @@ def main():
 
       infomap[key] = value
 
-    if not v.names and int(infomap.get('REFVAR_OUTGROUP_COUNT',0))>50:
+    if not v.names and int(infomap.get('REFVAR_OUTGROUP_COUNT',0))>80:
       continue
 
     if v.names:
