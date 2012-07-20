@@ -71,7 +71,7 @@ def read_features(filename,merge=True,pad=0):
 
     if pad:
       start -= pad
-      end   -= pad
+      end   += pad
 
     features[contig].append( (start,end,name) )
 
