@@ -10,8 +10,6 @@ __revision__  = '$Id$'
 
 import sys
 
-from   operator                     import itemgetter
-
 from   glu.lib.utils                import unique
 from   glu.lib.fileutils            import table_writer, table_reader, autofile, hyphen
 from   glu.lib.progressbar          import progress_loop
