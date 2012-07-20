@@ -12,7 +12,7 @@ __revision__  = '$Id$'
 import sys
 
 from   collections           import deque
-from   operator              import attrgetter, itemgetter
+from   operator              import attrgetter
 from   itertools             import groupby, imap, izip
 
 import pysam
