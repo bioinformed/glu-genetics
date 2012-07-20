@@ -76,14 +76,15 @@ def write_sequence(sequences, filename, outformat=None):
 
 def sequence_writer(filename, outformat=None):
   outformat = outformat or guess_outformat(filename) or 'fasta'
+
+  if outformat.endswith('.gz'):
+    outformat = outformat[:-3]
+
   outformat = FORMAT_REMAP.get(outformat,outformat)
   filename  = parse_augmented_filename(filename, {})
   outfile   = autofile(hyphen(filename,sys.stdout),'wb')
 
-  try:
-    return SeqIO._FormatToWriter[outformat](outfile)
-  finally:
-    outfile.close()
+  return SeqIO._FormatToWriter[outformat](outfile)
 
 
 def read_sequence(filename, informat=None):
@@ -95,6 +96,13 @@ def read_sequence(filename, informat=None):
     raise ValueError('Input format must be specified for filename %s' % filename)
 
   return SeqIO.parse(autofile(filename,'rb'), informat)
+
+
+def guess_sequence_format(filename, informat=None):
+  informat = informat or guess_informat(filename)
+  informat = FORMAT_REMAP.get(informat,informat)
+  filename = parse_augmented_filename(filename, {})
+  return format,filename
 
 
 def trim_quality(seq,q):
