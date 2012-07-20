@@ -14,15 +14,17 @@ import numpy as np
 import scipy
 import scipy.stats
 
-from   itertools            import groupby
-from   operator             import itemgetter,attrgetter
+from   itertools                 import groupby
+from   operator                  import itemgetter,attrgetter
 
-from   collections          import namedtuple
+from   collections               import namedtuple
 
-from   glu.lib.fileutils    import table_reader, table_writer
+from   glu.lib.fileutils         import table_reader, table_writer
 
-from   glu.modules.cnv.gdat import GDATFile, get_gcmodel, gc_correct
-from   glu.modules.cnv.plot import plot_chromosome
+from   glu.modules.cnv.gdat      import GDATFile, get_gcmodel, gc_correct
+from   glu.modules.cnv.plot      import plot_chromosome
+
+from   glu.lib.genolib.transform import GenoTransform
 
 
 def option_parser():
@@ -43,6 +45,10 @@ def option_parser():
                                       help='Plot name template (default={GDAT}_{ASSAY}_chr{CHROMOSOME}.png)')
   parser.add_argument('--title',      metavar='VAL', default='Intensity plot of {GDAT}:{ASSAY} chr{CHROMOSOME}',
                                       help="Plot name template (default='Intensity plot of {GDAT}:{ASSAY} chr{CHROMOSOME}')")
+  parser.add_argument('--includesamples', metavar='FILE', action='append',
+                                      help='List of samples to include, all others will be skipped')
+  parser.add_argument('--excludesamples', metavar='FILE', action='append',
+                                      help='List of samples to exclude, only samples not present will be kept')
 
   return parser
 
@@ -70,7 +76,21 @@ def main():
   if not chromosomes:
     chromosomes = sorted(c for c in chrom_index if c)
 
+  transform = GenoTransform.from_object(options)
+
+  if transform is not None:
+    include  = transform.samples.include
+    exclude  = transform.samples.exclude
+  else:
+    include  = exclude = None
+
   for offset,assay in enumerate(gdat.samples):
+    if include is not None and assay not in include:
+      continue
+
+    if exclude is not None and assay in exclude:
+      continue
+
     print 'GDAT:',gdatname,assay
     assay_id,genos,lrr,baf  = gdat.cnv_data(offset, raw=options.signal.lower()=='raw')
     mask     = np.isfinite(lrr)&(lrr>=-2)&(lrr<=2)

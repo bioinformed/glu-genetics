@@ -27,6 +27,9 @@ from   glu.modules.cnv.gdat      import GDATIndex, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot      import plot_chromosome
 from   glu.modules.cnv.normalize import quantile
 
+from   glu.lib.genolib.transform import GenoTransform
+
+
 Event = recordtype('Event', 'chrom start stop fields lrr baf baf_model state pmosaic')
 
 
@@ -135,7 +138,10 @@ def fit_gmm4(k,x,wnoise=0.02):
 
   mix = mixture.MixtureModel(len(dists), weights, dists)
 
-  post,logL = mix.EM(dataset, 100, delta=0.001, silent=True)
+  try:
+    post,logL = mix.EM(dataset, 100, delta=0.001, silent=True)
+  except mixture.ConvergenceFailureEM:
+    return None
 
   w     = np.array(mix.pi,                      dtype=float)
   mu    = np.array([het.mu    for het in hets], dtype=float)
@@ -171,6 +177,10 @@ def fit_gmm_baf(baf,max_baf=2):
 
   t0        = time.time()
   fits      = [ fit_gmm4(c,baf) for c in range(0,max_baf+1) ]
+
+  if None in fits:
+    return None
+
   AIC       = np.array([ (20*c-2*f[0]) for c,f in enumerate(fits) ], dtype=float)
   best      = AIC.argmin()
 
@@ -462,6 +472,11 @@ def option_parser():
                                       help='Segment start index column name (default=SEG_START)')
   parser.add_argument('--segstop',    metavar='COLUMN', default='SEG_STOP',
                                       help='Segment stop index column name (default=SEG_STOP)')
+  parser.add_argument('--includesamples', metavar='FILE', action='append',
+                                      help='List of samples to include, all others will be skipped')
+  parser.add_argument('--excludesamples', metavar='FILE', action='append',
+                                      help='List of samples to exclude, only samples not present will be kept')
+
   table_options(parser)
 
   return parser
@@ -497,7 +512,21 @@ def main():
   if out:
     out.writerow(header)
 
+  transform = GenoTransform.from_object(options)
+
+  if transform is not None:
+    include  = transform.samples.include
+    exclude  = transform.samples.exclude
+  else:
+    include  = exclude = None
+
   for assay,assay_events in groupby(events,key=attrgetter(options.assayid)):
+    if include is not None and assay not in include:
+      continue
+
+    if exclude is not None and assay in exclude:
+      continue
+
     assay_events = list(assay_events)
 
     locations  = list(indexfile.get(assay))

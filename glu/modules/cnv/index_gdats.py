@@ -34,6 +34,9 @@ def main():
     except IOError:
       print 'Unable to open GDAT file: %s' % filename
       continue
+    except ValueError:
+      print 'Invalid GDAT file: %s' % filename
+      continue
 
     manifest = gdat.attrs['ManifestName']
 

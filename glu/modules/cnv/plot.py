@@ -114,9 +114,12 @@ def plot_chromosome(filename, pos, lrr, baf, genos=None, title=None, events=None
     miss = genos=='  '
     homs = (~miss)&(~hets)
 
-    sec.scatter(pos[homs], baf[homs], c='darkred', marker='o', s=2, linewidths=0, alpha=0.8, zorder=4)
-    sec.scatter(pos[hets], baf[hets], c='red',     marker='o', s=2, linewidths=0, alpha=0.5, zorder=5)
-    sec.scatter(pos[miss], baf[miss], c='red',     marker='o', s=2, linewidths=0, alpha=0.8, zorder=6)
+    if homs.sum():
+      sec.scatter(pos[homs], baf[homs], c='darkred', marker='o', s=2, linewidths=0, alpha=0.8, zorder=4)
+    if hets.sum():
+      sec.scatter(pos[hets], baf[hets], c='red',     marker='o', s=2, linewidths=0, alpha=0.5, zorder=5)
+    if miss.sum():
+      sec.scatter(pos[miss], baf[miss], c='red',     marker='o', s=2, linewidths=0, alpha=0.8, zorder=6)
 
   main.set_xlabel('Chromosome Location (Mbps)')
   main.set_ylabel('Log Intensity Ratio (LRR)')

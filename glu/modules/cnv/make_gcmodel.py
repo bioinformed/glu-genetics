@@ -126,6 +126,10 @@ def main():
   attrs['TermCount']    = n
 
   for chrom,chrom_snps in groupby(allsnps, itemgetter(1)):
+    if not chrom:
+      sys.stderr.write('Skipping region: %s\n' % chrom)
+      continue
+
     try:
       seq = reference.fetch('chr'+chrom).upper()
     except IndexError:

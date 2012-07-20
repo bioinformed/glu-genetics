@@ -1,4 +1,6 @@
+import os
 import sys
+
 import h5py
 import sqlite3
 import numpy as np
@@ -88,7 +90,7 @@ class GDATFile(object):
 
     if self.format_found!='gdat':
       raise ValueError('Input file "%s" does not appear to be in %s format.  Found %s.' \
-                          % (namefile(filename),format,self.format_found))
+                          % (namefile(filename),'gdat',self.format_found))
 
     if self.gdat_version!=1:
       raise ValueError('Unknown gdat file version: %s' % self.gdat_version)
@@ -214,6 +216,9 @@ class GDATFile(object):
 
       yield sample,snps,genos[i],sample_lrr,sample_baf
 
+  def __contains__(self,item):
+    return item in self.gdat
+
   def __getitem__(self,item):
     return self.gdat[item]
 
@@ -225,7 +230,7 @@ class GDATFile(object):
 
 
 def gdat_decoder(table,rows):
-  if 'SCALE' not in table.attrs:
+  if not hasattr(table,'attrs') or 'SCALE' not in table.attrs:
     return rows
 
   def _decoder(table,rows):
@@ -238,6 +243,11 @@ def gdat_decoder(table,rows):
 
 
 def block_iter(table):
+  if not hasattr(table,'chunks'):
+    for row in table:
+      yield row
+    return
+
   chunksize = table.chunks[0]
   start     = 0
   last      = len(table)
@@ -333,7 +343,7 @@ def sqlite_magic(con):
   con.execute('PRAGMA journal_mode=OFF;')
   con.execute('PRAGMA count_changes=OFF;')
   con.execute('PRAGMA cache_size=200000;')
-  con.execute('PRAGMA default_cache_size=200000;')
+  #con.execute('PRAGMA default_cache_size=200000;')
 
 
 class GDATIndex(object):
@@ -410,7 +420,7 @@ class GDATIndex(object):
   def index(self,gdat):
     self.clear_index(gdat)
 
-    filename = gdat.filename
+    filename = os.path.abspath(gdat.filename)
     manifest = gdat.attrs['ManifestName']
     rows = [ (name,filename,i,manifest) for i,name in enumerate(gdat.samples) ]
 
@@ -425,11 +435,16 @@ def get_gcmodel(filename,chrom_indices,chrom_means=False,ploidy=True,extra_terms
 
   try:
     gc       = gcdata['GC'][:].T
+    gcmask   = np.isfinite(gc.sum(axis=1))
+
+    #import scipy
+    #r2       = scipy.corrcoef(gc[gcmask],rowvar=0)
+    #from   glu.lib.fileutils import table_writer
+    #table_writer('gc_cov.txt').writerows(r2)
 
     #small    = np.array([5,6,7,8,14,15,16,17],dtype=int)
     #gc       = gc[:,small]
 
-    gcmask   = np.isfinite(gc.sum(axis=1))
     gcmeans  = gc[gcmask].mean(axis=0)
     gc      -= gcmeans.reshape(1,-1)
     n        = len(gc)

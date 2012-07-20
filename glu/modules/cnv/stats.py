@@ -13,6 +13,7 @@ import os
 import sys
 
 from   math                 import modf
+from   itertools            import repeat
 
 import numpy       as np
 import scipy.stats as stats
@@ -56,9 +57,18 @@ def main():
   samples   = gdat.samples
   BAF_orig  = gdat['BAF']
   LRR_orig  = gdat['LRR']
-  BAF_norm  = gdat['BAF_QN']
-  LRR_norm  = gdat['LRR_QN']
   genotypes = gdat['Genotype']
+
+  if 'LRR_QN' in gdat:
+    BAF_norm  = gdat['BAF_QN']
+    LRR_norm  = gdat['LRR_QN']
+  else:
+    BAF_empty    = np.empty( (BAF_orig.shape[1],), dtype=float )
+    LRR_empty    = np.empty( (LRR_orig.shape[1],), dtype=float )
+    BAF_empty[:] = np.nan
+    LRR_empty[:] = np.nan
+    BAF_norm     = repeat(BAF_empty)
+    LRR_norm     = repeat(LRR_empty)
 
   print 'samples=%d, SNPs=%d' % (n,s)
 
