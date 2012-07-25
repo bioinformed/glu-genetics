@@ -225,6 +225,9 @@ class GDATFile(object):
   def __len__(self):
     return self.sample_count
 
+  def flush(self):
+    self.gdat.flush()
+
   def close(self):
     self.gdat.close()
 
@@ -243,21 +246,25 @@ def gdat_decoder(table,rows):
 
 
 def block_iter(table):
-  if not hasattr(table,'chunks'):
+  chunksize = table.chunks[0] if getattr(table,'chunks',0) and table.chunks else 1
+
+  assert chunksize>=0
+
+  # Fall back to normal iteration
+  if chunksize==1:
     for row in table:
       yield row
-    return
 
-  chunksize = table.chunks[0]
-  start     = 0
-  last      = len(table)
-
-  while start<last:
-    stop  = min(last,start+chunksize)
-    chunk = table[start:stop]
-    for row in chunk:
-      yield row
-    start = stop
+  # Explicitly read each chunk to avoid caching issues
+  else:
+    start     = 0
+    last      = len(table)
+    while start<last:
+      stop  = min(last,start+chunksize)
+      chunk = table[start:stop]
+      for row in chunk:
+        yield row
+      start = stop
 
 
 def parallel_gdat_iter(*tables):
@@ -266,15 +273,15 @@ def parallel_gdat_iter(*tables):
 
 
 class BatchTableWriter(object):
-  def __init__(self,table):
+  def __init__(self,table,start=0):
     self.table     = table
-    self.batchsize = table.chunks[0]
+    self.batchsize = table.chunks[0] if table.chunks else 1
     self.scale     = table.attrs['SCALE']
     self.nan       = table.attrs['NAN']
     self.min       = table.attrs['MIN']
     self.max       = table.attrs['MAX']
     self.batch     = []
-    self.index     = 0
+    self.index     = start
 
   def write(self, value):
     batch = self.batch
@@ -291,9 +298,11 @@ class BatchTableWriter(object):
 
     table = self.table
 
+    #print '    Writing chunk  %d (size=%d)...' % (self.index//self.batchsize+1,self.batchsize)
+
     if len(batch)==1:
       chunk             = gdat_encode_f(batch[0], self.scale, self.min, self.max, self.nan)
-      table[self.index] = chunk
+      table[self.index] = np.array(chunk, dtype=table.dtype)
       self.index       += 1
     else:
       chunk             = [ gdat_encode_f(c, self.scale, self.min, self.max, self.nan) for c in batch ]
@@ -306,6 +315,9 @@ class BatchTableWriter(object):
 
       self.index        = end
 
+    #print '    Flushing chunk %d (size=%d)...' % (self.index//self.batchsize,self.batchsize)
+
+    table.file.flush()
     batch[:] = []
 
   def close(self):
@@ -313,29 +325,47 @@ class BatchTableWriter(object):
     self.table = None
 
 
-def create_gdat_qn(gdatobject,s,n):
-  comp         = dict(compression='gzip',compression_opts=5)
+def create_gdat_cluster_model(gdatobject):
+  s       = gdatobject.snp_count
+  gdat    = gdatobject.gdat
+  gdat.require_dataset('CLUSTER_R', (3,s), np.float64, fillvalue=np.nan)
+  gdat.require_dataset('CLUSTER_T', (3,s), np.float64, fillvalue=np.nan)
+
+
+def create_gdat_qn(gdatobject):
+  n            = gdatobject.sample_count
+  s            = gdatobject.snp_count
+
+  #comp        = dict(compression='gzip',compression_opts=5)
   chunks       = (1,s)
+  comp         = {}
+  #chunks       = None
   shape        = (n,s)
   shuffle      = False
 
   gdat         = gdatobject.gdat
+  #BAF_QN       = gdat.require_dataset('BAF_QN', shape, BAF_TYPE,
+  #                                    maxshape=shape,chunks=chunks,shuffle=shuffle,
+  #                                    fillvalue=BAF_NAN,**comp)
   BAF_QN       = gdat.require_dataset('BAF_QN', shape, BAF_TYPE,
-                                      maxshape=shape,chunks=chunks,shuffle=shuffle,
-                                      fillvalue=BAF_NAN,**comp)
+                                      shuffle=shuffle,fillvalue=BAF_NAN,**comp)
   BAF_QN.attrs['SCALE'] = BAF_SCALE
   BAF_QN.attrs['NAN']   = BAF_NAN
   BAF_QN.attrs['MIN']   = BAF_MIN
   BAF_QN.attrs['MAX']   = BAF_MAX
 
+  #LRR_QN       = gdat.require_dataset('LRR_QN', shape, LRR_TYPE,
+  #                                    maxshape=shape,chunks=chunks,shuffle=shuffle,
+  #                                    fillvalue=LRR_NAN,**comp)
   LRR_QN       = gdat.require_dataset('LRR_QN', shape, LRR_TYPE,
-                                      maxshape=shape,chunks=chunks,shuffle=shuffle,
-                                      fillvalue=LRR_NAN,**comp)
+                                      shuffle=shuffle,fillvalue=LRR_NAN,**comp)
 
   LRR_QN.attrs['SCALE'] = LRR_SCALE
   LRR_QN.attrs['NAN']   = LRR_NAN
   LRR_QN.attrs['MIN']   = LRR_MIN
   LRR_QN.attrs['MAX']   = LRR_MAX
+
+  gdat.flush()
 
 
 def sqlite_magic(con):

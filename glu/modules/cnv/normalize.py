@@ -10,6 +10,7 @@ __revision__  = '$Id$'
 
 
 import os
+import sys
 
 from   math                      import modf
 
@@ -18,7 +19,8 @@ import numpy as np
 from   glu.lib.glm               import Linear
 from   glu.lib.progressbar       import progress_loop
 
-from   glu.modules.cnv.gdat      import GDATFile, BatchTableWriter, parallel_gdat_iter, create_gdat_qn, get_gcmodel
+from   glu.modules.cnv.gdat      import GDATFile, BatchTableWriter, parallel_gdat_iter, \
+                                        create_gdat_qn, create_gdat_cluster_model, get_gcmodel
 
 from   glu.lib.genolib.transform import _intersect_options, _union_options
 
@@ -295,6 +297,7 @@ def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='line
   #lm0 = Linear(r_geno_fit, design_fit0)
   #lm1 = Linear(r_geno_fit, design_fit1)
   #lm2 = Linear(r_geno_fit, design_fit2)
+
   lm  = Linear(r_geno_fit, design_fit)
 
   #lm0.fit()
@@ -332,64 +335,10 @@ def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='line
   return r
 
 
-def option_parser():
-  from glu.lib.glu_argparse import GLUArgumentParser
-
-  parser = GLUArgumentParser(description=__abstract__)
-
-  parser.add_argument('gdat',                         help='Input GDAT file')
-
-  parser.add_argument('--includemodel', metavar='FILE', action='append',
-                    help='List of samples to use to recalibrate model')
-  parser.add_argument('--excludemodel', metavar='FILE', action='append',
-                    help='List of samples not to use to recalibrate model')
-  parser.add_argument('--prenorm',    metavar='NAME', default='quantile', choices=['none','quantile'],
-                         help='Intensity pre-normalization: none or quantile (default)')
-  parser.add_argument('--rmodel',     metavar='NAME', default='quadratic', choices=['linear','quadratic'],
-                         help='Intensity correction model: linear or quadratic (default)')
-  parser.add_argument('--gcmodel',    metavar='GCM',  help='GC model file to use')
-  parser.add_argument('--gcmodeldir', metavar='DIR',  help='GC models directory')
-  parser.add_argument('--maxmissing', metavar='RATE', default=0.05, type=float,
-                         help='Maximum missing rate for assays to estimate cluster centers (default=0.05)')
-  parser.add_argument('--minqual',    metavar='N', default=0.01, type=float,
-                         help='Minimum genotype quality score (GC) (default=0.01)')
-  parser.add_argument('--minqqual',    metavar='Q', default=0, type=float,
-                         help='Minimum genotype quality score (GC) quantile (default=0, disabled)')
-  parser.add_argument('-P', '--progress', action='store_true',
-                         help='Show analysis progress bar, if possible')
-
-  return parser
-
-
-def main():
-  parser    = option_parser()
-  options   = parser.parse_args()
-
-  if options.rmodel=='linear':
-    extra_terms = 2
-  elif options.rmodel=='quadratic':
-    extra_terms = 4
-  else:
-    raise ValueError('Invalid intensity correction model')
-
-  gccorrect = bool(options.gcmodel or options.gcmodeldir)
-
-  gdat      = GDATFile(options.gdat,'r+')
+def pass1(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB):
   n         = gdat.sample_count
   s         = gdat.snp_count
   qnorm     = options.prenorm=='quantile'
-
-  create_gdat_qn(gdat,s,n)
-
-  if gccorrect:
-    manifest = os.path.splitext(os.path.basename(gdat.attrs['ManifestName']))[0]
-    print 'Loading GC/CpG model for %s...' % manifest
-    filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
-
-    design,dmask = get_gcmodel(filename, gdat.chromosome_index, ploidy=False, extra_terms=extra_terms)
-  else:
-    design  = np.ones( (s,1+extra_terms), dtype=float )
-    dmask   = design[:,0]==1
 
   X         = gdat['X']
   Y         = gdat['Y']
@@ -399,23 +348,31 @@ def main():
 
   print 'SNPs=%d, samples=%d' % (s,n)
 
-  np.set_printoptions(linewidth=120,precision=2,suppress=True)
-  np.seterr(all='ignore')
+  if not options.force and 'CLUSTER_R' in gdat and 'CLUSTER_T' in gdat:
+    r = gdat['CLUSTER_R']
+
+    r_AA[:] = r[0]
+    r_AB[:] = r[1]
+    r_BB[:] = r[2]
+
+    t = gdat['CLUSTER_T']
+
+    t_AA[:] = t[0]
+    t_AB[:] = t[1]
+    t_BB[:] = t[2]
+
+    print 'PASS 1: Read existing cluster data... (skipped re-estimation)'
+
+    return
 
   print 'PASS 1: Re-estimate cluster centers...'
 
   include = _intersect_options(options.includemodel or [])
-  exclude = _union_options(options.excludemodel or [])
+  exclude =     _union_options(options.excludemodel or [])
 
-  n_AA        = np.zeros(s, dtype=int  )
-  r_AA        = np.zeros(s, dtype=float)
-  t_AA        = np.zeros(s, dtype=float)
-  n_AB        = np.zeros(s, dtype=int  )
-  r_AB        = np.zeros(s, dtype=float)
-  t_AB        = np.zeros(s, dtype=float)
-  n_BB        = np.zeros(s, dtype=int  )
-  r_BB        = np.zeros(s, dtype=float)
-  t_BB        = np.zeros(s, dtype=float)
+  n_AA        = np.zeros(s, dtype=int)
+  n_AB        = np.zeros(s, dtype=int)
+  n_BB        = np.zeros(s, dtype=int)
 
   skipped_missing = 0
   skipped_exclude = 0
@@ -482,38 +439,147 @@ def main():
   print '  ... skipped %d samples (%.2f%%) for missing rate > %.2f%%' % (skipped_missing,skipped_missing/n*100,options.maxmissing*100)
   print '  ... removing %d loci with nonsensical allelic ratio (theta)' % bad.sum()
 
+  try:
+    create_gdat_cluster_model(gdat)
+
+    r = gdat['CLUSTER_R']
+
+    r[0] = r_AA
+    r[1] = r_AB
+    r[2] = r_BB
+
+    t = gdat['CLUSTER_T']
+
+    t[0] = t_AA
+    t[1] = t_AB
+    t[2] = t_BB
+
+  finally:
+    gdat.flush()
+
+
+def pass2(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB):
   print 'PASS 2: Updating LRR and BAF...'
+
+  n         = gdat.sample_count
+  qnorm     = options.prenorm=='quantile'
+
+  X         = gdat['X']
+  Y         = gdat['Y']
+  samples   = gdat['Samples']
+  genotypes = gdat['Genotype']
+
+  create_gdat_qn(gdat)
 
   LRR_QN      = BatchTableWriter(gdat['LRR_QN'])
   BAF_QN      = BatchTableWriter(gdat['BAF_QN'])
 
-  pass2       = enumerate(parallel_gdat_iter(samples,X,Y,genotypes))
+  try:
+    pass2       = enumerate(parallel_gdat_iter(samples,X,Y,genotypes))
 
-  if options.progress:
-    pass2     = progress_loop(pass2, length=n, units='samples', label='PASS 2: ')
+    if options.progress:
+      pass2     = progress_loop(pass2, length=n, units='samples', label='PASS 2: ')
 
-  for i,(sample,x,y,genos) in pass2:
-    if not options.progress:
-      print '  Sample %5d / %d: %s' % (i+1,n,sample)
+    for i,(sample,x,y,genos) in pass2:
+      if not options.progress:
+        print '  Sample %5d / %d: %s' % (i+1,n,sample)
 
-    if qnorm:
-      x,y     = quantile_normalize(x,y,max_threshold=1.5)
+      if qnorm:
+        x,y     = quantile_normalize(x,y,max_threshold=1.5)
 
-    t         = (2/np.pi)*np.arctan2(y,x)
+      t         = (2/np.pi)*np.arctan2(y,x)
 
-    r         = regress_intensity(x,y,design,dmask,genos,r_AA,r_AB,r_BB,rmodel=options.rmodel,thin=7)
+      r         = regress_intensity(x,y,design,dmask,genos,r_AA,r_AB,r_BB,rmodel=options.rmodel,thin=7)
 
-    lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
+      lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
 
-    mask      = np.isfinite(lrr)&np.isfinite(baf)
-    print '  ... sigmaLRR=%.2f, sigmaBAFhet=%.3f' % (lrr[mask].std(),baf[mask&(genos=='AB')].std())
+      mask      = np.isfinite(lrr)&np.isfinite(baf)
+      print '  ... sigmaLRR=%.2f, sigmaBAFhet=%.3f' % (lrr[mask].std(),baf[mask&(genos=='AB')].std())
 
-    LRR_QN.write(lrr)
-    BAF_QN.write(baf)
+      LRR_QN.write(lrr)
+      BAF_QN.write(baf)
 
-  # Close and flush re-normalize tables
-  LRR_QN.close()
-  BAF_QN.close()
+  finally:
+    # Close and flush re-normalize tables
+    LRR_QN.close()
+    BAF_QN.close()
+    sys.stderr.flush()
+    sys.stdout.flush()
+
+
+def option_parser():
+  from glu.lib.glu_argparse import GLUArgumentParser
+
+  parser = GLUArgumentParser(description=__abstract__)
+
+  parser.add_argument('gdat',                         help='Input GDAT file')
+
+  parser.add_argument('--includemodel', metavar='FILE', action='append',
+                    help='List of samples to use to recalibrate model')
+  parser.add_argument('--excludemodel', metavar='FILE', action='append',
+                    help='List of samples not to use to recalibrate model')
+  parser.add_argument('--prenorm',    metavar='NAME', default='quantile', choices=['none','quantile'],
+                         help='Intensity pre-normalization: none or quantile (default)')
+  parser.add_argument('--rmodel',     metavar='NAME', default='quadratic', choices=['linear','quadratic'],
+                         help='Intensity correction model: linear or quadratic (default)')
+  parser.add_argument('--gcmodel',    metavar='GCM',  help='GC model file to use')
+  parser.add_argument('--gcmodeldir', metavar='DIR',  help='GC models directory')
+  parser.add_argument('--maxmissing', metavar='RATE', default=0.05, type=float,
+                         help='Maximum missing rate for assays to estimate cluster centers (default=0.05)')
+  parser.add_argument('--minqual',    metavar='N', default=0.01, type=float,
+                         help='Minimum genotype quality score (GC) (default=0.01)')
+  parser.add_argument('--minqqual',    metavar='Q', default=0, type=float,
+                         help='Minimum genotype quality score (GC) quantile (default=0, disabled)')
+  parser.add_argument('-f', '--force', action='store_true',
+                         help='Force cluster re-estimation')
+  parser.add_argument('-P', '--progress', action='store_true',
+                         help='Show analysis progress bar, if possible')
+
+  return parser
+
+
+def main():
+  parser    = option_parser()
+  options   = parser.parse_args()
+
+  if options.rmodel=='linear':
+    extra_terms = 2
+  elif options.rmodel=='quadratic':
+    extra_terms = 4
+  else:
+    raise ValueError('Invalid intensity correction model')
+
+  np.set_printoptions(linewidth=120,precision=2,suppress=True)
+  np.seterr(all='ignore')
+
+  gdat      = GDATFile(options.gdat,'r+')
+  s         = gdat.snp_count
+
+  r_AA      = np.zeros(s, dtype=float)
+  t_AA      = np.zeros(s, dtype=float)
+  r_AB      = np.zeros(s, dtype=float)
+  t_AB      = np.zeros(s, dtype=float)
+  r_BB      = np.zeros(s, dtype=float)
+  t_BB      = np.zeros(s, dtype=float)
+
+  gccorrect = bool(options.gcmodel or options.gcmodeldir)
+
+  if gccorrect:
+    manifest = os.path.splitext(os.path.basename(gdat.attrs['ManifestName']))[0]
+    print 'Loading GC/CpG model for %s...' % manifest
+    filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
+
+    design,dmask = get_gcmodel(filename, gdat.chromosome_index, ploidy=False, extra_terms=extra_terms)
+  else:
+    design  = np.ones( (s,1+extra_terms), dtype=float )
+    dmask   = design[:,0]==1
+
+  try:
+    pass1(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB)
+    pass2(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB)
+
+  finally:
+    gdat.close()
 
 
 if __name__ == '__main__':
