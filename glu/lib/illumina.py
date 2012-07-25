@@ -11,7 +11,7 @@ import csv
 import struct
 
 from   glu.lib.utils         import chunk, namedtuple
-from   glu.lib.fileutils     import autofile,parse_augmented_filename,guess_format,get_arg
+from   glu.lib.fileutils     import autofile,parse_augmented_filename,guess_format,get_arg,namefile
 from   glu.lib.sections      import read_sections
 
 from   glu.lib.genolib.locus import STRAND_UNKNOWN
@@ -238,10 +238,8 @@ class IlluminaManifest(object):
 
       snp_count  = self.snp_count
       norm_ids   = self.norm_ids
-      unpack4B   = struct.Struct('<4B').unpack
       unpackL    = struct.Struct('<L').unpack
       unpackLL   = struct.Struct('<LL').unpack
-      unpack4L   = struct.Struct('<4L').unpack
       unpack3BLB = struct.Struct('<3BLB').unpack
       unpack4B4L = struct.Struct('<4B4L').unpack
 
@@ -404,7 +402,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   assayid_idx = find_index(header,['IlmnID','Ilmn ID'])
   name_idx    = find_index(header,['Name'])
   alleles_idx = find_index(header,['SNP'])
-  chr_idx     = find_index(header,['Chr','CHR'])
+  chrom_idx   = find_index(header,['Chr','CHR'])
   loc_idx     = find_index(header,['MapInfo'])
   cstrand_idx = find_index(header,['CustomerStrand','SourceStrand'])
   dstrand_idx = find_index(header,['IlmnStrand','Ilmn Strand'])
@@ -416,7 +414,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   for assay in manifest:
     lname   = assay[name_idx]
     alleles = assay[alleles_idx]
-    chr     = assay[chr_idx] or None
+    chrom   = assay[chrom_idx] or None
     loc     = assay[loc_idx]
     cstrand = assay[cstrand_idx].lower()
     dstrand = assay[dstrand_idx].lower()
@@ -426,29 +424,29 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     if targetstrand in ('real_forward','real_reverse'):
       gstrand = gstrandmap.get(assay[gstrand_idx]) or 'U'
 
-    if chr.startswith('chr'):
-      chr = chr[3:]
-    if chr=='Mt':
-      chr='M'
+    if chrom and chrom.startswith('chr'):
+      chrom = chrom[3:]
+    if chrom=='Mt':
+      chrom='M'
 
     if cstrand not in validstrand:
       errorhandler('Invalid customer strand %s for %s' % (cstrand,lname))
-      yield lname,chr,loc,STRAND_UNKNOWN,None
+      yield lname,chrom,loc,STRAND_UNKNOWN,None
       continue
 
     if dstrand not in validstrand:
       errorhandler('Invalid design strand %s for %s' % (dstrand,lname))
-      yield lname,chr,loc,STRAND_UNKNOWN,None
+      yield lname,chrom,loc,STRAND_UNKNOWN,None
       continue
 
     if gstrand not in '+-FRU':
       errorhandler('Unknown gstrand %s for %s' % (gstrand,lname))
-      yield lname,chr,loc,STRAND_UNKNOWN,None
+      yield lname,chrom,loc,STRAND_UNKNOWN,None
       continue
 
     if len(alleles) != 5 or (alleles[0],alleles[2],alleles[4]) != ('[','/',']'):
       errorhandler('Invalid SNP alleles %s for %s' % (alleles,lname))
-      yield lname,chr,loc,STRAND_UNKNOWN,None
+      yield lname,chrom,loc,STRAND_UNKNOWN,None
       continue
 
     a,b = alleles[1],alleles[3]
@@ -458,14 +456,14 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
 
     # CNV probes can simply be skipped
     if (a,b) == NA:
-      yield lname,chr,loc,STRAND_UNKNOWN,cnv
+      yield lname,chrom,loc,STRAND_UNKNOWN,cnv
       continue
 
     # Indels are strand neutral
     elif cstrand in plusminus or dstrand in plusminus:
       a = indelmap[a]
       b = indelmap[b]
-      yield lname,chr,loc,None,(a,b)
+      yield lname,chrom,loc,None,(a,b)
       continue
 
     # SNP with A and B alleles on the design strand
@@ -475,7 +473,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       if probea and probeb and (a,b) != (probea[-1],probeb[-1]):
         errorhandler('Design alleles do not match probes (%s,%s) != (%s,%s) for %s'
                          % (a,b,probea[-1],probeb[-1],lname))
-        yield lname,chr,loc,STRAND_UNKNOWN,None
+        yield lname,chrom,loc,STRAND_UNKNOWN,None
         continue
 
     try:
@@ -483,7 +481,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       tstrand       = tstrand.lower()
       if tstrand != 'top':
         errorhandler('Supplied sequence is not correctly normalize to top strand for %s' % lname)
-        yield lname,chr,loc,STRAND_UNKNOWN,None
+        yield lname,chrom,loc,STRAND_UNKNOWN,None
         continue
 
     except ValueError:
@@ -495,7 +493,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     # a,b and aa,bb should both be normalized to tstrand and must be equal
     if (a,b) != (aa,bb):
       errorhandler('Assay alleles do not match sequence alleles (%s/%s != %s/%s) for %s' % (a,b,aa,bb,lname))
-      yield lname,chr,loc,STRAND_UNKNOWN,None
+      yield lname,chrom,loc,STRAND_UNKNOWN,None
       continue
 
     if gstrand == '+':
@@ -533,7 +531,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
       a,b = complement_base(a),complement_base(b)
       strand = strandmap[strand]
 
-    yield lname,chr,loc,strand,(a,b)
+    yield lname,chrom,loc,strand,(a,b)
 
 
 def create_abmap(manifest,genome):
@@ -542,8 +540,8 @@ def create_abmap(manifest,genome):
   entries and updating the genome metadata for each locus.
   '''
   abmap = {}
-  for lname,chr,loc,strand,alleles in manifest:
-    genome.merge_locus(lname, chromosome=chr, location=loc, strand=strand)
+  for lname,chrom,loc,strand,alleles in manifest:
+    genome.merge_locus(lname, chromosome=chrom, location=loc, strand=strand)
     if alleles:
       abmap[lname] = alleles
   return abmap
