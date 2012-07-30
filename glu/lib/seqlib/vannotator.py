@@ -351,6 +351,13 @@ class VariantAnnotator(object):
 
     mut_type = []
 
+    if len(ref_nuc)==len(var_nuc):
+      mut_type.append('SUBSTITUTION')
+    elif len(ref_nuc)>len(var_nuc):
+      mut_type.append('DELETION')
+    else:
+      mut_type.append('INSERTION')
+
     if exon_start<5:
       mut_type.append('POSSIBLE-SPLICE5')
     if cds.end-exon_end<5:
@@ -445,13 +452,6 @@ class VariantAnnotator(object):
         mut_type.append('PREMATURE_STOP')
       elif ref_cds_aa[-1]=='*' and var_cds_aa[-1]!='*':
         mut_type.append('LOSS_OF_STOP')
-
-    if len(r)==len(v):
-      mut_type.append('SUBSTITUTION')
-    elif len(r)>len(v):
-      mut_type.append('DELETION')
-    else:
-      mut_type.append('INSERTION')
 
     if 0:
       print '  REF_NUC:',ref_cds_nuc
