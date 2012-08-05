@@ -9,7 +9,7 @@ __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
 
-import time
+import re
 import sys
 
 from   glu.lib.fileutils            import table_reader
