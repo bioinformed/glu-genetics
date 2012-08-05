@@ -45,7 +45,7 @@ def main():
   out.writerow(['ldat']+samples)
 
   seen     = set()
-  non_autosomes = set(['chrX','chrY','chrM'])
+  non_autosomes = set(['chrX','chrY','chrM','X','Y','M','Mt','MT'])
 
   for v in vcf:
     if v.chrom in non_autosomes or not v.names or len(v.var)!=1:
@@ -57,9 +57,9 @@ def main():
     if len(a)!=1 or len(b)!=1:
       continue
 
-    name = v.names[0]
-
-    if not name.startswith('rs'):
+    try:
+      name = next(name for name in v.names if name.startswith('rs'))
+    except StopIteration:
       continue
 
     if name in seen:
@@ -70,7 +70,8 @@ def main():
     genomap = genomaps.get(ab)
 
     if genomap is None:
-      genomap = genomaps[ab] = {'0/0':a+a,'0/1':a+b,'1/0':a+b,'1/1':b+b}
+      genomap = genomaps[ab] = {'0/0':a+a,'0/1':a+b,'1/0':a+b,'1/1':b+b,
+                                '0|0':a+a,'0|1':a+b,'1|0':a+b,'1|1':b+b}
 
     genos = [ genomap.get(g[0],'  ') for g in v.genos ]
 
