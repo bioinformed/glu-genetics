@@ -53,7 +53,7 @@ def main():
   ge_known = np.zeros(n, dtype=int)
 
   # Bloody double negatives
-  not_variant = set(['.','0','0/0','./0','0/.','./.'])
+  not_variant = set(['.','0','0/0','./0','0/.','./.','0|.','.|0'])
 
   bad = set(['SegDup','Repeat'])
 

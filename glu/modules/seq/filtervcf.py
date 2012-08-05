@@ -80,13 +80,15 @@ def check_segmodel(segmodel,genos):
   maxcost,minscore,constraints = segmodel
   cost = score = 0
 
+  split_alleles = re.compile('[/|]').split
+
   for i,constraint,c_cost,c_score in constraints:
     g = genos[i]
 
     if g=='.':
       a=b='.'
     else:
-      a,b = g.split('/')
+      a,b = split_alleles(g)
 
     if constraint=='VAR':
       match = a not in '0.' or b not in '0.'
