@@ -6,49 +6,67 @@ __abstract__  = 'Variant Call Format parser'
 __copyright__ = 'Copyright (c) 2010, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 
-import csv
 import sys
 
-from   collections                  import defaultdict, OrderedDict
+from   collections                  import OrderedDict
 
 import pysam
 
-from   glu.lib.fileutils            import table_reader, autofile, hyphen
+from   glu.lib                      import fileutils
 from   glu.lib.recordtype           import recordtype
 
 
-VCFRecord = recordtype('VCFRecord',    'chrom start end names ref var qual filter info format genos')
+VCFRecordBase = recordtype('VCFRecord',    'chrom start end names ref var qual filter info format genostr genolist')
+
+
+class VCFRecord(VCFRecordBase):
+  __slots__ = ()
+
+  @property
+  def genos(self):
+    genos = self.genolist
+
+    if genos is not None:
+      return genos
+
+    format  = self.format
+    genostr = self.genostr
+
+    fields  = genostr.split('\t') if genostr else []
+
+    if not fields:
+      genos      = fields
+    elif ':' in format:
+      genos      = [ g.split(':') for g in fields ]
+    else:
+      genos      = [ [g]          for g in fields ]
+
+    self.genolist = genos
+
+    return genos
 
 
 strcache    = {}
 def _intern(x,strcache=strcache.setdefault): return strcache(x,x)
 
 
-def _encode_vcf_records(rows,normalize_indels=True):
-  for row in rows:
-    chrom      = _intern(row[0])
-    start      = int(row[1])-1
-    names      = row[2].split(';') if row[2]!='.' else []
-    ref        = _intern(row[3])
+def _encode_vcf_records(data,normalize_indels=True):
+  for line in data:
+    line       = line.rstrip()
+    fields     = line.split('\t',9)
+    n          = len(fields)
+
+    chrom      = _intern(fields[0])
+    start      = int(fields[1])-1
+    names      = fields[2].split(';') if fields[2]!='.' else []
+    ref        = _intern(fields[3])
     end        = start+len(ref)
-    var        = [ _intern(v) for v in row[4].split(',') ]
-    qual       = row[5]
-    filter     = [ _intern(f) for f in row[6].split(';') ] if row[6]!='.' else []
-    info       = row[7].split(';') if row[7]!='.' else []
-
-    n          = len(row)
-    if n>8:
-      format     = _intern(row[8])
-
-      if n>9:
-        if ':' in format:
-          genos      = [ g.split(':') for g in row[9:] ] if len(row)>9 else None
-        else:
-          genos      = [ [g]          for g in row[9:] ] if len(row)>9 else None
-      else:
-        genos = None
-    else:
-      format = genos = None
+    var        = [ _intern(v) for v in fields[4].split(',') ]
+    qual       = fields[5]
+    filter     = [ _intern(f) for f in fields[6].split(';') ] if fields[6]!='.' else []
+    info       = fields[7].split(';') if fields[7]!='.' else []
+    format     = _intern(fields[8]) if n>8 else None
+    genostr    = fields[9] if n>9 else None
 
     # VCF codes indels with an extra left reference base, which we strip
     if normalize_indels:
@@ -58,42 +76,35 @@ def _encode_vcf_records(rows,normalize_indels=True):
         ref      = _intern(ref[1:])
         var      = [ _intern(v[1:]) for v in var ]
 
-    yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genos)
+    yield VCFRecord(chrom,start,end,names,ref,var,qual,filter,info,format,genostr,None)
 
 
 class VCFReader(object):
-  def __init__(self, filename, hyphen=None, normalize_indels=True, field_size_limit=1024*1024):
-    if csv.field_size_limit()<field_size_limit:
-      csv.field_size_limit(field_size_limit)
-
+  def __init__(self, filename, hyphen=sys.stdin, normalize_indels=True, field_size_limit=1024*1024):
     self.filename         = filename
     self.normalize_indels = normalize_indels
     self.tabixfile        = None
-    self.data = data      = table_reader(filename,hyphen=sys.stdin)
+    self.data = data      = fileutils.autofile(fileutils.hyphen(filename,hyphen))
 
     self.metadata         = metadata       = OrderedDict()
     self.header           = None
     self.samples          = None
 
-    for row in data:
-      if not row:
-        continue
-      elif row[0].startswith('##'):
-        if len(row)!=1:
-          raise ValueError('Invalid VCF header line')
+    for line in data:
+      line = line.rstrip()
 
-        meta,value = row[0].split('=',1)
-        meta = meta[2:]
+      if line.startswith('##'):
+        meta,value = line.split('=',1)
+        meta       = meta[2:]
 
         if meta not in metadata:
           metadata[meta] = []
 
-        metadata[meta].append(row[0])
+        metadata[meta].append(line)
 
-      elif row[0].startswith('#'):
-        self.header = header = list(row)
-        header[0]   = header[0][1:]
-
+      elif line.startswith('#'):
+        self.header  = header = line.split('\t')
+        header[0]    = header[0][1:]
         self.samples = [ s.split('.')[0] for s in header[9:] ]
         break
       else:
@@ -109,15 +120,15 @@ class VCFReader(object):
     if tabixfile is None:
       self.tabixfile = tabixfile = pysam.Tabixfile(self.filename,cache_size=128*1024*1024)
 
-    records = [ r.split('\t') for r in tabixfile.fetch(chromosome, start, stop) ]
+    records = tabixfile.fetch(chromosome, start, stop)
 
     return _encode_vcf_records(records,self.normalize_indels)
 
 
 class VCFWriter(object):
-  def __init__(self, filename, metadata, names, reference=None):
+  def __init__(self, filename, metadata, names, reference=None,hyphen=sys.stdout):
     self.reference = pysam.Fastafile(reference) if reference is not None else None
-    self.out = out = autofile(hyphen(filename,sys.stdout),'w')
+    self.out = out = fileutils.autofile(fileutils.hyphen(filename,hyphen),'w')
 
     for meta in metadata:
       for m in metadata[meta]:
