@@ -8,7 +8,7 @@ import numpy.lib.recfunctions as rfn
 
 from   itertools                 import izip
 
-from   glu.lib.utils             import is_str,namedtuple
+from   glu.lib.utils             import is_str,namedtuple,lazy_property
 from   glu.lib.fileutils         import parse_augmented_filename, compressed_filename, namefile
 from   glu.lib.glm               import Linear
 
@@ -30,16 +30,6 @@ LRR_SCALE  = 100000
 LRR_NAN    = np.iinfo(LRR_TYPE).min
 LRR_MIN    = np.iinfo(LRR_TYPE).min+1
 LRR_MAX    = np.iinfo(LRR_TYPE).max
-
-
-def lazy_property(fn):
-    attr_name = '_lazy_' + fn.__name__
-    @property
-    def _lazy_property(self):
-        if not hasattr(self, attr_name):
-            setattr(self, attr_name, fn(self))
-        return getattr(self, attr_name)
-    return _lazy_property
 
 
 def gdat_encode_f(data, scale, minval, maxval, nanval):

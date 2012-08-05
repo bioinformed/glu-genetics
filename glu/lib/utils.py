@@ -953,6 +953,23 @@ def generator_thread(source, maxsize=1000, chunksize=1000):
   return genfrom_queue(q)
 
 
+def lazy_property(fn):
+  '''
+  Return a lazily computed property.
+
+  This property will compute a read-only result once, but only when
+  requested.  All subsequent requests will used the stored result of the
+  first computation.
+  '''
+  attr_name = '_lazy_' + fn.__name__
+  @property
+  def _lazy_property(self):
+      if not hasattr(self, attr_name):
+          setattr(self, attr_name, fn(self))
+      return getattr(self, attr_name)
+  return _lazy_property
+
+
 def _test():
   import doctest
   doctest.testmod()
