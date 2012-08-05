@@ -838,7 +838,7 @@ def main():
 
   if format=='VCF':  # *** VCF ***
     annotate_vcf(options)
-  if format=='ION':
+  elif format=='ION':
     annotate_ion(options)
   elif format=='MASTERVAR':
     annotate_mastervar(options)
