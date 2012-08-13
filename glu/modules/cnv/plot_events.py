@@ -201,6 +201,8 @@ def fit_gmm_baf(baf,max_baf=2):
 
 
 def norm_chromosome(chrom):
+  chrom = chrom.strip()
+
   if chrom.startswith('chr'):
     chrom = chrom[3:]
   if chrom.upper()=='MT':
@@ -448,6 +450,25 @@ def t_test(mu1,sd1,n1,mu2,sd2,n2):
   return t,df,p
 
 
+def parse_chrom_region(s):
+  chrom,rest = s.split(':',1)
+  start,stop = rest.split('-')
+  chrom = norm_chromosome(chrom)
+  start = int(start.replace(',',''))-1
+  stop  = int(stop.replace(',',''))
+  return chrom,start,stop
+
+
+def make_mask_dict(masks):
+  chrmask = {}
+  if not masks:
+    return chrmask
+  for mask in masks:
+    chrom,start,stop = parse_chrom_region(mask)
+    chrmask[chrom] = (start,stop)
+  return chrmask
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -476,6 +497,8 @@ def option_parser():
                                       help='List of samples to include, all others will be skipped')
   parser.add_argument('--excludesamples', metavar='FILE', action='append',
                                       help='List of samples to exclude, only samples not present will be kept')
+  parser.add_argument('--chrmask',    action='append',
+                                      help='Show only chrom:start-stop region for events on chrom.  May be specified multiple times.')
 
   table_options(parser)
 
@@ -519,6 +542,8 @@ def main():
     exclude  = transform.samples.exclude
   else:
     include  = exclude = None
+
+  chrmask = make_mask_dict(options.chrmask)
 
   for assay,assay_events in groupby(events,key=attrgetter(options.assayid)):
     if include is not None and assay not in include:
@@ -624,6 +649,15 @@ def main():
         plotname = options.template.format(**variables)
         plotname = '%s/%s' % (options.outdir,plotname)
         title    = options.title.format(**variables)
+
+        if chrom in chrmask:
+          start,stop  = chrmask[chrom]
+          chrom_mask  = pos>=start
+          chrom_mask &= pos< stop
+          pos         = pos[chrom_mask]
+          chrom_genos = chrom_genos[chrom_mask]
+          chrom_baf   = chrom_baf[chrom_mask]
+          chrom_lrr   = chrom_lrr[chrom_mask]
 
         plot_chromosome(plotname, pos, chrom_lrr, chrom_baf, genos=chrom_genos,
                         title=title, events=chrom_events)

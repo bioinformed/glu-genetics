@@ -3,8 +3,8 @@
 from __future__ import division
 
 __gluindex__  = True
-__abstract__  = 'Perform quantile normalization and re-estimate LRR and BAF'
-__copyright__ = 'Copyright (c) 2011, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
+__abstract__  = 'Generate statistics on LRR and BAF for original and renormalized values'
+__copyright__ = 'Copyright (c) 2012, BioInformed LLC and the U.S. Department of Health & Human Services. Funded by NCI under Contract N01-CO-12400.'
 __license__   = 'See GLU license for terms by running: glu license'
 __revision__  = '$Id$'
 
@@ -29,6 +29,39 @@ def skewtest(s):
   return stats.skewtest(s)[0]
 
 
+def normalize_chromosome(chrom):
+  chrom = chrom.strip().upper()
+  if not chrom:
+    return None
+  if chrom.startswith('CHR'):
+    chrom = chrom[3:]
+  if chrom=='MT':
+    chrom = 'M'
+  return chrom
+
+
+def parse_chromosome_region(region):
+  if ':' not in region:
+    chrom      = normalize_chromosome(region)
+    start      = 0
+    stop       = sys.maxint
+  else:
+    chrom,rest = region.split(':',1)
+    start,stop = rest.split('-')
+    chrom      = normalize_chromosome(chrom)
+    start      = int(start.replace(',',''))-1
+    stop       = int(stop.replace(',',''))
+
+  return chrom,start,stop
+
+
+def parse_chromosome_regions(regions):
+  for region in regions:
+    region = region.strip()
+    if region:
+      yield parse_chromosome_region(region)
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -38,6 +71,8 @@ def option_parser():
 
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
                       help='Output results (default is "-" for standard out)')
+  parser.add_argument('--chrmask',    action='append',
+                                      help='Show only chrom:start-stop region for events on chrom.  May be specified multiple times.')
   parser.add_argument('--chromosomes',metavar='CHRS', default='',
                                       help='Comma separated list of chromosomes to plot (blank for all)')
   parser.add_argument('-P', '--progress', action='store_true',
@@ -75,24 +110,25 @@ def main():
   np.set_printoptions(linewidth=120,precision=2,suppress=True)
   np.seterr(all='ignore')
 
-  mask = None
+  valid_snps,mask = s,None
 
-  if options.chromosomes:
+  if options.chromosomes or options.chrmask:
     chrom_index = gdat.chromosome_index
 
     mask = np.zeros(gdat.snp_count, dtype=bool)
 
-    for chrom in options.chromosomes.split(','):
-      chrom = chrom.strip().upper()
-      if not chrom:
-        continue
-      if chrom.startswith('CHR'):
-        chrom = chrom[3:]
-      if chrom=='MT':
-        chrom = 'M'
+    regions = (options.chrmask or []) + (options.chromosomes or '').split(',')
+    regions = parse_chromosome_regions(regions)
 
-      indices = chrom_index[chrom][1]
-      mask[indices] = True
+    for chrom,start,stop in regions:
+      print '!!!',chrom,start,stop
+      pos,indices          = chrom_index[chrom]
+      region_mask          = (pos>=start)&(pos<stop)
+      region_indices       = indices[region_mask]
+      mask[region_indices] = True
+
+    valid_snps = mask.sum()
+    print 'Found %d valid probes' % valid_snps
 
   data = parallel_gdat_iter(LRR_orig,LRR_norm,BAF_orig,BAF_norm,genotypes)
 
@@ -138,8 +174,8 @@ def main():
     baf_orig_ab_sd = baf_orig[valid&AB].std(ddof=1)
     baf_orig_bb_u  = baf_orig[valid&BB].mean()
     baf_orig_bb_sd = baf_orig[valid&BB].std(ddof=1)
-    missing_orig   = 1-valid.sum()/s
-    #missing_orig  = (valid&NN).sum()/s
+    missing_orig   = 1-valid.sum()/valid_snps
+    #missing_orig  = (valid&NN).sum()/valid_snps
 
     valid          = np.isfinite(baf_norm)&np.isfinite(lrr_norm)
     count_norm     = valid.sum()
@@ -152,8 +188,8 @@ def main():
     baf_norm_ab_sd = baf_norm[valid&AB].std(ddof=1)
     baf_norm_bb_u  = baf_norm[valid&BB].mean()
     baf_norm_bb_sd = baf_norm[valid&BB].std(ddof=1)
-    missing_norm   = 1-valid.sum()/s
-    #missing_norm  = (valid&NN).sum()/s
+    missing_norm   = 1-valid.sum()/valid_snps
+    #missing_norm  = (valid&NN).sum()/valid_snps
 
     out.writerow([assay,name,
                   count_orig,lrr_orig_u,lrr_orig_sd,baf_orig_skew,
