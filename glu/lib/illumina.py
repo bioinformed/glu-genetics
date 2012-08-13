@@ -388,12 +388,13 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   indelmap     = {'D':'-','I':'+','A':'A','C':'C','G':'G','T':'T'}
   strandmap    = {STRAND_UNKNOWN:STRAND_UNKNOWN,'+':'-','-':'+'}
   NA           = ('N','A')
+  AB           = ('A','B')
   cnv          = ('-','+')
   targetstrand = targetstrand.lower()
   validstrand  = set(('top','bot','p','plus','m','minus'))
   plusminus    = set(('p','plus','m','minus'))
 
-  assert targetstrand in ('top','bottom','forward','reverse', \
+  assert targetstrand in ('ab','top','bottom','forward','reverse', \
                           'real_forward','real_reverse',
                           'customer','anticustomer','design','antidesign')
 
@@ -453,6 +454,10 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
 
     if loc:
       loc = int(loc)
+
+    if targetstrand=='ab':
+      yield lname,chrom,loc,STRAND_UNKNOWN,AB
+      continue
 
     # CNV probes can simply be skipped
     if (a,b) == NA:
