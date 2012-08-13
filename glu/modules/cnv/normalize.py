@@ -240,6 +240,31 @@ def finalize_centers(r_g,t_g,n_g):
   t_g       /= n_g
 
 
+plot_num = 0
+
+def plot(x,y):
+  import matplotlib.cm     as cm
+  import matplotlib.pyplot as plt
+
+  xmin = x.min()
+  xmax = x.max()
+  ymin = y.min()
+  ymax = y.max()
+
+  plt.clf()
+
+  plt.hexbin(x,y, cmap=cm.jet)
+  plt.axis([0, 2.5, -0.25,0.25])
+
+  cb = plt.colorbar()
+  cb.set_label('counts')
+
+  plt.show()
+  global plot_num
+  plot_num += 1
+  plt.savefig('plots/out%04d.png' % plot_num)
+
+
 def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='linear', thin=None, minpoints=10000):
   AA           = genos=='AA'
   AB           = genos=='AB'
@@ -277,6 +302,9 @@ def regress_intensity(x, y, design, dmask, genos, r_AA, r_AB, r_BB, rmodel='line
 
   r_geno       = r_geno[valid].reshape(-1,1)
   design_valid = design[valid]
+
+  if 0:
+    plot(r_geno.reshape(-1), design_valid[:,9].reshape(-1))
 
   if thin:
     if n/thin<minpoints:
@@ -466,6 +494,8 @@ def pass2(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB):
 
   X         = gdat['X']
   Y         = gdat['Y']
+  LRR       = gdat['LRR']
+  BAF       = gdat['BAF']
   samples   = gdat['Samples']
   genotypes = gdat['Genotype']
 
@@ -475,12 +505,12 @@ def pass2(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB):
   BAF_QN      = BatchTableWriter(gdat['BAF_QN'])
 
   try:
-    pass2       = enumerate(parallel_gdat_iter(samples,X,Y,genotypes))
+    pass2       = enumerate(parallel_gdat_iter(samples,X,Y,genotypes,LRR,BAF))
 
     if options.progress:
       pass2     = progress_loop(pass2, length=n, units='samples', label='PASS 2: ')
 
-    for i,(sample,x,y,genos) in pass2:
+    for i,(sample,x,y,genos,lrr_orig,baf_orig) in pass2:
       if not options.progress:
         print '  Sample %5d / %d: %s' % (i+1,n,sample)
 
@@ -493,8 +523,17 @@ def pass2(gdat,options,design,dmask,r_AA,t_AA,r_AB,t_AB,r_BB,t_BB):
 
       lrr,baf   = compute_lrr_baf(t,r,r_AA,r_AB,r_BB,t_AA,t_AB,t_BB)
 
-      mask      = np.isfinite(lrr)&np.isfinite(baf)
-      print '  ... sigmaLRR=%.2f, sigmaBAFhet=%.3f' % (lrr[mask].std(),baf[mask&(genos=='AB')].std())
+      mask      = dmask&np.isfinite(lrr)&np.isfinite(baf)
+      n_lrr_std =      lrr[mask].std()
+      n_baf_std =      baf[mask&(genos=='AB')].std()
+      #print '  ... Norm: sigmaLRR=%.2f, sigmaBAFhet=%.3f' % (n_lrr_std,n_baf_std)
+
+      mask      = dmask&np.isfinite(lrr_orig)&np.isfinite(baf_orig)
+      o_lrr_std = lrr_orig[mask].std()
+      o_baf_std = baf_orig[mask&(genos=='AB')].std()
+      #print '  ... Orig: sigmaLRR=%.2f, sigmaBAFhet=%.3f' % (o_lrr_std,o_baf_std)
+
+      print '  ... LRR improvement = %5.2f, BAF improvement = %5.2f' % (o_lrr_std/n_lrr_std,o_baf_std/n_baf_std)
 
       LRR_QN.write(lrr)
       BAF_QN.write(baf)
