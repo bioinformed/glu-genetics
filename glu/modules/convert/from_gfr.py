@@ -26,6 +26,14 @@ from   glu.lib.genolib.locus     import Genome
 from   glu.lib.genolib.transform import GenoTransform
 
 
+#                          HEADER    strand
+GFR_GENOTYPE_FORMATS = [ (  'AB',     'ab'),
+                         ('Forward','forward'),
+                         ('Reverse','reverse'),
+                         ( 'Top',     'top'),
+                         ('Bottom',  'bottom') ]
+
+
 GENO_TYPE  = 'S2'
 RAW_TYPE   = np.int16
 
@@ -105,32 +113,33 @@ def gfr_header(indata):
     return header,chain(rows,indata),num_snps,None,None
 
 
-def read_gfr(filename,targetstrand):
+
+
+def detect_genotype_convention(header):
+  for convention,strand in GFR_GENOTYPE_FORMATS:
+    allele1 = 'Allele1 - %s' % convention
+    allele2 = 'Allele2 - %s' % convention
+    if allele1 in header and allele2 in header:
+      return allele1,allele2,strand
+
+  return None,None,None
+
+
+def read_gfr(filename):
 
   infile = autofile(filename)
   indata = csv.reader(infile,dialect='excel-tab')
   header,indata,num_snps,num_samples,manifest = gfr_header(indata)
 
-  strand = targetstrand.lower()
+  allele1,allele2,strand = detect_genotype_convention(header)
 
-  fields = ['Sample ID','SNP Name','GC Score']
+  if not strand:
+    raise ValueError('GFR genotypes missing or in unsupported strand convention')
 
-  if strand=='ab':
-    fields  += ['Allele1 - AB','Allele2 - AB']
-  elif strand=='forward':
-    fields  += ['Allele1 - Forward','Allele2 - Forward']
-  elif strand=='reverse':
-    fields  += ['Allele1 - Reverse','Allele2 - Reverse']
-  elif strand=='top':
-    fields  += ['Allele1 - Top','Allele2 - Top']
-  elif strand=='bottom':
-    fields  += ['Allele1 - Bottom','Allele2 - Bottom']
-  else:
-    raise ValueError('Unsupported strand convention: %s' % targetstrand)
+  fields  = ['Sample ID','SNP Name','GC Score',allele1,allele2,
+             'X','Y','X Raw','Y Raw','B Allele Freq','Log R Ratio']
 
-  fields    += ['X','Y','X Raw','Y Raw','B Allele Freq','Log R Ratio']
-
-  indices    = [ header.index(f) for f in fields ]
+  indices = [ header.index(f) for f in fields ]
 
   def data():
     sample_idx,snp_idx,gc_idx,a1_idx,a2_idx,x_idx,y_idx,x_raw_idx,y_raw_idx,baf_idx,lrr_idx = indices
@@ -179,7 +188,7 @@ def read_gfr(filename,targetstrand):
 
     infile.close()
 
-  return num_snps,num_samples,manifest,data()
+  return num_snps,num_samples,manifest,strand,data()
 
 
 def create_gdat(filename, num_snps, num_samples=None):
@@ -394,8 +403,6 @@ def option_parser():
   parser.add_argument('manifest', help='Illumina BPM manifest file')
   parser.add_argument('gfrfile',  help='Illumina Genotype Final Report (GFR) file')
 
-  parser.add_argument('--calls', metavar='CONVENTION', choices=['AB','forward','reverse','top','bottom'],
-                    help='Use specified calling convention for alleles (default=AB, forward, reverse, top, bottom)')
   parser.add_argument('--includesamples', metavar='FILE', action='append',
                     help='List of samples to include, all others will be skipped')
   parser.add_argument('--excludesamples', metavar='FILE', action='append',
@@ -414,6 +421,13 @@ def main():
   parser  = option_parser()
   options = parser.parse_args()
 
+  transform  = GenoTransform.from_object(options)
+
+  num_snps,num_samples,manifest,filestrand,gfr_data = read_gfr(options.gfrfile)
+
+  sys.stderr.write('Reading %d SNPs on %d samples using manifest %s and %s strand\n' \
+                   % (num_snps,num_samples,manifest,filestrand))
+
   errorhandler = None
   if options.warnings:
     def errorhandler(msg):
@@ -422,14 +436,11 @@ def main():
   sys.stderr.write('Loading Illumina manifest file...')
   genome = Genome()
 
-  abmap  = create_Illumina_abmap(options.manifest,genome,targetstrand=options.calls,
+  abmap  = create_Illumina_abmap(options.manifest,genome,targetstrand=filestrand,
                                          errorhandler=errorhandler)
 
   sys.stderr.write('done.\n')
 
-  transform  = GenoTransform.from_object(options)
-
-  num_snps,num_samples,manifest,gfr_data = read_gfr(options.gfrfile,options.calls)
   gdat       = create_gdat(options.output, num_snps, num_samples)
 
   #gfr_data  = progress_bar(gfr_data,num_samples)
