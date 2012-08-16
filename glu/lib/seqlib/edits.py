@@ -898,7 +898,7 @@ def cigar_alignment(s1,s2,cigar,hide_match=True):
 def smith_waterman(s1, s2, match_score=10, mismatch_score=-9, gap_score=-12,
                            anchor_left=False,anchor_right=False,local_align=None):
   '''
-  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  Align s1 to s2 using the Smith-Waterman algorithm for local gapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
   The operations to align s1 to s2 are returned as a sequence, represented
@@ -1125,7 +1125,7 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
                                  s2_homopolymer_penalty=None,
                                  anchor_left=False,anchor_right=False,local_align=None):
   '''
-  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  Align s1 to s2 using the Smith-Waterman algorithm for local gapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
   The operations to align s1 to s2 are returned as a sequence, represented

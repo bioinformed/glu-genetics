@@ -524,7 +524,7 @@ cdef _roll_cigar(Py_ssize_t n, Py_ssize_t m, Py_ssize_t i, Py_ssize_t j, char *e
 def smith_waterman(s1, s2, match_score=10, mismatch_score=-9, gap_score=-12,
                            anchor_left=False,anchor_right=False,local_align=None):
   '''
-  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  Align s1 to s2 using the Smith-Waterman algorithm for local gapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
   The operations to align s1 to s2 are returned as a sequence, represented
@@ -776,7 +776,7 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
                                  gap_open_score=-15, gap_extend_score=-6,
                                  anchor_left=False,anchor_right=False,local_align=None):
   '''
-  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  Align s1 to s2 using the Smith-Waterman algorithm for local gapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
   The operations to align s1 to s2 are returned as a sequence, represented
@@ -1041,7 +1041,7 @@ def smith_waterman_gotoh(s1, s2, match_score=10, mismatch_score=-9,
 def smith_waterman_gotoh2_align(s1, s2, match_score=10, mismatch_score=-9,
                                         gap_open_score=-15, gap_extend_score=-6):
   '''
-  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  Align s1 to s2 using the Smith-Waterman algorithm for local gapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
   The operations to align s1 to s2 are returned as a sequence, represented
@@ -1250,7 +1250,7 @@ def smith_waterman_gotoh2_align(s1, s2, match_score=10, mismatch_score=-9,
 def smith_waterman_gotoh2_score(s1, s2, match_score=10, mismatch_score=-9,
                                         gap_open_score=-15, gap_extend_score=-6):
   '''
-  Align s1 to s2 using the Smith-Waterman algorithm for local ungapped
+  Align s1 to s2 using the Smith-Waterman algorithm for local gapped
   alignment.  An alignment score and sequence of alignment operations are returned.
 
   The operations to align s1 to s2 are returned as a sequence, represented
