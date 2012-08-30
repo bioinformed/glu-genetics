@@ -29,9 +29,8 @@ from   glu.lib.genolib.transform import GenoTransform
 #                          HEADER    strand
 GFR_GENOTYPE_FORMATS = [ (  'AB',     'ab'),
                          ('Forward','forward'),
-                         ('Reverse','reverse'),
                          ( 'Top',     'top'),
-                         ('Bottom',  'bottom') ]
+                         ('Design', 'design') ]
 
 
 GENO_TYPE  = 'S2'
