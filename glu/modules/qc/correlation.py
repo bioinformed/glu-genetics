@@ -290,7 +290,8 @@ def correlation_genos(options,filename1,filename2):
 
     dips     = count_diplotypes(locus1, locus2)
 
-    r2_em,dp = estimate_ld(dips)
+    #r2_em,dp = estimate_ld(dips)
+    r2_em,dp = estimate_ld(locus1,locus2)
     #r2_trend= trend_r2(locus1,locus2)
     r2_trend = trend_r2_dips(dips)
 
@@ -303,7 +304,7 @@ def correlation_genos(options,filename1,filename2):
 
     concord = concord/comps if comps else 1
 
-    out.writerow([lname1,len(locus1),missing1,maf1,missing2,maf2,concord,comps,r2_em, r2_trend])
+    out.writerow([lname1,len(locus1),missing1,maf1,missing2,maf2,concord,comps,r2_em,r2_trend])
 
 
 def correlation_dosage(options,filename1,filename2):
