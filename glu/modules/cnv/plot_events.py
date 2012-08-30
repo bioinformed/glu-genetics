@@ -18,19 +18,35 @@ from   math                      import sqrt, fabs
 from   itertools                 import groupby
 from   operator                  import attrgetter
 
-from   collections               import namedtuple
-
 from   glu.lib.fileutils         import table_reader, table_writer, cook_table, table_options
 from   glu.lib.recordtype        import recordtype
 
 from   glu.modules.cnv.gdat      import GDATIndex, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot      import plot_chromosome
-from   glu.modules.cnv.normalize import quantile
 
 from   glu.lib.genolib.transform import GenoTransform
 
 
 Event = recordtype('Event', 'chrom start stop fields lrr baf baf_model state pmosaic')
+
+
+def load_events(options):
+  add_fields = ['Probes','STATE','PMosaic','LRR_mean','LRR_sd','BAF_BANDS','BAF_means','BAF_sds']
+
+  events    = table_reader(options.events)
+  events    = cook_table(events,options)
+
+  header    = next(events)
+  extra     = [ h for h in add_fields if h not in header ]
+  header   += extra
+  blanks    = ['']*len(extra)
+
+  Event     = recordtype('Event', header)._make
+  events    = [ Event(e+blanks) for e in events ]
+
+  events.sort(key=attrgetter(options.assayid,options.chromid))
+
+  return header,events
 
 
 def fit_gmm1(components,x):
@@ -469,6 +485,17 @@ def make_mask_dict(masks):
   return chrmask
 
 
+def mask_event(start,stop,pos,chrom_genos,chrom_baf,chrom_lrr):
+  chrom_mask  = pos>=start
+  chrom_mask &= pos< stop
+  pos         = pos[chrom_mask]
+  chrom_genos = chrom_genos[chrom_mask]
+  chrom_baf   = chrom_baf[chrom_mask]
+  chrom_lrr   = chrom_lrr[chrom_mask]
+
+  return pos,chrom_genos,chrom_baf,chrom_lrr
+
+
 def option_parser():
   from glu.lib.glu_argparse import GLUArgumentParser
 
@@ -499,6 +526,8 @@ def option_parser():
                                       help='List of samples to exclude, only samples not present will be kept')
   parser.add_argument('--chrmask',    action='append',
                                       help='Show only chrom:start-stop region for events on chrom.  May be specified multiple times.')
+  parser.add_argument('--zoomends',   metavar='BP', type=float, default=None,
+                                      help='Zoom in on event start and end regions with +- BP window.')
 
   table_options(parser)
 
@@ -515,25 +544,13 @@ def main():
   gcmodels  = {}
   chip_indices = {}
 
-  add_fields = ['Probes','STATE','PMosaic','LRR_mean','LRR_sd','BAF_BANDS','BAF_means','BAF_sds']
+  header,events = load_events(options)
 
-  events    = table_reader(options.events)
-  events    = cook_table(events,options)
-
-  header    = next(events)
-  extra     = [ h for h in add_fields if h not in header ]
-  header   += extra
-  blanks    = ['']*len(extra)
-
-  Event     = recordtype('Event', header)._make
-  events    = [ Event(e+blanks) for e in events ]
-
-  events.sort(key=attrgetter(options.assayid,options.chromid))
-
-  out       = table_writer(options.outevents) if options.outevents else None
-
-  if out:
+  if options.outevents:
+    out = table_writer(options.outevents)
     out.writerow(header)
+  else:
+    out = None
 
   transform = GenoTransform.from_object(options)
 
@@ -633,8 +650,8 @@ def main():
 
       for chrom,chrom_events in groupby(eventrecs,key=attrgetter('chrom')):
         chrom        = norm_chromosome(chrom)
-        chrom_events = list(chrom_events)
         pos,index    = chrom_indices[chrom]
+        chrom_events = list(chrom_events)
 
         #chrom_valid  = valid_mask[index]
         #chrom_normal = normal_mask[index]
@@ -652,15 +669,43 @@ def main():
 
         if chrom in chrmask:
           start,stop  = chrmask[chrom]
-          chrom_mask  = pos>=start
-          chrom_mask &= pos< stop
-          pos         = pos[chrom_mask]
-          chrom_genos = chrom_genos[chrom_mask]
-          chrom_baf   = chrom_baf[chrom_mask]
-          chrom_lrr   = chrom_lrr[chrom_mask]
+          pos,chrom_genos,chrom_baf,chrom_lrr = mask_event(start,stop,pos,chrom_genos,
+                                                           chrom_baf,chrom_lrr)
 
-        plot_chromosome(plotname, pos, chrom_lrr, chrom_baf, genos=chrom_genos,
-                        title=title, events=chrom_events)
+        if not options.zoomends:
+          plot_chromosome(plotname, pos, chrom_lrr, chrom_baf, genos=chrom_genos,
+                          title=title, events=chrom_events)
+
+        else:
+          for i,event in enumerate(chrom_events):
+            if event.stop-event.start<2*options.zoomends:
+              start,stop  = event.start-options.zoomends,event.stop+options.zoomends
+              end_pos,end_genos,end_baf,end_lrr = mask_event(start,stop,pos,chrom_genos,
+                                                             chrom_baf,chrom_lrr)
+
+              end_plotname = plotname.replace('.png','_event%d_region.png' % (i+1))
+              end_title    = title + ' EVENT %d REGION' % (i+1)
+              plot_chromosome(end_plotname, end_pos, end_lrr, end_baf, genos=end_genos,
+                              title=end_title, events=[event])
+
+            else:
+              start,stop  = event.start-options.zoomends,event.start+options.zoomends
+              end_pos,end_genos,end_baf,end_lrr = mask_event(start,stop,pos,chrom_genos,
+                                                             chrom_baf,chrom_lrr)
+
+              end_plotname = plotname.replace('.png','_event%d_begin.png' % (i+1))
+              end_title    = title + ' EVENT %d START' % (i+1)
+              plot_chromosome(end_plotname, end_pos, end_lrr, end_baf, genos=end_genos,
+                              title=end_title, events=[event])
+
+              start,stop  = event.stop-options.zoomends,event.stop+options.zoomends
+              end_pos,end_genos,end_baf,end_lrr = mask_event(start,stop,pos,chrom_genos,
+                                                             chrom_baf,chrom_lrr)
+
+              end_plotname = plotname.replace('.png','_event%d_end.png' % (i+1))
+              end_title    = title + ' EVENT %d END' % (i+1)
+              plot_chromosome(end_plotname, end_pos, end_lrr, end_baf, genos=end_genos,
+                              title=end_title, events=[event])
 
 
 if __name__=='__main__':
