@@ -20,7 +20,8 @@ import scipy.stats as stats
 
 from   glu.lib.progressbar  import progress_loop
 from   glu.lib.fileutils    import table_writer
-from   glu.modules.cnv.gdat import GDATFile, BatchTableWriter, parallel_gdat_iter, create_gdat_qn
+from   glu.modules.cnv.gdat import GDATFile, BatchTableWriter, parallel_gdat_iter, \
+                                   create_gdat_qn, baf_deviation
 
 
 def skewtest(s):
@@ -121,7 +122,6 @@ def main():
     regions = parse_chromosome_regions(regions)
 
     for chrom,start,stop in regions:
-      print '!!!',chrom,start,stop
       pos,indices          = chrom_index[chrom]
       region_mask          = (pos>=start)&(pos<stop)
       region_indices       = indices[region_mask]
@@ -138,13 +138,17 @@ def main():
   out = table_writer(options.output,hyphen=sys.stdout)
   out.writerow(['ASSAY_ID','GDAT',
                 'COUNT_ORIG','LRR_ORIG_MEAN','LRR_ORIG_SD','BAF_ORIG_SKEW',
+                             'BDEV_ORIG_MEAN',  'BDEV_ORIG_SD',
                              'BAF_ORIG_AA_MEAN','BAF_ORIG_AA_SD',
                              'BAF_ORIG_AB_MEAN','BAF_ORIG_AB_SD',
-                             'BAF_ORIG_BB_MEAN','BAF_ORIG_BB_SD','MISSING_RATE_ORIG',
+                             'BAF_ORIG_BB_MEAN','BAF_ORIG_BB_SD',
+                             'MISSING_RATE_ORIG',
                 'COUNT_NORM','LRR_NORM_MEAN','LRR_NORM_SD','BAF_NORM_SKEW',
+                             'BDEV_NORM_MEAN',  'BDEV_NORM_SD',
                              'BAF_NORM_AA_MEAN','BAF_NORM_AA_SD',
                              'BAF_NORM_AB_MEAN','BAF_NORM_AB_SD',
-                             'BAF_NORM_BB_MEAN','BAF_NORM_BB_SD','MISSING_RATE_NORM'])
+                             'BAF_NORM_BB_MEAN','BAF_NORM_BB_SD',
+                             'MISSING_RATE_NORM'])
 
   for i,(lrr_orig,lrr_norm,baf_orig,baf_norm,genos) in enumerate(data):
     if not options.progress and options.output!='-':
@@ -163,16 +167,21 @@ def main():
     BB             = genos=='BB'
     NN             = genos=='  '
 
+    bdev_orig      = baf_deviation(baf_orig,genos)
+    bdev_norm      = baf_deviation(baf_norm,genos)
+
     valid          = np.isfinite(baf_orig)&np.isfinite(lrr_orig)
     count_orig     = valid.sum()
     baf_orig_skew  = skewtest(baf_orig[valid&AB])
-    lrr_orig_u  = lrr_orig[valid   ].mean()
+    lrr_orig_mu    = lrr_orig[valid   ].mean()
     lrr_orig_sd    = lrr_orig[valid   ].std(ddof=1)
-    baf_orig_aa_u  = baf_orig[valid&AA].mean()
+    bdev_orig_mu   = bdev_orig[valid  ].mean()
+    bdev_orig_sd   = bdev_orig[valid  ].std(ddof=1)
+    baf_orig_aa_mu = baf_orig[valid&AA].mean()
     baf_orig_aa_sd = baf_orig[valid&AA].std(ddof=1)
-    baf_orig_ab_u  = baf_orig[valid&AB].mean()
+    baf_orig_ab_mu = baf_orig[valid&AB].mean()
     baf_orig_ab_sd = baf_orig[valid&AB].std(ddof=1)
-    baf_orig_bb_u  = baf_orig[valid&BB].mean()
+    baf_orig_bb_mu = baf_orig[valid&BB].mean()
     baf_orig_bb_sd = baf_orig[valid&BB].std(ddof=1)
     missing_orig   = 1-valid.sum()/valid_snps
     #missing_orig  = (valid&NN).sum()/valid_snps
@@ -180,26 +189,30 @@ def main():
     valid          = np.isfinite(baf_norm)&np.isfinite(lrr_norm)
     count_norm     = valid.sum()
     baf_norm_skew  = skewtest(baf_norm[valid&AB])
-    lrr_norm_u     = lrr_norm[valid   ].mean()
+    lrr_norm_mu    = lrr_norm[valid   ].mean()
     lrr_norm_sd    = lrr_norm[valid   ].std(ddof=1)
-    baf_norm_aa_u  = baf_norm[valid&AA].mean()
+    bdev_norm_mu   = bdev_norm[valid  ].mean()
+    bdev_norm_sd   = bdev_norm[valid  ].std(ddof=1)
+    baf_norm_aa_mu = baf_norm[valid&AA].mean()
     baf_norm_aa_sd = baf_norm[valid&AA].std(ddof=1)
-    baf_norm_ab_u  = baf_norm[valid&AB].mean()
+    baf_norm_ab_mu = baf_norm[valid&AB].mean()
     baf_norm_ab_sd = baf_norm[valid&AB].std(ddof=1)
-    baf_norm_bb_u  = baf_norm[valid&BB].mean()
+    baf_norm_bb_mu = baf_norm[valid&BB].mean()
     baf_norm_bb_sd = baf_norm[valid&BB].std(ddof=1)
     missing_norm   = 1-valid.sum()/valid_snps
     #missing_norm  = (valid&NN).sum()/valid_snps
 
     out.writerow([assay,name,
-                  count_orig,lrr_orig_u,lrr_orig_sd,baf_orig_skew,
-                             baf_orig_aa_u,baf_orig_aa_sd,
-                             baf_orig_ab_u,baf_orig_ab_sd,
-                             baf_orig_bb_u,baf_orig_bb_sd,missing_orig,
-                  count_norm,lrr_norm_u,lrr_norm_sd,baf_norm_skew,
-                             baf_norm_aa_u,baf_norm_aa_sd,
-                             baf_norm_ab_u,baf_norm_ab_sd,
-                             baf_norm_bb_u,baf_norm_bb_sd,missing_norm,
+                  count_orig,lrr_orig_mu,lrr_orig_sd,baf_orig_skew,
+                             bdev_orig_mu,bdev_orig_sd,
+                             baf_orig_aa_mu,baf_orig_aa_sd,
+                             baf_orig_ab_mu,baf_orig_ab_sd,
+                             baf_orig_bb_mu,baf_orig_bb_sd,missing_orig,
+                  count_norm,lrr_norm_mu,lrr_norm_sd,baf_norm_skew,
+                             bdev_norm_mu,bdev_norm_sd,
+                             baf_norm_aa_mu,baf_norm_aa_sd,
+                             baf_norm_ab_mu,baf_norm_ab_sd,
+                             baf_norm_bb_mu,baf_norm_bb_sd,missing_norm,
                  ])
 
   gdat.close()

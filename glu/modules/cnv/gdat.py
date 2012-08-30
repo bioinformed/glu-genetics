@@ -538,3 +538,21 @@ def gc_correct(lrr,gcdesign,gcmask,minval=None,maxval=None,thin=None):
   lrr_adj  -= alpha
 
   return lrr_adj
+
+
+def baf_deviation(baf,genos):
+  bdev     = np.empty_like(baf)
+  bdev.fill(np.nan)
+
+  hom_mask = (genos=='AA')|(genos=='BB')
+  het_mask = genos=='AB'
+  mis_mask = genos=='  '
+
+  hom_dev  = np.minimum(baf,1-baf)
+  het_dev  = np.abs(baf-0.5)
+
+  bdev[hom_mask] = hom_dev[hom_mask]
+  bdev[het_mask] = het_dev[het_mask]
+  bdev[mis_mask] = np.minimum(hom_dev[mis_mask], het_dev[mis_mask])
+
+  return bdev
