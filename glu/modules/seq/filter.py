@@ -22,7 +22,6 @@ from   glu.lib.fileutils     import autofile, hyphen, list_reader, table_writer,
 from   glu.lib.progressbar   import progress_loop
 
 from   glu.lib.seqlib.bed    import read_features
-from   glu.lib.seqlib.cigar  import fix_cigar_bam, cigar_bam_str
 from   glu.lib.seqlib.filter import alignment_filter_options, filter_alignments
 
 
@@ -46,21 +45,6 @@ def set_readgroup(groupname,header,aligns):
       yield align
 
   return _set_readgroup()
-
-
-from   glu.lib.seqlib.edits         import reduce_match
-
-def fix_cigar_indels(aligns):
-  for align in aligns:
-    if align.tid>=0:
-      #before = align.cigar
-      align.cigar = fix_cigar_bam(align.cigar)
-      #if align.cigar is not before:
-      #  print 'BEFORE:',cigar_bam_str(before)
-      #  print 'AFTER: ',cigar_bam_str(align.cigar)
-      #  print
-
-    yield align
 
 
 def contig_stats(aligns,references,filename):
@@ -471,16 +455,13 @@ def load_contig_remap(filename):
     src_offset = int(src_offset or 0)
     dst_len    = int(dst_len)
 
-    if src!=dst or offset:
+    if src!=dst or src_offset:
       remap[src] = dst,src_offset,dst_len
 
   return remap
 
 
 def remap_contigs(header, references, lengths, alignments, remap):
-  src_remapped = set(r for r in references if r in remap)
-  dst_remapped = [ remap[r] for r in sorted(src_remapped) ]
-
   tidmap           = {}
   new_references   = []
   new_lengths      = []
@@ -544,9 +525,6 @@ def option_parser():
 
   parser.add_argument('--setreadgroup', type=str, metavar='RGNAME',
                     help='Set all reads to specified read group name')
-
-  parser.add_argument('--fixindels', action='store_true',
-                    help='Fix insertions adjacent to deletions and set them to mismatches.')
 
   parser.add_argument('--remapcontig', metavar='FILE',
                     help='Remap contigs from original to new contigs with an offset location')
@@ -626,9 +604,6 @@ def main():
     if options.output:
       if options.setreadgroup:
         aligns = set_readgroup(options.setreadgroup,header,aligns)
-
-      if options.fixindels:
-        aligns = fix_cigar_indels(aligns)
 
       flags  = 'wb' if options.output.endswith('.bam') else 'wh'
 
