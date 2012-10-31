@@ -394,7 +394,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
   validstrand  = set(('top','bot','p','plus','m','minus'))
   plusminus    = set(('p','plus','m','minus'))
 
-  assert targetstrand in ('ab','top','bottom','forward','reverse', \
+  assert targetstrand in ('ab','top','bottom','forward','reverse',
                           'real_forward','real_reverse',
                           'customer','anticustomer','design','antidesign')
 
@@ -455,7 +455,7 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     if loc:
       loc = int(loc)
 
-    if targetstrand=='ab':
+    if targetstrand=='ab' or a==b:
       yield lname,chrom,loc,STRAND_UNKNOWN,AB
       continue
 
