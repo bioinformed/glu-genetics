@@ -62,12 +62,21 @@ def encode_genotypes(loci, samples, genome, phenome):
 
   descr = build_descr(model,len(loci))
 
+  seen = set()
+
   for lname in loci:
+    if lname in seen:
+      raise ValueError('Duplicate locus %s in LBD file' % lname)
+    else:
+      seen.add(lname)
+
     genome.merge_locus(lname, model)
 
   def _encode(descr):
     for sampleid,genos,gcscores in samples:
       genos = GenotypeArray(descr, imap(getitem, repeat(genomap), genos))
+      if not genos.check_encoding():
+        raise ValueError('Invalid input genotype encoding (should not happen)')
       yield sampleid,genos
 
   return GenomatrixStream(_encode(descr), 'sdat', loci=loci, models=list(descr),
@@ -104,9 +113,12 @@ def recode_genotypes(genos, abmap):
 
   def _recode():
     descr = GenotypeArrayDescriptor(models)
+
     for sample,row in genos:
       new_row = GenotypeArray(descr)
       new_row.data = row.data
+      if not new_row.check_encoding():
+        raise ValueError('Invalid output encoding (should not happen)')
       yield sample,new_row
 
   return genos.clone(_recode(), models=models, genome=genome, materialized=False)
