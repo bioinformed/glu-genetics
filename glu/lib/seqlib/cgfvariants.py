@@ -34,7 +34,7 @@ class CGFVariants(object):
       source = [ s.strip() for s in source.split(',') ]
 
       yield VarRecord(chrom, int(vstart), int(vstop), allele.replace('-',''),
-                             float(common_score), int(function_score),
+                             float(common_score or 0), int(function_score or 0),
                              source)
 
   def build_variants_lookup(self, chromosome, start, stop):
