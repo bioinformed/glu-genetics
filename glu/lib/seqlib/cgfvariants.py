@@ -27,10 +27,20 @@ class CGFVariants(object):
       chromosome = chromosome[3:]
 
     chrmap = {'X':23,'Y':24,'MT':25,'M':25}
-    score  = self.vars.fetch(chrmap.get(chromosome,chromosome), start, stop+1)
+
+    # Search more broadly than necessary to ensure that we cover indels
+    score  = self.vars.fetch(chrmap.get(chromosome,chromosome), start-1, stop+1)
 
     for s in score:
       chrom,vstart,vstop,allele,common_score,function_score,source = s.split('\t')
+
+      vstart = int(vstart)
+      vstop  = int(vstop)
+
+      # Skip non-matching records due to broader search
+      if vstart!=start or vstop!=vstop:
+        continue
+
       source = [ s.strip() for s in source.split(',') ]
 
       yield VarRecord(chrom, int(vstart), int(vstop), allele.replace('-',''),
