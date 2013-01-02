@@ -539,20 +539,23 @@ def orient_manifest(manifest,targetstrand='customer',errorhandler=None):
     yield lname,chrom,loc,strand,(a,b)
 
 
-def create_abmap(manifest,genome):
+def create_abmap(manifest,genome=None):
   '''
   Create mapping from A/B probes to final alleles from the oriented manifest
   entries and updating the genome metadata for each locus.
   '''
   abmap = {}
   for lname,chrom,loc,strand,alleles in manifest:
-    genome.merge_locus(lname, chromosome=chrom, location=loc, strand=strand)
+    if genome:
+      genome.merge_locus(lname, chromosome=chrom, location=loc, strand=strand)
+
     if alleles:
       abmap[lname] = alleles
+
   return abmap
 
 
-def create_Illumina_abmap(filename,genome,targetstrand='customer',errorhandler=None):
+def create_Illumina_abmap(filename,genome=None,targetstrand='customer',errorhandler=None):
   manifest = IlluminaManifest(filename)
   manifest = orient_manifest(manifest,targetstrand=targetstrand,errorhandler=errorhandler)
   return create_abmap(manifest,genome)

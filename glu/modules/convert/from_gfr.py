@@ -263,7 +263,7 @@ def fix_allele(a):
     return a
 
 
-def gdat_writer(gdat, gfr_data, genome, transform, abmap=None):
+def gdat_writer(gdat, gfr_data, genome, transform, abmap=None, fwdmap=None):
   sample_chunk = 16
 
   gdat_SNPs     = gdat['SNPs']
@@ -354,10 +354,13 @@ def gdat_writer(gdat, gfr_data, genome, transform, abmap=None):
       snp_recs = []
 
       for i,name in enumerate(snp_names):
-        ab  = abmap[name] if abmap is not None else 'AB'
+        # Store forward alleles
+        ab  = fwdmap[name] if fwdmap is not None else 'AB'
         loc = locusmap[name]
         snp_recs.append( (name,loc.chromosome,loc.location,''.join(ab)) )
 
+        # Remap file alleles to AB
+        ab   = abmap[name] if abmap is not None else 'AB'
         gmap = mapcache.get(ab)
         if gmap is None:
           a = fix_allele(ab[0])
@@ -375,6 +378,7 @@ def gdat_writer(gdat, gfr_data, genome, transform, abmap=None):
       for name,gmap,g in izip(snp_names,genomap,geno):
         if g not in gmap:
           print 'Invalid allele mapping for locus %s, genotype=%s, mapping=%s' % (name,g,gmap)
+      raise
 
     gc_chunk[j]    = gc
     x_chunk[j]     = x
@@ -438,12 +442,18 @@ def main():
   abmap  = create_Illumina_abmap(options.manifest,genome,targetstrand=filestrand,
                                          errorhandler=errorhandler)
 
+  if filestrand!='forward':
+    fwdmap = create_Illumina_abmap(options.manifest,genome,targetstrand='forward',
+                                         errorhandler=errorhandler)
+  else:
+    fwdmap = abmap
+
   sys.stderr.write('done.\n')
 
   gdat       = create_gdat(options.output, num_snps, num_samples)
 
   #gfr_data  = progress_bar(gfr_data,num_samples)
-  gdat_writer(gdat, gfr_data, genome, transform, abmap)
+  gdat_writer(gdat, gfr_data, genome, transform, abmap, fwdmap)
 
   attrs = gdat.attrs
   attrs['GLU_FORMAT']   = 'gdat'
