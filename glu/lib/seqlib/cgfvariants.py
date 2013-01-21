@@ -75,8 +75,13 @@ class CGFVariants(object):
 
     exact_vars     = []
     inexact_vars   = []
-    common_score   = defaultdict(float)
     function_score = 0
+
+    # Start by assuming common score is 0 for each non-reference allele and
+    # 1 for reference.  This initialization is needed because a novel allele
+    # would have no matching variant records and the minimum score would be
+    # incorrectly taken as 1 based only on information about the reference allele.
+    common_score   = dict( (a, 0. if not qref or a!=qref else 1.) for a in geno )
 
     for v,vrecs in vdata.iteritems():
       if v.start!=start or v.stop!=stop:
@@ -99,7 +104,7 @@ class CGFVariants(object):
 
     exact_vars   = sorted(set(exact_vars))
     inexact_vars = sorted(set(inexact_vars))
-    common_score = min(common_score.values()) if common_score else 0
+    common_score = min(common_score.values())
 
     functions = []
     if function_score:
