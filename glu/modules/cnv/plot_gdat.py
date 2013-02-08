@@ -1,4 +1,4 @@
- # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 __gluindex__  = True
 __abstract__  = 'Plot intensity and allelic ratio data from a single GDAT file'
@@ -11,20 +11,48 @@ import os
 import sys
 
 import numpy as np
-import scipy
-import scipy.stats
 
-from   itertools                 import groupby
-from   operator                  import itemgetter,attrgetter
-
-from   collections               import namedtuple
-
-from   glu.lib.fileutils         import table_reader, table_writer
+from   glu.lib.fileutils         import table_reader
 
 from   glu.modules.cnv.gdat      import GDATFile, get_gcmodel, gc_correct
 from   glu.modules.cnv.plot      import plot_chromosome
 
 from   glu.lib.genolib.transform import GenoTransform
+
+
+def load_extravars(filename):
+  extravars = {}
+
+  if not filename:
+    return extravars,extravars
+
+  data   = table_reader(filename)
+  header = next(data)
+
+  if 'GDAT' not in header:
+    raise ValueError('extravars must have a "GDAT" column')
+
+  if 'ASSAY' not in header:
+    raise ValueError('extravars must have an "ASSAY" column')
+
+  for row in data:
+    vars  = dict(zip(header,row))
+    gdat  = vars.get('GDAT')
+    assay = vars.get('ASSAY')
+
+    if not gdat or not assay:
+      continue
+
+    key = gdat,assay
+
+    if key in extravars:
+      raise KeyError('duplicate extra variable information for %s' % key)
+
+    extravars[key] = vars
+
+  extradummy = dict( (k,'') for k in header )
+
+  return extravars,extradummy
 
 
 def option_parser():
@@ -45,6 +73,9 @@ def option_parser():
                                       help='Plot name template (default={GDAT}_{ASSAY}_chr{CHROMOSOME}.png)')
   parser.add_argument('--title',      metavar='VAL', default='Intensity plot of {GDAT}:{ASSAY} chr{CHROMOSOME}',
                                       help="Plot name template (default='Intensity plot of {GDAT}:{ASSAY} chr{CHROMOSOME}')")
+  parser.add_argument('--extravars',  metavar='FILE', 
+                                      help='Table of extra variables on each sample to add information to the '
+                                      'title and filename template. Table must have GDAT and ASSAY columns.')
   parser.add_argument('--includesamples', metavar='FILE', action='append',
                                       help='List of samples to include, all others will be skipped')
   parser.add_argument('--excludesamples', metavar='FILE', action='append',
@@ -60,7 +91,8 @@ def main():
   gccorrect = bool(options.gcmodel or options.gcmodeldir)
   gdat      = GDATFile(options.gdat)
 
-  gdatname  = '_'.join(os.path.basename(gdat.filename).replace('.gdat','').split('_')[:2])
+  gdatraw   = os.path.basename(gdat.filename).replace('.gdat','')
+  gdatname  = '_'.join(gdatraw.split('_')[:2])
   manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
 
   print 'Loading manifest for %s...' % manifest
@@ -83,6 +115,8 @@ def main():
     exclude  = transform.samples.exclude
   else:
     include  = exclude = None
+
+  extravars,extradummy = load_extravars(options.extravars)
 
   for offset,assay in enumerate(gdat.samples):
     if include is not None and assay not in include:
@@ -130,7 +164,14 @@ def main():
                          chrom_baf[mask].mean(),1.96*chrom_baf[mask].std(),
                          het_baf.mean(),1.96*het_baf.std())
 
-      variables = dict(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom)
+      extra     = extravars.get( (gdatraw,assay), {} )
+      if not extra:
+        extra   = extravars.get( (gdatname,assay), {} )
+      defvars   = dict(GDAT=gdatname,ASSAY=assay,CHROMOSOME=chrom)
+
+      variables = extradummy.copy()
+      variables.update(extra)
+      variables.update(defvars)
 
       plotname = options.template.format(**variables)
       plotname = '%s/%s' % (options.outdir,plotname)
