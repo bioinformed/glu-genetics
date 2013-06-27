@@ -27,7 +27,7 @@ def main():
 
   transform = GenoTransform.from_object(options)
   gdat      = GDATFile(options.gdatfile)
-  data      = gdat.cnv_iter(transform)
+  data      = gdat.cnv_iter(transform, raw=options.signal.lower()=='raw')
   genomap   = {'AA':'AA','AB':'AB','BB':'BB','  ':'NC'}
 
   for sample,snps,geno,lrr,baf in data:

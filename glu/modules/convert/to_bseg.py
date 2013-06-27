@@ -27,6 +27,8 @@ def option_parser():
 
   parser.add_argument('gdatfile', help='GLU GDAT input file')
 
+  parser.add_argument('--signal',     metavar='TYPE', default='norm', choices=['norm','raw'],
+                      help='LRR/BAF signal processing: raw or norm (default)')
   parser.add_argument('--gcmodel',    metavar='GCM', help='GC model file to use')
   parser.add_argument('--gcmodeldir', metavar='DIR', help='GC models directory')
   parser.add_argument('--includesamples', metavar='FILE', action='append',
@@ -50,11 +52,11 @@ def main():
   transform = GenoTransform.from_object(options)
 
   gdat      = GDATFile(options.gdatfile)
-  data      = gdat.cnv_iter(transform)
+  data      = gdat.cnv_iter(transform, raw=options.signal.lower()=='raw')
 
   if gccorrect:
+    manifest = gdat.attrs['ManifestName'].replace('.bpm','')
     print 'Loading GC/CpG model for %s...' % manifest
-    manifest  = gdat.attrs['ManifestName'].replace('.bpm','')
     filename = options.gcmodel or '%s/%s.gcm' % (options.gcmodeldir,manifest)
     gcdesign,gcmask = get_gcmodel(filename, gdat.chromosome_index)
 
