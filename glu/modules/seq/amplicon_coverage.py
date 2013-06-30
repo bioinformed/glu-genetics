@@ -54,8 +54,6 @@ def target_overlap(aligns,references,reference,targets,options):
     contigs.add(rname)
 
     if rname=='unaligned':
-      for align in contig_aligns:
-        pass
       continue
 
     next_start,next_end = ctargets[0][:2] if ctargets else nulltarget
@@ -185,8 +183,7 @@ def main():
     aligns     = iter(samfile)
 
     aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
-    aligns = filter_alignments(aligns, options.includealign, options.excludealign)
-
+    aligns = filter_alignments(aligns, options.includealign, options.excludealign, options.minmapq)
 
     target_stats = {}
     for target_name in target_names:

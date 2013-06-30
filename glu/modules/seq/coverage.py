@@ -198,7 +198,7 @@ def load_bam(filename,options):
     contig_lens  = inbam.lengths
     aligns       = inbam.fetch(region=options.region or None)
     aligns       = progress_loop(aligns, label='Loading BAM file: ', units='alignments')
-    aligns       = filter_alignments(aligns, options.includealign, options.excludealign)
+    aligns       = filter_alignments(aligns, options.includealign, options.excludealign, options.minmapq)
 
     for tid,contig_aligns in groupby(aligns, attrgetter('tid')):
       contig_name   = contig_names[tid]

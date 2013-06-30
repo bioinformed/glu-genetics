@@ -585,7 +585,7 @@ def main():
   if options.progress:
     aligns = progress_loop(aligns, label='Loading BAM file(s): ', units='alignments')
 
-  aligns = filter_alignments(aligns, options.includealign, options.excludealign)
+  aligns = filter_alignments(aligns, options.includealign, options.excludealign, options.minmapq)
 
   stats  = FilterStats()
 

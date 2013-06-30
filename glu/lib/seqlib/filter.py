@@ -50,16 +50,22 @@ def normalize_options(opts):
 
 
 # Internal helper generator function for filter_alignments
-def _filter_alignments(alignments,positive_flags,negative_flags):
+def _filter_alignments(alignments, positive_flags, negative_flags, min_mapq):
   for alignment in alignments:
-    flags     = alignment.flag
-    pos_match = (flags&positive_flags)==positive_flags
-    neg_match = (flags&negative_flags)==0
-    if pos_match and neg_match:
-      yield alignment
+    if min_mapq and alignment.mapq < min_mapq:
+      continue
+
+    flags = alignment.flag
+    pos_mismatch = (flags&positive_flags)!=positive_flags
+    neg_mismatch = (flags&negative_flags)!=0
+
+    if pos_mismatch or neg_mismatch:
+      continue
+      
+    yield alignment
 
 
-def filter_alignments(alignments, include, exclude):
+def filter_alignments(alignments, include, exclude, min_mapq=None):
   '''
   Filter alignments based on a set of specified options
 
@@ -128,6 +134,8 @@ def alignment_filter_options(group):
   group.add_argument('--excludealign', action='append', metavar='OPTS',
                    help='Exclude alignments that meet the specified comma separated criteria. '
                         ' See --includealign for supported criteria.')
+  group.add_argument('--minmapq', type=int, default=None, metavar='N', 
+                  help='Exclude alignments with MAPQ < N')
 
 
 def _test():
