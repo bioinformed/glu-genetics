@@ -194,6 +194,8 @@ class VariantAnnotator(object):
     self.band_map = band_map = defaultdict(IntervalTree)
     for band in get_cytobands(self.con):
       band_map[band.chrom].insert(band.start,band.end,band)
+      if band.chrom.startswith('chr') and band.chrom[3:] not in band_map:
+        band_map[band.chrom[3:]] = band_map[band.chrom]
 
     trans = get_transcripts(self.con)
     trans = progress_loop(trans, label='Loading transcripts: ', units='transcripts')
