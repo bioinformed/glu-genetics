@@ -333,6 +333,10 @@ def update_vcf_annotation(v, vs, cv, esp, kaviar, refvars, polyphen2, options):
     v.names.remove('tgp')
     v.filter.append('1000G')
 
+  if 'esp' in v.names:
+    v.names.remove('esp')
+    v.filter.append('ESP')
+
   if not v.ref or v.var==['']:
     v.filter.append('Indel')
 
