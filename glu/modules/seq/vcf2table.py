@@ -48,7 +48,7 @@ def flatten_vcf(vcf,records=None):
       inf = inf[3:]
     info.append(inf)
 
-  header = ( ['CHROM','LOCATION','IDS','REF','VAR','QUAL']
+  header = ( ['CHROM','REF_START','REF_STOP','IDS','REF','VAR','QUAL']
            + [ f.upper() for f in filters ]
            + [ i.upper() for i in info   ]
            + samples
@@ -71,7 +71,7 @@ def flatten_vcf(vcf,records=None):
 
       infomap[key] = value
 
-    row = ( [ v.chrom, str(v.end), ','.join(v.names), v.ref, ','.join(v.var), v.qual ]
+    row = ( [ v.chrom, str(v.start), str(v.end), ','.join(v.names), v.ref, ','.join(v.var), v.qual ]
           + [ 'Y' if f in v.filter else '' for f in filters ]
           + [ infomap.get(i,'') for i in info ]
           + [ g[0] for g in v.genos ]
