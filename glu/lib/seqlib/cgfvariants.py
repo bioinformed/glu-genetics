@@ -19,7 +19,8 @@ goFlyAKite = VarInfo( (), (), 0, 0)
 
 class CGFVariants(object):
   def __init__(self, cgfvariant, reference_fasta):
-    self.vars      = pysam.Tabixfile(cgfvariant,cache_size=128*1024*1024)
+    #self.vars      = pysam.Tabixfile(cgfvariant,cache_size=128*1024*1024)
+    self.vars      = pysam.Tabixfile(cgfvariant)
     self.reference = pysam.Fastafile(reference_fasta)
 
   def query_variants(self, chromosome, start, stop):
