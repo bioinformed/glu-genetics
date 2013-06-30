@@ -619,7 +619,7 @@ def main():
     f      = individual_frequencies(pops,genotype_indices(genos))
 
     # Find feasible starting values
-    x0     = estimate_admixture_em(f,iters=0)
+    x0     = estimate_admixture_em(f,iters=10)
 
     # Estimate admixture
     x,l,it = estimate_admixture_sqp(f, x0)
