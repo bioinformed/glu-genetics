@@ -62,7 +62,7 @@ def _encode_vcf_records(data,normalize_indels=True):
     ref        = _intern(fields[3])
     end        = start+len(ref)
     var        = [ _intern(v) for v in fields[4].split(',') ]
-    qual       = fields[5]
+    qual       = float(fields[5]) if fields[5]!='.' else None
     filter     = [ _intern(f) for f in fields[6].split(';') ] if fields[6]!='.' else []
     info       = fields[7].split(';') if fields[7]!='.' else []
     format     = _intern(fields[8]) if n>8 else None
