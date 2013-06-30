@@ -119,10 +119,10 @@ def filter_alignments(alignments, include, exclude, min_mapq=None):
     positive_flags |= pos
     negative_flags |= neg
 
-  if not positive_flags and not negative_flags:
+  if positive_flags or negative_flags or min_mapq:
+    return _filter_alignments(alignments,positive_flags,negative_flags, min_mapq)
+  else:
     return alignments
-
-  return _filter_alignments(alignments,positive_flags,negative_flags)
 
 
 def alignment_filter_options(group):
