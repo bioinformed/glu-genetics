@@ -82,7 +82,7 @@ def make_cigar(query, ref):
   result[pos] = 0
 
   # Convert result to a Python string, free memory, and return
-  cdef str retval = result
+  cdef bytes retval = result
   free(result)
 
   return retval
@@ -154,7 +154,7 @@ def make_ndiff(query,ref):
   ndiff[end] = 0
 
   # Copy result ndiff to a Python string and free buffer
-  cdef str md = ndiff
+  cdef bytes md = ndiff
   free(ndiff)
 
   # Return count of mismatches and ndiff string (md)
