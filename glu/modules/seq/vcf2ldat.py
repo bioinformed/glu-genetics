@@ -25,6 +25,8 @@ def option_parser():
 
   parser.add_argument('variants', help='Input VCF variant file')
 
+  parser.add_argument('--quality-filter', default=None, type=float,
+                      help='Apply a site quality filter')
   parser.add_argument('-o', '--output', metavar='FILE', default='-',
                     help='Output variant file')
   return parser
@@ -48,8 +50,12 @@ def main():
   non_autosomes = set(['chrX','chrY','chrM','X','Y','M','Mt','MT'])
 
   for v in vcf:
+    # Bialleleic for now
     if v.chrom in non_autosomes or not v.names or len(v.var)!=1:
       continue
+
+    if options.quality_filter and v.qual < options.quality_filter:
+        continue
 
     a,b = ab = v.ref,v.var[0]
 
