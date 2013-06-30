@@ -47,6 +47,7 @@ def read_features(filename,merge=True,pad=0):
   if not filename:
     return features
 
+  csv.field_size_limit(1024*1024)
   bed = csv.reader(autofile(filename),dialect='excel-tab')
 
   generic_names = ('feature_%06d' % i for i in count(1))
