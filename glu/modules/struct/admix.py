@@ -604,7 +604,7 @@ def main():
   labels    = build_labels(options)
 
   if len(options.pop_genotypes)>1:
-    test,pops = load_from_genotypes(options)
+    test,pops = load_from_genos(options)
   else:
     test,pops = load_from_freqs(options)
 
