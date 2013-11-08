@@ -504,6 +504,8 @@ def option_parser():
   parser.add_argument('events',       help='Tablular or delimited file of events')
   parser.add_argument('index',        help='Index file created by cnv.index_gdats')
 
+  parser.add_argument('--signal',     metavar='TYPE', default='norm', choices=['norm','raw'],
+                                      help='LRR/BAF signal processing: raw or norm (default)')
   parser.add_argument('--gcmodel',    metavar='GCM', help='GC model file to use')
   parser.add_argument('--gcmodeldir', metavar='DIR', help='GC models directory')
   parser.add_argument('--outdir',     metavar='DIR', help='Plot output directory', default='.')
@@ -593,7 +595,7 @@ def main():
 
       print 'GDAT:ASSAY =',gdatname,assay
 
-      assay_id,genos,lrr,baf = gdat.cnv_data(offset)
+      assay_id,genos,lrr,baf = gdat.cnv_data(offset, raw=options.signal.lower()=='raw')
       normal_mask            = build_normal_mask(len(lrr),chrom_indices,assay_events,options)
       valid_mask             = (lrr>=-2)&(lrr<=2)
       valid_mask            &= autosome_mask
